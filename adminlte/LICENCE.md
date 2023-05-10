@@ -1,8 +1,3 @@
-Service Screener
-Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-
-This tool contains third-party software (https://github.com/ColorlibHQ/AdminLTE) developed by ColorlibHQ, licensed under:
-
 The MIT License (MIT)
 
 Copyright (c) 2014-2021 ColorlibHQ

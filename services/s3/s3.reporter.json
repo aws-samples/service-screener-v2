@@ -1,0 +1,145 @@
+{
+    "ServerSideEncrypted": {
+        "category": "S",
+        "^description": "You have not enabled server side encryption (SSE) on {$COUNT} buckets which automatically encrypts objects uploaded to the bucket. If this bucket contains non-publically-available data, and you are not implementing client-side encryption, please enable SSE.",
+        "shortDesc": "Enable SSE",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/serv-side-encryption.html>"   
+        ]
+    },
+    "PublicAccessBlock": {
+        "category": "S",
+        "^description": "You have disabled public access block on {$COUNT} S3 buckets.This leaves your data to be accessible by anyone. Unless absolutely necessary, enable public access block.",
+        "shortDesc": "Enable Public Access Block",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": -1,
+        "ref": [
+            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html#access-control-block-public-access-options>"   
+        ]
+    },
+    "MFADelete": {
+        "category": "S",
+        "^description": "You have not enabled MFA delete on {$COUNT} buckets. MFA delete provides added security if, for example, your security credentials are compromised. MFA delete can help prevent accidental bucket deletions by requiring the user who initiates the delete action to prove physical possession of an MFA device with an MFA code and adding an extra layer of friction and security to the delete action.",
+        "shortDesc": "Enable MFA Delete",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/MultiFactorAuthenticationDelete.html>"   
+        ]
+    },
+    "BucketVersioning": {
+        "category": "RS",
+        "^description": "You have not enabled versioning on {$COUNT} buckets. Versioning in Amazon S3 is a means of keeping multiple variants of an object in the same bucket. You can use the S3 Versioning feature to preserve, retrieve, and restore every version of every object stored in your buckets.With versioning you can recover more easily from both unintended user actions and application failures.",
+        "shortDesc": "Enable Versioning",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html>"   
+        ]
+    },
+    "ObjectLock": {
+        "category": "S",
+        "^description": "You have not enabled object lock on {$COUNT} buckets. Object Lock can help prevent objects from being deleted or overwritten for a fixed amount of time or indefinitely.",
+        "shortDesc": "Enable Object Lock",
+        "criticality": "I",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html>"   
+        ]
+    },
+    "BucketReplication": {
+        "category": "RS",
+        "^description": "You have not enabled bucket replication on {$COUNT} buckets. Replication enables automatic, asynchronous copying of objects across Amazon S3 buckets.",
+        "shortDesc": "Enable Bucket Replication",
+        "criticality": "I",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html#access-control-block-public-access-options>"   
+        ]
+    },
+    "BucketLifecycle": {
+        "category": "CO",
+        "^description": "You have not configured lifecycle policies for objects in {$COUNT} buckets. Lifecycle configuration is a set of rules that define actions that Amazon S3 applies to a group of objects. This will save you cost by moving infrequently accessed objects to lower cost storage tiers and expiring objects that are no longer needed.",
+        "shortDesc": "Configure Lifecycle Policies",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": -1,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lifecycle-mgmt.html>"   
+        ]
+    },
+    "BucketLogging": {
+        "category": "S",
+        "^description": "You have not enabled server access logging in {$COUNT} buckets. Server access logging provides detailed records for the requests that are made to a bucket.",
+        "shortDesc": "Enable Server Access Logging",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerLogs.html>"   
+        ]
+    },
+    "ObjectsInIntelligentTier": {
+        "category": "CO",
+        "^description": "Your objects in {$COUNT} S3 buckets are not in S3 Intelligent Tier. The S3 Intelligent-Tiering storage class is designed to optimize storage costs by automatically moving data to the most cost-effective access tier when access patterns change. For a small monthly object monitoring and automation charge, S3 Intelligent-Tiering monitors access patterns and automatically moves objects that have not been accessed to lower-cost access tiers. Unless all your objects are very frequently accessed, or the data lifecycle is very clearly known and defined, it is considered best practice to store your objects in Intelligent Tier.",
+        "shortDesc": "Enable Intelligent Tiering",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": -1,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/intelligent-tiering.html>"   
+        ]
+    },
+    "TlsEnforced": {
+        "category": "S",
+        "^description": "You have not enforced encryption of data in transit in {$COUNT} buckets. You can use HTTPS (TLS) to help prevent potential attackers from eavesdropping on or manipulating network traffic using person-in-the-middle or similar attacks. You should allow only encrypted connections over HTTPS (TLS) using the aws:SecureTransport condition on Amazon S3 bucket policies..",
+        "shortDesc": "Enforce Encryption of Data in Transit",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": -1,
+        "ref": [
+            "[AWS Docs]<https://aws.amazon.com/premiumsupport/knowledge-center/s3-bucket-policy-for-config-rule/>"   
+        ]
+    },
+    "S3AccountPublicAccessBlock": {
+        "category": "S",
+        "^description": "You have disabled public access block on your account.This allows your buckets and onjects to be potentially made public. Unless absolutely necessary, enable public access block at the account level.",
+        "shortDesc": "Enable Public Access Block",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": -1,
+        "ref": [
+            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/configuring-block-public-access-account.html>"   
+        ]
+    }
+}

@@ -1,0 +1,105 @@
+{
+    "DefaultPort": {
+        "category": "S",
+        "^description": "You have {$COUNT} instances/clusters are using default port, which enable attackers to scan & penetrate to the service easier. Default Port for Redis is 6379, Memcached is 11211. ",
+        "shortDesc": "Change to non-default port",
+        "criticality": "L",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[New Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/GettingStarted.CreateCluster.html>",
+            "[New Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/GettingStarted.CreateCluster.html>",
+            "[Modify Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/Clusters.Modify.html>",
+            "[Modify Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Clusters.Modify.html>"
+        ]
+    },
+    "EngineVersion": {
+        "category": "SP",
+        "^description": "There are {$COUNT} instances/clusters are not running on the latest engine. Refer to the individual engine changelog in the references.",
+        "shortDesc": "Upgrade to latest engine version",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Redis Changelogs]<https://docs.redis.com/latest/rs/release-notes/>",
+            "[Memcached ReleaseNotes]<https://github.com/memcached/memcached/wiki/ReleaseNotes>"
+        ]
+    },
+    "EngineVersionUnlisted": {
+        "category": "SP",
+        "^description": "There are {$COUNT} instances/clusters running on an unlisted engine version. Refer to the individual engine changelog in the references.",
+        "shortDesc": "Upgrade to supported engine version",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Redis Changelogs]<https://docs.redis.com/latest/rs/release-notes/>",
+            "[Memcached ReleaseNotes]<https://github.com/memcached/memcached/wiki/ReleaseNotes>"
+        ]
+    },
+    "LatestInstance": {
+        "category": "PCS",
+        "^description": "You have {$COUNT} instances still using older instance types. If there are no Reserved Instances tied to older generation of instance class, then you should consider upgrading your instance type to use latest instance class families - r5, m5, t3, m6g, and r6g. Latest instance classes (for the same size of instance) often offer better performance either at same or lesser cost. Changing the instance class will cause some downtime.",
+        "shortDesc": "Upgrade to latest instance",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Latest redis supported nodes]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/CacheNodes.SupportedTypes.html>",
+            "[Latest memcached supported nodes]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/CacheNodes.SupportedTypes.html>"
+        ]
+    },
+    "RinstanceType": {
+        "category": "PCS",
+        "^description": "You have {$COUNT} instances not running on R instance (Memory-Optimised). It is recommended to use R instance for better performance over cost efficiency. (Only flagged this when you are running instance with more than 8GB ram)",
+        "shortDesc": "Use R instance type",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[ElastiCache Instance Type]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/CacheNodes.SupportedTypes.html>"
+        ]
+    },
+    "EncInTransitAndRest": {
+        "category": "S",
+        "^description": "toImplement",
+        "shortDesc": "toImplement",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[New Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/GettingStarted.CreateCluster.html>",
+            "[New Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/GettingStarted.CreateCluster.html>",
+            "[Modify Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/Clusters.Modify.html>",
+            "[Modify Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Clusters.Modify.html>"
+        ]
+    },
+    "DefaultParamGroup": {
+        "category": "O",
+        "^description": "todo",
+        "shortDesc": "Customise Parameter Group",
+        "criticality": "I",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[New Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/GettingStarted.CreateCluster.html>",
+            "[New Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/GettingStarted.CreateCluster.html>",
+            "[Modify Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/Clusters.Modify.html>",
+            "[Modify Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Clusters.Modify.html>"
+        ]
+    }
+}

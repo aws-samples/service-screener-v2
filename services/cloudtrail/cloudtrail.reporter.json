@@ -1,0 +1,202 @@
+{
+  "NeedToEnableCloudTrail": {
+    "category": "S",
+    "^description": "For an ongoing record of events in your AWS account, you must create a trail. Although CloudTrail provides 90 days of event history information for management events in the CloudTrail console without creating a trail, it is not a permanent record, and it does not provide information about all possible types of events. For an ongoing record, and for a record that contains all the event types you specify, you must create a trail, which delivers log files to an Amazon S3 bucket that you specify.\n\nTo help manage your CloudTrail data, consider creating one trail that logs management events in all AWS Regions, and then creating additional trails that log specific event types for resources, such as Amazon S3 bucket activity or AWS Lambda functions.",
+    "shortDesc": "To have 1 CloudTrail",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "ref": [
+      "[Best Practices]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/best-practices-security.html>",
+      "[Getting started]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-create-a-trail-using-the-console-first-time.html#creating-a-trail-in-the-console>"
+    ]
+  },
+  "HasOneMultiRegionTrail": {
+    "category": "S",
+    "^description": "To obtain a complete record of events taken by an IAM identity, or service in your AWS account, each trail should be configured to log events in all AWS Regions. By logging events in all AWS Regions, you ensure that all events that occur in your AWS account are logged, regardless of which AWS Region where they occurred. This includes logging global service events, which are logged to an AWS Region specific to that service. When you create a trail that applies to all regions, CloudTrail records events in each region and delivers the CloudTrail event log files to an S3 bucket that you specify.",
+    "shortDesc": "Enable Multi Region CloudTrail",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": [
+      "[Apply trails to all AWS Regions]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/best-practices-security.html>",
+      "[Enable Multi-Region Trail]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-create-and-update-a-trail-by-using-the-aws-cli-update-trail.html#cloudtrail-create-and-update-a-trail-by-using-the-aws-cli-examples-convert>"
+    ]
+  },
+  "LogFileValidationEnabled": {
+    "category": "S",
+    "^description": "Validated log files are especially valuable in security and forensic investigations. For example, a validated log file enables you to assert positively that the log file itself has not changed, or that particular IAM identity credentials performed specific API activity. The CloudTrail log file integrity validation process also lets you know if a log file has been deleted or changed, or assert positively that no log files were delivered to your account during a given period of time.",
+    "shortDesc": "Enable CloudTrail log file integrity",
+    "criticality": "L",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "ref": [
+      "[What is log file integrity]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/best-practices-security.html>",
+      "[Enable Log file integrity]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-log-file-validation-intro.html#cloudtrail-log-file-validation-intro-enabling-and-using>"
+    ]
+  },
+  "CloudWatchLogsLogGroupArn": {
+    "category": "O",
+    "^description": "You can configure CloudTrail with CloudWatch Logs to monitor your trail logs and be notified when specific activity occurs.<br>1.Configure your trail to send log events to CloudWatch Logs.<br>2.Define CloudWatch Logs metric filters to evaluate log events for matches in terms, phrases, or values. For example, you can monitor for ConsoleLogin events.<br>3.Assign CloudWatch metrics to the metric filters.<br>4.Create CloudWatch alarms that are triggered according to thresholds and time periods that you specify. You can configure alarms to send notifications when alarms are triggered, so that you can take action.<br>5.You can also configure CloudWatch to automatically perform an action in response to an alarm.",
+    "shortDesc": "CloudWatch for CloudTrail",
+    "criticality": "L",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "ref": [
+      "[Using CloudWatch Logs with CloudTrail]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/monitor-cloudtrail-log-files-with-cloudwatch-logs.html>"
+    ]
+  },
+  "SetupSNSTopicForTrail": {
+    "category": "O",
+    "^description": "You can be notified when CloudTrail publishes new log files to your Amazon S3 bucket. You manage notifications using Amazon Simple Notification Service (Amazon SNS).",
+    "shortDesc": "Enable SNS Topic",
+    "criticality": "L",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "ref": [
+      "[Configure SNS for CloudTrail]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/configure-sns-notifications-for-cloudtrail.html>"
+    ]
+  },
+  "EnableTrailS3BucketMFADelete": {
+    "category": "S",
+    "^description": "You have not enabled MFA delete on {$COUNT} CloudTrail buckets. MFA delete provides added security if, for example, your security credentials are compromised. MFA delete can help prevent accidental bucket deletions by requiring the user who initiates the delete action to prove physical possession of an MFA device with an MFA code and adding an extra layer of friction and security to the delete action.",
+    "shortDesc": "Enable MFA delete",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": [
+      "[S3 Enable MFA Delete]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/MultiFactorAuthenticationDelete.html>"
+    ]
+  },
+  "EnableTrailS3BucketLifecycle": {
+    "category": "CO",
+    "^description": "You have not configured lifecycle policies for objects in {$COUNT} CloudTrail buckets. Lifecycle configuration is a set of rules that define actions that Amazon S3 applies to a group of objects. This will save you cost by moving infrequently accessed objects to lower cost storage tiers and expiring objects that are no longer needed.",
+    "shortDesc": "Enable S3 Bucket Lifecycle",
+    "criticality": "M",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": -1,
+    "needFullTest": 0,
+    "ref": [
+      "[Configure S3 bucket lifecycle]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lifecycle-mgmt.html>",
+      "[Resilience in CloudTrail]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/disaster-recovery-resiliency.html>"
+    ]
+  },
+  "EnableTrailS3BucketLogging": {
+    "category": "R",
+    "^description": "You have not enabled server access logging in {$COUNT} CloudTrail buckets. Server access logging provides detailed records for the requests that are made to a bucket.",
+    "shortDesc": "Enable S3 Bucket Logging",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "ref": [
+      "[Configure S3 Logging]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerLogs.html>",
+      "[Resilience in CloudTrail]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/disaster-recovery-resiliency.html>"
+    ]
+  },
+  "EnableTrailS3BucketVersioning": {
+    "category": "R",
+    "^description": "You have not enabled versioning on {$COUNT} CloudTrail buckets. Versioning in Amazon S3 is a means of keeping multiple variants of an object in the same bucket. You can use the S3 Versioning feature to preserve, retrieve, and restore every version of every object stored in your buckets.With versioning you can recover more easily from both unintended user actions and application failures.",
+    "shortDesc": "Enable S3 Bucket versioning",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": [
+      "[Configure S3 bucket versioning]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html>",
+      "[Resilience in CloudTrail]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/disaster-recovery-resiliency.html>"
+    ]
+  },
+  "HasInsightSelectors": {
+    "category": "O",
+    "^description": "CloudTrail Insights analyzes your normal patterns of API call volume and API error rates, also called the baseline, and generates Insights events when the call volume or error rates are outside normal patterns. Insights events on API call volume are generated for write management APIs, and Insights events on API error rate are generated for both read and write management APIs.",
+    "shortDesc": "Enable Insight Selectors",
+    "criticality": "L",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "ref": [
+      "[Insight events]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-insights-events-with-cloudtrail.html>"
+    ]
+  },
+  "TrailDeliverError": {
+    "category": "O",
+    "^description": "Your Amazon CloudTrail trail(s) experiencing logs delivery errors. Review the error via `aws cloudtrail get-trail-status --name <CloudTrail ARN>`",
+    "shortDesc": "Review latest delivery error",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": [
+      "[CloudTrail Delivery Error]<https://docs.aws.amazon.com/awscloudtrail/latest/APIReference/API_GetTrailStatus.html>"
+    ]
+  },
+  "HasCoverGlobalServices": {
+    "category": "O",
+    "^description": "None of your existing Amazon CloudTrail trails cover AWS Global Services. For most services, events are recorded in the Region where the action occurred. For global services such as AWS Identity and Access Management (IAM), AWS STS, and Amazon CloudFront, events are delivered to any trail that includes global services.",
+    "shortDesc": "Trail to include Global Service",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "ref": [
+      "[Global Services covered by CloudTrail]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-concepts.html#cloudtrail-concepts-global-service-events>"
+    ]
+  },
+  "DuplicateGlobalTrail": {
+    "category": "O",
+    "^description": "You have {$COUNT} Amazon CloudTrail trails configured to include global services. It is reduntant, as duplicate logs are stored.",
+    "shortDesc": "Keep only 1 global trail",
+    "criticality": "M",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": []
+  },
+  "HasManagementEventsCaptured": {
+    "category": "O",
+    "^description": "None of your existing Amazon CloudTrail trails cover AWS Management events. Management events provide visibility into management operations that are performed on resources in your AWS account. These are also known as control plane operations. Example management events include:<br>- Configuring security (for example, IAM AttachRolePolicy API operations)<br>- Registering devices (for example, Amazon EC2 CreateDefaultVpc API operations)<br>- Configuring rules for routing data (for example, Amazon EC2 CreateSubnet API operations)<br>- Setting up logging (for example, AWS CloudTrail CreateTrail API operations)<br><br>Management events can also include non-API events that occur in your account. For example, when a user logs in to your account, CloudTrail logs the ConsoleLogin event. ",
+    "shortDesc": "Trail to include Management Events",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": [
+      "[Logging Management events]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-management-events-with-cloudtrail.html>"
+    ]
+  },
+  "RequiresKmsKey": {
+    "category": "S",
+    "^description": "You have not enabled server side encryption (SSE) on {$COUNT} CloudTrail buckets which automatically encrypts objects uploaded to the bucket. If this bucket contains non-publically-available data, and you are not implementing client-side encryption, please enable SSE.",
+    "shortDesc": "Enable SSE",
+    "criticality": "M",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": [
+      "[Encrypt CloudTrail using AWS KMS]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/encrypting-cloudtrail-log-files-with-aws-kms.html>",
+      "[CloudTrail Security Best Practices]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/best-practices-security.html>"
+    ]
+  }
+}

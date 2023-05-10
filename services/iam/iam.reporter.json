@@ -1,0 +1,383 @@
+{
+	"rootMfaActive": {
+		"category": "S",
+		"^description": "You have not enabled Multi-Factor Authentication (MFA) on your root user. AWS MFA is a simple best practice that adds an extra layer of protection on top of your user name and password. With MFA enabled, when a user signs in to an AWS Management Console, they will be prompted for their user name and password (the first factor—what they know), as well as for an authentication code from their AWS MFA device (the second factor—what they have). Taken together, these multiple factors provide increased security for your AWS account settings and resources.",
+		"shortDesc": "Enable MFA on root user",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://aws.amazon.com/iam/features/mfa/>"
+		]
+	},
+	"mfaActive": {
+		"category": "S",
+		"^description": "You have not enabled Multi-Factor Authentication (MFA) on {$COUNT} IAM users. AWS MFA is a simple best practice that adds an extra layer of protection on top of your user name and password. With MFA enabled, when a user signs in to an AWS Management Console, they will be prompted for their user name and password (the first factor—what they know), as well as for an authentication code from their AWS MFA device (the second factor—what they have). Taken together, these multiple factors provide increased security for your AWS account settings and resources.",
+		"shortDesc": "Enable MFA on IAM user.",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://aws.amazon.com/iam/features/mfa/>"
+		]
+	},
+	"passwordLastChange365": {
+		"category": "S",
+		"^description": "{$COUNT} IAM user passwords have not been changed in more than 365 days. Please rotate the passwords. Alternatively, you can set an expiration period in the password policy.",
+		"shortDesc": "Rotate password",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_admin-change-user.html>"
+		]
+	},
+	"passwordLastChange90": {
+		"category": "S",
+		"^description": "{$COUNT} IAM user passwords have not been changed in more than 90 days. Please rotate the passwords. Alternatively, you can set an expiration period in the password policy.",
+		"shortDesc": "Rotate password",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_admin-change-user.html>"
+		]
+	},
+	"consoleLastAccess365": {
+		"category": "S",
+		"^description": "{$COUNT} IAM users have not accessed the AWS console in more than 365 days. Please identify the need for these IAM users to access the console and delete them if not needed.",
+		"shortDesc": "Validate IAM user console access.",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_finding-unused.html>"
+		]
+	},
+	"consoleLastAccess90": {
+		"category": "S",
+		"^description": "{$COUNT} IAM users have not accessed the AWS console in more than 90 days. Please identify the need for these IAM users to access the console and delete them if not needed.",
+		"shortDesc": "Validate IAM user console access",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_finding-unused.html>"
+		]
+	},
+	"passwordPolicy": {
+		"category": "S",
+		"^description": "You have not set a custom password policy. Setting a custom password policy will allow you to have the ability to require strong password practices, such as complexity level, avoiding re-use, and enforcing multi-factor authentication (MFA). If you don't set a custom password policy, IAM user passwords must meet the default AWS password policy.",
+		"shortDesc": "Set a custom password policy.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_account-policy.html#IAMPasswordPolicy>"
+		]
+	},
+	"passwordPolicyWeak": {
+		"category": "S",
+		"^description": "Your current password policy is not strong. Improving the strength of your password policy would improve the security of your account. Consider implementing best practices when setting the password policy. If you already configure as per your organization ",
+		"shortDesc": "Set a stronger password policy",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#configure-strong-password-policy>"
+		]
+	},
+	"InlinePolicy": {
+		"category": "O",
+		"^description": "You have set an inline policy for {$COUNT} IAM users, groups or roles. An inline policy is a policy that's embedded in an IAM identity (a user, group, or role). In most cases, we recommend that you use managed policies instead of inline policies. This is because managed policies have several additional features such as reusability, central change management, versioning and rolling back, delegating permissions management and automatic updates. Inline policies are useful if you want to maintain a strict one-to-one relationship between a policy and the identity that it's applied to. For example, you want to be sure that the permissions in a policy are not inadvertently assigned to an identity other than the one they're intended for.",
+		"shortDesc": "Use managed policies",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_managed-vs-inline.html>"
+		]
+	},
+	"InlinePolicyFullAccessOneServ": {
+		"category": "S",
+		"^description": "You have set an inline policy giving {$COUNT} users, groups and/or roles full access to one service. Consider switching to managed policies instead. It is also considered best practice to limit access by following the standard security advice of granting least privilege, or granting only the permissions required to perform a task. Determine what users and roles need to do and then craft policies that allow them to perform only those tasks.",
+		"shortDesc": "Limit access in policy",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+		]
+	},
+	"InlinePolicyFullAdminAccess": {
+		"category": "S",
+		"^description": "You have set an inline policy providing full Administrator access to {$COUNT} users, groups or roles. It is considered best practice to limit access by following the standard security advice of granting least privilege, or granting only the permissions required to perform a task. Determine what users and roles need to do and then craft policies that allow them to perform only those tasks.",
+		"shortDesc": "Limit permissions.",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+		]
+	},
+	"ManagedPolicyFullAccessOneServ": {
+		"category": "S",
+		"^description": "You have set a managed policy giving {$COUNT} users, groups and/or roles full access to one service. It is considered best practice to limit access by following the standard security advice of granting least privilege, or granting only the permissions required to perform a task. Determine what users and roles need to do and then craft policies that allow them to perform only those tasks.",
+		"shortDesc": "Limit permissions.",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+		]
+	},
+	"FullAdminAccess": {
+		"category": "S",
+		"^description": "You have provided full Administrator access to {$COUNT} users, groups or roles. It is considered best practice to limit access by following the standard security advice of granting least privilege, or granting only the permissions required to perform a task. Determine what users and roles need to do and then craft policies that allow them to perform only those tasks.",
+		"shortDesc": "Limit permissions.",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+		]
+	},
+	"userNotUsingGroup": {
+		"category": "O",
+		"^description": "{$COUNT} users are not within user groups. An IAM user group is a collection of IAM users. User groups let you specify permissions for multiple users, which can make it easier to manage the permissions for those users.",
+		"shortDesc": "Place IAM user within User Group",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/serv-side-encryption.html>"
+		]
+	},
+	"groupEmptyUsers": {
+		"category": "O",
+		"^description": "{$COUNT} User groups have no users within them. Consider deleting the groups if not being used.",
+		"shortDesc": "Delete empty group.",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_groups_manage_delete.html>"
+		]
+	},
+	"unusedRole": {
+		"category": "OS",
+		"^description": "You have {$COUNT} unused roles in your account. Review the necessities of these roles, and delete them if no longer necessary. By removing unused roles, you can simplify monitoring and improve your security posture.",
+		"shortDesc": "Review & remove inactive roles",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Blog]<https://aws.amazon.com/blogs/security/identify-unused-iam-roles-remove-confidently-last-used-timestamp/>"
+		]
+	},
+	"roleLongSession": {
+		"category": "S",
+		"^description": "{$COUNT} role session duration is longer than the default duration of 60 minutes. Unless your applications and/or federated users need to complete longer running workloads in a single session, it is recommended to stick with the default session duration.",
+		"shortDesc": "Review & reduce max session duration",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": -1,
+		"ref": [
+			"[AWS Blog]<https://aws.amazon.com/blogs/security/enable-federated-api-access-to-your-aws-resources-for-up-to-12-hours-using-iam-roles/>"
+		]
+	},
+	"hasAlternateContact": {
+		"category": "S",
+		"^description": "Alternate account contacts help AWS get in contact with the appropriate personnel if needed. Configure the account’s alternate contacts to point to a group rather than an individual. For example, create separate email distribution lists for billing, operations, and security and configure these as Billing, Security, and Operations contacts in each active AWS account. This ensures that multiple people will receive AWS notifications and be able to respond, even if someone is on vacation, changes roles, or leaves the company.",
+		"shortDesc": "Configure AWS account contacts",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Alternate Contact]<https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-update-contact.html/>"
+		]
+	},
+	"noUsersFound": {
+		"category": "S",
+		"^description": "Create individual entities and give unique security credentials and permissions to each user accessing your account. With individual entities and no shared credentials, you can audit the activity of each user.",
+		"shortDesc": "Create individual identities",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Create IAM Users]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_create.html>"
+		]
+	},
+	"rootHasAccessKey": {
+		"category": "S",
+		"^description": "Programmatic access to AWS APIs should never use the root user. It is best not to generate static an access key for the root user. If one already exists, you should transition any processes using that key to use temporary access keys from an AWS Identity and Access Management (IAM) role, or, if necessary, static access keys from an IAM user.",
+		"shortDesc": "Remove access keys for the root user",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Delete root access key]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html#id_root-user_manage_delete-key>"
+		]
+	},
+	"supportPlanLowTier": {
+		"category": "O",
+		"^description": "It is recommended that you subscribe to the AWS Business Support tier or higher for all of your AWS production accounts. For more information, refer to Compare AWS Support Plans. If you don't have premium support, you must have an action plan to handle issues which require help from AWS Support. AWS Support provides a mix of tools and technology, people, and programs designed to proactively help you optimize performance, lower costs, and innovate faster. AWS Business Support provides additional benefits including access to AWS Trusted Advisor and AWS Personal Health Dashboard and faster response times.",
+		"shortDesc": "Subscribe to the AWS Business Support tier (or higher)",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Support Plan]<https://aws.amazon.com/premiumsupport/plans/>",
+			"[Guide]<https://docs.aws.amazon.com/awssupport/latest/user/aws-support-plans.html>"
+		]
+	},
+	"hasAccessKeyNoRotate30days": {
+		"category": "S",
+		"^description": "{$COUNT} user(s) impacted. When you cannot rely on temporary credentials and require long term credentials, rotate the IAM access keys regularly(maximum every 90 days). If an access key is compromised without your knowledge, you limit how long the credentials can be used to access your resources",
+		"shortDesc": "Rotate credentials regularly",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Rotate access key]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html#Using_RotateAccessKey>"
+		]
+	},
+	"hasAccessKeyNoRotate90days": {
+		"category": "S",
+		"^description": "{$COUNT} user(s) impacted. When you cannot rely on temporary credentials and require long term credentials, rotate the IAM access keys regularly(maximum every 90 days). If an access key is compromised without your knowledge, you limit how long the credentials can be used to access your resources",
+		"shortDesc": "Rotate credentials regularly",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Rotate access key]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html#Using_RotateAccessKey>"
+		]
+	},
+	"enableCostBudget": {
+		"category": "C",
+		"^description": "AWS Budgets enable monitoring of monthly costs and usage with notifications when costs are forecasted to exceed target thresholds. Forecasted cost notifications can provide an indication of unexpected activity, providing extra defense in addition to other monitoring systems, such as AWS Trusted Advisor and Amazon GuardDuty. Monitoring and understanding your AWS costs is also part of good operational hygiene.",
+		"shortDesc": "Monitor your AWS spending",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Create a budget]<https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-create.html#create-cost-budget>"
+		]
+	},
+	"enableGuardDuty": {
+		"category": "C",
+		"^description": "Amazon GuardDuty is a threat-detection service that continuously monitors for malicious or unauthorized behavior to help protect your AWS accounts, workloads, and data. When it detects unexpected and potentially malicious activity, GuardDuty delivers detailed security findings for visibility and remediation. GuardDuty can detect threats such as cryptocurrency mining activity, access from Tor clients and relays, unexpected behavior, and compromised IAM credentials. Enable GuardDuty and respond to findings to stop potentially malicious or unauthorized behavior in your AWS environment.",
+		"shortDesc": "Enable GuardDuty",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Getting started]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_settingup.html>",
+			"[Findings]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-active.html>"
+		]
+	},
+	"hasExternalIdentityProvider": {
+		"category": "O",
+		"^description": "This enables your users to sign in to the AWS access portal with their corporate credentials. They can then navigate to their assigned accounts, roles, and applications hosted in external IdPs. For example, you can connect an external IdP such as Okta or Azure Active Directory (AD), to IAM Identity Center. Your users can then sign in to the AWS access portal with their existing Okta or Azure credentials. In addition, you can assign access permissions centrally for your users across all the accounts and applications in your AWS organization. In addition, developers can simply sign in to the AWS Command Line Interface (AWS CLI) using their existing credentials, and benefit from automatic short-term credential generation and rotation.",
+		"shortDesc": "Use External Identity Provider",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Connect to external identity]<https://docs.aws.amazon.com/singlesignon/latest/userguide/manage-your-identity-source-idp.html>"
+		]
+	},
+	"hasSSORoles": {
+		"category": "O",
+		"^description": "With AWS IAM Identity Center (successor to AWS Single Sign-On), you can manage sign-in security for your workforce identities, also known as workforce users. IAM Identity Center provides one place where you can create or connect workforce users and centrally manage their access across all their AWS accounts and applications. You can use multi-account permissions to assign your workforce users access to AWS accounts. You can use application assignments to assign your users access to IAM Identity Center enabled applications, cloud applications, and customer Security Assertion Markup Language (SAML 2.0) applications.",
+		"shortDesc": "Centralize Sign On to AWS",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS SSO]<https://docs.aws.amazon.com/singlesignon/latest/userguide/what-is.html>"
+		]
+	},
+	"rootConsoleLogin30days": {
+		"category": "S",
+		"^description": "We recommend that you configure an administrative user in AWS IAM Identity Center (successor to AWS Single Sign-On) to perform daily tasks and access AWS resources. However, you can perform the tasks listed below only when you sign in as the root user of an account.<br>[1] Change your account settings, [2] Restore IAM user permissions, [3] Activate IAM access to the Billing and Cost Management console, [4] View certain tax invocies, [5] Close your account and etc. Refers to the link",
+		"shortDesc": "Review activity carry out by root",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Notify on Root Activity]<https://aws.amazon.com/blogs/mt/monitor-and-notify-on-aws-account-root-user-activity/>",
+			"[Root ID responsible]<https://docs.aws.amazon.com/accounts/latest/reference/root-user-tasks.html>"
+		]
+	},
+	"rootConsoleLoginFail3x": {
+		"category": "S",
+		"^description": "We detected at least 3 attempts of root id login failure in the past 30 days. Please review  CloudTrail in us-east-1 region with the EventName=ConsoleLogin, dive deep into the activity information such as eventTime, sourceIPAddress and userAgent.<br>Recommend to turn on Amazon GuardDuty to proactively perform such Threat Detection",
+		"shortDesc": "Review CloudTrail [ConsoleLogin] event",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[CloudTrail ConsoleLogin event]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-aws-console-sign-in-events.html>",
+			"[GuardDuty IAM findings]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-iam.html>"
+		]
+	}
+}

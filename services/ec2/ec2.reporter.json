@@ -1,0 +1,509 @@
+{
+    "EC2NewGen": {
+        "category": "CP",
+        "^description": "Instance Type Currency: {$COUNT} of your instances are running in an older generation of instance type. Upgrade to the latest generation of instance type to gain better perfomance and lower cost.",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "New EC2 Generation Available",
+        "ref": [
+            "[Amazon EC2 Instance Types]<https://aws.amazon.com/ec2/instance-types/>"    
+        ]
+    },
+    "EC2DetailedMonitor": {
+        "category": "P",
+        "^description": "Detailed Monitoring: Detailed Monitoring has not been enabled for {$COUNT} of your instances. Enable Detailed Monitoring to get monitoring metrics with higher frequency.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "EC2 Detailed Monitoring",
+        "ref": [
+            "[Enable Detailed Monitoring]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-cloudwatch-new.html>"    
+        ]
+    },
+    "EC2IamProfile": {
+        "category": "S",
+        "^description": "IAM Instance Profile: {$COUNT} of your instances lack an IAM profile association. Associate IAM profile to control AWS API request securely.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "EC2 IAM Profile",
+        "ref": [
+            "[IAM roles for EC2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/iam-roles-for-amazon-ec2.html>"    
+        ]
+    },
+    "EC2EIPNotInUse": {
+        "category": "C",
+        "^description": "Elastic IP Not In Use: {$COUNT} of your Elastic IP is not associated to any instance. Release unused Elastic IP to save cost.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Elastic IP In Use",
+        "ref": [
+            "[Elastic IP Charges]<https://aws.amazon.com/premiumsupport/knowledge-center/elastic-ip-charges/>"       
+        ]
+    },
+    "EC2MemoryMonitor": {
+        "category": "P",
+        "^description": "EC2 Memory Monitoring: Memory monitoring has not been enabled for {$COUNT} of your instances. Install CloudWatch agent and enable the monitoring",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "EC2 Memory Monitoring",
+        "ref": [
+            "[Collecting EC2 metrics with CloudWatch Agent]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Install-CloudWatch-Agent.html>"
+        ]
+    },
+    "EC2DiskMonitor": {
+        "category": "P",
+        "^description": "EC2 Disk Monitoring: Disk monitoring has not been enabled for {$COUNT} of your instances. Install CloudWatch agent and enable the monitoring",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "EC2 Disk Monitoring",
+        "ref": [
+            "[Collecting EC2 metrics with CloudWatch Agent]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Install-CloudWatch-Agent.html>"
+        ]
+    },
+    "EC2Active": {
+        "category": "C",
+        "^description": "EC2 Active: {$COUNT} of your instances have not been running for more than 7 days. Terminate intances that are not required.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "EC2 Active",
+        "ref": [
+            ""
+        ]
+    },
+    "EC2SGNumber": {
+        "category": "O",
+        "^description": "EC2 Security Group Association: {$COUNT} of your instances have more than 50 security groups associated. Please reduce the number of security groups.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "EC2 Security Group Association",
+        "ref": [
+            "https://docs.aws.amazon.com/vpc/latest/userguide/amazon-vpc-limits.html#vpc-limits-security-groups"
+        ]
+    },
+    "EC2LowUtilization": {
+        "category": "C",
+        "^description": "EC2 Low Utilization: {$COUNT} of your instances have low utilization. Decrease instance size to save cost.",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "EC2 Low Utilization",
+        "ref": [
+            "https://d1.awsstatic.com/whitepapers/cost-optimization-right-sizing.pdf"
+        ]
+    },
+    "EC2HighUtilization": {
+        "category": "P",
+        "^description": "EC2 High Utilization: {$COUNT} of your instances have high utilization. Increase instance size to improve performance.",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "EC2 High Utilization",
+        "ref": [
+            "https://d1.awsstatic.com/whitepapers/cost-optimization-right-sizing.pdf"
+        ]
+    },
+    "EBSEncrypted": {
+        "category": "S",
+        "^description": "Storage Encyrption: {$COUNT} of EBS storage volumes are not encrypted. Enable encryption for EBS volumes to meet security and compliance requirements.",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Enable EBS Encryption",
+        "ref": [
+            "[Best practices for Amazon EC2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html>"
+        ]
+    },
+    "EBSNewGen": {
+        "category": "CP",
+        "^description": "Storage Type Currency: {$COUNT} of EBS volumes are on an older storage type. Upgrade to latest generation of storage type to gain better performance and lower cost",
+        "downtime": 1,
+        "slowness": 1,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "New EBS Generation Available",
+        "ref": [
+            "[Amazon EBS volume types]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-volume-types.html>"    
+        ]
+    },
+    "EBSInUse": {
+        "category": "C",
+        "^description": "Storage Utilization: {$COUNT} of EBS storage volumes are not attached to any instances. Remove unused volumes to reduce the storage cost.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Remove Unused EBS",
+        "ref": [
+            "[Controlling AWS costs by deleting unused Amazon EBS volumes]<https://aws.amazon.com/blogs/mt/controlling-your-aws-costs-by-deleting-unused-amazon-ebs-volumes/>"    
+        ]
+    },
+    "EBSSnapshot": {
+        "category": "RO",
+        "^description": "Storage Snapshot: {$COUNT} of EBS has no snapshot(s) available. Enable regular backups to prevent data loss.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Enable EBS Snapshot",
+        "ref": [
+            "[Best practices for Amazon EC2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html>"    
+        ]
+    },
+    "EBSUpToDateSnapshot": {
+        "category": "R",
+        "^description": "Storage Snapshot Up To Date: {$COUNT} of EBS has outdated snapshots. Take a new snapshot.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Enable EBS Snapshot",
+        "ref": [
+            "[Best practices for Amazon EC2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html>"    
+        ]
+    },
+    "EBSLowUtilization": {
+        "category": "C",
+        "^description": "EBS Low Utilization: {$COUNT} of EBS volume has less than 1 IOPS utilization for past 7 days. Remove volumes that are not required to reduce costs.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "EBS Low Utilization",
+        "ref": [
+            "[Controlling AWS costs by deleting unused Amazon EBS volumes]<https://aws.amazon.com/blogs/mt/controlling-your-aws-costs-by-deleting-unused-amazon-ebs-volumes/>"    
+        ]
+    },
+    "EBSFastSnapshot": {
+        "category": "C",
+        "^description": "EBS Fast Snapshot Enabled: {$COUNT} of EBS volumes has Fast Snapshot Restores enabled. Only enable Fast Snapshot Restore if necessary as it will generate additional cost.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "EBS Fast Snapshot Enabled",
+        "ref": [
+            "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-fast-snapshot-restore.html#fsr-pricing"    
+        ]
+    },
+    "SGDefaultInUsed": {
+        "category": "S",
+        "^description": "Default Security Group: {$COUNT} of default security groups are utilized. It is recommended to create custom security group that configured with specific rules.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Default Security Group In Use",
+        "ref": [
+            "[Best practices for Amazon EC2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html>"    
+        ]
+    },
+    "SGSensitivePortOpenToAll": {
+        "category": "S",
+        "^description": "Sensitive ports open to all: {$COUNT} of security group have sensitive ports (DNS, MongoDB, MSSQL, MySQL, NFS, OracleDB PostgreSQL, RDP, SMTP, SMTPS, SSH) open to all IPs. Recommend to open only for required IP.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Sensitive port open to all.",
+        "ref": [
+            "[Best practices for Amazon EC2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html>"    
+        ]
+    },
+    "SGAllTCPOpen": {
+        "category": "S",
+        "^description": "All TCP Ports Open: {$COUNT} security groups has all TCP ports open. It is recommended to open only specific ports that are required.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "All TCP ports open",
+        "ref": [
+            "[Best practices for Amazon EC2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html>"    
+        ]
+    },
+    "SGAllUDPOpen": {
+        "category": "S",
+        "^description": "All UDP Ports Open: {$COUNT} security groups has all UDP ports open. It is recommended to open only specific ports that are required.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "All UDP ports open.",
+        "ref": [
+            "[Best practices for Amazon EC2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html>"    
+        ]
+    },
+    "SGAllPortOpen": {
+        "category": "S",
+        "^description": "All Ports Open: {$COUNT} of security group has all ports open. It is recommended to open only specific ports that are required.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "All ports open.",
+        "ref": [
+            "[Best practices for Amazon EC2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html>"    
+        ]
+    },
+    "SGAllPortOpenToAll": {
+        "category": "S",
+        "^description": "All Ports Open to All: {$COUNT} of security group has all port open to all IP. It is recommended to open only specific ports to specific IPs that are required.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "All ports open to all",
+        "ref": [
+            "[Best practices for Amazon EC2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html>"    
+        ]
+    },
+    "SGEncryptionInTransit": {
+        "category": "S",
+        "^description": "Encryption In Transit: {$COUNT} of security group has ports enabled without encryption in transit. It is recommended to use ports with encryption in transit",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Encryption in Transit",
+        "ref": [
+            "[Data protection in Amazon EC2]<https://docs.amazonaws.cn/en_us/AWSEC2/latest/UserGuide/data-protection.html>"    
+        ]
+    },
+    "SGRuleNumber": {
+        "category": "O",
+        "^description": "High Number of Rules: {$COUNT} of security group have more than 50 rules. Restructure and reuse the rules.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "High Number of Rules",
+        "ref": [
+            "https://docs.aws.amazon.com/vpc/latest/userguide/amazon-vpc-limits.html#vpc-limits-security-groups"    
+        ]
+    },
+    "ComputeOptimizerEnabled": {
+        "category": "CP",
+        "^description": "Compute Optimizer Not Enabled: Compute Optimizer of your account is not enabled. Enable Compute Optimizer to get resources recommendations.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Compute Optimizer Enabled",
+        "ref": [
+            "[AWS Compute Optimizer]<https://aws.amazon.com/compute-optimizer/>"    
+        ]
+    },
+    "CEReservedInstance": {
+        "category": "C",
+        "^description": "Reserved Instance Recommendation: Reserved Instances recommendations available in Cost Explorer",        
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Reserved Instance Recommendation",
+        "ref": [
+            "https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/ri-recommendations.html"    
+        ]
+    },
+    "CESavingsPlans": {
+        "category": "C",
+        "^description": "Savings Plans Recommendation: Savings Plans recommendations available in Cost Explorer",        
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Savings Plans Recommendation",
+        "ref": [
+            "https://docs.aws.amazon.com/savingsplans/latest/userguide/sp-recommendations.html"    
+        ]
+    },
+    "ELBListenerInsecure": {
+        "category": "S",
+        "^description": "Insecure Listener: {$COUNT} of ELB listeners are using insecure protocols. Please use secure protocols.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Insecure Listener",
+        "ref": [
+            "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html"    
+        ]
+    },
+    "ELBSGNumber": {
+        "category": "O",
+        "^description": "ELB Security Group Association: {$COUNT} of your ELBs have more than 50 security groups associated. Please reduce the number of security groups",        
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "ELB Security Group Association",
+        "ref": [
+            "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-update-security-groups.html"    
+        ]
+    },
+    "ELBCrossZone": {
+        "category": "R",
+        "^description": "ELB Cross Zone Load Balancing: {$COUNT} of your ELBs do not have cross zone load balancing enabled. Enable cross zone load balancing to improve availability.",        
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "ELB Cross Zone Load Balancing",
+        "ref": [
+            "https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-disable-az.html"    
+        ]
+    },
+    "ELBConnectionDraining": {
+        "category": "R",
+        "^description": "ELB Connection Draining: {$COUNT} of your ELBs have not enabled connection draining.",        
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "ELB Connection Draining",
+        "ref": [
+            "[ELB Connection Draining]<https://aws.amazon.com/blogs/aws/elb-connection-draining-remove-instances-from-service-with-care/>"    
+        ]
+    },
+    "ELBClassicLB": {
+        "category": "O",
+        "^description": "ELB Classic Load Balancer: {$COUNT} of your ELBs are Classic Load Balancers. Migrate to a newer generation of ELB.",        
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "ELB Classic Load Balancer",
+        "ref": [
+            "[Migrate your Classic Load Balancer]<https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/migrate-classic-load-balancer.html/>"    
+        ]
+    },
+    "ASGELBHealthCheckValidation": {
+        "category": "O",
+        "^description": "ELB Health Check Validation: {$COUNT} of your ASG have ELB health check enabled without ELB association.",        
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "ELB Health Check Validation",
+        "ref": [
+            ""    
+        ]
+    },
+    "ASGELBHealthCheckEnabled": {
+        "category": "O",
+        "^description": "ELB Health Check Enabled: {$COUNT} of your ASG ELB association without ELB health check enabled",        
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "ELB Health Check Enabled",
+        "ref": [
+            ""    
+        ]
+    },
+    "ASGInstancesRemoved": {
+        "category": "O",
+        "^description": "Instance Removed: {$COUNT} of your ASG have no instances association.",        
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "No Instance Associated",
+        "ref": [
+            ""    
+        ]
+    },
+    "ASGTargetGroupELBExist": {
+        "category": "O",
+        "^description": "Target Group without ELB: {$COUNT} of target group your ASG have no ELB association.",        
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "Target Group without ELB",
+        "ref": [
+            ""    
+        ]
+    },
+    "ASGClassicLBExist": {
+        "category": "O",
+        "^description": "Classic LB Deleted: {$COUNT} of your ASG are associated with a deleted Classic Load Balancer.",        
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "Classic LB Deleted",
+        "ref": [
+            ""    
+        ]
+    },
+    "ASGAMIExist": {
+        "category": "O",
+        "^description": "Launch Configuration/Template AMI Deleted: {$COUNT} of Launch Configuration/Template AMI of your ASG are using deleted AMI",  
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "Launch Configuration/Template AMI Deleted",
+        "ref": [
+            ""    
+        ]
+    }
+}

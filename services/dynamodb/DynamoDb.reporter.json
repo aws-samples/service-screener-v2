@@ -1,0 +1,340 @@
+{
+	"resourcesWithoutTags": {
+		"category": "C",
+		"^description": "Setting tags on your table allows you to be able to identify cost per table.",
+		"shortDesc": "Set tags on tables",
+		"criticality": "L", 
+		"downtime": 0, 
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0, 
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableLevelCostAnalysis.html/>"
+		]
+	},
+	"autoScalingHighUtil":{
+	    "category":"P",
+	    "^description": "When you set a high utilization target (a target around 90%) it means your traffic needs to be higher than 90% for a period of time before the auto scaling kicks in. You should not use a high utilization target unless your application is very constant and doesn’t receive spikes in traffic.",
+	    "shortDesc":"Autoscaling with high utilization policy",
+	    "criticality": "M",
+		"downtime": 0,
+		"slowness": -1,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_AutoScalingSettings.html#CostOptimization_AutoScalingSettings_UnderProvisionedTables>"
+		]
+	},
+	"autoScalinglowUtil":{
+	    "category":"P",
+	    "^description": "When you set a very low utilization (a target less than 50%) it means your application would need to reach 50% of the provisioned capacity before it triggers an auto scaling policy. Unlless your application traffic grows at a very aggressive rate, this usually translates into unused capacity and wasted resources.",
+	    "shortDesc":"Autoscaling with low utilization policy",
+	    "criticality": "H",
+		"downtime": 0,
+		"slowness": -1,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_AutoScalingSettings.html#CostOptimization_AutoScalingSettings_UnderProvisionedTables>"
+		]
+	},
+	"unusedResourcesGSIRead":{
+	    "category":"C",
+	    "^description": "Your consumed Read Capacity Unit (RCU) for the GSI is 0 for the past 30 days. Recommend to delete the GSI.",
+	    "shortDesc":"Unused Global Secondary Index consumed Read Capacity Unit (RCU)",
+	    "criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html>"
+		]
+	},
+	"unusedResourcesGSIWrite":{
+	    "category":"C",
+	    "^description": "Your consumed Write Capacity Unit (WCU) for the GSI is 0 for the past 30 days. Recommend to delete the GSI.",
+	    "shortDesc":"Unused Global Secondary Index consumed Write Capacity Unit (WCU)",
+	    "criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html>"
+		]
+	},
+	"attributeNamesXL":{
+	    "category":"C",
+	    "^description": "The total size of an item in DynamoDB is the sum of its attribute name lengths and values. Having long attribute names not only contributes towards storage costs, but it might also lead to higher RCU/WCU consumption. We recommend that you choose shorter attribute names rather than long ones. Having shorter attribute names can help limit the item size within the next 4KB/1KB boundary after which you would consume additional RCU/WCU to access data.",
+	    "shortDesc":"Attributes name longer than 15 characters.",
+	    "criticality": "L",
+		"downtime": 0,
+		"slowness": -1,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html#CostOptimization_TableUsagePatterns_AttributeNames>"
+		]
+	},
+	"attributeNamesL":{
+	    "category":"C",
+	    "^description": "The total size of an item in DynamoDB is the sum of its attribute name lengths and values. Having long attribute names not only contributes towards storage costs, but it might also lead to higher RCU/WCU consumption. We recommend that you choose shorter attribute names rather than long ones. Having shorter attribute names can help limit the item size within the next 4KB/1KB boundary after which you would consume additional RCU/WCU to access data.",
+	    "shortDesc":"Attributes name longer than 8 characters.",
+	    "criticality": "L",
+		"downtime": 0,
+		"slowness": -1,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html#CostOptimization_TableUsagePatterns_AttributeNames>"
+		]
+	},
+	"disabledTTL":{
+	    "category":"C",
+	    "^description": "Time to Live (TTL) can identify items older than the expiry time that you have set on an item and remove them from the table. If your data grows over time and older data becomes irrelevant, enabling TTL on the table can help trim your data down and save on storage costs.",
+	    "shortDesc":"Tables Time-To-Live (TTL) is disabled",
+	    "criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html#CostOptimization_TableUsagePatterns_TTL>"
+		]
+	},
+	"deleteTableProtection":{
+	    "category":"R",
+	    "^description": "Deletion protection can keep your table from being accidentally deleted. This section describes some best practices for using deletion protection.",
+	    "shortDesc":"Delete table protection is disabled.",
+	    "criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-deletion-protection.html>"
+		]
+	},
+	"disabledBackup":{
+	    "category":"R",
+	    "^description": "You can use the DynamoDB on-demand backup capability to create full backups of your tables for long-term retention, and archiving for regulatory compliance needs. You can back up and restore your table data anytime with a single click on the AWS Management Console or with a single API call. Backup and restore actions run with no impact on table performance or availability.",
+	    "shortDesc":"No table backup found.",
+	    "criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/BackupRestore.html>"
+		]
+	},
+	"rcuServiceLimit":{
+	    "category":"R",
+	    "^description": "You have reach at least average 80% of current Read Capacity Unit (RCU) limit",
+	    "shortDesc":"Read Capacity Unit table limit",
+	    "criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#default-limits-throughput-capacity-modes>"
+		]
+	},
+	"wcuServiceLimit":{
+	    "category":"R",
+	    "^description": "You have reach at least average 80% of current Read Capacity Unit (RCU) limit",
+	    "shortDesc":"Write Capacity Unit table limit",
+	    "criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#default-limits-throughput-capacity-modes>"
+		]
+	},
+	"serviceLimitMaxTablePerRegion":{
+	    "category":"R",
+	    "^description": "You have {$COUNT} tables against 2500(default) or 10000(max) tables per region available. If you need more than 2,500 tables for a single account, please reach out to your AWS account team to explore an increase up to a maximum of 10,000 tables. For more than 10,000, the recommended best practice is to setup multiple accounts, each of which can serve up to 10,000 tables.",
+	    "shortDesc":"Tables limit per region",
+	    "criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#limits-tables>"
+		]
+	},
+	"capacityModeOnDemand":{
+	    "category":"C",
+	    "^description": "The on-demand capacity mode is designed to eliminate the need to plan or provision the capacity of your DynamoDB table. In this mode, your table will instantly accommodate requests to your table without the need to scale any resources up or down (up to twice the previous peak throughput of the table).",
+	    "shortDesc":"Recommended to use on-demand capacity.",
+	    "criticality": "M",
+		"downtime": 0,
+		"slowness": -1,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableCapacityMode.html#CostOptimization_TableCapacityMode_OnDemand>"
+		]
+	},
+	"capacityModeProvisioned":{
+	    "category":"C",
+	    "^description": "The provisioned capacity mode is a more traditional model where you can define how much capacity the table has available for requests either directly or with the assistance of auto-scaling. Because a specific capacity is provisioned for the table at any given time, billing is based off of the capacity provisioned rather than the number of requests. Going over the allocated capacity can also cause the table to reject requests and reduce the experience of your applications users.",
+	    "shortDesc":"Recommended to use provisioned capcity.",
+	    "criticality": "M",
+		"downtime": 0,
+		"slowness": -1,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableCapacityMode.html#CostOptimization_TableCapacityMode_Provisioned>"
+		]
+	},
+	"autoScalingStatus":{
+	    "category":"C",
+	    "^description": "Amazon DynamoDB auto scaling uses the AWS Application Auto Scaling service to dynamically adjust provisioned throughput capacity on your behalf, in response to actual traffic patterns. This enables a table or a global secondary index to increase its provisioned read and write capacity to handle sudden increases in traffic, without throttling. When the workload decreases, Application Auto Scaling decreases the throughput so that you don't pay for unused provisioned capacity.",
+	    "shortDesc":"Tables with provisoined capacity but not using autoscaling.",
+	    "criticality": "M",
+		"downtime": 0,
+		"slowness": -1,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/AutoScaling.html>"
+		]
+	},
+	"systemErrors":{
+	    "category":"O",
+	    "^description": "You have {$COUNT} tables against 2500(default) or 10000(max) tables per region available.",
+	    "shortDesc":"Tables limit per region",
+	    "criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#limits-tables>"
+		]
+	},
+	"throttledRequest":{
+	    "category":"O",
+	    "^description": "You have {$COUNT} throttled requests over the past 30 days",
+	    "shortDesc":"Throttled request detected.",
+	    "criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/metrics-dimensions.html#ThrottledRequests>"
+		]
+	},
+	"serviceLimitMaxGSIPerTable":{
+	    "category":"R",
+	    "^description": "There is a default quota of 20 global secondary indexes per table. ",
+	    "shortDesc":"Global Secondary index reached 80% of service quota",
+	    "criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#limits-secondary-indexes>"
+		]
+	},
+	"conditionalCheckFailedRequests":{
+	    "category":"O",
+	    "^description": "You have {$COUNT} conditional check failed requests errors over the past 30 days.",
+	    "shortDesc":"Conditional Check Failed Requests detected",
+	    "criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/metrics-dimensions.html#ConditionalCheckFailedRequests>"
+		]
+	},
+	"userErrors":{
+	    "category":"O",
+	    "^description": "You have {$COUNT} user errors detected in the past 30 days.",
+	    "shortDesc":"User errors detected",
+	    "criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/metrics-dimensions.html#UserErrors>"
+		]
+	},
+	"trailDeleteBackup":{
+	    "category":"R",
+	    "^description": "There has been {COUNT} of backup deleted in the past 30 days.",
+	    "shortDesc":"Backup deleted in the past 30 days.",
+	    "criticality": "I",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<NEED_REF>"
+		]
+	},
+	"trailDeleteTable":{
+	    "category":"R",
+	    "^description": "There has been {COUNT} of table deleted in the past 30 days.",
+	    "shortDesc":"Tables deleted in the past 30 days.",
+	    "criticality": "I",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<NEED_REF>"
+		]
+	},
+	"rcuServiceLimit":{
+	    "category":"R",
+	    "^description": "You have {$COUNT} tables exceeding 80% of it's Read Capacity Unit (RCU) limit.",
+	    "shortDesc":"Table exceeded 80% of it's Read Capacity Unit limit",
+	    "criticality": "M",
+		"downtime": 0,
+		"slowness": -1,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#default-limits-throughput-capacity-modes>"
+		]
+	},
+	"wcuServiceLimit":{
+	    "category":"R",
+	    "^description": "You have {$COUNT} tables exceeding 80% of it's Write Capacity Unit (WCU) limit.",
+	    "shortDesc":"Table exceeded 80% of it's Write Capacity Unit limit",
+	    "criticality": "M",
+		"downtime": 0,
+		"slowness": -1,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#default-limits-throughput-capacity-modes>"
+		]
+	},
+	"disabledPointInTimeRecovery":{
+		"category":"R",
+		"^description":"Backups help you to recover more quickly from a security incident. They also strengthen the resilience of your systems. DynamoDB point-in-time recovery automates backups for DynamoDB tables. It reduces the time to recover from accidental delete or write operations. DynamoDB tables that have PITR enabled can be restored to any point in time in the last 35 days.",
+		"shortDesc":"Point In Time Recovery backup is disabled",
+		"criticality":"M",
+		"downtime":0,
+		"slowness":0,
+		"additionalCost":1,
+		"needFullTest":0,
+		"ref":[
+			"[AWS Docs]<https://docs.aws.amazon.com/securityhub/latest/userguide/dynamodb-controls.html#dynamodb-2>"
+		]
+	}
+}

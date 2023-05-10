@@ -1,0 +1,95 @@
+{
+    "eksClusterVersionEol":{
+        "category": "S",
+		"^description": "EKS version end of life: {$COUNT} of your clusters are close to end of life. Please proceed to upgrade your cluster.",
+		"shortDesc": "EKS cluster version end of life",
+		"criticality": "H",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[EKS Kubernetes Release Calendar]<https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html#kubernetes-release-calendar>",
+			"[EKS Version Update]<https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html>"
+		]
+    },
+    "eksClusterVersionUpdate":{
+        "category": "S",
+		"^description": "EKS new version: Newer version are available for {$COUNT} of your clusters. Please proceed to upgrade your cluster.",
+		"shortDesc": "EKS new version available",
+		"criticality": "M",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[EKS Kubernetes Release Calendar]<https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html#kubernetes-release-calendar>",
+			"[EKS Version Update]<https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html>"
+		]
+    },
+    "eksEndpointPublicAccess":{
+        "category": "S",
+		"^description": "EKS public endpoint: {$COUNT} of your clusters have enabled public access for endpoint. Disable public access to minimize the security risks.",
+		"shortDesc": "EKS public endpoint enabled",
+		"criticality": "H",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[EKS Endpoint Access Control]<https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html>"
+		]
+    },
+    "eksSecretsEncryption":{
+        "category": "S",
+		"^description": "EKS secrets encryption: {$COUNT} of your clusters have disabled secrets encryption. Enable secrets encryption to protect your secrets in your clusters",
+		"shortDesc": "EKS secrets encryption disabled",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 1,
+		"ref": [
+			"[EKS Secrets Encryption]<https://docs.aws.amazon.com/eks/latest/userguide/enable-kms.html>"
+		]
+    },
+    "eksClusterLogging":{
+        "category": "OS",
+		"^description": "EKS cluster logging: {$COUNT} of your clusters have disabled control plane logging. Enable control plane logging for better monitoring.",
+		"shortDesc": "EKS cluster logging disabled",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[EKS Control Plane Logging]<https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html>"
+		]
+    },
+    "eksClusterSGRestriction":{
+        "category": "S",
+		"^description": "EKS cluster security group: {$COUNT} of clusters' security groups have provided permission beyond minimal rules. Grant minimum rules to reduce security risks.",
+		"shortDesc": "EKS cluster security group minimum rules",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[EKS Security Group Requirements]<https://docs.aws.amazon.com/eks/latest/userguide/sec-group-reqs.html>"
+		]
+    },
+    "eksClusterRoleLeastPrivilege":{
+        "category": "S",
+		"^description": "EKS role: {$COUNT} of clusters' roles have full access to one or more services.Grant only required permission to reduce the security risks. ",
+		"shortDesc": "EKS rols full access",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[IAM Grant Least Privilege]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+		]
+    }
+}

@@ -1,0 +1,15 @@
+{
+    "DefineTag": {
+      "category": "O",
+      "^description": "TODO",
+      "downtime": 0,
+      "slowness": 0,
+      "additionalCost": 0,
+      "criticality": "M",
+      "shortDesc": "Enable Tag",
+      "ref": [
+          "[Taggin Best Practices]<https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/welcome.html>",
+          "[Whitepaper]<https://d1.awsstatic.com/whitepapers/aws-tagging-best-practices.pdf>"
+      ]
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "metadata": {
+    "originator": "AWS",
+    "shortname": "FTR",
+    "fullname": "Foundational Technical Review",
+    "description": "Assesses an AWS Partner's solution against a specific set of Amazon Web Services (AWS) best practices around security, performance, and operational processes that are most critical for customer success.",
+    "_": "https://apn-checklists.s3.amazonaws.com/foundational/partner-hosted/partner-hosted/CVLHEC5X7.html"
+  },
+  "mapping": {
+    "Partner hosted": {
+      "HOST-001": []
+    },
+    "Support level": {
+      "SUP-001": ["iam.supportPlanLowTier"]
+    },
+    "Architecture review": {
+      "WAFR-001": [],
+      "WAFR-002": []
+    },
+    "AWS root account": {
+      "ARC-001": [],
+      "ARC-002": [],
+      "ARC-003": ["iam.rootMfaActive"],
+      "ARC-004": ["iam.rootHasAccessKey"],
+      "ARC-005": []
+    },
+    "Communications from AWS": {
+      "ACOM-001": ["iam.hasAlternateContact"],
+      "ACOM-002": []
+    },
+    "AWS CloudTrail": {
+      "CTL-001": [],
+      "CTL-002": [],
+      "CTL-003": [],
+      "CTL-004": []
+    },
+    "Identity and Access Management": {
+      "IAM-001": ["iam.mfaActive"],
+      "IAM-002": [
+        "iam.passwordLastChange90",
+        "iam.passwordLastChange365",
+        "iam.hasAccessKeyNoRotate90days",
+        "iam.hasAccessKeyNoRotate365days"
+      ],
+      "IAM-003": [
+        "iam.passwordPolicyWeak",
+        "iam.passwordPolicy"
+      ],
+      "IAM-004": ["iam.noUsersFound"],
+      "IAM-005": [],
+      "IAM-006": ["iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "iam.ManagedPolicyFullAccessOneServ", "iam.FullAdminAccess"],
+      "IAM-007": [
+        "iam.consoleLastAccess90",
+        "iam.consoleLastAccess365",
+        "iam.unusedRole"
+      ],
+      "IAM-008": [],
+      "IAM-009": [],
+      "IAM-010": [],
+      "IAM-011": [],
+      "IAM-012": ["iam.mfaActive", "ec2.EC2IamProfile"]
+    },
+    "Operational security": {
+      "SECOPS-001": []
+    },
+    "Network security": {
+      "NETSEC-001": ["ec2.SGDefaultInUsed", "ec2.SGSensitivePortOpenToAll", "ec2.SGAllOpenToAll", "ec2.SGAllOpen"],
+      "NETSEC-002": []
+    },
+    "Backups and recovery": {
+      "BAR-001": ["ec2.EBSSnapshot", "rds.Backup", "rds.BackupTooLow", "dynamodb.backupStatus", "dynamodb.enabledContinuousBackup"],
+      "BAR-002": []
+    },
+    "Resiliency": {
+      "RES-001": [],
+      "RES-002": [],
+      "RES-003": [],
+      "RES-004": [],
+      "RES-005": [],
+      "RES-006": [],
+      "RES-007": []
+    },
+    "Amazon S3 bucket access": {
+      "S3-001": [],
+      "S3-002": ["s3.PublicAccessBlock", "s3.S3AccountPublicAccessBlock"],
+      "S3-003": []
+    },
+    "Cross-account access": {
+      "CAA-001": [],
+      "CAA-002": [],
+      "CAA-003": [],
+      "CAA-004": [],
+      "CAA-005": [],
+      "CAA-006": [],
+      "CAA-007": []
+    },
+    "Sensitive data": {
+      "SDAT-001": [],
+      "SDAT-002": ["ec2.EBSEncrypted", "s3.ServerSideEncrypted", "rds.StorageEncrypted"],
+      "SDAT-003": ["ec2.SGEncryptionInTransit", "s3.TlsEnforced"]
+    },
+    "Regulatory compliance validation process": {
+      "RCVP-001": []
+    }
+  }
+}

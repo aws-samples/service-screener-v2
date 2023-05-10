@@ -1,0 +1,107 @@
+{
+	"accessLogging": {
+		"category": "S",
+		"^description": "You have not enabled CloudFront standard logs (access logs) for your distribution(s). CloudFront standard logs provide detailed records about every request that's made to a distribution. These logs are useful for many scenarios, including security and access audits.",
+		"shortDesc": "Enable CloudFront standard logs (access logs)",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/logging.html>"
+		]
+	},
+	"WAFAssociation": {
+		"category": "S",
+		"^description": "You have not associated either WAF or WAFv2 web ACL with your Amazon CloudFront distributions. AWS WAF helps you protect against common web exploits and bots that can affect availability, compromise security, or consume excessive resources.",
+		"shortDesc": "Use Web Application Firewall (WAF) for enhanced security.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 1,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/waf/latest/developerguide/cloudfront-features.html>",
+			"[Developer Guide]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/distribution-web-awswaf.html>"
+		]
+	},
+	"defaultRootObject": {
+		"category": "S",
+		"^description": "You have not configured CloudFront to return a specific object (the default root object) when a user requests the root URL for your distribution instead of requesting an object in your distribution. Specifying a default root object lets you avoid exposing the contents of your distribution.",
+		"shortDesc": "Specify a default root object for your distribution.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DefaultRootObject.html>"
+		]
+	},
+	"compressObjectsAutomatically": {
+		"category": "P",
+		"^description": "You have not configured CloudFront to automatically compress certain types of objects (files) and serve the compressed objects when viewers (web browsers or other clients) support them. When requested objects are compressed, downloads can be faster because the objects are smaller.",
+		"shortDesc": "Configure CloudFront to compress objects automatically",
+		"criticality": "I",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/ServingCompressedFiles.html>"
+		]
+	},
+	"DeprecatedSSLProtocol": {
+		"category": "S",
+		"^description": "Your CloudFront distributions are using deprecated SSL protocols for HTTPS communication between CloudFront edge locations and custom origins.",
+		"shortDesc": "Avoid using SSLv3 in your CloudFront distributions.",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/secure-connections-supported-viewer-protocols-ciphers.html>"
+		]
+	},
+	"originFailover": {
+		"category": "R",
+		"^description": "Your CloudFront distributions is not setup for origin failover. To set up origin failover, you must have a distribution with at least two origins.",
+		"shortDesc": "Create an origin group with two origins: a primary and a secondary for your default origin.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/high_availability_origin_failover.html>"
+		]
+	},	
+	"fieldLevelEncryption": {
+		"category": "S",
+		"^description": "Field-level encryption adds an additional layer of security that lets you protect specific data throughout system processing so that only certain applications can see it.",
+		"shortDesc": "Set-up field-level encryption for your CloudFront distributions.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 1,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/field-level-encryption.html>"
+		]
+	},
+	"viewerPolicyHttps": {
+		"category": "S",
+		"^description": "Your CloudFront distribution does not enforce HTTPS for communication between viewers and CloudFront.",
+		"shortDesc": "Configure one or more cache behaviors in your CloudFront distribution to require HTTPS for communication between viewers and CloudFront.",
+		"criticality": "I",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-https-viewers-to-cloudfront.html>"
+		]
+	}
+}

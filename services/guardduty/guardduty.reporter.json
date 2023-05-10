@@ -1,0 +1,46 @@
+{
+  "Findings": {
+      "category": "T",
+      "^description": "Custom Page Usage",
+      "downtime": 0,
+      "slowness": 0,
+      "additionalCost": 0,
+      "criticality": "H",
+      "shortDesc": "Findings",
+      "ref": [
+      ]
+  },
+  "UsageStat": {
+      "category": "T",
+      "^description": "Custom Page Usage",
+      "downtime": 0,
+      "slowness": 0,
+      "additionalCost": 0,
+      "criticality": "L",
+      "shortDesc": "UsageStat",
+      "ref": [
+      ]
+  },
+  "FreeTrial": {
+      "category": "T",
+      "^description": "Custom Page Usage",
+      "downtime": 0,
+      "slowness": 0,
+      "additionalCost": 0,
+      "criticality": "M",
+      "shortDesc": "FreeTrial",
+      "ref": [
+      ]
+  },
+  "Settings": {
+      "category": "T",
+      "^description": "Custom Page Usage",
+      "downtime": 0,
+      "slowness": 0,
+      "additionalCost": 0,
+      "criticality": "L",
+      "shortDesc": "Settings",
+      "ref": [
+      ]
+  }
+}

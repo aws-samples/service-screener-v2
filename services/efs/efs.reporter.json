@@ -1,0 +1,41 @@
+{
+    "EncryptedAtRest": {
+        "category": "S",
+        "^description": "EFS is not encrypted at rest. You can create a new encrypted EFS and migrate over the files into it",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "Migrate your files to encrypted EFS",
+        "ref": [
+            "[]<https://docs.aws.amazon.com/efs/latest/ug/encryption-at-rest.html>"    
+        ]
+    },
+    "EnabledLifecycle": {
+        "category": "C",
+        "^description": "",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "I",
+        "needFullTest": 0,
+        "shortDesc": "Enable Lifecycle Management for EFS.",
+        "ref": [
+            "[]<>"    
+        ]
+    },
+    "AutomatedBackup": {
+        "category": "R",
+        "^description": "Automatic backup for EFS is disabled, you can choose to enable it or setup customized backup plan through AWS Backup. You can ignore this if backup is enabled in AWS Backup.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Enable automatic backup for EFS.",
+        "ref": [
+            "[]<>"    
+        ]
+    }
+}
