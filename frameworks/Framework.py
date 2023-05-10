@@ -1,6 +1,7 @@
 import os
 import json
 
+from utils.Config import Config
 import constants as _C
 
 class Framework():
@@ -92,6 +93,13 @@ class Framework():
         
     def getContent(self, _m):
         serv, check = _m.split(".")
+        if check == '$length':
+            cnt = self.getResourceCount(serv)
+            if cnt == 0:
+                return {"c": check, "d": "Has at least 1 "+serv, "r": {}, "l": ''}
+            else:
+                return {"c": check, "d": "Has #cnt "+serv}
+        
         if serv in self.data and check in self.data[serv]['summary']:
             tmp = self.data[serv]['summary'][check]
             
@@ -100,6 +108,13 @@ class Framework():
             return {"c": check, "d": tmp['shortDesc'], "r": tmp['__affectedResources'], "l": "<br>".join(tmp['__links'])}
         else:
             return {"c": check}
+            
+    def getResourceCount(self, serv):
+        d = Config.get('cli_services', {})
+        if serv in d:
+            return d[serv]
+        else:
+            return 0
             
     def formatCheckAndLinks(self, packedData):
         links = []

@@ -24,6 +24,9 @@ class CloudtrailAccount(Evaluator):
             
         if Config.get('CloudTrail_hasManagementEventsCaptured') == False:
             self.results['HasManagementEventsCaptured'] = [-1, '']
+        
+        if Config.get('CloudTrail_hasDataEventsCaptured') == False:
+            self.results['HasDataEventsCaptured'] = [-1, '']
             
         lists = Config.get('CloudTrail_listGlobalServEnabled')
         if len(lists) > 1:

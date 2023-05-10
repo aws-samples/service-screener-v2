@@ -10,7 +10,7 @@ from services.Service import Service
 from services.cloudfront.drivers.cloudfrontDist import cloudfrontDist
 
 
-class Cloudfront(Service):
+class CloudFront(Service):
     def __init__(self, region):
         super().__init__(region)
         self.cloudfrontClient = boto3.client('cloudfront')
@@ -32,8 +32,6 @@ class Cloudfront(Service):
     
     def advise(self):
         objs = {}
-        
-        print('... (CloudFront:Distribution) inspecting')
         
         dists = self.getDistributions()
         for dist in dists:

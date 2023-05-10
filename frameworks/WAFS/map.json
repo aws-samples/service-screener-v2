@@ -1,0 +1,98 @@
+{
+  "metadata": {
+    "originator": "AWS",
+    "shortname": "WAFS",
+    "fullname": "AWS Well-Architected Framework - Security Pillar",
+    "description": "This framework focuses on the security pillar. This will help you meet your business and regulatory requirements by following current AWS recommendations. It’s intended for those in technology roles, such as chief technology officers (CTOs), chief information security officers (CSOs/CISOs), architects, developers, and operations team members. The security pillar describes how to take advantage of cloud technologies to protect data, systems, and assets in a way that can improve your security posture.",
+    "_": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/welcome.html"
+  },
+  "mapping": {
+    "SEC01": {
+      "BP01": ["iam.hasOrganization"],
+      "BP02": ["iam.rootMfaActive", "iam.hasAlternateContact", "iam.rootHasAccessKey", "iam.rootConsoleLogin30days", "iam.passwordPolicy", "iam.enableGuardDuty"],
+      "BP03": ["iam.mfaActive", "iam.passwordPolicyWeak", "iam.passwordLastChange90", "iam.hasAccessKeyNoRotate30days"],
+      "BP04": [],
+      "BP05": [],
+      "BP06": [],
+      "BP07": [],
+      "BP08": []
+    },
+    "SEC02": {
+      "BP01": ["iam.mfaActive", "iam.passwordPolicyWeak", "iam.passwordLastChange90", "iam.hasAccessKeyNoRotate30days"],
+      "BP02": ["ec2.EC2IamProfile"],
+      "BP03": [],
+      "BP04": ["iam.hasExternalIdentityProvider"],
+      "BP05": ["iam.passwordLastChange90", "iam.hasAccessKeyNoRotate30days", "eks.eksClusterRoleLeastPrivilege", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "iam.FullAdminAccess", "lambda.lambdaRoleReused", "ec2.EC2IamProfile"],
+      "BP06": ["iam.userNotUsingGroup", "iam.groupEmptyUsers"]
+    },
+    "SEC03": {
+      "BP01": [],
+      "BP02": ["eks.eksClusterRoleLeastPrivilege", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "iam.FullAdminAccess", "lambda.lambdaRoleReused", "ec2.EC2IamProfile"],
+      "BP03": [],
+      "BP04": ["iam.groupEmptyUsers", "iam.userNoActivity90days", "cloudtrail.HasDataEventsCaptured"],
+      "BP05": [],
+      "BP06": ["iam.userNoActivity90days"],
+      "BP07": ["s3.PubliclyAccessible", "s3.S3AccountPublicAccessBlock"],
+      "BP08": ["iam.hasOrganization"],
+      "BP09": []
+    },
+    "SEC04": {
+      "BP01": ["cloudtrail.NeedToEnableCloudTrail", "cloudtrail.HasOneMultiRegionTrail", "cloudtrail.EnableTrailS3BucketLifecycle", "cloudtrail.HasInsightSelectors", "iam.enableGuardDuty"],
+      "BP02": [],
+      "BP03": [],
+      "BP04": []
+    },
+    "SEC05":{
+      "BP01": ["cloudfront.$length"],
+      "BP02": ["ec.SGSensitivePortOpenToAll", "ec2.SGAllTCPOpen", "ec2.SGAllUDPOpen", "ec2.SGDefaultInUsed", "ec2.SGEncryptionInTransit", "ec2.ELBListenerInsecure", "rds.PubliclyAccessible"],
+      "BP03": [],
+      "BP04": ["iam.enableGuardDuty"]
+    },
+    "SEC06":{
+      "BP01": [],
+      "BP02": [],
+      "BP03": ["lambda.$length", "rds.$length", "ecs.$length", "eks.$length", "dynamodb.$length", "elasticache.$length"],
+      "BP04": [],
+      "BP05": [],
+      "BP06": []
+    },
+    "SEC07":{
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": []
+    },
+    "SEC08":{
+      "BP01": [],
+      "BP02": ["cloudtrail.RequiresKmsKey", "ec2.EBSEncrypted", "efs.EncryptedAtRest", "eks.eksSecretsEncryption", "lambda.lambdaCMKEncryptionDisabled", "rds.StorageEncrypted", "s3.ServerSideEncrypted"],
+      "BP03": [],
+      "BP04": ["eks.eksClusterRoleLeastPrivilege", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "iam.FullAdminAccess", "lambda.lambdaRoleReused", "ec2.EC2IamProfile", "s3.BucketVersioning", "s3.ObjectLock", "s3.PublicAccessBlock"],
+      "BP05": []
+    },
+    "SEC09":{
+      "BP01": [],
+      "BP02": ["cloudfront.viewerPolicyHttps", "cloudfront.DeprecatedSSLProtocol", "ec2.SGEncryptionInTransit", "ec2.ELBListenerInsecure"],
+      "BP03": [],
+      "BP04": []
+    },
+    "SEC10":{
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": [],
+      "BP07": []
+    },
+    "SEC11":{
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": [],
+      "BP07": [],
+      "BP08": []
+    }
+  }
+}

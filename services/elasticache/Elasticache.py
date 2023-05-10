@@ -14,9 +14,6 @@ class Elasticache(Service):
     def __init__(self, region) -> None:
         super().__init__(region)
         self.elasticacheClient = boto3.client('elasticache', config=self.bConfig)
-        self.driverInfo = {}
-        self.driverInfo['engine_veresions'] = self.getEngineVersions()
-        self.driverInfo['latest_instances'] = self.getLatestInstanceTypes()
 
     def getECClusterInfo(self):
         # list all Elasticahe clusters
@@ -137,6 +134,11 @@ class Elasticache(Service):
         # loop through EC nodes
         if len(self.cluster_info) > 0:
             print("evaluating Elasticache Clusters")
+            self.driverInfo = {}
+            self.driverInfo['engine_veresions'] = self.getEngineVersions()
+            self.driverInfo['latest_instances'] = self.getLatestInstanceTypes()
+        else:
+            return objs
 
         for cluster in self.cluster_info:
             if cluster.get('Engine') == 'memcached':

@@ -174,7 +174,7 @@
   },
   "HasManagementEventsCaptured": {
     "category": "O",
-    "^description": "None of your existing Amazon CloudTrail trails cover AWS Management events. Management events provide visibility into management operations that are performed on resources in your AWS account. These are also known as control plane operations. Example management events include:<br>- Configuring security (for example, IAM AttachRolePolicy API operations)<br>- Registering devices (for example, Amazon EC2 CreateDefaultVpc API operations)<br>- Configuring rules for routing data (for example, Amazon EC2 CreateSubnet API operations)<br>- Setting up logging (for example, AWS CloudTrail CreateTrail API operations)<br><br>Management events can also include non-API events that occur in your account. For example, when a user logs in to your account, CloudTrail logs the ConsoleLogin event. ",
+    "^description": "None of your existing Amazon CloudTrail trails cover AWS Management events. Management events provide visibility into management operations that are performed on resources in your AWS account. These are also known as control plane operations. Example management events include:<br>- Configuring security (for example, IAM AttachRolePolicy API operations)<br>- Registering devices (for example, Amazon EC2 CreateDefaultVpc API operations)<br>- Configuring rules for routing data (for example, Amazon EC2 CreateSubnet API operations)<br>- Setting up logging (for example, AWS CloudTrail CreateTrail API operations)<br><br>Management events can also include non-API events that occur in your account. For example, when a user logs in to your account, CloudTrail logs the ConsoleLogin event.",
     "shortDesc": "Trail to include Management Events",
     "criticality": "H",
     "downtime": 0,
@@ -197,6 +197,19 @@
     "ref": [
       "[Encrypt CloudTrail using AWS KMS]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/encrypting-cloudtrail-log-files-with-aws-kms.html>",
       "[CloudTrail Security Best Practices]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/best-practices-security.html>"
+    ]
+  },
+  "HasDataEventsCaptured": {
+    "category": "S",
+    "^description": "None of your existing Amazon CloudTrail trails cover AWS Data events. Data events provide visibility into the resource operations performed on or within a resource. These are also known as data plane operations. Data events are often high-volume activities.",
+    "shortDesc": "Trail to include data event",
+    "criticality": "M",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "ref": [
+      "[CloudTrail Data Event]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-data-events-with-cloudtrail.html>"
     ]
   }
 }

@@ -37,6 +37,7 @@ class Cloudtrail(Service):
         Config.set('CloudTrail_hasGlobalServEnabled', False)
         Config.set('CloudTrail_listGlobalServEnabled', [])
         Config.set('CloudTrail_hasManagementEventsCaptured', False)
+        Config.set('CloudTrail_hasDataEventsCaptured', False)
         
         objs = {}
         trails = self.getTrails()

@@ -178,7 +178,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/serv-side-encryption.html>"
+			"[IAM Group]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_groups.html>"
 		]
 	},
 	"groupEmptyUsers": {
@@ -378,6 +378,34 @@
 		"ref": [
 			"[CloudTrail ConsoleLogin event]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-aws-console-sign-in-events.html>",
 			"[GuardDuty IAM findings]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-iam.html>"
+		]
+	},
+	"hasOrganization": {
+		"category": "SO",
+		"^description": "This AWS account is not belong to any AWS organization. Recommend to separate workloads using accounts. Establish common guardrails and isolation between environments (such as production, development, and test) and workloads through a multi-account strategy. Account-level separation is strongly recommended, as it provides a strong isolation boundary for security, billing, and access. We need to have an account structure that isolates cloud operations, unrelated workloads, and environments into separate accounts, increasing security across the cloud infrastructure.",
+		"shortDesc": "Setup AWS Organization",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[AWS Organizations conepts]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_getting-started_concepts.html>",
+			"[Multiaccounts best practices]<https://aws.amazon.com/blogs/industries/best-practices-for-aws-organizations-service-control-policies-in-a-multi-account-environment/>"
+		]
+	},
+	"userNoActivity90days": {
+		"category": "S",
+		"^description": "{$COUNT} of user(s) does not has active activity in the past 90 days (neither console or api). Please review and disable.",
+		"shortDesc": "Inactive user",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[IAM Credential Reports]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_getting-report.html>",
+			"[Rotate Keys]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html#Using_RotateAccessKey>"
 		]
 	}
 }

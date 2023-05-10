@@ -19,29 +19,6 @@ Running this tool is free as it is covered under the AWS Free Tier. If you have 
 1. Please review the [DISCLAIMER](./DISCLAIMER.md) before proceeding. 
 2. You must have an existing AWS Account.
 3. You must have an IAM User with sufficient read permissions. Here is a sample [policy](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_examples_iam_read-only-console.html). Additionally, The IAM User must also have full access to AWS CloudShell i.e. AWSCloudShellFullAccess. 
-4. **(Optional)** You can create an S3 bucket to store Service Screener findings. 
-    - If you do not have sufficient permissions attached to your IAM User, you can create a new IAM Policy in the IAM console by copying the policy below into the policy editor and attaching it to your IAM user.
-    ```
-    {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Sid": "",
-                "Effect": "Allow",
-                "Action": [
-                    "s3:CreateBucket",
-                    "s3:ListAllMyBuckets",
-                    "s3:ListBucket",
-                    "s3:GetObject",
-                    "s3:PutObject",
-                    "s3:GetObjectAcl",
-                    "s3:PutObjectAcl"
-                ],
-                "Resource": "arn:aws:s3:::<sample_bucket>/*"
-            }
-        ]
-    }
-    ```
 
 ## Installing service-screener V2
 1. [Log in to your AWS account](https://docs.aws.amazon.com/cloudshell/latest/userguide/getting-started.html#start-session) using the IAM User with sufficient permissions described above. 
@@ -53,12 +30,9 @@ In the AWS CloudShell terminal, run this script this to install the dependencies
 ```bash
 python -m venv .
 source bin/activate
-git clone https://github.com/<GITHUB_REPO_OWNER>/service-screener-v2.git
-mv service-screener-v2 src
-cd src
-pip install -e .
-pip install boto3
-pip install packaging
+git clone https://github.com/aws-samples/service-screener-v2.git
+cd service-screener-v2
+pip install -r requirements.txt
 alias screener="python3 $(pwd)/main.py"
 
 ```
@@ -66,7 +40,7 @@ alias screener="python3 $(pwd)/main.py"
 ![Install dependencies](https://d39bs20xyg7k53.cloudfront.net/services-screener/p2-dependencies.gif)
 
 ## Using Service Screener
-When running Service Screener, you will need to specify the regions and services you would like it to run on. It currently supports Amazon EC2, Amazon RDS, AWS IAM, Amazon Opensearch, and Amazon S3.
+When running Service Screener, you will need to specify the regions and services you would like it to run on. It currently supports Amazon Cloudfront, AWS Cloudtrail, Amazon Dynamodb, Amazon EC2, Amazon EFS, Amazon RDS, Amazon EKS, Amazon Elasticache, Amazon Guardduty, AWS IAM, Amazon Opensearch, AWS Lambda, and Amazon S3.
 
 We recommend running it in all regions where you have deployed workloads in. Adjust the code samples below to suit your needs then copy and paste it into Cloudshell to run Service Screener. 
 
@@ -99,12 +73,6 @@ screener --regions ap-southeast-1 --filters env=prod%department=hr,coe
 **Example 6: Running in all regions, and all services**
 ```
 screener --regions ALL
-```
-
-**Example 7: Running in the Singapore & North Virginia regions, checking RDS and IAM, and uploading the result to an S3 bucket with static website hosting enabled**
-```
-## NOT SUPPORTED YET, RELEASE SOON
-screener --region ap-southeast-1,us-east-1 --services rds,iam --bucket service-screener-<YOUR_ACCOUNT_ID>
 ```
 
 ### Other parameters

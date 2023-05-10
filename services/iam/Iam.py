@@ -19,6 +19,7 @@ class Iam(Service):
         
         self.awsClients = {
             'iamClient': self.iamClient,
+            'orgClient': boto3.client('organizations'),
             'accClient': boto3.client('account', config=self.bConfig),
             'sppClient': boto3.client('support', config=self.bConfig),
             'gdClient': boto3.client('guardduty', config=self.bConfig),

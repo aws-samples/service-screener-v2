@@ -58,6 +58,9 @@ class CloudtrailCommon(Evaluator):
         e = self.trailSelector['Event']
         if 'IncludeManagementEvents' in e and e['IncludeManagementEvents'] == True:
             Config.set('CloudTrail_hasManagementEventsCaptured', True)
+        
+        if 'DataResources' in e and len(e['DataResources']) > 0:
+            Config.set('CloudTrail_hasDataEventsCaptured', True)
             
     def _checkSNSTopicValid(self):
         if (not 'SnsTopicARN' in self.trailInfo) or (self.trailInfo['SnsTopicARN'] == None):
@@ -88,7 +91,7 @@ class CloudtrailCommon(Evaluator):
         ## For safety purpose, though all trails must have bucket
         if 'S3BucketName' in self.trailInfo and len(self.trailInfo['S3BucketName']) > 0:
             s3Bucket = self.trailInfo['S3BucketName']
-            print("Bucket Name {}".format(s3Bucket))
+            # print("Bucket Name {}".format(s3Bucket))
             try:
                 r = self.s3Client.get_bucket_versioning(
                     Bucket=s3Bucket
