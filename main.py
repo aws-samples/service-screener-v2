@@ -107,7 +107,7 @@ scanned = {
 
 hasGlobal = False
 for file in os.listdir(_C.FORK_DIR):
-    if file[0] == '.' or file == _C.SESSUID_FILENAME or file == 'tail.txt' or file == 'error.txt':
+    if file[0] == '.' or file == _C.SESSUID_FILENAME or file == 'tail.txt' or file == 'error.txt' or file == 'empty.txt':
         continue
     f = file.split('.')
     if len(f) == 2:

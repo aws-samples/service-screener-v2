@@ -33,8 +33,6 @@ class Cloudfront(Service):
     def advise(self):
         objs = {}
         
-        print('... (CloudFront:Distribution) inspecting')
-        
         dists = self.getDistributions()
         for dist in dists:
             print('... (CloudFront::Distribution) inspecting ' + dist)

@@ -38,22 +38,6 @@ class IamUser(IamCommon):
             
         if key != False:
             self.results[key] = [-1, daySinceLastAccess]
-            
-    def _checkPasswordLastChange(self):
-        if self.user['password_last_changed'] in self.ENUM_NO_INFO:
-            return
-        
-        daySinceLastChange = self.getAgeInDay(self.user['password_last_changed'])
-
-        if daySinceLastChange > 365:
-            key = "passwordLastChange365"
-        elif daySinceLastChange > 90:
-            key = "passwordLastChange90"
-        else:
-            key = False
-            
-        if key != False:
-            self.results[key] = [-1, daySinceLastChange]
     
     def _checkUserInGroup(self):
         user = self.user['user']
@@ -82,24 +66,48 @@ class IamUser(IamCommon):
         
     def _checkAccessKeyRotate(self):
         user = self.user
+        if user['password_last_changed'] in self.ENUM_NO_INFO:
+            return
+        
+        daySinceLastChange = self.getAgeInDay(self.user['password_last_changed'])
+
+        if daySinceLastChange > 365:
+            key = "passwordLastChange365"
+        elif daySinceLastChange > 90:
+            key = "passwordLastChange90"
+        else:
+            key = False
+            
+        if key != False:
+            self.results[key] = [-1, daySinceLastChange]
+        
+        daysAccesskey = 0
         if user['user'] == '<root_account>':
             if user['access_key_1_active'] == 'false' and user['access_key_2_active'] == 'false':
                 pass 
             else:
                 self.results['rootHasAccessKey'] = [-1, '']
         else:
-            ## <TODO>
-            ## GenerateReport api will cache results, waiting it to refresh
             if user['access_key_1_active'] == 'false':
-                return
-            
-            days = self.getAgeInDay(user['access_key_1_last_rotated'])
-            
-            if days >= 90:
-                k = 'hasAccessKeyNoRotate90days'
-            elif days >= 30:
-                k = 'hasAccessKeyNoRotate30days'
+                pass
             else:
-                return
+                daysAccesskey = self.getAgeInDay(user['access_key_1_last_rotated'])
+                
+                if daysAccesskey >= 90:
+                    k = 'hasAccessKeyNoRotate90days'
+                elif daysAccesskey >= 30:
+                    k = 'hasAccessKeyNoRotate30days'
+                else:
+                    return
+                
+                self.results[k] = [-1, str(daysAccesskey)]
+        
+        daySinceLastLogin = 0
+        field = 'password_last_used'
+        if user['password_last_used'] in self.ENUM_NO_INFO:
+            field = 'user_creation_time'
             
-            self.results[k] = [-1, str(days)]
+        daySinceLastLogin = self.getAgeInDay(user[field])
+                
+        if daysAccesskey >= 90 and daySinceLastLogin >= 90:
+            self.results['userNoActivity90days'] = [-1, '']

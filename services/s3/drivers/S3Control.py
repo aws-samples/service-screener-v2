@@ -24,8 +24,8 @@ class S3Control(Evaluator):
                 self.results['S3AccountPublicAccessBlock'] = [-1,'Insufficient info']
                 return
         except botocore.exceptions.ClientError as e:
-            print("Unable to retrieve account information")
-            self.results['S3AccountPublicAccessBlock'] = [-1,'Insufficient info']
+            print('Unable to capture S3 Logging settings:', e.response['Error']['Code'])
+            # self.results['S3AccountPublicAccessBlock'] = [-1,'Insufficient info']
             
         try:
             resp = self.s3Control.get_public_access_block(

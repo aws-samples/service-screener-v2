@@ -21,6 +21,7 @@ class IamAccount(IamCommon):
         self.sppClient = awsClients['sppClient']
         self.gdClient = awsClients['gdClient']
         self.budgetClient = awsClients['budgetClient']
+        self.orgClient = awsClients['orgClient']
         
         self.ctClient = boto3.client('cloudtrail', config=bConfig(region_name='us-east-1'))
         
@@ -218,3 +219,14 @@ class IamAccount(IamCommon):
             ecode = e.response['Error']['Code']
             if ecode == 'ResourceNotFoundException':
                 return 0
+
+    def _checkHasOrganization(self):
+        try:
+            resp = self.orgClient.describe_organization()
+        except botocore.exceptions.ClientError as e:
+            ecode = e.response['Error']['Code']
+            if ecode == 'AWSOrganizationsNotInUseException':
+                self.results['hasOrganization'] = [-1, '']
+                return 0
+
+        
