@@ -200,32 +200,38 @@ class Ec2(Service):
         secGroups = {}
         
         # compute optimizer checks
-        try:
-            compOptPath = "/aws/service/global-infrastructure/regions/" + self.region + "/services/compute-optimizer";
-            compOptCheck = self.ssmClient.get_parameters_by_path(
-                Path = compOptPath    
-            )
-            
-            if 'Parameters' in compOptCheck and len(compOptCheck['Parameters']) > 0:
-                print('... (Compute Optimizer Recommendations) inspecting')
-                obj = Ec2CompOpt(self.compOptClient)
-                obj.run()
+        hasRunComputeOpt = Config.get('EC2_HasRunComputeOpt', False)
+        if hasRunComputeOpt == False:
+            try:
+                compOptPath = "/aws/service/global-infrastructure/regions/" + self.region + "/services/compute-optimizer";
+                compOptCheck = self.ssmClient.get_parameters_by_path(
+                    Path = compOptPath    
+                )
                 
-        except botocore.exceptions.ClientError as e:
-            ecode = e.response['Error']['Code']
-            emsg = e.response['Error']['Message']
-            print(ecode, emsg)     
-        except Exception as e:
-            print(e)
-            print("!!! Skipping compute optimizer check for <" + self.region + ">")
+                if 'Parameters' in compOptCheck and len(compOptCheck['Parameters']) > 0:
+                    print('... (Compute Optimizer Recommendations) inspecting')
+                    obj = Ec2CompOpt(self.compOptClient)
+                    obj.run()
+                    Config.set('EC2_HasRunComputeOpt', True)
+                    
+            except botocore.exceptions.ClientError as e:
+                ecode = e.response['Error']['Code']
+                emsg = e.response['Error']['Message']
+                print(ecode, emsg)     
+            except Exception as e:
+                print(e)
+                print("!!! Skipping compute optimizer check for <" + self.region + ">")
             
         
         #EC2 Cost Explorer checks
-        print('... (Cost Explorer Recommendations) inspecting')
-        obj = Ec2CostExplorerRecs(self.ceClient)
-        obj.run()
-
-        objs['CostExplorer'] = obj.getInfo()
+        hasRunRISP = Config.get('EC2_HasRunRISP', False)
+        if hasRunRISP == False:
+            print('... (Cost Explorer Recommendations) inspecting')
+            obj = Ec2CostExplorerRecs(self.ceClient)
+            obj.run()
+    
+            objs['CostExplorer'] = obj.getInfo()
+            Config.set('EC2_HasRunRISP', True)
         
         
         # EC2 instance checks

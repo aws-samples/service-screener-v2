@@ -1,10 +1,10 @@
 import urllib.parse
 from datetime import date
 import boto3
-​
+
 from utils.Config import Config
 from services.Evaluator import Evaluator
-​
+
 class cloudfrontDist(Evaluator):
     def __init__(self, dist, cloudfrontClient):
         super().__init__()
@@ -46,6 +46,9 @@ class cloudfrontDist(Evaluator):
         resp = self.cloudfrontClient.get_distribution_config(Id=dist)
         
         for y in resp['DistributionConfig']['Origins']['Items']:
+            if not 'CustomOriginConfig' in y:
+                continue
+            
             if 'SSLv3' in y['CustomOriginConfig']['OriginSslProtocols']['Items']:
                 self.results['DeprecatedSSLProtocol'] = [-1, '']
                 break

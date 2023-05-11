@@ -14,7 +14,13 @@ class PageBuilder:
         's3': 'hdd',
         'iam': 'users',
         'guardduty': 'shield-alt',
-        'opensearch': 'warehouse'
+        'opensearch': 'warehouse',
+        'efs': 'network-wired', 
+        'eks': 'box', 
+        'cloudfront': 'wifi', 
+        'elasticache': 'store', 
+        'lambda': 'calculator', 
+        'cloudtrail': 'user-secret'
     }
     
     frameworkIcon = 'tasks'

@@ -10,7 +10,7 @@ from services.Service import Service
 from services.cloudfront.drivers.cloudfrontDist import cloudfrontDist
 
 
-class CloudFront(Service):
+class Cloudfront(Service):
     def __init__(self, region):
         super().__init__(region)
         self.cloudfrontClient = boto3.client('cloudfront')
