@@ -173,7 +173,7 @@ class Screener:
                 os.chdir(_C.ROOT_DIR)
                 os.system('cd adminlte; zip -q -r output.zip html; mv output.zip ../output.zip')
                 print("Pages generated, download \033[1;42moutput.zip\033[0m to view")
-                print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m ~/service-screenerV2/output.zip \033[1;42m <===== \033[0m")
+                print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m ~/service-screener-v2/output.zip \033[1;42m <===== \033[0m")
                 
                 # <TODO>
                 ## Upload to S3
