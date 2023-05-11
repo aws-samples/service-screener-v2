@@ -28,8 +28,9 @@ Running this tool is free as it is covered under the AWS Free Tier. If you have 
 
 In the AWS CloudShell terminal, run this script this to install the dependencies:
 ```bash
-python -m venv .
+python3 -m venv .
 source bin/activate
+rm -rf service-screner-v2
 git clone https://github.com/aws-samples/service-screener-v2.git
 cd service-screener-v2
 pip install -r requirements.txt
@@ -87,7 +88,7 @@ screener --regions ALL
 ![Get Report](https://d39bs20xyg7k53.cloudfront.net/services-screener/p3-getreport.gif)
 
 ### Downloading the report
-The output is generated as an output.zip file. 
+The output is generated as an ~/service-screener-v2/output.zip file. 
 You can [download the file](https://docs.aws.amazon.com/cloudshell/latest/userguide/working-with-cloudshell.html#files-storage) in the CloudShell console by clicking the *Download file* button under the *Actions* menu on the top right of the Cloudshell console. 
 
 ![Download Output](https://d39bs20xyg7k53.cloudfront.net/services-screener/p4-outputzip.gif)
