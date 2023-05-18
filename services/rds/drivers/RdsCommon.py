@@ -71,12 +71,12 @@ class RdsCommon(Evaluator):
     def _checkHasBackup(self):
         backupDay = self.db['BackupRetentionPeriod']
         if backupDay == 0:
-            self.results['Backup'] = -1
+            kk = 'Backup'
         elif backupDay < 7:
-            self.results['BackupTooLow'] = -1
+            kk = 'BackupTooLow'
             
         if backupDay < 7:
-            self.results['Backup'] = [-1, backupDay]
+            self.results[kk] = [-1, backupDay]
 
     def _checkIsUsingDefaultParameterGroups(self):
         params = self.db['DBParameterGroups']
