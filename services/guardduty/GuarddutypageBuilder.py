@@ -37,7 +37,11 @@ class GuarddutypageBuilder(PageBuilder):
                 if 'Findings' in detector:
                     findings = self._gdProcessFinding(detector['Findings']['value'])
 
-                self.settings[region] = self._gdProcessGeneral(detector['FreeTrial']['value'], detector['Settings']['value']['Settings'], detector['UsageStat']['value'])
+                ustat = '-1'
+                if 'UsageStat' in detector:
+                    ustat = detector['UsageStat']['value']
+                self.settings[region] = self._gdProcessGeneral(detector['FreeTrial']['value'], detector['Settings']['value']['Settings'], ustat)
+
 
             if findings:
                 self.findings.append(findings['detail'])
