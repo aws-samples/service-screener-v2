@@ -176,12 +176,18 @@ class IamAccount(IamCommon):
         stsInfo = Config.get('stsInfo')
         
         budgetClient = self.budgetClient
-        resp = budgetClient.describe_budgets(AccountId=stsInfo['Account'])
         
-        if 'Budgets' in resp:
-            return 
+        try:
+            resp = budgetClient.describe_budgets(AccountId=stsInfo['Account'])
         
-        self.results['enableCostBudget'] = [-1, ""]
+            if 'Budgets' in resp:
+                return 
+        
+            self.results['enableCostBudget'] = [-1, ""]
+        except botocore.exceptions.ClientError as e:
+            ecode = e.response['Error']['Code']
+            emsg = e.response['Error']['Message']
+            print(ecode, emsg)
     
     def _checkSupportPlan(self):
         sppClient = self.sppClient
@@ -202,11 +208,12 @@ class IamAccount(IamCommon):
         cnt = 0
         for typ in CONTACT_TYP:
             res = self.getAlternateContactByType(typ)
+            if res == None:
+                res = 0
             cnt += res
         
         if cnt == 0:
             self.results['hasAlternateContact'] = [-1, 'No alternate contacts']
-
     
     def getAlternateContactByType(self, typ):
         try:
