@@ -127,7 +127,10 @@ class GuarddutypageBuilder(PageBuilder):
                 key = ds[0] + ':' + ds[1]
                 arr[key] = empty_array.copy()
 
-                arr[key]['FreeTrial'] = free_trial[ds[0]][ds[1]]['FreeTrialDaysRemaining'] if free_trial[ds[0]][ds[1]]['FreeTrialDaysRemaining'] else 'N/A'
+                stat = 'X'
+                if ds[0] in free_trial and ds[1] in free_trial[ds[0]] and 'FreeTrialDaysRemaining' in free_trial[ds[0]][ds[1]]:
+                    stat = free_trial[ds[0]][ds[1]]['FreeTrialDaysRemaining']
+                
 
                 if ds[0] == 'MalwareProtection':
                     arr[key]['Enabled'] = self._generate_enabled_icon(settings[ds[0]][ds[1]]['EbsVolumes']['Status'])
