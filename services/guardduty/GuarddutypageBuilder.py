@@ -36,8 +36,20 @@ class GuarddutypageBuilder(PageBuilder):
             for detectorId, detector in detectors.items():
                 if 'Findings' in detector:
                     findings = self._gdProcessFinding(detector['Findings']['value'])
-
-                self.settings[region] = self._gdProcessGeneral(detector['FreeTrial']['value'], detector['Settings']['value']['Settings'], detector['UsageStat']['value'])
+                
+                ustat = '-1'
+                if 'UsageStat' in detector and 'value' in detector['UsageStat']:
+                    ustat = detector['UsageStat']['value']
+                
+                ftrial = '-1'
+                if 'FreeTrial' in detector and 'value' in detector['FreeTrial']:
+                    ftrial = detector['FreeTrial']['value']
+                
+                settings = '-1'
+                if 'Settings' in detector and 'value' in detector['Settings'] and 'Settings' in detector['Settings']['value']:
+                    settings = detector['Settings']['value']['Settings']
+                    
+                self.settings[region] = self._gdProcessGeneral(ftrial, settings, ustat)
 
             if findings:
                 self.findings.append(findings['detail'])
@@ -114,12 +126,23 @@ class GuarddutypageBuilder(PageBuilder):
                 key = ds[0] + ':' + ds[1]
                 arr[key] = empty_array.copy()
 
-                arr[key]['FreeTrial'] = free_trial[ds[0]][ds[1]]['FreeTrialDaysRemaining'] if free_trial[ds[0]][ds[1]]['FreeTrialDaysRemaining'] else 'N/A'
+                ft = None
+                if ds[0] in free_trial and ds[1] in free_trial[ds[0]] and 'FreeTrialDaysRemaining' in free_trial[ds[0]][ds[1]]:
+                    ft = free_trial[ds[0]][ds[1]]['FreeTrialDaysRemaining']
+                
+                arr[key]['FreeTrial'] = ft if ft else 'N/A'
 
-                if ds[0] == 'MalwareProtection':
-                    arr[key]['Enabled'] = self._generate_enabled_icon(settings[ds[0]][ds[1]]['EbsVolumes']['Status'])
-                else:
-                    arr[key]['Enabled'] = self._generate_enabled_icon(settings[ds[0]][ds[1]]['Status'])
+                estat = 'X'
+                if ds[0] in settings and ds[1] in settings[ds[0]]:
+                    _settings = settings[ds[0]][ds[1]]
+                    
+                    if ds[0] == 'MalwareProtection':
+                        estat = _settings['EbsVolumes']['Status']
+                    else:
+                        estat = _settings['Status']
+                
+                arr[key]['Enabled'] = self._generate_enabled_icon(estat)
+
             else:
                 arr[ds] = empty_array.copy()
                 arr[ds]['FreeTrial'] = free_trial[ds]['FreeTrialDaysRemaining'] if free_trial[ds]['FreeTrialDaysRemaining'] else 'N/A'
@@ -129,10 +152,12 @@ class GuarddutypageBuilder(PageBuilder):
 
         total = 0
         for stat in usage_stat:
-            amount = round(float(stat['Total']['Amount']), 4)
-            ds = MAPPED[stat['DataSource']]
-            arr[ds]['Usage'] = amount
-
+            amount = 0
+            if 'Total' in stat and 'Amount' in stat['Total']:
+                amount = round(float(stat['Total']['Amount']), 4)
+                ds = MAPPED[stat['DataSource']]
+                arr[ds]['Usage'] = amount
+            
             total += amount
 
         arr['Total'] = total
