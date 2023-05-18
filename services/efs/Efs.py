@@ -38,7 +38,7 @@ class Efs(Service):
                 obj = globals()[driver](efs, self.efs_client)
                 obj.run()
 
-                objs['EFS::' + efs['FileSystemId']] = obj.get_info()
+                objs['EFS::' + efs['FileSystemId']] = obj.getInfo()
                 del obj
 
         return objs
