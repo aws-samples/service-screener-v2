@@ -56,6 +56,9 @@ class CloudtrailCommon(Evaluator):
             
     def _checkEvents(self):
         e = self.trailSelector['Event']
+        if e == None:
+            return
+        
         if 'IncludeManagementEvents' in e and e['IncludeManagementEvents'] == True:
             Config.set('CloudTrail_hasManagementEventsCaptured', True)
         
