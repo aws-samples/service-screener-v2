@@ -21,12 +21,15 @@ class Cloudfront(Service):
         arr = []
         
         while True:
-            for dist in response["DistributionList"]["Items"]:
-                arr.append(dist["Id"])
-            if "NextMarker" not in response["DistributionList"]:
-                break
+            if "DistributionList" in response and "Items" in response["DistributionList"]:
+                for dist in response["DistributionList"]["Items"]:
+                    arr.append(dist["Id"])
+                if "NextMarker" not in response["DistributionList"]:
+                    break
     
-            response = self.cloudfrontClient.list_distributions(Marker=response["DistributionList"]["NextMarker"])
+                response = self.cloudfrontClient.list_distributions(Marker=response["DistributionList"]["NextMarker"])
+            else:
+                break
         return arr
         
     
