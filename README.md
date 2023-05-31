@@ -18,7 +18,7 @@ Running this tool is free as it is covered under the AWS Free Tier. If you have 
 ## Prerequisites
 1. Please review the [DISCLAIMER](./DISCLAIMER.md) before proceeding. 
 2. You must have an existing AWS Account.
-3. You must have an IAM User with sufficient read permissions. Here is a sample [policy](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_examples_iam_read-only-console.html). Additionally, The IAM User must also have full access to AWS CloudShell i.e. AWSCloudShellFullAccess. 
+3. You must have an IAM User with sufficient read permissions. Here is a sample [policy](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_examples_iam_read-only-console.html). Additionally, The IAM User must also have both full access to AWS CloudShell i.e. AWSCloudShellFullAccess, and "cloudformation:CreateStack"
 
 ## Installing service-screener V2
 1. [Log in to your AWS account](https://docs.aws.amazon.com/cloudshell/latest/userguide/getting-started.html#start-session) using the IAM User with sufficient permissions described above. 
@@ -30,6 +30,7 @@ In the AWS CloudShell terminal, run this script this to install the dependencies
 ```bash
 python3 -m venv .
 source bin/activate
+python3 -m pip install --upgrade pip
 rm -rf service-screner-v2
 git clone https://github.com/aws-samples/service-screener-v2.git
 cd service-screener-v2

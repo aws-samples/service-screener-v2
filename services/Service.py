@@ -1,5 +1,6 @@
 import time
 
+import boto3
 from botocore.config import Config as bConfig
 from utils.Config import Config
 
@@ -24,6 +25,11 @@ class Service:
         self.bConfig = bConfig(
             region_name = region    
         )
+        
+        # param = Config.get('_SS_PARAMS')
+        # profile = param['profile']
+        # if not profile == False:
+        #    boto3.setup_default_session(profile_name=profile)
         
         print('PREPARING -- ' + classname.upper()+ '::'+region)
         

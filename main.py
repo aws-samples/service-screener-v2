@@ -4,8 +4,11 @@ import json
 import locale
 from multiprocessing import Pool
 
+import boto3
+
 from utils.Config import Config
 from utils.ArguParser import ArguParser
+from utils.CfnFaker import CfnFaker
 import constants as _C
 from utils.AwsRegionSelector import AwsRegionSelector
 from Screener import Screener
@@ -35,9 +38,8 @@ runmode = runmode if runmode in ['api-raw', 'api-full', 'report'] else 'report'
 
 # <TODO> analyse the impact profile switching
 profile = _cli_options['profile']
-if profile:
-    global PHPSDK_CRED_PROFILE
-    PHPSDK_CRED_PROFILE = profile
+if not profile == False:
+    boto3.setup_default_session(profile_name=profile)
 
 _AWS_OPTIONS = {
     'signature_version': Config.AWS_SDK['signature_version']
@@ -69,7 +71,9 @@ if _cli_options['regions'] == None:
 services = _cli_options['services'].split(',')
 regions = _cli_options['regions'].split(',')
 
+Config.set('PARAMS_REGION_ALL', False)
 if regions[0] == 'ALL':
+    Config.set('PARAMS_REGION_ALL', True)
     regions = AwsRegionSelector.get_all_enabled_regions()
 
 frameworks = []
@@ -85,6 +89,9 @@ serviceStat = {}
 GLOBALRESOURCES = []
 
 oo = Config.get('_AWS_OPTIONS')
+
+CfnFaker = CfnFaker()
+CfnFaker.createStack()
 
 overallTimeStart = time.time()
 os.chdir('__fork')
@@ -156,6 +163,7 @@ Config.set('cli_regions', regions)
 Config.set('cli_frameworks', frameworks)
 
 Screener.generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS3, bucket)
+CfnFaker.deleteStack()
 
 os.chdir(_C.FORK_DIR)
 os.system('rm -f tail.txt')
