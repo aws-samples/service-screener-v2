@@ -31,7 +31,7 @@ In the AWS CloudShell terminal, run this script this to install the dependencies
 python3 -m venv .
 source bin/activate
 python3 -m pip install --upgrade pip
-rm -rf service-screner-v2
+rm -rf service-screener-v2
 git clone https://github.com/aws-samples/service-screener-v2.git
 cd service-screener-v2
 pip install -r requirements.txt
