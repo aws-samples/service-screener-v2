@@ -1,4 +1,3 @@
-
 from .RdsCommon import RdsCommon
 
 class RdsMysql(RdsCommon):
@@ -19,7 +18,7 @@ class RdsMysql(RdsCommon):
     # https://aws.amazon.com/blogs/database/best-practices-for-configuring-parameters-for-amazon-rds-for-mysql-part-1-parameters-related-to-performance/
     def _checkParamSyncBinLog(self):
         sync_binLog = self.dbParams.get('sync_binlog', False)
-        if sync_binLog != 1:
+        if sync_binLog != "1":
             self.results['MYSQL__param_syncBinLog'] = [-1, 'null' if sync_binLog is False else sync_binLog]
     
     def _checkParamInnoDbFlushTrxCommit(self):
