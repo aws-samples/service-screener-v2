@@ -136,8 +136,8 @@ class DashboardPageBuilder(PageBuilder):
         colorArr = {
             'S': ['danger', 'Security', 'cog'],
             'R': ['fuchsia', 'Reliability', 'globe'],
-            'C': ['warning', 'Cost Optimisation', 'dollar-sign'],
-            'P': ['success', 'Performance Efficieny', 'seedling'],
+            'C': ['warning', 'Cost Optimization', 'dollar-sign'],
+            'P': ['success', 'Performance Efficiency', 'seedling'],
             'O': ['navy', 'Operation Excellence', 'wrench']
         }
         

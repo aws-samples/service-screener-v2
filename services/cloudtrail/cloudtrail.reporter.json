@@ -211,5 +211,18 @@
     "ref": [
       "[CloudTrail Data Event]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-data-events-with-cloudtrail.html>"
     ]
+  },
+  "EnableCloudTrailLogging": {
+    "category": "O",
+    "^description": "You have {$count} CloudTrail that is not currently logging AWS API calls",
+    "shortDesc": "Enable logging of AWS API calls",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "ref": [
+      "[Stop/Start Logging]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-turning-off-logging.html>"
+    ]
   }
 }
