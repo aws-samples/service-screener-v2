@@ -26,30 +26,38 @@ class S3(Service):
     
     def getResources(self):
         buckets = Config.get('s3::buckets', {})
-        if not buckets:
-            buckets = {}
-            results = self.s3Client.list_buckets()
-            
-            arr = results.get('Buckets')
-            while results.get('Maker') is not None:
-                results = self.s3Client.list_buckets(
-                    Maker = results.get('Maker')
-                )    
-                arr = arr + results.get('Buckets')
-            
-            for ind, bucket in enumerate(arr):
-                loc = self.s3Client.get_bucket_location(
-                    Bucket = bucket['Name']
-                )
-                reg = loc.get('LocationConstraint')
+        unableToListBucket = Config.get('s3::bucketUnableToList', False)
+        if not buckets and not unableToListBucket:
+            try:
+                buckets = {}
+                results = self.s3Client.list_buckets()
                 
-                if reg == None:
-                    reg = 'us-east-1'
+                arr = results.get('Buckets')
+                while results.get('Maker') is not None:
+                    results = self.s3Client.list_buckets(
+                        Maker = results.get('Maker')
+                    )    
+                    arr = arr + results.get('Buckets')
+                
+                for ind, bucket in enumerate(arr):
+                    loc = self.s3Client.get_bucket_location(
+                        Bucket = bucket['Name']
+                    )
+                    reg = loc.get('LocationConstraint')
                     
-                if not reg in buckets:
-                    buckets[reg] = []
-                buckets[reg].append(arr[ind])
-            
+                    if reg == None:
+                        reg = 'us-east-1'
+                        
+                    if not reg in buckets:
+                        buckets[reg] = []
+                    buckets[reg].append(arr[ind])
+                
+            except botocore.exceptions.ClientError as e:
+                Config.set('s3::bucketUnableToList', True)
+                ecode = e.response['Error']['Code']
+                emsg = e.response['Error']['Message']
+                print('s3', ecode, emsg)
+                
             Config.set('s3::buckets', buckets)
             
         if self.region in buckets:
