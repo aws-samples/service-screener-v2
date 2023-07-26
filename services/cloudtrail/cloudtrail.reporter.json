@@ -214,7 +214,7 @@
   },
   "EnableCloudTrailLogging": {
     "category": "O",
-    "^description": "You have {$count} CloudTrail that is not currently logging AWS API calls",
+    "^description": "You have {$COUNT} CloudTrail that is not currently logging AWS API calls",
     "shortDesc": "Enable logging of AWS API calls",
     "criticality": "H",
     "downtime": 0,

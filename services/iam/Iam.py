@@ -58,7 +58,7 @@ class Iam(Service):
         self.getUserFlag = True
         arr = []
         resp = self.iamClient.generate_credential_report()
-        time.sleep(1)
+        time.sleep(5)
         try:
             results = self.iamClient.get_credential_report()
         except botocore.exceptions.ClientError as e:
@@ -66,7 +66,7 @@ class Iam(Service):
                 try: 
                     resp = self.iamClient.generate_credential_report()
                     print('Generating IAM Credential Report...')
-                    time.sleep(1)
+                    time.sleep(5)
                     
                     results = self.iamClient.get_credential_report()
                 except botocore.exceptions.ClientError as e:
