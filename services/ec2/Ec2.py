@@ -13,6 +13,7 @@ from services.ec2.drivers.Ec2CompOpt import Ec2CompOpt
 from services.ec2.drivers.Ec2EbsVolume import Ec2EbsVolume
 from services.ec2.drivers.Ec2SecGroup import Ec2SecGroup
 from services.ec2.drivers.Ec2CostExplorerRecs import Ec2CostExplorerRecs
+from services.ec2.drivers.Ec2EIP import Ec2EIP
 from services.ec2.drivers.Ec2ElbCommon import Ec2ElbCommon
 from services.ec2.drivers.Ec2ElbClassic import Ec2ElbClassic
 from services.ec2.drivers.Ec2AutoScaling import Ec2AutoScaling
@@ -194,6 +195,18 @@ class Ec2(Service):
             arr = arr + results.get('AutoScalingGroups')
         
         return arr
+        
+    def getEIPResources(self):
+        filters = []
+        if self.tags:
+            filters = self.tags
+            
+        result = self.ec2Client.describe_addresses(
+            Filters = filters    
+        )
+        arr = result.get('Addresses')
+        
+        return arr
     
     def advise(self):
         objs = {}
@@ -212,6 +225,7 @@ class Ec2(Service):
                     print('... (Compute Optimizer Recommendations) inspecting')
                     obj = Ec2CompOpt(self.compOptClient)
                     obj.run()
+                    objs['ComputeOptimizer'] = obj.getInfo()
                     Config.set('EC2_HasRunComputeOpt', True)
                     
             except botocore.exceptions.ClientError as e:
@@ -298,5 +312,14 @@ class Ec2(Service):
             obj.run()
             
             objs[f"SG::{group['GroupId']}"] = obj.getInfo()
+        
+        # EIP checks    
+        print('... (Elastic IP Recommendations) inspecting')
+        eips = self.getEIPResources()
+        for eip in eips:
+            obj = Ec2EIP(eip)
+            obj.run()
+            objs[f"ElasticIP::{eip['AllocationId']}"] = obj.getInfo()
+        
         
         return objs
