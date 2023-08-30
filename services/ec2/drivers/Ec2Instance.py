@@ -112,16 +112,6 @@ class Ec2Instance(Evaluator):
         if "IamInstanceProfile" not in self.ec2InstanceData:
             self.results['EC2IamProfile'] = [-1, '']
         return
-        
-    def _checkEIPInUse(self):
-        eipList = self.ec2Client.describe_addresses()
-        
-        for eip in eipList['Addresses']:
-            if 'AssociationId' not in eip:
-                self.results['EC2EIPNotInUse'] = [-1, eip['PublicIp']]
-                return
-        
-        return
     
     def _checkCWMemoryMetrics(self):
         cw_client = boto3.client('cloudwatch')
