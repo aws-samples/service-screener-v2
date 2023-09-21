@@ -102,9 +102,9 @@ class Ec2Instance(Evaluator):
     def _checkDetailedMonitoringEnabled(self):
 
         if self.ec2InstanceData['Monitoring']['State'] == 'disabled':
-            self.results['EC2DetailedMonitor'] = [-1, self.ec2InstanceData['Monitoring']['State']]
+            self.results['EC2DetailedMonitor'] = [-1, 'Disabled']
         else:
-            self.results['EC2DetailedMonitor'] = [1, self.ec2InstanceData['Monitoring']['State']]
+            self.results['EC2DetailedMonitor'] = [1, 'Enabled']
         
         return
         
