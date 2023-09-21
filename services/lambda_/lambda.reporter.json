@@ -167,5 +167,18 @@
         "ref": [
             ""    
         ]
+    },
+    "lambdaPublicAccess":{
+        "category": "S",
+        "^description": "Function with public access: {$COUNT} of your Lambda is allowed public access in resource-based policy. Please restrict access to authorized principals only",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Function with public access",
+        "ref": [
+            "[Using resource-based policies for Lambda]<https://docs.aws.amazon.com/lambda/latest/dg/access-control-resource-based.html>"    
+        ]
     }
 }
