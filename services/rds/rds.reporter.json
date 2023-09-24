@@ -401,7 +401,7 @@
     "slowness": 0,
     "additionalCost": 1,
     "needFullTest": 1,
-    "criticality": "H",
+    "criticality": "M",
     "shortDesc": "Secrets Manager Usage",
     "ref": [
       "[About Secrets Manager]<https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html>"
@@ -427,7 +427,7 @@
     "slowness": 0,
     "additionalCost": 1,
     "needFullTest": 0,
-    "criticality": "H",
+    "criticality": "M",
     "shortDesc": "Setup auto-rotation",
     "ref": [
       "[Managed Secret Rotation]<https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html>"

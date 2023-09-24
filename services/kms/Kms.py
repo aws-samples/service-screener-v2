@@ -43,7 +43,7 @@ class Kms(Service):
             print('... (KMS) inspecting ' + key['KeyId'] + ' (' + key['Arn'] +')')
             
             obj = KmsCommon(key, self.kmsClient)        
-            obj.run()
+            obj.run(self.__class__)
             objs[key['KeyId']] = obj.getInfo()
             del obj
            

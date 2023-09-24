@@ -88,12 +88,11 @@ class S3(Service):
     
     def advise(self):
         objs = {}
-        '''
         accountScanned = Config.get('S3_HasAccountScanned', False)
         if accountScanned == False:
             print('... (S3Account) inspecting ')
             obj = S3Control(self.s3Control)
-            obj.run()
+            obj.run(self.__class__)
             
             objs["Account::Control"] = obj.getInfo()
             Config.set('GLOBALRESOURCES', objs)
@@ -105,14 +104,13 @@ class S3(Service):
         for bucket in buckets:
             print('... (S3Bucket) inspecting ' + bucket['Name'])
             obj = S3Bucket(bucket['Name'], self.s3Client)
-            obj.run()
+            obj.run(self.__class__)
             
             objs["Bucket::" + bucket['Name']] = obj.getInfo()
             del obj
         
-        '''
         obj = Macie(self.macieV2Client)
-        obj.run()
+        obj.run(self.__class__)
         objs["Macie"] = obj.getInfo()
         return objs
 

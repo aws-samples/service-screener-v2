@@ -72,7 +72,7 @@ class Rds(Service):
         for secret in self.secrets:
             print('... (SecretsManager) inspecting ' + secret['Name'])
             obj = SecretsManager(secret, self.smClient, self.ctClient)
-            obj.run()
+            obj.run(self.__class__)
             
             objs['SecretsManager::'+ secret['Name']] = obj.getInfo()
             del obj
@@ -94,13 +94,13 @@ class Rds(Service):
             driver = 'Rds' + engine
             if driver in globals():
                 obj = globals()[driver](instance, self.rdsClient, self.ctClient)
-                obj.run()
+                obj.run(self.__class__)
                 
                 objs[instance['Engine'] + '::' + instance['DBInstanceIdentifier']] = obj.getInfo()
                 del obj
         
         obj = SecretsVsDB(len(self.secrets), len(instances))
-        obj.run()
+        obj.run(self.__class__)
         objs['Secrets__General'] = obj.getInfo()
         del obj
         

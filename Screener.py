@@ -20,6 +20,12 @@ class Screener:
     
     @staticmethod
     def scanByService(service, regions, filters):
+        _zeroCount = {
+            'resources': 0,
+            'rules': 0,
+            'exceptions': 0
+        }
+        
         contexts = {}
         time_start = time.time()
         
@@ -27,6 +33,9 @@ class Screener:
         service = service.split('::')
         
         _regions = ['GLOBAL'] if service[0] in Config.GLOBAL_SERVICES else regions
+        
+        scannedKey = 'scanned_'+service[0]
+        Config.set(scannedKey, _zeroCount)
 
         for region in _regions:
             CURRENT_REGION = region
@@ -60,7 +69,8 @@ class Screener:
             contexts[service[0]]['GLOBAL'] = GLOBALRESOURCES
         
         time_end = time.time()
-        scanned = Config.get('scanned')
+        scanned = Config.get(scannedKey)
+        # print(scannedKey)
         
         with open(_C.FORK_DIR + '/' + service[0] + '.json', 'w') as f:
             json.dump(contexts[service[0]], f)

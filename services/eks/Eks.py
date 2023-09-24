@@ -49,7 +49,7 @@ class Eks(Service):
                 continue
             
             obj = EksCommon(cluster, clusterInfo, self.eksClient, self.ec2Client, self.iamClient)
-            obj.run()
+            obj.run(self.__class__)
             objs['Cluster::' + cluster] = obj.getInfo()
             
         return objs

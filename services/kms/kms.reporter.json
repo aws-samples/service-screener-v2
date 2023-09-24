@@ -6,7 +6,7 @@
       "slowness": 0,
       "additionalCost": 0,
       "needFullTest": 0,
-      "criticality": "H",
+      "criticality": "M",
       "shortDesc": "Enable Key Rotation",
       "ref": [
           "[Enable CMK Rotation]<https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html#rotating-keys-enable-disable>"
