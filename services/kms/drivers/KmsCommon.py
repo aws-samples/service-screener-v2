@@ -52,6 +52,12 @@ class KmsCommon(Evaluator):
         if 'allow' in parseInfo:
             ## Build Admin List
             for sid, arr in parseInfo['allow'].items():
+                if 'Service' in arr['Principal']:
+                    continue
+                
+                if not 'AWS' in arr['Principal']:
+                    continue
+                
                 principals = arr['Principal']['AWS']
                 if isinstance(principals, str):
                     principals = [principals]
