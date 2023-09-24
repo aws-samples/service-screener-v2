@@ -5,6 +5,7 @@
       "downtime": 0,
       "slowness": 1,
       "additionalCost": 1,
+      "needFullTest": 0,
       "criticality": "H",
       "shortDesc": "Enable MultiAZ",
       "ref": [
@@ -391,6 +392,58 @@
     "shortDesc": "Use SQL Server Standard / Enterprise Edition",
     "ref": [
       "[High Availability for MSSQL]<https://docs.aws.amazon.com/prescriptive-guidance/latest/migration-sql-server/rds-sql.html>"
+    ]
+  },
+  "DBwithoutSecretManager": {
+    "category": "S",
+    "^description": "[Secrets Manager] Secrets Manager helps you improve the security posture of your organization. Secrets include database credentials, passwords, and third-party API keys. You can use Secrets Manager to store secrets centrally, encrypt secrets automatically, control access to secrets, and rotate secrets safely and automatically.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 1,
+    "criticality": "H",
+    "shortDesc": "Secrets Manager Usage",
+    "ref": [
+      "[About Secrets Manager]<https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html>"
+    ]
+  },
+  "DBwithSomeSecretsManagerOnly": {
+    "category": "S",
+    "^description": "[Secrets Manager] Secrets Manager helps you improve the security posture of your organization. Secrets include database credentials, passwords, and third-party API keys. You can use Secrets Manager to store secrets centrally, encrypt secrets automatically, control access to secrets, and rotate secrets safely and automatically.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 1,
+    "criticality": "M",
+    "shortDesc": "Review Secrets Manager Usage",
+    "ref": [
+      "[About Secrets Manager]<https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html>"
+    ]
+  },
+  "Secret__NoRotation": {
+    "category": "S",
+    "^description": "[Secrets Manager] Rotation is the process of periodically updating a secret. When you rotate a secret, you update the credentials in both the secret and the database or service. In Secrets Manager, you can set up automatic rotation for your secrets.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "criticality": "H",
+    "shortDesc": "Setup auto-rotation",
+    "ref": [
+      "[Managed Secret Rotation]<https://docs.aws.amazon.com/secretsmanager/latest/userguide/rotating-secrets.html>"
+    ]
+  },
+  "Secret__NotUsed7days": {
+    "category": "O",
+    "^description": "[Secrets Manager] You have {$COUNT} secrets not in used in the past 7 days. Please review and removed it if it not in used to ease future operation",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": -1,
+    "criticality": "L",
+    "shortDesc": "Review & Remove unused secrets",
+    "ref": [
+      "[Delete a secet]<https://docs.aws.amazon.com/secretsmanager/latest/userguide/manage_delete-secret.html>"
     ]
   }
 }

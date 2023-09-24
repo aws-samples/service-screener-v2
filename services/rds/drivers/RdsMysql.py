@@ -1,8 +1,8 @@
 from .RdsCommon import RdsCommon
 
 class RdsMysql(RdsCommon):
-    def __init__(self, db, rdsClient):
-        super().__init__(db, rdsClient)
+    def __init__(self, db, rdsClient, ctClient):
+        super().__init__(db, rdsClient, ctClient)
         self.loadParameterInfo()
         
     def _checkEnableLogs(self):

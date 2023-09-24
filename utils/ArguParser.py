@@ -45,6 +45,10 @@ class ArguParser:
         #    "required": False,
         #    "default": False
         #},
+        "ztestmode": {
+            "required": False,
+            "default": False
+        },
         "mode": {
             "required": False,
             "default": "report",

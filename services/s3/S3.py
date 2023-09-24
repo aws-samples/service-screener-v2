@@ -13,6 +13,7 @@ from botocore.config import Config as bConfig
 # import drivers here
 from services.s3.drivers.S3Bucket import S3Bucket
 from services.s3.drivers.S3Control import S3Control
+from services.s3.drivers.Macie import Macie
 
 class S3(Service):
     def __init__(self, region):
@@ -21,6 +22,7 @@ class S3(Service):
         conf = bConfig(region_name=region)
         self.s3Client = boto3.client('s3')
         self.s3Control = boto3.client('s3control')
+        self.macieV2Client = boto3.client('macie2', config=self.bConfig)
         
         # buckets = Config.get('s3::buckets', [])
     
@@ -86,6 +88,7 @@ class S3(Service):
     
     def advise(self):
         objs = {}
+        '''
         accountScanned = Config.get('S3_HasAccountScanned', False)
         if accountScanned == False:
             print('... (S3Account) inspecting ')
@@ -107,6 +110,10 @@ class S3(Service):
             objs["Bucket::" + bucket['Name']] = obj.getInfo()
             del obj
         
+        '''
+        obj = Macie(self.macieV2Client)
+        obj.run()
+        objs["Macie"] = obj.getInfo()
         return objs
 
         

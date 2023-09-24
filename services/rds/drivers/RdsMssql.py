@@ -4,8 +4,8 @@ from utils.Tools import _pr
 from .RdsCommon import RdsCommon
 
 class RdsMssql(RdsCommon):
-    def __init__(self, db, rdsClient):
-        super().__init__(db, rdsClient)
+    def __init__(self, db, rdsClient, ctClient):
+        super().__init__(db, rdsClient, ctClient)
         self.loadParameterInfo()
     
     # check if MSSQL engine is Express Edition / Web Edition

@@ -21,14 +21,16 @@ _cli_options = ArguParser.Load()
 debugFlag = _cli_options['debug']
 # feedbackFlag = _cli_options['feedback']
 # testmode = _cli_options['dev']
-testmode = False
+testmode = _cli_options['ztestmode']
 bucket = _cli_options['bucket']
 runmode = _cli_options['mode']
 filters = _cli_options['tags']
 
+
 DEBUG = True if debugFlag in _C.CLI_TRUE_KEYWORD_ARRAY or debugFlag is True else False
 # feedbackFlag = True if feedbackFlag in _C.CLI_TRUE_KEYWORD_ARRAY or feedbackFlag is True else False
 testmode = True if testmode in _C.CLI_TRUE_KEYWORD_ARRAY or testmode is True else False
+# print(testmode)
 
 runmode = runmode if runmode in ['api-raw', 'api-full', 'report'] else 'report'
 
@@ -90,8 +92,9 @@ GLOBALRESOURCES = []
 
 oo = Config.get('_AWS_OPTIONS')
 
-CfnFaker = CfnFaker()
-CfnFaker.createStack()
+if testmode == False:
+    CfnFaker = CfnFaker()
+    CfnFaker.createStack()
 
 overallTimeStart = time.time()
 os.chdir('__fork')
@@ -128,7 +131,7 @@ for file in os.listdir(_C.FORK_DIR):
         if f[0] in Config.GLOBAL_SERVICES:
             hasGlobal = True
 
-if testmode:
+if testmode == True:
     exit("Test mode enable, script halted")
 
 timespent = round(time.time() - overallTimeStart, 3)

@@ -1,0 +1,28 @@
+{
+  "KeyRotationEnabled": {
+      "category": "S",
+      "^description": "You have {$COUNT} CMK does not have automatic rotation enabled. Rotating encryption keys helps reduce the potential impact of a compromised key because data encrypted with a new key can't be accessed with a previous key that might have been exposed.",
+      "downtime": 0,
+      "slowness": 0,
+      "additionalCost": 0,
+      "needFullTest": 0,
+      "criticality": "H",
+      "shortDesc": "Enable Key Rotation",
+      "ref": [
+          "[Enable CMK Rotation]<https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html#rotating-keys-enable-disable>"
+      ]
+  },
+  "AdminIsGrantor": {
+      "category": "S",
+      "^description": "It is recommended to separate the usage permissions from administration permissions associated withthe key. Identify any publicly accessible AWS Key Management Service master keys and update their access policy in order to stop any unsigned requests made to these resources.",
+      "downtime": 0,
+      "slowness": 0,
+      "additionalCost": 0,
+      "needFullTest": 0,
+      "criticality": "H",
+      "shortDesc": "Separate Admin and Grantor",
+      "ref": [
+          "[Best practices for AWS KMS grants]<https://docs.aws.amazon.com/kms/latest/developerguide/grants.html#grant-best-practices>"
+      ]
+  }
+}
