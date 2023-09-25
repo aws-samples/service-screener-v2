@@ -97,8 +97,16 @@ if testmode == False:
     CfnFaker.createStack()
 
 overallTimeStart = time.time()
-os.chdir('__fork')
-os.system('rm -f *.json; echo > tail.txt')
+# os.chdir('__fork')
+directory = '__fork'
+files_in_directory = os.listdir(directory)
+filtered_files = [file for file in files_in_directory if file.endswith(".json")]
+for file in filtered_files:
+	path_to_file = os.path.join(directory, file)
+	os.remove(path_to_file)
+
+with open(directory + '/tail.txt', 'w') as fp:
+    pass
 
 input_ranges = []
 for service in services:
@@ -143,18 +151,35 @@ print("Total Resources scanned: " + str(number_format(scanned['resources'])) + "
 print("Time consumed (seconds): " + str(timespent))
 
 # Cleanup
-os.chdir(_C.HTML_DIR)
-os.system('rm -f *.html; rm -f error.txt')
+# os.chdir(_C.HTML_DIR)
+filetodel = _C.HTML_DIR + '/error.txt'
+if os.path.exists(filetodel):
+    os.remove(filetodel)
 
-if os.path.exists(_C.FORK_DIR + '/error.txt'):
-    os.chdir(_C.FORK_DIR)
-    os.system('mv error.txt ' + _C.HTML_DIR + '/error.txt')
+directory = _C.HTML_DIR
+files_in_directory = os.listdir(directory)
+filtered_files = [file for file in files_in_directory if file.endswith(".html")]
+for file in filtered_files:
+	path_to_file = os.path.join(directory, file)
+	os.remove(path_to_file)
+
+# os.system('rm -f *.html; rm -f error.txt')
+
+src = _C.FORK_DIR + '/error.txt'
+if os.path.exists(src):
+    # os.chdir(_C.FORK_DIR)
+    dest = _C.HTML_DIR + '/error.txt'
+    os.move(src, dest)
+    # os.system('mv error.txt ' + _C.HTML_DIR + '/error.txt')
 
 os.chdir(_C.FORK_DIR)
 # os.system('rm -f *.json')
 
 os.chdir(_C.ROOT_DIR)
-os.system('rm -f output.zip')
+filetodel = _C.ROOT_DIR + '/output.zip'
+if os.path.exists(filetodel):
+    os.remove(filetodel)
+
 
 ## Generate output
 uploadToS3 = False
@@ -170,6 +195,9 @@ Screener.generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS
 CfnFaker.deleteStack()
 
 os.chdir(_C.FORK_DIR)
-os.system('rm -f tail.txt')
+filetodel = _C.FORK_DIR + '/tail.txt'
+if os.path.exists(filetodel):
+    os.remove(filetodel)
+# os.system('rm -f tail.txt')
 
 print("@ Thank you for using " + Config.ADVISOR['TITLE'] + " @")
