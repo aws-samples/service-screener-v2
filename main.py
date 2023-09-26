@@ -116,7 +116,7 @@ for service in services:
     input_ranges = [(service, regions, filters) for service in services]
 
 # pool = Pool(processes=len(services))
-pool = Pool(processes=2)
+pool = Pool(processes=4)
 pool.starmap(Screener.scanByService, input_ranges)
 
 ## <TODO>
