@@ -316,22 +316,21 @@ class PageBuilder:
         r3Arr = [124, 100, 75 , 63 , 51 , 75 , 100, 148, 197]
         
         if idx >= len(r1Arr):
-            r1 = random.randint(1,255)
-            r2 = random.randint(1,255)
-            r3 = random.randint(1,255)    
-        else:
-            r1 = r1Arr[idx]
-            r2 = r2Arr[idx]
-            r3 = r3Arr[idx]
+            idx = idx%len(r1Arr)
         
+        r1 = r1Arr[idx]
+        r2 = r2Arr[idx]
+        r3 = r3Arr[idx]
+    
         return "rgba({}, {}, {}, 1)".format(r1, r2, r3)
         
     def _randomHexColorCode(self, idx):
         color = ["#e27c7c", "#a86464", "#6d4b4b", "#503f3f", "#333333", "#3c4e4b", "#466964", "#599e94", "#6cd4c5"]
         if idx >= len(color):
-            return '#' + str(hex(random.randint(0, 0xFFFFFF))).lstrip('0x').rjust(6, '0')
-        else:
-            return color[idx]
+            idx = idx%len(color)
+            # return '#' + str(hex(random.randint(0, 0xFFFFFF))).lstrip('0x').rjust(6, '0')
+        #else:
+        return color[idx]
 
     def generateTitleWithCategory(self, count, title, category, color='info'):
         if not category:

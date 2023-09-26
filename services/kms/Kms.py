@@ -1,0 +1,55 @@
+import boto3
+import botocore
+
+from utils.Config import Config
+from utils.Tools import _pr
+from services.Service import Service
+##import drivers here
+from services.kms.drivers.KmsCommon import KmsCommon
+
+class Kms(Service):
+    def __init__(self, region):
+        super().__init__(region)
+        self.kmsClient = boto3.client('kms', config=self.bConfig)
+        self.kmsCustomerManagedKeys = []
+    
+    def getResources(self):
+        resp = self.kmsClient.list_keys(Limit=10)
+        self.checkKmsKey(resp)
+        NextMarker = resp.get('NextMarker')
+        while NextMarker != None:
+            resp = self.kmsClient.list_keys(Limit=10, Marker=NextMarker)
+            NextMarker = resp.get('NextMarker')
+            
+            self.checkKmsKey(resp)
+        
+    def checkKmsKey(self, resp):
+        for key in resp['Keys']:
+            res = self.kmsClient.describe_key(KeyId = key['KeyId'])
+            metadata = res.get('KeyMetadata')
+            if metadata['KeyManager'] != 'AWS':
+                rr = self.kmsClient.get_key_rotation_status(KeyId = key['KeyId'])
+                metadata['KeyRotationEnabled'] = rr.get('KeyRotationEnabled')
+                
+                self.kmsCustomerManagedKeys.append(metadata)
+        
+        return []
+        
+    def advise(self):
+        objs = {}
+        self.getResources()
+        
+        for key in self.kmsCustomerManagedKeys:
+            print('... (KMS) inspecting ' + key['KeyId'] + ' (' + key['Arn'] +')')
+            
+            obj = KmsCommon(key, self.kmsClient)        
+            obj.run(self.__class__)
+            objs[key['KeyId']] = obj.getInfo()
+            del obj
+           
+        return objs
+    
+if __name__ == "__main__":
+    Config.init()
+    o = Kms('ap-southeast-1')
+    out = o.advise()

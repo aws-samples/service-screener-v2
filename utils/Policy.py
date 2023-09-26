@@ -9,6 +9,10 @@ class Policy:
     def __init__(self, document):
         self.doc = document
         # self.doc = json.loads(document)
+        
+    ## Only if it is a string objects, some boto3 api does not return as array
+    def parseDocumentToJson(self):
+        self.doc = json.loads(self.doc)
     
     def inspectAccess(self):
         doc = self.doc
@@ -41,3 +45,13 @@ class Policy:
     
     def hasFullAccessAdmin(self):
         return self.fullAccessList['fullAdmin']
+        
+    def extractPolicyInfo(self):
+        doc = self.doc
+        
+        policy = {'allow': {}, 'deny': {}}
+        for statement in doc['Statement']:
+            effect = statement['Effect'].lower()
+            policy[effect][statement['Sid']] = {'Principal': statement['Principal'], 'Action': statement['Action']}
+            
+        return policy

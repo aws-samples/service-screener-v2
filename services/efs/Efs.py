@@ -36,7 +36,7 @@ class Efs(Service):
             for efs in efs_list:
                 print('... (EFS) inspecting ' + efs['FileSystemId'])
                 obj = globals()[driver](efs, self.efs_client)
-                obj.run()
+                obj.run(self.__class__)
 
                 objs['EFS::' + efs['FileSystemId']] = obj.getInfo()
                 del obj

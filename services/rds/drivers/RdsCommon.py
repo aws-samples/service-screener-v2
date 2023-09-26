@@ -10,7 +10,7 @@ from utils.Tools import _warn
 from services.Evaluator import Evaluator
 
 class RdsCommon(Evaluator):
-    def __init__(self, db, rdsClient):
+    def __init__(self, db, rdsClient, ctClient):
         self.dbParams = {}
         self.results = {}
         self.db = db
@@ -18,6 +18,8 @@ class RdsCommon(Evaluator):
         self.__configPrefix = 'rds::' + db['Engine'] + '::' + db['EngineVersion'] + '::'
         self.init()
         self.loadParameterInfo()
+        
+        self.ctClient = ctClient
         
     def showInfo(self):
         print("Identifier: " + self.db['DBInstanceIdentifier'] + "\n")

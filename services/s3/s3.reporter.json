@@ -9,12 +9,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/serv-side-encryption.html>"   
+            "[Protecting data with encryption]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingEncryption.html>"
         ]
     },
     "PublicAccessBlock": {
         "category": "S",
-        "^description": "You have disabled public access block on {$COUNT} S3 buckets.This leaves your data to be accessible by anyone. Unless absolutely necessary, enable public access block.",
+        "^description": "You have disabled public access block on {$COUNT} S3 buckets.This leaves your data to be accessible by anyone. Unless absolutely necessary, enable public access block. Block Public Access at the S3 bucket level provides controls to ensure that objects never have public access. Public access is granted to buckets and objects through access control lists (ACLs), bucket policies, or both.",
         "shortDesc": "Enable Public Access Block",
         "criticality": "H",
         "downtime": 0,
@@ -22,7 +22,7 @@
         "additionalCost": 0,
         "needFullTest": -1,
         "ref": [
-            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html#access-control-block-public-access-options>"   
+            "[Block S3 Public Access]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html#access-control-block-public-access-options>"   
         ]
     },
     "MFADelete": {
@@ -35,6 +35,7 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
+            "[Prevention for Accidental Deletions on S3]<https://repost.aws/knowledge-center/s3-audit-deleted-missing-objects>",
             "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/MultiFactorAuthenticationDelete.html>"   
         ]
     },
@@ -48,7 +49,8 @@
         "additionalCost": 1,
         "needFullTest": 0,
         "ref": [
-            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html>"   
+            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html>",
+            "[Manage Versioning Example]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/manage-versioning-examples.html>"
         ]
     },
     "ObjectLock": {
@@ -140,6 +142,19 @@
         "needFullTest": -1,
         "ref": [
             "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/configuring-block-public-access-account.html>"   
+        ]
+    },
+    "MacieToEnable": {
+        "category": "S",
+        "^description": "You should evaluate using a tool, such as Amazon Macie, that uses machine learning to automatically discover, classify, and protect sensitive data in AWS. Amazon Macie recognizes sensitive data, such as personally identifiable information (PII) or intellectual property, and provides you with dashboards and alerts that give visibility into how this data is being accessed or moved.",
+        "shortDesc": "Enable Macie",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Getting started with Amazon Macie]<https://docs.aws.amazon.com/macie/latest/user/getting-started.html>"
         ]
     }
 }

@@ -1,0 +1,88 @@
+{
+  "metadata": {
+    "originator": "AWS",
+    "shortname": "PSR",
+    "fullname": "PMSR baseline checks",
+    "description": "At AWS, security is our top priority. Partner Migration Security Requirements (PMSR) is an APJ SAT team initiative to help our partners migrate their custom's worklaods securely to AWS.<br><br>PMSR will be used by both internal stakeholders like Migration PSA's, relevant account teams and external stakeholders like consulting, migration, and GSI partners to elevate the security posture of workloads being migrated to cloud and ensure ongoing elevated security posture",
+    "_": "https://www.google.com"
+  },
+  "mapping": {
+    "CW.": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "CD.": {
+      "1": []
+    },
+    "IAM.": {
+      "1": ["iam.ManagedPolicyFullAccessOneServ", "iam.FullAdminAccess", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess"],
+      "2": ["iam.rootConsoleLogin30days", "iam.rootConsoleLoginFail3x"],
+      "3": ["iam.rootHasAccessKey"],
+      "4": ["iam.rootMfaActive"],
+      "5": [],
+      "6": []
+    },
+    "DP.": {
+      "1": ["s3.MacieToEnable"],
+      "2": [],
+      "3": ["s3.PublicAccessBlock"],
+      "4": ["s3.BucketVersioning"],
+      "5": ["s3.MFADelete"],
+      "6": [],
+      "7": [],
+      "8": ["rds.DBwithoutSecretManager", "rds.DBwithSomeSecretsManagerOnly", "rds.Secret__NoRotation", "rds.Secret__NotUsed7days"],
+      "9": ["s3.ServerSideEncrypted"],
+      "10": ["lambda.lambdaPublicAccess"],
+      "11": ["kms.KeyRotationEnabled"],
+      "12": ["kms.AdminIsGrantor"]
+    },
+    "LM.": {
+      "1": [],
+      "2": ["cloudtrail.NeedToEnableCloudTrail"],
+      "3": [],
+      "4": ["cloudtrail.CloudWatchLogsLogGroupArn"],
+      "5": ["cloudtrail.HasOneMultiRegionTrail"],
+      "6": ["s3.MacieToEnable"],
+      "7": ["cloudtrail.EnableTrailS3BucketLogging"],
+      "8": ["cloudtrail.EnableTrailS3BucketMFADelete"],
+      "9": ["s3.ServerSideEncrypted"],
+      "10": [],
+      "11": ["iam.supportPlanLowTier"],
+      "12": ["s3.BucketLogging"],
+      "13": [],
+      "14": [],
+      "15": []
+    },
+    "IP.": {
+      "1": [],
+      "2": [],
+      "3": ["iam.enableGuardDuty"],
+      "4": [],
+      "5": ["ec2.EC2InstanceAutoPublicIP"],
+      "6": ["ec2.EC2SubnetAutoPublicIP"],
+      "7": ["cloudfront.WAFAssociation", "ec2.ELBEnableWAF"],
+      "8": ["cloudtrail.EnableTrailS3BucketMFADelete"],
+      "9": ["rds.DBwithoutSecretManager", "rds.DBwithSomeSecretsManagerOnly", "rds.Secret__NoRotation", "rds.Secret__NotUsed7days"],
+      "10": ["ec2.SGDefaultDisallowTraffic"],
+      "11": [],
+      "12": [],
+      "13": [],
+      "14": [],
+      "15": ["ec2.ASGIMDSv2"]
+    },
+    "IR.": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [],
+      "5": [],
+      "6": [],
+      "7": [],
+      "8": [],
+      "9": [],
+      "10": []
+    }
+  }
+}

@@ -45,7 +45,7 @@ class Cloudtrail(Service):
         for trail in trails:
             print("... [Cloudtrail] inspecting " + trail['Name'])
             obj = CloudtrailCommon(trail, self.ctClient, self.snsClient, self.s3Client)
-            obj.run()
+            obj.run(self.__class__)
             objs['Cloudtrail::' + trail['Name']] = obj.getInfo()
             del obj
         

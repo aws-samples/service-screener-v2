@@ -81,7 +81,7 @@ class Lambda(Service):
                 print(f"... (Lambda) inspecting {lambda_function['FunctionName']}")
                 # obj = cls(lambda_function, self.lambda_client, self.iam_client, role_count)
                 obj = LambdaCommon(lambda_function, self.lambda_client, self.iam_client, role_count)
-                obj.run()
+                obj.run(self.__class__)
                 objs[f"Lambda::{lambda_function['FunctionName']}"] = obj.getInfo()
             except (ImportError, AttributeError):
                 print(f"Failed to load driver {driver}")
