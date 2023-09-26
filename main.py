@@ -88,7 +88,7 @@ Config.setAccountInfo(tempConfig)
 
 contexts = {}
 serviceStat = {}
-GLOBALRESOURCES = []
+# GLOBALRESOURCES = []
 
 oo = Config.get('_AWS_OPTIONS')
 
@@ -99,6 +99,9 @@ if testmode == False:
 overallTimeStart = time.time()
 # os.chdir('__fork')
 directory = '__fork'
+if not os.path.exists(directory):
+    os.mkdir(directory)
+
 files_in_directory = os.listdir(directory)
 filtered_files = [file for file in files_in_directory if file.endswith(".json")]
 for file in filtered_files:
@@ -113,7 +116,7 @@ for service in services:
     input_ranges = [(service, regions, filters) for service in services]
 
 # pool = Pool(processes=len(services))
-pool = Pool(processes=4)
+pool = Pool(processes=2)
 pool.starmap(Screener.scanByService, input_ranges)
 
 ## <TODO>
