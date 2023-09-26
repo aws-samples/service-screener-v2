@@ -28,6 +28,7 @@ class Ec2(Service):
         self.elbClient = boto3.client('elbv2', config=self.bConfig)
         self.elbClassicClient = boto3.client('elb', config=self.bConfig)
         self.asgClient = boto3.client('autoscaling', config=self.bConfig)
+        self.wafv2Client = boto3.client('wafv2', config=self.bConfig)
     
     # get EC2 Instance resources
     def getResources(self):
@@ -276,7 +277,7 @@ class Ec2(Service):
         loadBalancers = self.getELB()
         for lb in loadBalancers:
             print(f"... (ELB::Load Balancer) inspecting {lb['LoadBalancerName']}")
-            obj = Ec2ElbCommon(lb, self.elbClient)
+            obj = Ec2ElbCommon(lb, self.elbClient, self.wafv2Client)
             obj.run()
             objs[f"ELB::{lb['LoadBalancerName']}"] = obj.getInfo()
             

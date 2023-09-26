@@ -428,6 +428,19 @@
             "[Migrate your Classic Load Balancer]<https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/migrate-classic-load-balancer.html/>"    
         ]
     },
+    "ELBEnableWAF": {
+        "category": "S",
+        "^description": "ALB Web Application Firewall: {$COUNT} of your ALBs have not enabled WAF.",        
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "ALB Web Application Firewall",
+        "ref": [
+            "[AWS WAF for Applicatoin Load Balancers]<https://aws.amazon.com/blogs/aws/aws-web-application-firewall-waf-for-application-load-balancers/>"    
+        ]
+    },
     "ASGELBHealthCheckValidation": {
         "category": "O",
         "^description": "ELB Health Check Validation: {$COUNT} of your ASG have ELB health check enabled without ELB association.",        
