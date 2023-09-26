@@ -95,7 +95,10 @@ class S3(Service):
             obj.run(self.__class__)
             
             objs["Account::Control"] = obj.getInfo()
-            Config.set('GLOBALRESOURCES', objs)
+            
+            globalKey = 'GLOBALRESOURCES_s3'
+            Config.set(globalKey, objs)
+            
             Config.set('S3_HasAccountScanned', True)
             del obj
         

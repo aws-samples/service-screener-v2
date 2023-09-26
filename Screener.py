@@ -38,6 +38,7 @@ class Screener:
         _regions = ['GLOBAL'] if service[0] in Config.GLOBAL_SERVICES else regions
         
         scannedKey = 'scanned_'+service[0]
+        globalKey = 'GLOBALRESOURCES_'+service[0]
         Config.set(scannedKey, _zeroCount)
 
         for region in _regions:
@@ -67,7 +68,7 @@ class Screener:
             tempCount += len(contexts[service[0]][region])
             del serv
         
-        GLOBALRESOURCES = Config.get('GLOBALRESOURCES', [])
+        GLOBALRESOURCES = Config.get(globalKey, [])
         if len(GLOBALRESOURCES) > 0:
             contexts[service[0]]['GLOBAL'] = GLOBALRESOURCES
         

@@ -1,0 +1,18 @@
+ Name                Version    License                              
+ ServiceScreenerV2   2.0        Apache 2.0 license                   
+ XlsxWriter          3.1.3      BSD License                          
+ boto3               1.26.165   Apache Software License              
+ botocore            1.29.165   Apache Software License              
+ certifi             2023.7.22  Mozilla Public License 2.0 (MPL 2.0) 
+ charset-normalizer  3.2.0      MIT License                          
+ docopt              0.6.2      MIT License                          
+ idna                3.4        BSD License                          
+ jmespath            1.0.1      MIT License                          
+ packaging           23.1       Apache Software License; BSD License 
+ pipreqs             0.4.13     Apache Software License              
+ python-dateutil     2.8.2      Apache Software License; BSD License 
+ requests            2.31.0     Apache Software License              
+ s3transfer          0.6.2      Apache Software License              
+ six                 1.16.0     MIT License                          
+ urllib3             1.26.16    MIT License                          
+ yarg                0.1.9      MIT License                          
