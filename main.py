@@ -166,13 +166,11 @@ for file in filtered_files:
 	path_to_file = os.path.join(directory, file)
 	os.remove(path_to_file)
 
-# os.system('rm -f *.html; rm -f error.txt')
-
 src = _C.FORK_DIR + '/error.txt'
 if os.path.exists(src):
     # os.chdir(_C.FORK_DIR)
     dest = _C.HTML_DIR + '/error.txt'
-    os.move(src, dest)
+    os.rename(src, dest)
     # os.system('mv error.txt ' + _C.HTML_DIR + '/error.txt')
 
 os.chdir(_C.FORK_DIR)
