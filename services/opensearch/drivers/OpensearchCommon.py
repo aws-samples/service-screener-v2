@@ -100,8 +100,10 @@ class OpensearchCommon(Evaluator):
                     self.results["FineGrainedAccessControl"] = [1, "Enabled"]
 
     def _checkDomainWithinVpc(self):
-        if not self.attribute["DomainStatus"]["VPCOptions"]:
-            self.results["DomainWithinVPC"] = [-1, "Public"]
+        self.results["DomainWithinVPC"] = [-1, "Public"]
+        if "DomainStatus" in self.attribute:
+            if "VPCOptions" in self.attribute["DomainStatus"]:
+                self.results["DomainWithinVPC"] = [1, "Private"]
 
     def _checkInstanceVersion(self):
         instance_type = self.cluster_config["InstanceType"]
