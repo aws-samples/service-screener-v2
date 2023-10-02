@@ -9,8 +9,8 @@ class Config:
 
     ADVISOR = {
         'TITLE': 'Service Screener',
-        'VERSION': '2.0.0',
-        'LAST_UPDATE': '1-May-2023'
+        'VERSION': '2.0.1',
+        'LAST_UPDATE': '26-Sep-2023'
     }
 
     ADMINLTE = {
