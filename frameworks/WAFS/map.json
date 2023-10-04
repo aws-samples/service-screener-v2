@@ -4,7 +4,8 @@
     "shortname": "WAFS",
     "fullname": "AWS Well-Architected Framework - Security Pillar",
     "description": "This framework focuses on the security pillar. This will help you meet your business and regulatory requirements by following current AWS recommendations. It’s intended for those in technology roles, such as chief technology officers (CTOs), chief information security officers (CSOs/CISOs), architects, developers, and operations team members. The security pillar describes how to take advantage of cloud technologies to protect data, systems, and assets in a way that can improve your security posture.",
-    "_": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/welcome.html"
+    "_": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/welcome.html",
+    "emptyCheckDefaultMsg": ""
   },
   "mapping": {
     "SEC01": {

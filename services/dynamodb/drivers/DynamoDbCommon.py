@@ -204,7 +204,7 @@ class DynamoDbCommon(Evaluator):
             for eachDatapoints in result['Datapoints']:
                 _percentageWrite += eachDatapoints['Average']
             
-            if 'BillingModeSummary' not in self.tables['Table']:
+            if 'BillingModeSummary' not in self.tables['Table'] or 'BillingMode' not in self.tables['Table']['BillingModeSummary']:
                 billingMode = 'PAY_PER_REQUEST' ## Default it
             else:
                 billingMode = self.tables['Table']['BillingModeSummary']['BillingMode']
@@ -234,8 +234,9 @@ class DynamoDbCommon(Evaluator):
                 )
             
             #If results comes back with record, autoscaling is enabled
-            if len(results['ScalingPolicies']) == 0 and self.tables['Table']['BillingModeSummary']['BillingMode'] == 'PROVISIONED':
-                self.results['autoScalingStatus'] = [-1 , '']
+            if len(results['ScalingPolicies']) == 0:
+                if 'BillingModeSummary' in self.tables['Table'] and 'BillingMode' in self.tables['Table']['BillingModeSummary'] and self.tables['Table']['BillingModeSummary']['BillingMode'] == 'PROVISIONED':
+                    self.results['autoScalingStatus'] = [-1 , '']
                 
         except botocore.exceptions as e:
             ecode = e.response['Error']['Code']

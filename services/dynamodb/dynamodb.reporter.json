@@ -9,7 +9,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0, 
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableLevelCostAnalysis.html/>"
+			"[Tagging in Cost Analysis]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableLevelCostAnalysis.html/>"
 		]
 	},
 	"autoScalingHighUtil":{
@@ -22,7 +22,7 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_AutoScalingSettings.html#CostOptimization_AutoScalingSettings_UnderProvisionedTables>"
+			"[DDB Autoscaling Guide]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_AutoScalingSettings.html#CostOptimization_AutoScalingSettings_UnderProvisionedTables>"
 		]
 	},
 	"autoScalinglowUtil":{
@@ -35,7 +35,7 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_AutoScalingSettings.html#CostOptimization_AutoScalingSettings_UnderProvisionedTables>"
+			"[DDB Autoscaling Guide]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_AutoScalingSettings.html#CostOptimization_AutoScalingSettings_UnderProvisionedTables>"
 		]
 	},
 	"unusedResourcesGSIRead":{
@@ -48,7 +48,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html>"
+			"[DDB CostOps Best Practices]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html>"
 		]
 	},
 	"unusedResourcesGSIWrite":{
@@ -61,7 +61,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html>"
+			"[DDB CostOps Best Practices]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html>"
 		]
 	},
 	"attributeNamesXL":{
@@ -74,7 +74,7 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html#CostOptimization_TableUsagePatterns_AttributeNames>"
+			"[DDB attribute name best practices]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html#CostOptimization_TableUsagePatterns_AttributeNames>"
 		]
 	},
 	"attributeNamesL":{
@@ -87,7 +87,7 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html#CostOptimization_TableUsagePatterns_AttributeNames>"
+			"[DDB attribute name best practices]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html#CostOptimization_TableUsagePatterns_AttributeNames>"
 		]
 	},
 	"disabledTTL":{
@@ -100,7 +100,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html#CostOptimization_TableUsagePatterns_TTL>"
+			"[DDB TTL CostOps]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableUsagePatterns.html#CostOptimization_TableUsagePatterns_TTL>"
 		]
 	},
 	"deleteTableProtection":{
@@ -113,20 +113,20 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-deletion-protection.html>"
+			"[Turn on DDB delete protection]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-deletion-protection.html>"
 		]
 	},
 	"disabledBackup":{
 	    "category":"R",
-	    "^description": "You can use the DynamoDB on-demand backup capability to create full backups of your tables for long-term retention, and archiving for regulatory compliance needs. You can back up and restore your table data anytime with a single click on the AWS Management Console or with a single API call. Backup and restore actions run with no impact on table performance or availability.",
-	    "shortDesc":"No table backup found.",
+	    "^description": "You have {$COUNT} tables do not have backup. You can use the DynamoDB on-demand backup capability to create full backups of your tables for long-term retention, and archiving for regulatory compliance needs. You can back up and restore your table data anytime with a single click on the AWS Management Console or with a single API call. Backup and restore actions run with no impact on table performance or availability.",
+	    "shortDesc":"Table does not have backup.",
 	    "criticality": "M",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/BackupRestore.html>"
+			"[DDB Backup/Restore]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/BackupRestore.html>"
 		]
 	},
 	"rcuServiceLimit":{
@@ -139,7 +139,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#default-limits-throughput-capacity-modes>"
+			"[Default DDB RCU Limits]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#default-limits-throughput-capacity-modes>"
 		]
 	},
 	"wcuServiceLimit":{
@@ -152,7 +152,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#default-limits-throughput-capacity-modes>"
+			"[Default DDB WCU Limits]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#default-limits-throughput-capacity-modes>"
 		]
 	},
 	"serviceLimitMaxTablePerRegion":{
@@ -165,7 +165,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#limits-tables>"
+			"[Default DDB Tables Limits]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#limits-tables>"
 		]
 	},
 	"capacityModeOnDemand":{
@@ -178,7 +178,7 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableCapacityMode.html#CostOptimization_TableCapacityMode_OnDemand>"
+			"[DDB CostOps TableMode]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableCapacityMode.html#CostOptimization_TableCapacityMode_OnDemand>"
 		]
 	},
 	"capacityModeProvisioned":{
@@ -191,7 +191,7 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableCapacityMode.html#CostOptimization_TableCapacityMode_Provisioned>"
+			"[DDB CostOps TableMode]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableCapacityMode.html#CostOptimization_TableCapacityMode_Provisioned>"
 		]
 	},
 	"autoScalingStatus":{
@@ -204,25 +204,25 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/AutoScaling.html>"
+			"[DDB Autoscaling]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/AutoScaling.html>"
 		]
 	},
 	"systemErrors":{
 	    "category":"O",
-	    "^description": "You have {$COUNT} tables against 2500(default) or 10000(max) tables per region available.",
-	    "shortDesc":"Tables limit per region",
+	    "^description": "You have {$COUNT} tables with systemErrors over the past 30 days.",
+	    "shortDesc":"System Errors detected",
 	    "criticality": "H",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#limits-tables>"
+			"[DDB System Errors]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#limits-tables>"
 		]
 	},
 	"throttledRequest":{
 	    "category":"O",
-	    "^description": "You have {$COUNT} throttled requests over the past 30 days",
+	    "^description": "You have {$COUNT} table with throttled requests over the past 30 days",
 	    "shortDesc":"Throttled request detected.",
 	    "criticality": "H",
 		"downtime": 0,
@@ -230,7 +230,7 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/metrics-dimensions.html#ThrottledRequests>"
+			"[DDB Throttled Request]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/metrics-dimensions.html#ThrottledRequests>"
 		]
 	},
 	"serviceLimitMaxGSIPerTable":{
@@ -243,12 +243,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#limits-secondary-indexes>"
+			"[DDB GSI ServQuota]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#limits-secondary-indexes>"
 		]
 	},
 	"conditionalCheckFailedRequests":{
 	    "category":"O",
-	    "^description": "You have {$COUNT} conditional check failed requests errors over the past 30 days.",
+	    "^description": "You have {$COUNT} tables with conditional check failed requests errors over the past 30 days.",
 	    "shortDesc":"Conditional Check Failed Requests detected",
 	    "criticality": "H",
 		"downtime": 0,
@@ -256,12 +256,12 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/metrics-dimensions.html#ConditionalCheckFailedRequests>"
+			"[DDB ConditionalCheckFailedRequests]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/metrics-dimensions.html#ConditionalCheckFailedRequests>"
 		]
 	},
 	"userErrors":{
 	    "category":"O",
-	    "^description": "You have {$COUNT} user errors detected in the past 30 days.",
+	    "^description": "You have {$COUNT} tables with user errors detected in the past 30 days.",
 	    "shortDesc":"User errors detected",
 	    "criticality": "H",
 		"downtime": 0,
@@ -269,12 +269,12 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/metrics-dimensions.html#UserErrors>"
+			"[DDB UserErrors]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/metrics-dimensions.html#UserErrors>"
 		]
 	},
 	"trailDeleteBackup":{
 	    "category":"R",
-	    "^description": "There has been {COUNT} of backup deleted in the past 30 days.",
+	    "^description": "There has been {COUNT} of ddb backup being deleted in the past 30 days.",
 	    "shortDesc":"Backup deleted in the past 30 days.",
 	    "criticality": "I",
 		"downtime": 0,
@@ -282,12 +282,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<NEED_REF>"
+			"[CloudTrail guides]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/logging-using-cloudtrail.html>"
 		]
 	},
 	"trailDeleteTable":{
 	    "category":"R",
-	    "^description": "There has been {COUNT} of table deleted in the past 30 days.",
+	    "^description": "There has been {COUNT} of ddb table deleted in the past 30 days.",
 	    "shortDesc":"Tables deleted in the past 30 days.",
 	    "criticality": "I",
 		"downtime": 0,
@@ -295,7 +295,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<NEED_REF>"
+			"[CloudTrail guides]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/logging-using-cloudtrail.html>"
 		]
 	},
 	"rcuServiceLimit":{
@@ -308,7 +308,7 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#default-limits-throughput-capacity-modes>"
+			"[DDB RCU ServQuotas]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#default-limits-throughput-capacity-modes>"
 		]
 	},
 	"wcuServiceLimit":{
@@ -321,7 +321,7 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#default-limits-throughput-capacity-modes>"
+			"[DDB WCU ServQuotas]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ServiceQuotas.html#default-limits-throughput-capacity-modes>"
 		]
 	},
 	"disabledPointInTimeRecovery":{
@@ -334,7 +334,7 @@
 		"additionalCost":1,
 		"needFullTest":0,
 		"ref":[
-			"[AWS Docs]<https://docs.aws.amazon.com/securityhub/latest/userguide/dynamodb-controls.html#dynamodb-2>"
+			"[DDB PITR]<https://docs.aws.amazon.com/securityhub/latest/userguide/dynamodb-controls.html#dynamodb-2>"
 		]
 	}
 }
