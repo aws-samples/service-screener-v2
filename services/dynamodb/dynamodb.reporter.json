@@ -25,7 +25,7 @@
 			"[DDB Autoscaling Guide]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_AutoScalingSettings.html#CostOptimization_AutoScalingSettings_UnderProvisionedTables>"
 		]
 	},
-	"autoScalinglowUtil":{
+	"autoScalingLowUtil":{
 	    "category":"P",
 	    "^description": "When you set a very low utilization (a target less than 50%) it means your application would need to reach 50% of the provisioned capacity before it triggers an auto scaling policy. Unlless your application traffic grows at a very aggressive rate, this usually translates into unused capacity and wasted resources.",
 	    "shortDesc":"Autoscaling with low utilization policy",
