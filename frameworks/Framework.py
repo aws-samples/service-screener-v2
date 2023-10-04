@@ -11,6 +11,9 @@ class Framework():
         self.framework = type(self).__name__
         pass
     
+    def gateCheck(self):
+        return True
+    
     def getFilePath(self):
         filepath = _C.FRAMEWORK_DIR + '/' + self.framework + '/map.json'
         exists = os.path.exists(filepath)

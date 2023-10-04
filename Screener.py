@@ -182,7 +182,10 @@ class Screener:
                 if len(frameworks) > 0:
                     for framework in frameworks:
                         o = FrameworkPageBuilder(framework, apiResultArray)
-                        p = o.buildPage()
+                        if o.getGateCheckStatus() == True:
+                            p = o.buildPage()
+                        else:
+                            print(framework + " GATECHECK==FALSE")
                 
                 # os.chdir(_C.ROOT_DIR)
 

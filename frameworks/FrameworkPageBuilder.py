@@ -45,6 +45,9 @@ class FrameworkPageBuilder(PageBuilder):
         else:
             print('[Framework] -{}- not found'.format(framework))
     
+    def getGateCheckStatus(self):
+        return self.framework.gateCheck()
+    
     def populate(self):
         self.headerInfo = self.framework.getMetaData()
     
