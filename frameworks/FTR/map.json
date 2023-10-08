@@ -4,7 +4,8 @@
     "shortname": "FTR",
     "fullname": "Foundational Technical Review",
     "description": "Assesses an AWS Partner's solution against a specific set of Amazon Web Services (AWS) best practices around security, performance, and operational processes that are most critical for customer success.",
-    "_": "https://apn-checklists.s3.amazonaws.com/foundational/partner-hosted/partner-hosted/CVLHEC5X7.html"
+    "_": "https://apn-checklists.s3.amazonaws.com/foundational/partner-hosted/partner-hosted/CVLHEC5X7.html",
+    "emptyCheckDefaultMsg": ""
   },
   "mapping": {
     "Partner hosted": {

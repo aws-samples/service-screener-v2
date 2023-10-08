@@ -4,7 +4,8 @@
     "shortname": "SSB",
     "fullname": "AWS Startup Security Baseline",
     "description": "The AWS Startup Security Baseline (SSB) is a set of controls that create a minimum foundation for businesses to build securely on AWS without decreasing their agility. These controls form the basis of your security posture and are focused on securing credentials, enabling logging and visibility, managing contact information, and implementing basic data boundaries.<br><br>The controls in this guide are designed with early startups in mind, mitigating the most common security risks without requiring significant effort. Many startups begin their journey in the AWS Cloud with a single AWS account. As organizations grow, they migrate to multi-account architectures. The guidance in this guide is designed for single-account architectures, but it helps you set up security controls that are easily migrated or modified as you transition to a multi-account architecture.<br><br>The controls in the AWS SSB are separated into two categories: account and workload. Account controls help keep your AWS account secure. It includes recommendations for setting up user access, policies, and permissions, and it includes recommendations for how to monitor your account for unauthorized or potentially malicious activity. Workload controls help secure your resources and code in the cloud, such as applications, backend processes, and data. It includes recommendations such as encryption and reducing the scope of access.",
-    "_": "https://docs.aws.amazon.com/prescriptive-guidance/latest/aws-startup-security-baseline/welcome.html"
+    "_": "https://docs.aws.amazon.com/prescriptive-guidance/latest/aws-startup-security-baseline/welcome.html",
+    "emptyCheckDefaultMsg": ""
   },
   "mapping": {
     "Account": {

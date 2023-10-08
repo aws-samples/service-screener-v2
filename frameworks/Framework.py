@@ -11,6 +11,9 @@ class Framework():
         self.framework = type(self).__name__
         pass
     
+    def gateCheck(self):
+        return True
+    
     def getFilePath(self):
         filepath = _C.FRAMEWORK_DIR + '/' + self.framework + '/map.json'
         exists = os.path.exists(filepath)
@@ -41,6 +44,10 @@ class Framework():
         summ = {}
         outp = []
         
+        emptyCheckDefaultMsg = ""
+        if 'emptyCheckDefaultMsg' in self.map['metadata']:
+            emptyCheckDefaultMsg = self.map['metadata']['emptyCheckDefaultMsg']
+        
         for title, sections in self.map['mapping'].items():
             # outp.append(self.formatTitle(title))
             # [Manual, Compliant, Not Comply]
@@ -54,6 +61,7 @@ class Framework():
                 if len(maps) == 0:
                     # outp.append("Framework does not has relevant check, manual intervention required")
                     comp = 0
+                    checks = emptyCheckDefaultMsg
                 
                 else: 
                     pre = []
