@@ -138,7 +138,6 @@ for file in os.listdir(_C.FORK_DIR):
         contexts[f[0]] = json.loads(open(_C.FORK_DIR + '/' + file).read())
     else:
         cnt, rules, exceptions = list(json.loads(open(_C.FORK_DIR + '/' + file).read()).values())
-        inventory[f[0]] = {cnt, rules, exceptions}
         
         serviceStat[f[0]] = cnt
         scanned['resources'] += cnt
@@ -146,8 +145,6 @@ for file in os.listdir(_C.FORK_DIR):
         scanned['exceptions'] += exceptions
         if f[0] in Config.GLOBAL_SERVICES:
             hasGlobal = True
-
-print(inventory)
 
 if testmode == True:
     exit("Test mode enable, script halted")

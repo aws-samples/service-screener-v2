@@ -486,7 +486,7 @@ class PageBuilder:
             output.append("<li class='nav-item'>\n"
                           "<a href='{}.html' class='nav-link {}'>\n"
                           "<i class='nav-icon fas fa-{}'></i>\n"
-                          "<p>{} <span class='badge badge-info right'>{}</span></p>\n"
+                          "<p>{} <span class='badge badge-info right' data-count='{}'></span></p>\n"
                           "</a>\n"
                           "</li>".format(name, class_, icon, name.upper(), _count))
 
