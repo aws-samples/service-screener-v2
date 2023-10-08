@@ -264,3 +264,23 @@ class Ec2Instance(Evaluator):
     
         self.results['EC2HighUtilization'] = [-1, '']
         return
+    
+    def _checkEC2PublicIP(self):
+        instance = self.ec2InstanceData
+        
+        if instance.get('PublicIpAddress') is None:
+            return
+        
+        self.results['EC2InstancePublicIP'] = [-1, instance.get('PublicIpAddress')]
+        
+        try:
+            addrResp = self.ec2Client.describe_addresses(
+                PublicIps=[instance.get('PublicIpAddress')]
+            )
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == 'InvalidAddress.NotFound':
+                self.results['EC2InstanceAutoPublicIP'] = [-1, instance.get('PublicIpAddress')]
+            else:
+                raise(e)
+        
+        return
