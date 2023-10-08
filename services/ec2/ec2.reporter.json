@@ -155,6 +155,19 @@
             "[Amazon EC2 public IP]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-9>"
         ]
     },
+    "EC2SubnetAutoPublicIP": {
+        "category": "S",
+        "^description": "EC2 Subnet with Auto Assign IP: {$COUNT} of your instances has enabled auto-assign public IP in subnet configuration.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "EC2 Subnet with Auto Assign IP",
+        "ref": [
+            "[Amazon EC2 public IP]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-9>"
+        ]
+    },
     "EBSEncrypted": {
         "category": "S",
         "^description": "Storage Encyrption: {$COUNT} of EBS storage volumes are not encrypted. Enable encryption for EBS volumes to meet security and compliance requirements.",

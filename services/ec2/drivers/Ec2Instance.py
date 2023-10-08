@@ -284,3 +284,16 @@ class Ec2Instance(Evaluator):
                 raise(e)
         
         return
+    
+    def _checkEC2SubnetAutoPublicIP(self):
+        instance = self.ec2InstanceData
+        
+        results = self.ec2Client.describe_subnets(
+            SubnetIds = [instance.get('SubnetId')]
+        )
+        
+        for subnet in results.get('Subnets'):
+            if subnet.get('MapPublicIpOnLaunch'):
+                self.results['EC2SubnetAutoPublicIP'] = [-1, subnet.get('SubnetId')]
+        
+        return

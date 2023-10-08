@@ -123,14 +123,3 @@ class Ec2AutoScaling(Evaluator):
             
         
         return
-    
-    # def _checkLaunchConfig(self):
-    #     result = self.asgClient.describe_launch_configurations(
-    #         LaunchConfigurationNames = ['testAnother']
-    #     )
-        
-    #     for config in result.get('LaunchConfigurations'):
-    #         print(config.get('MetadataOptions').get('HttpTokens'))
-        
-        
-    #     return
