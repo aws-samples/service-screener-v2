@@ -168,7 +168,8 @@ class Screener:
                     apiResultArray[service]['detail'] = reporter.getDetail()
             
             if runmode == 'report':
-                serviceStat = Config.get('cli_services')
+                # serviceStat = Config.get('cli_services')
+                # print(serviceStat)
                 dashPB = DashboardPageBuilder('index', [])
                 dashPB.buildPage()
                 
