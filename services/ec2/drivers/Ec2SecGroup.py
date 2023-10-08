@@ -130,6 +130,9 @@ class Ec2SecGroup(Evaluator):
     def _checkDefaultSGInUsed(self):
         group = self.secGroup
         if group['GroupName'] == 'default':
+            if 'inUsed' in group and group['inUsed'] == 'False':
+                return
+            
             self.results['SGDefaultInUsed'] = [-1, group['GroupName']]
             
         return
@@ -190,7 +193,11 @@ class Ec2SecGroup(Evaluator):
     def _checkSGRulesNumber(self):
         group = self.secGroup
         ruleNum = len(group['IpPermissions']) + len(group['IpPermissionsEgress'])
-        if ruleNum >= 50:
-            self.results['SGRuleNumber'] = [-1, ruleNum]
+        if group.get('GroupName') == 'default':
+            if ruleNum > 0:
+                self.results['SGDefaultDisallowTraffic'] = [-1, '']
+        else:
+            if ruleNum >= 50:
+                self.results['SGRuleNumber'] = [-1, ruleNum]
             
         return

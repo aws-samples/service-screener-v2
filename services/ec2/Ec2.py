@@ -208,6 +208,23 @@ class Ec2(Service):
         arr = result.get('Addresses')
         
         return arr
+        
+    def getDefaultSG(self):
+        defaultSGs = {}
+        result = self.ec2Client.describe_security_groups()
+        for group in result.get('SecurityGroups'):
+            if group.get('GroupName') == 'default':
+                defaultSGs[group.get('GroupId')] = group
+                
+        while result.get('NextToken') is not None:
+            result = self.ec2Client.describe_security_groups(
+                NextToken = result.get('NextToken')
+            )
+            for group in result.get('SecurityGroups'):
+                if group.get('GroupName') == 'default':
+                    defaultSGs[group.get('GroupId')] = group
+        
+        return defaultSGs
     
     def advise(self):
         objs = {}
@@ -305,6 +322,12 @@ class Ec2(Service):
             obj = Ec2AutoScaling(group, self.asgClient, self.elbClient, self.elbClassicClient, self.ec2Client)
             obj.run()
             objs[f"ASG::{group['AutoScalingGroupName']}"] = obj.getInfo()
+        
+        defaultSGs = self.getDefaultSG()
+        for groupId in defaultSGs.keys():
+            if groupId not in secGroups:
+                secGroups[groupId] = defaultSGs[groupId]
+                secGroups[groupId]['inUsed'] = 'False'
             
         # SG checks
         for group in secGroups.values():

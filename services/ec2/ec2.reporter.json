@@ -350,6 +350,19 @@
             "https://docs.aws.amazon.com/vpc/latest/userguide/amazon-vpc-limits.html#vpc-limits-security-groups"    
         ]
     },
+    "SGDefaultDisallowTraffic": {
+        "category": "S",
+        "^description": "Default Security Group with Rules: {$COUNT} of default security group have rules. Remove rules in default security group",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Default Security Group with Rules",
+        "ref": [
+            "https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-2"    
+        ]
+    },
     "ComputeOptimizerEnabled": {
         "category": "CP",
         "^description": "Compute Optimizer Not Enabled: Compute Optimizer of your account is not enabled. Enable Compute Optimizer to get resources recommendations.",
