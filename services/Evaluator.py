@@ -12,7 +12,7 @@ class Evaluator():
     def init(self):
         self.classname = type(self).__name__
         
-    def run(self):
+    def run(self, serviceName):
         servClass = self.classname
         rulePrefix = servClass + '::rules'
         rules = Config.get(rulePrefix, [])
@@ -41,9 +41,12 @@ class Evaluator():
             with open(_C.FORK_DIR + '/error.txt', 'a+') as f:
                 f.write('\n\n'.join(emsg))
                 f.close()
-                
-        scanned = Config.get('scanned')
-        Config.set('scanned', {
+        
+        scannedKey = 'scanned_'+serviceName.__name__.lower()
+        # print(scannedKey)
+        
+        scanned = Config.get(scannedKey)
+        Config.set(scannedKey, {
             'resources': scanned['resources'] + 1,
             'rules': scanned['rules'] + cnt,
             'exceptions': scanned['exceptions'] + ecnt

@@ -55,7 +55,7 @@ class Dynamodb(Service):
             #Run generic checks
             print('... (Dynamodb::Generic) inspecting')
             obj = DynamoDbGeneric(listOfTables, self.dynamoDbClient, self.cloudWatchClient, self.serviceQuotaClient, self.appScalingPolicyClient, self.backupClient, self.cloudTrailClient)
-            obj.run()
+            obj.run(self.__class__)
             objs['DynamoDb::Generic'] = obj.getInfo()
             del obj
         
@@ -64,7 +64,7 @@ class Dynamodb(Service):
                 objName = 'Dynamodb::' + eachTable['Table']['TableName']
                 print('... ({}) inspecting'.format(objName))
                 obj = DynamoDbCommon(eachTable, self.dynamoDbClient, self.cloudWatchClient, self.serviceQuotaClient, self.appScalingPolicyClient, self.backupClient, self.cloudTrailClient)
-                obj.run()
+                obj.run(self.__class__)
                 objs[objName] = obj.getInfo()
                 del obj
             

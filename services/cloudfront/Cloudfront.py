@@ -40,7 +40,7 @@ class Cloudfront(Service):
         for dist in dists:
             print('... (CloudFront::Distribution) inspecting ' + dist)
             obj = cloudfrontDist(dist, self.cloudfrontClient)
-            obj.run()
+            obj.run(self.__class__)
             
             objs['Cloudfront::' + dist] = obj.getInfo()
             del obj

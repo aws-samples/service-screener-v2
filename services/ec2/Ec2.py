@@ -242,7 +242,7 @@ class Ec2(Service):
                 if 'Parameters' in compOptCheck and len(compOptCheck['Parameters']) > 0:
                     print('... (Compute Optimizer Recommendations) inspecting')
                     obj = Ec2CompOpt(self.compOptClient)
-                    obj.run()
+                    obj.run(self.__class__)
                     objs['ComputeOptimizer'] = obj.getInfo()
                     Config.set('EC2_HasRunComputeOpt', True)
                     
@@ -260,7 +260,7 @@ class Ec2(Service):
         if hasRunRISP == False:
             print('... (Cost Explorer Recommendations) inspecting')
             obj = Ec2CostExplorerRecs(self.ceClient)
-            obj.run()
+            obj.run(self.__class__)
     
             objs['CostExplorer'] = obj.getInfo()
             Config.set('EC2_HasRunRISP', True)
@@ -272,7 +272,7 @@ class Ec2(Service):
             instanceData = instance['Instances'][0]
             print('... (EC2) inspecting ' + instanceData['InstanceId'])
             obj = Ec2Instance(instanceData,self.ec2Client)
-            obj.run()
+            obj.run(self.__class__)
             
             objs[f"EC2::{instanceData['InstanceId']}"] = obj.getInfo()
             
@@ -287,7 +287,7 @@ class Ec2(Service):
         for volume in volumes:
             print('... (EBS) inspecting ' + volume['VolumeId'])
             obj = Ec2EbsVolume(volume,self.ec2Client)
-            obj.run()
+            obj.run(self.__class__)
             objs[f"EBS::{volume['VolumeId']}"] = obj.getInfo()
             
         # ELB checks
@@ -308,7 +308,7 @@ class Ec2(Service):
         for lb in lbClassic:
             print(f"... (ELB::Load Balancer Classic) inspecting {lb['LoadBalancerName']}")
             obj = Ec2ElbClassic(lb, self.elbClassicClient)
-            obj.run()
+            obj.run(self.__class__)
             objs[f"ELB Classic::{lb['LoadBalancerName']}"] = obj.getInfo()
             
             elbSGList = self.getELBSecurityGroup(lb)
@@ -320,7 +320,7 @@ class Ec2(Service):
         for group in autoScalingGroups:
             print(f"... (ASG::Auto Scaling Group) inspecting {group['AutoScalingGroupName']}");
             obj = Ec2AutoScaling(group, self.asgClient, self.elbClient, self.elbClassicClient, self.ec2Client)
-            obj.run()
+            obj.run(self.__class__)
             objs[f"ASG::{group['AutoScalingGroupName']}"] = obj.getInfo()
         
         defaultSGs = self.getDefaultSG()
@@ -333,7 +333,7 @@ class Ec2(Service):
         for group in secGroups.values():
             print(f"... (EC2::Security Group) inspecting {group['GroupId']}")
             obj = Ec2SecGroup(group, self.ec2Client)
-            obj.run()
+            obj.run(self.__class__)
             
             objs[f"SG::{group['GroupId']}"] = obj.getInfo()
         
@@ -342,7 +342,7 @@ class Ec2(Service):
         eips = self.getEIPResources()
         for eip in eips:
             obj = Ec2EIP(eip)
-            obj.run()
+            obj.run(self.__class__)
             objs[f"ElasticIP::{eip['AllocationId']}"] = obj.getInfo()
         
         

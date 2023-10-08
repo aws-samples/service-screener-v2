@@ -20,6 +20,6 @@ class Guardduty(Service):
         for detector in detectors:
             print(f"... (GuardDuty) inspecting {detector}")
             obj = GuarddutyDriver(detector, self.guardduty_client, self.region)
-            obj.run()
+            obj.run(self.__class__)
             objs[f"Detector::{detector}"] = obj.getInfo()
         return objs

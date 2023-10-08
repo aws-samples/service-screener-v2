@@ -1,7 +1,7 @@
 {
 	"rootMfaActive": {
 		"category": "S",
-		"^description": "You have not enabled Multi-Factor Authentication (MFA) on your root user. AWS MFA is a simple best practice that adds an extra layer of protection on top of your user name and password. With MFA enabled, when a user signs in to an AWS Management Console, they will be prompted for their user name and password (the first factor—what they know), as well as for an authentication code from their AWS MFA device (the second factor—what they have). Taken together, these multiple factors provide increased security for your AWS account settings and resources.",
+		"^description": "Root user can perform sensitive operations in your account, adding an additional layer of authentication helps you to better secure your account. You have <b>NOT</b> enabled Multi-Factor Authentication (MFA) on your root user. AWS MFA is a simple best practice that adds an extra layer of protection on top of your user name and password. With MFA enabled, when a user signs in to an AWS Management Console, they will be prompted for their user name and password (the first factor—what they know), as well as for an authentication code from their AWS MFA device (the second factor—what they have). Taken together, these multiple factors provide increased security for your AWS account settings and resources.",
 		"shortDesc": "Enable MFA on root user",
 		"criticality": "H",
 		"downtime": 0,
@@ -9,7 +9,8 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://aws.amazon.com/iam/features/mfa/>"
+			"[AWS MFA]<https://aws.amazon.com/iam/features/mfa/>",
+			"[IAM Best Practices]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html>"
 		]
 	},
 	"mfaActive": {
@@ -22,7 +23,7 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://aws.amazon.com/iam/features/mfa/>"
+			"[AWS MFA]<https://aws.amazon.com/iam/features/mfa/>"
 		]
 	},
 	"passwordLastChange365": {
@@ -35,7 +36,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_admin-change-user.html>"
+			"[Managing IAM Password]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_admin-change-user.html>"
 		]
 	},
 	"passwordLastChange90": {
@@ -48,7 +49,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_admin-change-user.html>"
+			"[Managing IAM Password]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_admin-change-user.html>"
 		]
 	},
 	"consoleLastAccess365": {
@@ -61,7 +62,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_finding-unused.html>"
+			"[Finds unused credentials]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_finding-unused.html>"
 		]
 	},
 	"consoleLastAccess90": {
@@ -74,33 +75,33 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_finding-unused.html>"
+			"[Finds unused credentials]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_finding-unused.html>"
 		]
 	},
 	"passwordPolicy": {
 		"category": "S",
 		"^description": "You have not set a custom password policy. Setting a custom password policy will allow you to have the ability to require strong password practices, such as complexity level, avoiding re-use, and enforcing multi-factor authentication (MFA). If you don't set a custom password policy, IAM user passwords must meet the default AWS password policy.",
 		"shortDesc": "Set a custom password policy.",
-		"criticality": "M",
+		"criticality": "L",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_account-policy.html#IAMPasswordPolicy>"
+			"[IAM Password Policy]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_account-policy.html#IAMPasswordPolicy>"
 		]
 	},
 	"passwordPolicyWeak": {
 		"category": "S",
 		"^description": "Your current password policy is not strong. Improving the strength of your password policy would improve the security of your account. Consider implementing best practices when setting the password policy. If you already configure as per your organization ",
 		"shortDesc": "Set a stronger password policy",
-		"criticality": "M",
+		"criticality": "L",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#configure-strong-password-policy>"
+			"[IAM Password Policy]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#configure-strong-password-policy>"
 		]
 	},
 	"InlinePolicy": {
@@ -165,7 +166,8 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>",
+			"[Organization GuardRail Blog]<https://aws.amazon.com/blogs/security/how-to-use-service-control-policies-to-set-permission-guardrails-across-accounts-in-your-aws-organization/?ref=wellarchitected>"
 		]
 	},
 	"userNotUsingGroup": {
@@ -248,7 +250,7 @@
 	},
 	"rootHasAccessKey": {
 		"category": "S",
-		"^description": "Programmatic access to AWS APIs should never use the root user. It is best not to generate static an access key for the root user. If one already exists, you should transition any processes using that key to use temporary access keys from an AWS Identity and Access Management (IAM) role, or, if necessary, static access keys from an IAM user.",
+		"^description": "The root user is the most privileged user in an AWS account, with full administrative access to all resources within the account, and in some cases cannot be constrained by security policies. Disabling programmatic access to the root user, establishing appropriate controls for the root user, and avoiding routine use of the root user helps reduce the risk of inadvertent exposure of the root credentials and subsequent compromise of the cloud environment. Programmatic access to AWS APIs should never use the root user. It is best not to generate static an access key for the root user. If one already exists, you should transition any processes using that key to use temporary access keys from an AWS Identity and Access Management (IAM) role, or, if necessary, static access keys from an IAM user.",
 		"shortDesc": "Remove access keys for the root user",
 		"criticality": "H",
 		"downtime": 0,
@@ -354,7 +356,7 @@
 	},
 	"rootConsoleLogin30days": {
 		"category": "S",
-		"^description": "We recommend that you configure an administrative user in AWS IAM Identity Center (successor to AWS Single Sign-On) to perform daily tasks and access AWS resources. However, you can perform the tasks listed below only when you sign in as the root user of an account.<br>[1] Change your account settings, [2] Restore IAM user permissions, [3] Activate IAM access to the Billing and Cost Management console, [4] View certain tax invocies, [5] Close your account and etc. Refers to the link",
+		"^description": "It is critical to prevent root user access from getting into the wrong hands and to be aware whenever root user activity occurs in your AWS account. We recommend that you configure an administrative user in AWS IAM Identity Center (successor to AWS Single Sign-On) to perform daily tasks and access AWS resources. However, you can perform the tasks listed below only when you sign in as the root user of an account.<br>[1] Change your account settings, [2] Restore IAM user permissions, [3] Activate IAM access to the Billing and Cost Management console, [4] View certain tax invocies, [5] Close your account and etc. Refers to the link",
 		"shortDesc": "Review activity carry out by root",
 		"criticality": "H",
 		"downtime": 0,

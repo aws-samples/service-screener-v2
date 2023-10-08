@@ -21,14 +21,16 @@ _cli_options = ArguParser.Load()
 debugFlag = _cli_options['debug']
 # feedbackFlag = _cli_options['feedback']
 # testmode = _cli_options['dev']
-testmode = False
+testmode = _cli_options['ztestmode']
 bucket = _cli_options['bucket']
 runmode = _cli_options['mode']
 filters = _cli_options['tags']
 
+
 DEBUG = True if debugFlag in _C.CLI_TRUE_KEYWORD_ARRAY or debugFlag is True else False
 # feedbackFlag = True if feedbackFlag in _C.CLI_TRUE_KEYWORD_ARRAY or feedbackFlag is True else False
 testmode = True if testmode in _C.CLI_TRUE_KEYWORD_ARRAY or testmode is True else False
+# print(testmode)
 
 runmode = runmode if runmode in ['api-raw', 'api-full', 'report'] else 'report'
 
@@ -86,22 +88,35 @@ Config.setAccountInfo(tempConfig)
 
 contexts = {}
 serviceStat = {}
-GLOBALRESOURCES = []
+# GLOBALRESOURCES = []
 
 oo = Config.get('_AWS_OPTIONS')
 
-CfnFaker = CfnFaker()
-CfnFaker.createStack()
+if testmode == False:
+    CfnFaker = CfnFaker()
+    CfnFaker.createStack()
 
 overallTimeStart = time.time()
-os.chdir('__fork')
-os.system('rm -f *.json; echo > tail.txt')
+# os.chdir('__fork')
+directory = '__fork'
+if not os.path.exists(directory):
+    os.mkdir(directory)
+
+files_in_directory = os.listdir(directory)
+filtered_files = [file for file in files_in_directory if file.endswith(".json")]
+for file in filtered_files:
+	path_to_file = os.path.join(directory, file)
+	os.remove(path_to_file)
+
+with open(directory + '/tail.txt', 'w') as fp:
+    pass
 
 input_ranges = []
 for service in services:
     input_ranges = [(service, regions, filters) for service in services]
 
-pool = Pool(processes=len(services))
+# pool = Pool(processes=len(services))
+pool = Pool(processes=4)
 pool.starmap(Screener.scanByService, input_ranges)
 
 ## <TODO>
@@ -112,6 +127,8 @@ scanned = {
     'exceptions': 0
 }
 
+inventory = {}
+
 hasGlobal = False
 for file in os.listdir(_C.FORK_DIR):
     if file[0] == '.' or file == _C.SESSUID_FILENAME or file == 'tail.txt' or file == 'error.txt' or file == 'empty.txt':
@@ -121,6 +138,7 @@ for file in os.listdir(_C.FORK_DIR):
         contexts[f[0]] = json.loads(open(_C.FORK_DIR + '/' + file).read())
     else:
         cnt, rules, exceptions = list(json.loads(open(_C.FORK_DIR + '/' + file).read()).values())
+        
         serviceStat[f[0]] = cnt
         scanned['resources'] += cnt
         scanned['rules'] += rules
@@ -128,7 +146,7 @@ for file in os.listdir(_C.FORK_DIR):
         if f[0] in Config.GLOBAL_SERVICES:
             hasGlobal = True
 
-if testmode:
+if testmode == True:
     exit("Test mode enable, script halted")
 
 timespent = round(time.time() - overallTimeStart, 3)
@@ -139,18 +157,33 @@ print("Total Resources scanned: " + str(number_format(scanned['resources'])) + "
 print("Time consumed (seconds): " + str(timespent))
 
 # Cleanup
-os.chdir(_C.HTML_DIR)
-os.system('rm -f *.html; rm -f error.txt')
+# os.chdir(_C.HTML_DIR)
+filetodel = _C.HTML_DIR + '/error.txt'
+if os.path.exists(filetodel):
+    os.remove(filetodel)
 
-if os.path.exists(_C.FORK_DIR + '/error.txt'):
-    os.chdir(_C.FORK_DIR)
-    os.system('mv error.txt ' + _C.HTML_DIR + '/error.txt')
+directory = _C.HTML_DIR
+files_in_directory = os.listdir(directory)
+filtered_files = [file for file in files_in_directory if file.endswith(".html")]
+for file in filtered_files:
+	path_to_file = os.path.join(directory, file)
+	os.remove(path_to_file)
+
+src = _C.FORK_DIR + '/error.txt'
+if os.path.exists(src):
+    # os.chdir(_C.FORK_DIR)
+    dest = _C.HTML_DIR + '/error.txt'
+    os.rename(src, dest)
+    # os.system('mv error.txt ' + _C.HTML_DIR + '/error.txt')
 
 os.chdir(_C.FORK_DIR)
 # os.system('rm -f *.json')
 
 os.chdir(_C.ROOT_DIR)
-os.system('rm -f output.zip')
+filetodel = _C.ROOT_DIR + '/output.zip'
+if os.path.exists(filetodel):
+    os.remove(filetodel)
+
 
 ## Generate output
 uploadToS3 = False
@@ -166,6 +199,9 @@ Screener.generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS
 CfnFaker.deleteStack()
 
 os.chdir(_C.FORK_DIR)
-os.system('rm -f tail.txt')
+filetodel = _C.FORK_DIR + '/tail.txt'
+if os.path.exists(filetodel):
+    os.remove(filetodel)
+# os.system('rm -f tail.txt')
 
 print("@ Thank you for using " + Config.ADVISOR['TITLE'] + " @")

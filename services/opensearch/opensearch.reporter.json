@@ -1,0 +1,236 @@
+{
+    "FineGrainedAccessControl": {
+        "category": "S",
+        "^description": "Fine-grained access control offers additional ways of controlling access to your data on Amazon OpenSearch Service. For example, depending on who makes the request, you might want a search to return results from only one index. You might want to hide certain fields in your documents or exclude certain documents altogether.",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "Follow the principle of least privilege when granting access to the configuration API and the OpenSearch APIs.",
+        "ref": [
+            "[Fine-grained access control in Amazon OpenSearch Service]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/fgac.html>"    
+        ]
+    },
+    "ReplicaShard": {
+        "category": "R",
+        "^description": "So what is the right number of replicas? If you have a cluster that has num_nodes nodes, num_primaries primary shards in total and if you want to be able to cope with max_failures node failures at once at most, then the right number of replicas for you is max(max_failures, ceil(num_nodes / num_primaries) - 1).",
+        "downtime": 0,
+        "slowness": -1,
+        "additionalCost": 1,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Configure at least one replica, the OpenSearch default, for each index.",
+        "ref": [
+            "[Sharding Strategies]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp.html#bp-sharding-strategy>"    
+        ]
+    },
+    "DedicatedMasterNodes": {
+        "category": "R",
+        "^description": "Amazon OpenSearch Service uses dedicated master nodes to increase cluster stability. A dedicated master node performs cluster management tasks, but does not hold data or respond to data upload requests. This offloading of cluster management tasks increases the stability of your domain.",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 1,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "We recommend that you add three dedicated master nodes to each production OpenSearch Service domain.",
+        "ref": [
+            "Dedicated master nodes in Amazon OpenSearch Service]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-dedicatedmasternodes.html>"    
+        ]
+    },
+    "AvailabilityZones": {
+        "category": "R",
+        "^description": "To prevent data loss and minimize cluster downtime in the event of a service disruption, you can distribute nodes across two or three Availability Zones in the same AWS Region. Availability Zones are isolated locations within each Region. With a two-AZ configuration, losing one Availability Zone means that you lose half of all domain capacity. Moving to three Availability Zones further reduces the impact of losing a single Availability Zone. Deploy mission-critical domains across three Availability Zones and two replica shards per index. This configuration lets OpenSearch Service distribute replica shards to different AZs than their corresponding primary shards. There are no cross-AZ data transfer charges for cluster communications between Availability Zones.",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Distribute nodes across two or three Availability Zones in the same Region",
+        "ref": [
+            "[Stability]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-multiaz.html>"    
+        ]
+    },
+    "EngineVersion": {
+        "category": "PR",
+        "^description": "OpenSearch Service regularly adds support for community-maintained versions of OpenSearch. Always upgrade to the latest OpenSearch versions when they're available. OpenSearch Service simultaneously upgrades both OpenSearch and OpenSearch Dashboards (or Elasticsearch and Kibana if your domain is running a legacy engine). If the cluster has dedicated master nodes, upgrades complete without downtime. Otherwise, the cluster might be unresponsive for several seconds post-upgrade while it elects a master node. OpenSearch Dashboards might be unavailable during some or all of the upgrade.",
+        "downtime": -1,
+        "slowness": 1,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 1,
+        "shortDesc": "Always upgrade to the latest OpenSearch versions when they're available. ",
+        "ref": [
+            "[Keep current with OpenSearch]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp.html#bp-stability>"    
+        ]
+    },
+    "ServiceSoftwareVersion": {
+        "category": "PS",
+        "^description": "OpenSearch Service regularly releases software updates that add features or otherwise improve your domains. Updates don't change the OpenSearch or Elasticsearch engine version. We recommend that you schedule a recurring time to run the DescribeDomain API operation, and initiate a service software update if the UpdateStatus is ELIGIBLE. If you don't update your domain within a certain time frame (typically two weeks), OpenSearch Service automatically performs the update.",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": -1,
+        "shortDesc": "If you don't update your domain within a certain time frame (typically two weeks), OpenSearch Service automatically performs the update.",
+        "ref": [
+            "[Keep current with OpenSearch]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp.html#bp-stability>"    
+        ]
+    },
+    "EBSStorageUtilisation": {
+        "category": "CR",
+        "^description": "A node in your cluster is down to 20 GiB of free storage space. See Lack of available storage space. This value is in MiB, so rather than 20480, we recommend setting it to 25% of the storage space for each node.",
+        "downtime": -1,
+        "slowness": 1,
+        "additionalCost": -1,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "We recommend monitoring if the free storage space falls below 25% of the storage space for each node",
+        "ref": [
+            "[FreeStorageSpace]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/cloudwatch-alarms.html>"    
+        ]
+    },
+    "LatestInstanceVersion": {
+        "category": "CP",
+        "^description": "For the best performance, it is recommended that you use the current generation instance types when you create new OpenSearch Service domains.",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "We recommend running the latest instance version",
+        "ref": [
+            "[OS Latest Instance Vers]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/supported-instance-types.html#latest-gen>"
+        ]
+    },
+    "ClusterStatus": {
+        "category": "RP",
+        "^description": "OpenSearch expresses cluster health in three colors: green, yellow, and red. A green status means all primary shards and their replicas are allocated to nodes. A yellow status means all primary shards are allocated to nodes, but some replicas aren’t. A red status means at least one primary shard is not allocated to any node.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Red: At least one primary shard and its replicas are not allocated to a node. Yellow: At least one replica shard is not allocated to a node.",
+        "ref": [
+            "[OS Error Handling]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/handling-errors.html>"    
+        ]
+    },
+    "MasterNodeType": {
+        "category": "P",
+        "^description": "Although dedicated master nodes don't process search and query requests, their size is highly correlated with the number of instances, indexes, and shards that they can manage.",
+        "downtime": -1,
+        "slowness": 1,
+        "additionalCost": -1,
+        "criticality": "I",
+        "needFullTest": 1,
+        "shortDesc": "Although dedicated master nodes don't process search and query requests, their size is highly correlated with the number of instances, indexes, and shards that they can manage.",
+        "ref": [
+            "[Choosing instance types for dedicated master nodes]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-dedicatedmasternodes.html#:~:text=Recommended%20minimum%20dedicated%20master%20instance%20type>"    
+        ]
+    },
+    "TSeriesForProduction": {
+        "category": "PR",
+        "^description": "We recommend avoiding the use of T-type instances in production",
+        "downtime": -1,
+        "slowness": -1,
+        "additionalCost": 1,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "We recommend avoiding the use of T-type instances in production",
+        "ref": [
+            "[]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp.html#:~:text=Don%27t%20use%20T2%20or%20t3.small%20instances%20for%20production%20domains%3B%20they%20can%20become%20unstable%20under%20sustained%20heavy%20load.%20t3.medium%20instances%20are%20an%20option%20for%20small%20production%20workloads%20(both%20as%20data%20nodes%20and%20dedicated%20master%20nodes).>"    
+        ]
+    },
+    "DomainWithinVPC": {
+        "category": "S",
+        "^description": "Placing your OpenSearch Service domain within a virtual private cloud (VPC) helps enable secure communication between OpenSearch Service and other services within the VPC—without the need for an internet gateway, NAT device, or VPN connection. All traffic remains securely within the AWS Cloud. Because of their logical isolation, domains that reside within a VPC have an extra layer of security compared to domains that use public endpoints.",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": -1,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "We recommend that you create your domains within a VPC.",
+        "ref": [
+            "[Deploy domains within a VPC]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"    
+        ]
+    },
+    "EncyptionAtRest": {
+        "category": "S",
+        "^description": "OpenSearch Service domains offer encryption of data at rest to help prevent unauthorized access to your data. Encryption at rest uses AWS Key Management Service (AWS KMS) to store and manage your encryption keys, and the Advanced Encryption Standard algorithm with 256-bit keys (AES-256) to perform the encryption.",
+        "downtime": -1,
+        "slowness": -1,
+        "additionalCost": 0,
+        "criticality": "I",
+        "needFullTest": 0,
+        "shortDesc": "If your domain stores sensitive data, enable encryption of data at rest.",
+        "ref": [
+            "[Enable encryption at rest]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"    
+        ]
+    },
+    "NodeToNodeEncryption": {
+        "category": "S",
+        "^description": "Node-to-node encryption provides an additional layer of security on top of the default security features within OpenSearch Service. It implements Transport Layer Security (TLS) for all communications between the nodes that are provisioned within OpenSearch. Node-to-node encryption, any data sent to your OpenSearch Service domain over HTTPS remains encrypted in transit while it's being distributed and replicated between nodes.",
+        "downtime": -1,
+        "slowness": -1,
+        "additionalCost": 0,
+        "criticality": "I",
+        "needFullTest": 0,
+        "shortDesc": "If your domain stores sensitive data, enable node-to-node encryption.",
+        "ref": [
+            "[Enable node-to-node encryption]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"    
+        ]
+    },
+    "SearchSlowLogs": {
+        "category": "P",
+        "^description": "OpenSearch Service exposes OpenSearch error logs, search slow logs, indexing slow logs, and audit logs in Amazon CloudWatch Logs. Search slow logs, indexing slow logs, and error logs are useful for troubleshooting performance and stability issues. Audit logs, which are only available if you enable fine-grained access control to track user activity. For more information, see Logs in the OpenSearch documentation. Search slow logs and indexing slow logs are an important tool for understanding and troubleshooting the performance of your search and indexing operations. Enable search and index slow log delivery for all production domains. You must also configure logging thresholds—otherwise, CloudWatch won't capture the logs.",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 1,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": " Enable search and index slow log delivery for all production domains.",
+        "ref": [
+            "[Enable log publishing]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"    
+        ]
+    },
+    "AutoTune": {
+        "category": "P",
+        "^description": "Auto-Tune uses performance and usage metrics from your OpenSearch cluster to suggest changes to queue sizes, cache sizes, and Java virtual machine (JVM) settings on your nodes. These optional changes improve cluster speed and stability. You can revert to the default OpenSearch Service settings at any time. Auto-Tune is enabled by default on new domains unless you explicitly disable it.",
+        "downtime": 0,
+        "slowness": -1,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "We recommend that you enable Auto-Tune on all domains, and either set a recurring maintenance window or periodically review its recommendations.",
+        "ref": [
+            "[Enable Auto-Tune]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ism.html>"    
+        ]
+    },
+    "UltrawarmEnabled": {
+        "category": "C",
+        "^description": "UltraWarm provides a cost-effective way to store large amounts of read-only data in OpenSearch Service. UltraWarm uses Amazon S3 for storage, which means that the data is immutable and only one copy is needed. You only pay for storage that's equivalent to the size of the primary shards in your indexes. Latencies for UltraWarm queries grow with the amount of S3 data that's needed to service the query. After the data has been cached on the nodes, queries to UltraWarm indexes perform similar to queries to hot indexes.",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "criticality": "I",
+        "needFullTest": -1,
+        "shortDesc": "If you're using OpenSearch for log analytics, move your data to UltraWarm to reduce costs.",
+        "ref": [
+            "[Use UltraWarm for time-series log data]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp.html#bp-cost-optimization>"    
+        ]
+    },
+    "ColdStorage": {
+        "category": "C",
+        "^description": "Cold storage is backed by S3. When you need to query cold data, you can selectively attach it to existing UltraWarm nodes. Cold data incurs the same managed storage cost as UltraWarm, but objects in cold storage don't consume UltraWarm node resources. Therefore, cold storage provides a significant amount amount of storage capacity without impacting UltraWarm node size or count.",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "criticality": "I",
+        "needFullTest": -1,
+        "shortDesc": "If you're using OpenSearch for log analytics, move your data to cold storage to reduce costs.",
+        "ref": [
+            "[Use cold storage for time-series log data]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp.html#bp-cost-optimization>"    
+        ]
+    }
+}

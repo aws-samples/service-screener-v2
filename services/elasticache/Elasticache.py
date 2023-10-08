@@ -151,7 +151,7 @@ class Elasticache(Service):
             if obj is not None:
                 objName = cluster.get('Engine') + f"{cluster.get('ARN')}"
                 print("... (ElastiCache:" + cluster.get('Engine') + ') ' + f"{cluster.get('ARN')}")
-                obj.run()
+                obj.run(self.__class__)
                 objs[objName] = obj.getInfo()
                 del obj
             else:

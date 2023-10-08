@@ -11,6 +11,9 @@ from services.dashboard.DashboardPageBuilder import DashboardPageBuilder
 
 from frameworks.FrameworkPageBuilder import FrameworkPageBuilder
 from utils.ExcelBuilder import ExcelBuilder
+import zipfile
+import glob
+# import zlib
 
 import constants as _C
 
@@ -20,6 +23,12 @@ class Screener:
     
     @staticmethod
     def scanByService(service, regions, filters):
+        _zeroCount = {
+            'resources': 0,
+            'rules': 0,
+            'exceptions': 0
+        }
+        
         contexts = {}
         time_start = time.time()
         
@@ -27,6 +36,10 @@ class Screener:
         service = service.split('::')
         
         _regions = ['GLOBAL'] if service[0] in Config.GLOBAL_SERVICES else regions
+        
+        scannedKey = 'scanned_'+service[0]
+        globalKey = 'GLOBALRESOURCES_'+service[0]
+        Config.set(scannedKey, _zeroCount)
 
         for region in _regions:
             CURRENT_REGION = region
@@ -55,12 +68,13 @@ class Screener:
             tempCount += len(contexts[service[0]][region])
             del serv
         
-        GLOBALRESOURCES = Config.get('GLOBALRESOURCES', [])
+        GLOBALRESOURCES = Config.get(globalKey, [])
         if len(GLOBALRESOURCES) > 0:
             contexts[service[0]]['GLOBAL'] = GLOBALRESOURCES
         
         time_end = time.time()
-        scanned = Config.get('scanned')
+        scanned = Config.get(scannedKey)
+        # print(scannedKey)
         
         with open(_C.FORK_DIR + '/' + service[0] + '.json', 'w') as f:
             json.dump(contexts[service[0]], f)
@@ -154,7 +168,8 @@ class Screener:
                     apiResultArray[service]['detail'] = reporter.getDetail()
             
             if runmode == 'report':
-                serviceStat = Config.get('cli_services')
+                # serviceStat = Config.get('cli_services')
+                # print(serviceStat)
                 dashPB = DashboardPageBuilder('index', [])
                 dashPB.buildPage()
                 
@@ -168,10 +183,28 @@ class Screener:
                 if len(frameworks) > 0:
                     for framework in frameworks:
                         o = FrameworkPageBuilder(framework, apiResultArray)
-                        p = o.buildPage()
+                        if o.getGateCheckStatus() == True:
+                            p = o.buildPage()
+                        else:
+                            print(framework + " GATECHECK==FALSE")
                 
-                os.chdir(_C.ROOT_DIR)
-                os.system('cd adminlte; zip -q -r output.zip html; mv output.zip ../output.zip')
+                # os.chdir(_C.ROOT_DIR)
+
+                # Create object of ZipFile
+                # os.system('cd adminlte; zip -q -r output.zip html; mv output.zip ../output.zip')
+                adminlteDir = _C.ROOT_DIR + '/adminlte'
+                with zipfile.ZipFile('output.zip', 'w', zipfile.ZIP_DEFLATED) as zip_object:
+                    folder='html'
+                    os.chdir(adminlteDir)
+                    for subdir, dirs, files in os.walk(folder):
+                        for file in files:
+                            # Read file
+                            srcpath = os.path.join(subdir, file)
+                            dstpath_in_zip = os.path.relpath(srcpath, start=folder)
+                            with open(srcpath, 'rb') as infile:
+                                # Write to zip
+                                zip_object.writestr(dstpath_in_zip, infile.read())
+                
                 print("Pages generated, download \033[1;42moutput.zip\033[0m to view")
                 print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m ~/service-screener-v2/output.zip \033[1;42m <===== \033[0m")
                 

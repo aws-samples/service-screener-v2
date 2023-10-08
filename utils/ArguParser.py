@@ -23,7 +23,7 @@ class ArguParser:
         "services": {
             "required": False,
             "emptymsg": "Missing --services, using default value: $defaultValue",
-            "default": "rds,ec2,iam,s3,efs,lambda,guardduty,cloudfront,cloudtrail,elasticache,eks,dynamodb",
+            "default": "rds,ec2,iam,s3,efs,lambda,guardduty,cloudfront,cloudtrail,elasticache,eks,dynamodb,kms,opensearch",
             "help": "--services ec2,iam"
         },
         "debug": {
@@ -45,6 +45,10 @@ class ArguParser:
         #    "required": False,
         #    "default": False
         #},
+        "ztestmode": {
+            "required": False,
+            "default": False
+        },
         "mode": {
             "required": False,
             "default": "report",
@@ -65,6 +69,11 @@ class ArguParser:
         "frameworks": {
             "required": False,
             "default": 'FTR,SSB,WAFS'
+        },
+        "others":{
+            "required": False,
+            "default": None,
+            "help": "reserved for future development"
         }
     }
 
