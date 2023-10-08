@@ -126,7 +126,6 @@ class Ec2SecGroup(Evaluator):
         return
             
     # checks
-    
     def _checkDefaultSGInUsed(self):
         group = self.secGroup
         if group['GroupName'] == 'default':

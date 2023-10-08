@@ -139,7 +139,7 @@
         "needFullTest": 1,
         "shortDesc": "EC2 with Public IP",
         "ref": [
-            "https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-9"
+            "[Amazon EC2 public IP]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-9>"
         ]
     },
     "EC2InstanceAutoPublicIP": {
@@ -152,7 +152,7 @@
         "needFullTest": 1,
         "shortDesc": "EC2 with Auto Assign IP",
         "ref": [
-            "https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-9"
+            "[Amazon EC2 public IP]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-9>"
         ]
     },
     "EBSEncrypted": {
@@ -347,7 +347,7 @@
         "needFullTest": 0,
         "shortDesc": "High Number of Rules",
         "ref": [
-            "https://docs.aws.amazon.com/vpc/latest/userguide/amazon-vpc-limits.html#vpc-limits-security-groups"    
+            "[Amazon VPC quotas]<https://docs.aws.amazon.com/vpc/latest/userguide/amazon-vpc-limits.html#vpc-limits-security-groups>"    
         ]
     },
     "SGDefaultDisallowTraffic": {
@@ -360,7 +360,7 @@
         "needFullTest": 0,
         "shortDesc": "Default Security Group with Rules",
         "ref": [
-            "https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-2"    
+            "[VPC default security group rules]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-2>"    
         ]
     },
     "ComputeOptimizerEnabled": {
@@ -556,6 +556,19 @@
         "shortDesc": "Launch Configuration/Template AMI Deleted",
         "ref": [
             ""    
+        ]
+    },
+    "ASGIMDSv2": {
+        "category": "S",
+        "^description": "Launch Configuration/Template IMDSv2: {$COUNT} of Launch Configuration/Template have not enable IMDSv2",  
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 1,
+        "shortDesc": "Launch Configuration/Template IMDSv2",
+        "ref": [
+            "[Auto Scaling Group Metadata Response Hop Limit]<https://docs.aws.amazon.com/securityhub/latest/userguide/autoscaling-controls.html#autoscaling-5>"    
         ]
     }
 }
