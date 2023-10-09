@@ -42,12 +42,22 @@ class Cloudtrail(Service):
         objs = {}
         trails = self.getTrails()
         
+        ctRanList = Config.get('CloudTrail_ranList', [])
+        
         for trail in trails:
+            if trail['TrailARN'] in ctRanList:
+                print('... [Cloudtrail::SKIPPED] ' + trail['Name'] + ', executed in other regions')
+                continue
+            
             print("... [Cloudtrail] inspecting " + trail['Name'])
+            ctRanList.append(trail['TrailARN'])
+            
             obj = CloudtrailCommon(trail, self.ctClient, self.snsClient, self.s3Client)
             obj.run(self.__class__)
             objs['Cloudtrail::' + trail['Name']] = obj.getInfo()
             del obj
+        
+        Config.set('CloudTrail_ranList', ctRanList)
         
         print('... (CloudTrail:Common) inspecting')
         obj = CloudtrailAccount(self.ctClient, len(trails))
