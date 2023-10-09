@@ -6,6 +6,7 @@ import botocore
 import boto3
 
 from utils.Config import Config
+from utils.Policy import Policy
 from services.Evaluator import Evaluator
 import constants as _C
 
@@ -230,4 +231,25 @@ class LambdaCommon(Evaluator):
                 self.results['lambdaNotInUsed' + str(day) + 'Days'] = [-1, '']
                 return
 
+        return
+    
+    def _check_function_public_access(self):
+        try:
+            results = self.lambda_client.get_policy(
+                FunctionName=self.function_name
+            )
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == 'ResourceNotFoundException':
+                return
+            else:
+                raise e
+                
+        if results.get('Policy'):
+            doc = json.loads(results.get('Policy'))
+            pObj = Policy(doc)
+            pObj.inspectPrinciple()
+            
+            if pObj.hasPublicAccess() == True:
+                self.results['lambdaPublicAccess'] = [-1, 'Enabled']
+            
         return

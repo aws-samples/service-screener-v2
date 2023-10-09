@@ -28,6 +28,7 @@ class Ec2(Service):
         self.elbClient = boto3.client('elbv2', config=self.bConfig)
         self.elbClassicClient = boto3.client('elb', config=self.bConfig)
         self.asgClient = boto3.client('autoscaling', config=self.bConfig)
+        self.wafv2Client = boto3.client('wafv2', config=self.bConfig)
     
     # get EC2 Instance resources
     def getResources(self):
@@ -207,6 +208,23 @@ class Ec2(Service):
         arr = result.get('Addresses')
         
         return arr
+        
+    def getDefaultSG(self):
+        defaultSGs = {}
+        result = self.ec2Client.describe_security_groups()
+        for group in result.get('SecurityGroups'):
+            if group.get('GroupName') == 'default':
+                defaultSGs[group.get('GroupId')] = group
+                
+        while result.get('NextToken') is not None:
+            result = self.ec2Client.describe_security_groups(
+                NextToken = result.get('NextToken')
+            )
+            for group in result.get('SecurityGroups'):
+                if group.get('GroupName') == 'default':
+                    defaultSGs[group.get('GroupId')] = group
+        
+        return defaultSGs
     
     def advise(self):
         objs = {}
@@ -276,8 +294,8 @@ class Ec2(Service):
         loadBalancers = self.getELB()
         for lb in loadBalancers:
             print(f"... (ELB::Load Balancer) inspecting {lb['LoadBalancerName']}")
-            obj = Ec2ElbCommon(lb, self.elbClient)
-            obj.run(self.__class__)
+            obj = Ec2ElbCommon(lb, self.elbClient, self.wafv2Client)
+            obj.run()
             objs[f"ELB::{lb['LoadBalancerName']}"] = obj.getInfo()
             
             
@@ -304,6 +322,12 @@ class Ec2(Service):
             obj = Ec2AutoScaling(group, self.asgClient, self.elbClient, self.elbClassicClient, self.ec2Client)
             obj.run(self.__class__)
             objs[f"ASG::{group['AutoScalingGroupName']}"] = obj.getInfo()
+        
+        defaultSGs = self.getDefaultSG()
+        for groupId in defaultSGs.keys():
+            if groupId not in secGroups:
+                secGroups[groupId] = defaultSGs[groupId]
+                secGroups[groupId]['inUsed'] = 'False'
             
         # SG checks
         for group in secGroups.values():
