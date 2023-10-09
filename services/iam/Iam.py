@@ -57,23 +57,36 @@ class Iam(Service):
     def getUsers(self):
         self.getUserFlag = True
         arr = []
-        resp = self.iamClient.generate_credential_report()
-        time.sleep(5)
-        try:
+        
+        try: 
             results = self.iamClient.get_credential_report()
         except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] == 'ReportNotPresent':
-                try: 
+            if e.response['Error']['Code'] == 'ReportNotPresent' or e.response['Error']['Code'] == 'ReportExpired':
+                resp = self.iamClient.generate_credential_report()
+                print('Generating IAM Credential Report...')
+                time.sleep(5)
+        
+        currCount = 0
+        MAX_LOOPS = 5
+        while not 'results' in locals() and currCount < MAX_LOOPS: 
+            try:
+                results = self.iamClient.get_credential_report()
+            except botocore.exceptions.ClientError as e:
+                currCount = currCount + 1
+                if e.response['Error']['Code'] == 'ReportInProgress':
+                    print('IAM Credential is still genererating, current counter: ' + str(currCount))
+                elif e.response['Error']['Code'] == 'ReportExpired':
                     resp = self.iamClient.generate_credential_report()
-                    print('Generating IAM Credential Report...')
-                    time.sleep(5)
-                    
-                    results = self.iamClient.get_credential_report()
-                except botocore.exceptions.ClientError as e:
-                    if e.response['Error']['Code'] == 'InvalidClientTokenId':
-                        self.getUserFlag = False
-                        print(" !!! UNABLE TO GET USERS INFORMATION, SKIP ALL IAM !!!")
-                        return arr
+                    print('IAM Credential expired, regenerating... : ' + str(currCount))
+                else:
+                    print('Unexpected error: ', e.response['Error']['Code'])
+                    currCount = 10 #skip the loop entirely
+                time.sleep(5)
+            
+        
+        if not 'results' in locals():
+            print('IAM Users scan will be skip, unable to acquire IamCredentialReports')
+            return []
         
         rows = results.get('Content')
         rows = rows.decode('UTF-8')
