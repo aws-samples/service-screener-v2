@@ -30,7 +30,7 @@ class Ec2ElbCommon(Evaluator):
     def _checkSecurityGroupNo(self):
         elb = self.elb
         
-        if len(elb['SecurityGroups']) > 50:
+        if 'SecurityGroups' in elb and len(elb['SecurityGroups']) > 50:
             self.results['ELBListenerInsecure'] = [-1, len(elb['SecurityGroups'])]
             
         return
