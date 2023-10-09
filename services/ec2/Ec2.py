@@ -295,7 +295,7 @@ class Ec2(Service):
         for lb in loadBalancers:
             print(f"... (ELB::Load Balancer) inspecting {lb['LoadBalancerName']}")
             obj = Ec2ElbCommon(lb, self.elbClient, self.wafv2Client)
-            obj.run()
+            obj.run(self.__class__)
             objs[f"ELB::{lb['LoadBalancerName']}"] = obj.getInfo()
             
             
