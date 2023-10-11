@@ -2,6 +2,7 @@ import re
 from collections import defaultdict
 
 from services.PageBuilder import PageBuilder
+from utils.Tools import _warn
 
 class GuarddutypageBuilder(PageBuilder):
     DATASOURCE = [
@@ -14,7 +15,9 @@ class GuarddutypageBuilder(PageBuilder):
         'Kubernetes': 0,
         'S3': 0,
         'Malware': 0,
-        'RDS': 0
+        'RDS': 0,
+        'Lambda': 0,
+        'Runtime': 0
     }
 
     def __init__(self, service, reporter):
@@ -56,6 +59,10 @@ class GuarddutypageBuilder(PageBuilder):
 
                 self.statSummary[region] = findings['stat']['severity']
                 for serv, val in findings['stat']['services'].items():
+                    if not serv in self.statSummary['services']:
+                        _warn("New GuardDuty category not being tracked (summary), please submit an issue to github --> " + serv)
+                        self.statSummary['services'][serv] = 0
+                    
                     self.statSummary['services'][serv] += val
 
     def _gdProcessFinding(self, findings):
@@ -101,6 +108,10 @@ class GuarddutypageBuilder(PageBuilder):
                 self.findingsLink[service_type+topic] = detail['__']
 
             for service, detail in findings_by_severity[severity].items():
+                if not service in arr['stat']['services']:
+                    _warn("New GuardDuty category not being tracked (detail), please submit an issue to github --> " + service)
+                    arr['stat']['services'][service] = 0
+                
                 arr['stat']['services'][service] += len(findings_by_severity[severity][service])
 
         arr['detail'] = findings_by_severity
@@ -120,6 +131,7 @@ class GuarddutypageBuilder(PageBuilder):
             'KUBERNETES_AUDIT_LOGS': 'Kubernetes:AuditLogs',
             'EC2_MALWARE_SCAN': 'MalwareProtection:ScanEc2InstanceWithFindings'
         }
+        
         arr = {}
         for ds in self.DATASOURCE:
             if isinstance(ds, list):
