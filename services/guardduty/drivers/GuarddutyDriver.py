@@ -111,7 +111,6 @@ class GuarddutyDriver(Evaluator):
             )
 
             settings = results.get('DataSources')
-            print(settings)
             gd_status = results.get('Status')
 
             self.results['Settings'] = [-1, {'isEnabled': gd_status, 'Settings': settings}]

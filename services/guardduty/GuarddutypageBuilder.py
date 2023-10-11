@@ -15,7 +15,9 @@ class GuarddutypageBuilder(PageBuilder):
         'Kubernetes': 0,
         'S3': 0,
         'Malware': 0,
-        'RDS': 0
+        'RDS': 0,
+        'Lambda': 0,
+        'Runtime': 0
     }
 
     def __init__(self, service, reporter):
@@ -129,13 +131,6 @@ class GuarddutypageBuilder(PageBuilder):
             'KUBERNETES_AUDIT_LOGS': 'Kubernetes:AuditLogs',
             'EC2_MALWARE_SCAN': 'MalwareProtection:ScanEc2InstanceWithFindings'
         }
-        
-        print('Free Trial =============')
-        print(free_trial)
-        print('Settings =============')
-        print(settings)
-        print('Usage =============')
-        print(usage_stat)
         
         arr = {}
         for ds in self.DATASOURCE:
