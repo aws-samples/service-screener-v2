@@ -102,9 +102,9 @@ class Ec2Instance(Evaluator):
     def _checkDetailedMonitoringEnabled(self):
 
         if self.ec2InstanceData['Monitoring']['State'] == 'disabled':
-            self.results['EC2DetailedMonitor'] = [-1, self.ec2InstanceData['Monitoring']['State']]
+            self.results['EC2DetailedMonitor'] = [-1, 'Disabled']
         else:
-            self.results['EC2DetailedMonitor'] = [1, self.ec2InstanceData['Monitoring']['State']]
+            self.results['EC2DetailedMonitor'] = [1, 'Enabled']
         
         return
         
@@ -263,4 +263,37 @@ class Ec2Instance(Evaluator):
             return
     
         self.results['EC2HighUtilization'] = [-1, '']
+        return
+    
+    def _checkEC2PublicIP(self):
+        instance = self.ec2InstanceData
+        
+        if instance.get('PublicIpAddress') is None:
+            return
+        
+        self.results['EC2InstancePublicIP'] = [-1, instance.get('PublicIpAddress')]
+        
+        try:
+            addrResp = self.ec2Client.describe_addresses(
+                PublicIps=[instance.get('PublicIpAddress')]
+            )
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == 'InvalidAddress.NotFound':
+                self.results['EC2InstanceAutoPublicIP'] = [-1, instance.get('PublicIpAddress')]
+            else:
+                raise(e)
+        
+        return
+    
+    def _checkEC2SubnetAutoPublicIP(self):
+        instance = self.ec2InstanceData
+        
+        results = self.ec2Client.describe_subnets(
+            SubnetIds = [instance.get('SubnetId')]
+        )
+        
+        for subnet in results.get('Subnets'):
+            if subnet.get('MapPublicIpOnLaunch'):
+                self.results['EC2SubnetAutoPublicIP'] = [-1, subnet.get('SubnetId')]
+        
         return

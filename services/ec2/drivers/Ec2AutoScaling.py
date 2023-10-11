@@ -67,7 +67,7 @@ class Ec2AutoScaling(Evaluator):
             if lb['LoadBalancerName'] in asg['LoadBalancerNames']:
                 return
             
-        self.restuls['ASGClassicLBExist'] = [-1, asg['LoadBalancerNames']]
+        self.results['ASGClassicLBExist'] = [-1, asg['LoadBalancerNames']]
         
         return
         
@@ -84,6 +84,13 @@ class Ec2AutoScaling(Evaluator):
             
             for config in result['LaunchConfigurations']:
                 imageId = config['ImageId']
+                
+                if config.get('MetadataOptions') is None:
+                    self.results['ASGIMDSv2'] = [-1, '']
+                else:
+                    if config.get('MetadataOptions').get('HttpTokens') == 'optional':
+                        self.results['ASGIMDSv2'] = [-1, 'Optional']
+                
         elif 'MixedInstancesPolicy' in asg:
             templateInfo = asg['MixedInstancesPolicy']['LaunchTemplate']['LaunchTemplateSpecification']
             templateId = templateInfo['LaunchTemplateId']
@@ -96,7 +103,11 @@ class Ec2AutoScaling(Evaluator):
             
             for version in templateResult['LaunchTemplateVersions']:
                 imageId = version['LaunchTemplateVersions']['ImageId']
-            
+                if version.get('LaunchTemplateData').get('MetadataOptions') is None:
+                    self.results['ASGIMDSv2'] = [-1, '']
+                else:
+                    if version.get('LaunchTemplateData').get('MetadataOptions').get('HttpTokens') == 'optional':
+                        self.results['ASGIMDSv2'] = [-1, 'Optional']
         else:
             return
         
@@ -106,7 +117,7 @@ class Ec2AutoScaling(Evaluator):
             )
         except botocore.exceptions.ClientError as error:
             if error.response['Error']['Code'] == 'InvalidAMIID.NotFound':
-                self.restuls['ASGAMIExist'] = [-1, imageId]
+                self.results['ASGAMIExist'] = [-1, imageId]
             else:
                 raise(error)
             

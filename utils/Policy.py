@@ -6,6 +6,8 @@ class Policy:
         'fullAdmin': False
     }
     
+    publicAccess = False
+    
     def __init__(self, document):
         self.doc = document
         # self.doc = json.loads(document)
@@ -39,13 +41,32 @@ class Policy:
                     return
                     
         return False
-    
+        
     def hasFullAccessToOneResource(self):
         return self.fullAccessList['oneService']
     
     def hasFullAccessAdmin(self):
         return self.fullAccessList['fullAdmin']
         
+    def inspectPrinciple(self):
+        doc = self.doc
+        for statement in doc['Statement']:
+            if statement['Effect'] != 'Allow':
+                continue
+            
+            principals = statement['Principal']
+            principals = principals if isinstance(principals, list) else [principals]
+            
+            for principal in principals:
+                if principal == '*':
+                    self.publicAccess = True
+                    return
+                
+        return False
+    
+    def hasPublicAccess(self):
+        return self.publicAccess
+
     def extractPolicyInfo(self):
         doc = self.doc
         

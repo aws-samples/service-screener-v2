@@ -129,6 +129,45 @@
             "https://d1.awsstatic.com/whitepapers/cost-optimization-right-sizing.pdf"
         ]
     },
+    "EC2InstancePublicIP": {
+        "category": "S",
+        "^description": "EC2 with Public IP: {$COUNT} of your instances associated public IP. Disable unused public IP from instances.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 1,
+        "shortDesc": "EC2 with Public IP",
+        "ref": [
+            "[Amazon EC2 public IP]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-9>"
+        ]
+    },
+    "EC2InstanceAutoPublicIP": {
+        "category": "S",
+        "^description": "EC2 with Auto Assign IP: {$COUNT} of your instances enabled auto-assign public IP. Disable unused public IP from instances.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "EC2 with Auto Assign IP",
+        "ref": [
+            "[Amazon EC2 public IP]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-9>"
+        ]
+    },
+    "EC2SubnetAutoPublicIP": {
+        "category": "S",
+        "^description": "EC2 Subnet with Auto Assign IP: {$COUNT} of your instances has enabled auto-assign public IP in subnet configuration.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "EC2 Subnet with Auto Assign IP",
+        "ref": [
+            "[Amazon EC2 public IP]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-9>"
+        ]
+    },
     "EBSEncrypted": {
         "category": "S",
         "^description": "Storage Encyrption: {$COUNT} of EBS storage volumes are not encrypted. Enable encryption for EBS volumes to meet security and compliance requirements.",
@@ -321,7 +360,20 @@
         "needFullTest": 0,
         "shortDesc": "High Number of Rules",
         "ref": [
-            "https://docs.aws.amazon.com/vpc/latest/userguide/amazon-vpc-limits.html#vpc-limits-security-groups"    
+            "[Amazon VPC quotas]<https://docs.aws.amazon.com/vpc/latest/userguide/amazon-vpc-limits.html#vpc-limits-security-groups>"    
+        ]
+    },
+    "SGDefaultDisallowTraffic": {
+        "category": "S",
+        "^description": "Default Security Group with Rules: {$COUNT} of default security group have rules. Remove rules in default security group",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Default Security Group with Rules",
+        "ref": [
+            "[VPC default security group rules]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-2>"    
         ]
     },
     "ComputeOptimizerEnabled": {
@@ -428,6 +480,19 @@
             "[Migrate your Classic Load Balancer]<https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/migrate-classic-load-balancer.html/>"    
         ]
     },
+    "ELBEnableWAF": {
+        "category": "S",
+        "^description": "ALB Web Application Firewall: {$COUNT} of your ALBs have not enabled WAF.",        
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "ALB Web Application Firewall",
+        "ref": [
+            "[AWS WAF for Applicatoin Load Balancers]<https://aws.amazon.com/blogs/aws/aws-web-application-firewall-waf-for-application-load-balancers/>"    
+        ]
+    },
     "ASGELBHealthCheckValidation": {
         "category": "O",
         "^description": "ELB Health Check Validation: {$COUNT} of your ASG have ELB health check enabled without ELB association.",        
@@ -504,6 +569,19 @@
         "shortDesc": "Launch Configuration/Template AMI Deleted",
         "ref": [
             ""    
+        ]
+    },
+    "ASGIMDSv2": {
+        "category": "S",
+        "^description": "Launch Configuration/Template IMDSv2: {$COUNT} of Launch Configuration/Template have not enable IMDSv2",  
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 1,
+        "shortDesc": "Launch Configuration/Template IMDSv2",
+        "ref": [
+            "[Auto Scaling Group Metadata Response Hop Limit]<https://docs.aws.amazon.com/securityhub/latest/userguide/autoscaling-controls.html#autoscaling-5>"    
         ]
     }
 }
