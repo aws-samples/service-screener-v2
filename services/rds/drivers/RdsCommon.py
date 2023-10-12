@@ -21,6 +21,9 @@ class RdsCommon(Evaluator):
         
         self.ctClient = ctClient
         
+    def setEngine(self, engine):
+        self.engine = engine
+        
     def showInfo(self):
         print("Identifier: " + self.db['DBInstanceIdentifier'] + "\n")
         _pr(self.results)
@@ -33,7 +36,6 @@ class RdsCommon(Evaluator):
         )
 
         for param in results.get('Parameters'):
-            
             if param['IsModifiable'] == 1 and 'ParameterValue' in param:
                 arr[param['ParameterName']] = param['ParameterValue']
         
@@ -53,6 +55,43 @@ class RdsCommon(Evaluator):
 
     ##Common Logic Belows
     ##All checks start from __check;
+    def _checkPublicSnapshot(self):
+        if self.engine[0:6] == 'aurora':
+            resp = self.rdsClient.describe_db_cluster_snapshots(
+                DBClusterIdentifier=self.db['DBClusterIdentifier'],
+                SnapshotType='public',
+                IncludePublic=True,
+                MaxRecords=20
+            )
+            publicSnapshots = resp.get('DBClusterSnapshots')
+        else:
+            resp = self.rdsClient.describe_db_snapshots(
+                DBInstanceIdentifier=self.db['DBInstanceIdentifier'],
+                SnapshotType='public',
+                IncludePublic=True,
+                MaxRecords=20
+            )
+            
+            publicSnapshots = resp.get('DBSnapshots')
+            
+        if len(publicSnapshots) > 0:
+            self.results['SnapshotIsPublic'] = [-1, "At least " + str(len(publicSnapshots))]
+    
+    def _checkMasterUsername(self):
+        defaultMasterUser = {
+            'mysql': 'admin',
+            'aurora-mysql': 'admin',
+            'postgres': 'postgres',
+            'aurora-postgresql': 'postgres',
+            'sqlserver': 'admin'
+        }
+        
+        if not self.engine in defaultMasterUser:
+            _warn("New Engine not being tracked (RDS-MasterUser), please submit an issue to github --> " + self.engine)
+            return
+        
+        if defaultMasterUser[self.engine] == self.db['MasterUsername']:
+            self.results['DefaultMasterAdmin'] = [-1, self.engine + "::" + self.db["MasterUsername"]]
     
     def _checkHasMultiAZ(self):
         multiAZ = -1 if self.db['MultiAZ'] == False else 1

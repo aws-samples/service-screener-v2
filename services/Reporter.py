@@ -3,6 +3,7 @@ import json
 import re
 
 from utils.Config import Config, dashboard
+from utils.Tools import _warn
 import constants as _C
 
 class Reporter:
@@ -12,6 +13,7 @@ class Reporter:
         self.detail = {}
         self.config = {}
         self.service = service
+        self.warningList = []
         
         folder = service
         if service in Config.KEYWORD_SERVICES:
@@ -72,14 +74,20 @@ class Reporter:
 
     def _getConfigValue(self, check, field):
         if check not in self.config:
-            print("<{}> not exists in {}.reporter.json".format(check, self.service))
+            k = self.service + '::' + check
+            if not k in self.warningList:
+                _warn("Rule {}::{} is not available in reporter, please submit an issue to github.".format(self.service, check) )
+                self.warningList.append(k)
             return None
         
         if field == 'category' and field not in self.config[check]:
             field = '__categoryMain'
         
         if field not in self.config[check]:
-            print("<{}>::<{}> not exists in {}.reporter.json".format(check, field, self.service))
+            k = self.service + '::' + check + '::' + field
+            if not k in self.warningList:
+                _warn("Rule {}::{} available in reporter, but missing {}, please submit an issue to github.".format(self.service, check, field) )
+                self.warningList.append(k)
             return None
         
         return self.config[check][field]
@@ -154,8 +162,13 @@ class Reporter:
                     dashboard['MAP'][self.service]['_'][mainCategory] += itemSize
                 else:
                     pass
-                dashboard['MAP'][self.service][critical] += itemSize
-                dashboard['MAP'][self.service][mainCategory] += itemSize
+                
+                if critical == 'X':
+                    ## Error handling in _getConfigValue
+                    break
+                else:
+                    dashboard['MAP'][self.service][critical] += itemSize
+                    dashboard['MAP'][self.service][mainCategory] += itemSize
 
         self.cardSummary = {}
         service = self.service
@@ -163,7 +176,7 @@ class Reporter:
         sorted(self.summary)
         for check, items in self.summary.items():
             if check not in self.config:
-                print("<{}> not exists in {}.reporter.json".format(check, service))
+                # print("<{}> not exists in {}.reporter.json".format(check, service))
                 continue
             
             self.cardSummary[check] = self.config[check]

@@ -1,4 +1,5 @@
 boto3~=1.26.114
 packaging~=23.1
 XlsxWriter~=3.1.0
+netaddr~=0.9.0
 -e .

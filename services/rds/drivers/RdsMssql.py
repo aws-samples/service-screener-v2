@@ -17,3 +17,6 @@ class RdsMssql(RdsCommon):
             # print("instance flagged: multiAZ not supported")
             self.results['MSSQL__EngineHasMultiAZSupport'] = [-1,engine]
 
+    def _checkSSLParams(self):
+        if 'rds.force_ssl' in self.dbParams and self.dbParams['rds.force_ssl'] == '0':
+            self.results['MSSQL__TransportEncrpytionDisabled'] = [-1, 'rds.force_ssl==0']

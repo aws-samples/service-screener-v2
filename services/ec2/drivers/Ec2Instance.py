@@ -1,6 +1,7 @@
 import boto3
 import botocore
 import datetime
+from utils.Config import Config
 
 from datetime import timedelta
 from utils.Tools import aws_parseInstanceFamily
@@ -78,6 +79,19 @@ class Ec2Instance(Evaluator):
         self.launchTimeDeltaInDays = launchDay
     
     # checks
+    def _checkSQLServerEdition(self):
+        EolVersion = Config.get('SQLEolVersion', 2012)
+        
+        imageId = self.ec2InstanceData['ImageId']
+        resp = self.ec2Client.describe_images(ImageIds=[imageId])
+        images = resp.get('Images')
+        for image in images:
+            if 'PlatformDetails' in image and image['PlatformDetails'].find('SQL Server') > 0:
+                pos = image['Name'].find('SQL')
+                if pos > 0:
+                    sqlVers = image['Name'][pos+4:pos+8]
+                    if EolVersion < sqlVers:
+                        self.results['SQLServerEOL'] = [-1, image['Name']]
     
     def _checkInstanceTypeGeneration(self):
         

@@ -2,6 +2,8 @@
 
 import boto3
 import botocore
+import requests
+from datetime import date, datetime
 
 import json
 import time
@@ -29,6 +31,27 @@ class Ec2(Service):
         self.elbClassicClient = boto3.client('elb', config=self.bConfig)
         self.asgClient = boto3.client('autoscaling', config=self.bConfig)
         self.wafv2Client = boto3.client('wafv2', config=self.bConfig)
+        
+        self.getOutdateSQLVersion()
+    
+    def getOutdateSQLVersion(self):
+        outdateVersion = Config.get('SQLEolVersion', None)
+        if outdateVersion != None:
+            return outdateVersion
+        
+        try:
+            outdateVersion = 2012
+            resp = requests.get("https://endoflife.date/api/mssqlserver.json")
+            for prod in resp.json():
+                if date.today() > datetime.strptime(prod['eol'], '%Y-%m-%d').date():
+                    outdateVersion = prod['cycle'][0:4]
+                    break
+        except requests.exceptions.RequestException  as e:
+            print("Unable to retrieve endoflife mssqlserver information, using default value: 2012")
+        
+        Config.set('SQLEolVersion', outdateVersion)
+        
+        
     
     # get EC2 Instance resources
     def getResources(self):
@@ -265,7 +288,6 @@ class Ec2(Service):
             objs['CostExplorer'] = obj.getInfo()
             Config.set('EC2_HasRunRISP', True)
         
-        
         # EC2 instance checks
         instances = self.getResources()
         for instance in instances:
@@ -281,7 +303,6 @@ class Ec2(Service):
             for group in instanceSG:
                 secGroups[group['GroupId']] = group
             
-        
         #EBS checks
         volumes = self.getEBSResources()
         for volume in volumes:
@@ -344,6 +365,5 @@ class Ec2(Service):
             obj = Ec2EIP(eip)
             obj.run(self.__class__)
             objs[f"ElasticIP::{eip['AllocationId']}"] = obj.getInfo()
-        
         
         return objs

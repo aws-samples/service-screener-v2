@@ -32,7 +32,9 @@ class DashboardPageBuilder(PageBuilder):
         
         for region, details in dashboard['CRITICALITY'].items():
             for cat, cnt in details.items():
-                hriSets[cat] += cnt
+                if not cat == 'X':
+                    hriSets[cat] += cnt
+                    
                 total += cnt
         
         for cat, count in hriSets.items():
@@ -43,7 +45,8 @@ class DashboardPageBuilder(PageBuilder):
                 if cat == 'T':
                     continue
                 
-                dataSets[cat] += cnt
+                if not cat == 'X':
+                    dataSets[cat] += cnt
         
         xhtml = "<dl class='row'>" + '\n'.join(items) + "</dl>"
         items = []

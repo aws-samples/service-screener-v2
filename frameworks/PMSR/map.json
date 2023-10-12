@@ -37,7 +37,11 @@
       "9": ["s3.ServerSideEncrypted"],
       "10": ["lambda.lambdaPublicAccess"],
       "11": ["kms.KeyRotationEnabled"],
-      "12": ["kms.AdminIsGrantor"]
+      "12": ["kms.AdminIsGrantor"],
+      "13": [],
+      "14": [],
+      "15": ["ec2.SQLServerEOL"],
+      "16": ["rds.PubliclyAccessible", "rds.SecurityGroupIPRangeNotPrivateCidr"]
     },
     "LM.": {
       "1": [],
@@ -66,12 +70,13 @@
       "7": ["cloudfront.WAFAssociation", "ec2.ELBEnableWAF"],
       "8": ["cloudtrail.EnableTrailS3BucketMFADelete"],
       "9": ["rds.DBwithoutSecretManager", "rds.DBwithSomeSecretsManagerOnly", "rds.Secret__NoRotation", "rds.Secret__NotUsed7days"],
-      "10": ["ec2.SGDefaultDisallowTraffic"],
+      "10": ["ec2.SGDefaultDisallowTraffic", "rds.SecurityGroupDefault"],
       "11": [],
       "12": [],
       "13": [],
       "14": [],
-      "15": ["ec2.ASGIMDSv2"]
+      "15": ["ec2.ASGIMDSv2"],
+      "16": ["lambda.lambdaRuntimeUpdate"]
     },
     "IR.": {
       "1": [],
@@ -83,7 +88,8 @@
       "7": [],
       "8": [],
       "9": [],
-      "10": []
+      "10": [],
+      "11": []
     }
   }
 }
