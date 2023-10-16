@@ -233,6 +233,19 @@
             "[Best practices for Amazon EC2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html>"    
         ]
     },
+    "EBSSnapshotIsPublic": {
+        "category": "S",
+        "^description": "Public Snapshot: {$COUNT} of EBS snapshots is available to public. Modify snapshot permission to private.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Snapshot is Public",
+        "ref": [
+            "[Best practices for Amazon EBS Encryption]<https://aws.amazon.com/blogs/compute/must-know-best-practices-for-amazon-ebs-encryption/>"    
+        ]
+    },
     "EBSLowUtilization": {
         "category": "C",
         "^description": "EBS Low Utilization: {$COUNT} of EBS volume has less than 1 IOPS utilization for past 7 days. Remove volumes that are not required to reduce costs.",

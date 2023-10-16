@@ -17,6 +17,7 @@ from services.ec2.drivers.Ec2EIP import Ec2EIP
 from services.ec2.drivers.Ec2ElbCommon import Ec2ElbCommon
 from services.ec2.drivers.Ec2ElbClassic import Ec2ElbClassic
 from services.ec2.drivers.Ec2AutoScaling import Ec2AutoScaling
+from services.ec2.drivers.Ec2EbsSnapshot import Ec2EbsSnapshot
 
 class Ec2(Service):
     def __init__(self, region):
@@ -290,6 +291,13 @@ class Ec2(Service):
             obj.run(self.__class__)
             objs[f"EBS::{volume['VolumeId']}"] = obj.getInfo()
             
+        #EBS Snapshots
+        print('... (EBS Snapshots Recommendations) inspecting')
+        obj = Ec2EbsSnapshot(self.ec2Client)
+        obj.run(self.__class__)
+        objs["EBS::Snapshots"] = obj.getInfo()
+        
+        
         # ELB checks
         loadBalancers = self.getELB()
         for lb in loadBalancers:
