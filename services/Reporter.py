@@ -14,6 +14,8 @@ class Reporter:
         self.config = {}
         self.service = service
         self.warningList = []
+        self.stats = {}
+        self.findingsCount = 0
         
         folder = service
         if service in Config.KEYWORD_SERVICES:
@@ -28,6 +30,29 @@ class Reporter:
             raise Exception(serviceReporterJsonPath + " does not contain valid JSON")
         generalConfig = json.loads(open(_C.GENERAL_CONF_PATH).read())
         self.config = {**self.config, **generalConfig}
+        
+        ## KPI Building
+        self.acquireStatInfo()
+        
+    def acquireStatInfo(self):
+        checksCount = 0
+        
+        statpath = _C.FORK_DIR + '/' + self.service + '.stat.json'
+        f = open(statpath, "r")
+        stats = json.loads(f.read())
+        f.close()
+        
+        infopath = _C.ROOT_DIR + '/' + 'info.json'
+        f = open(infopath, "r")
+        checks = json.loads(f.read())
+        if not self.service in checks:
+            _warn( "[{}] is not available in checks, please submit an issue to github to update info.json through RuleCount.py.".format(self.service))
+        else:
+            checksCount = checks[self.service]
+            
+        stats['checksCount'] = checksCount
+        self.stats = stats
+            
 
     def process(self, serviceObjs):
         for region, objs in serviceObjs.items():
@@ -214,6 +239,7 @@ class Reporter:
                 
             resourceByRegion = {}
             for region, insts in self.summaryRegion[check].items():
+                self.findingsCount += len(insts)
                 resourceByRegion[region] = insts
                 
             self.cardSummary[check]['__affectedResources'] = resourceByRegion
