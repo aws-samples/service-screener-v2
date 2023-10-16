@@ -420,9 +420,100 @@
       "[High Availability for MSSQL]<https://docs.aws.amazon.com/prescriptive-guidance/latest/migration-sql-server/rds-sql.html>"
     ]
   },
-  "MSSQL__TransportEncrpytionDisabled":{
+  "MSSQL__EEUnderSize": {
+    "category": "S",
+    "^description": "<TODO>",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": -1,
+    "criticality": "M",
+    "shortDesc": "Using SSL",
+    "ref": [
+      "[RDS SQLServer SSL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/SQLServer.Concepts.General.SSL.Using.html>"
+    ]
+  },
+  "MSSQL__EditionOversize": {
+    "category": "S",
+    "^description": "<TODO>",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": -1,
+    "criticality": "M",
+    "shortDesc": "Using SSL",
+    "ref": [
+      "[RDS SQLServer SSL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/SQLServer.Concepts.General.SSL.Using.html>"
+    ]
+  },
+  "MSSQL__EE2017": {
+    "category": "S",
+    "^description": "<TODO>",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": -1,
+    "criticality": "M",
+    "shortDesc": "Using SSL",
+    "ref": [
+      "[RDS SQLServer SSL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/SQLServer.Concepts.General.SSL.Using.html>"
+    ]
+  },
+  "MSSQLorPG__TransportEncrpytionDisabled":{
     "category": "S",
     "^description": "[MSSQL Transport Encryption] You have {$COUNT} instance(s) does not enable transport encryption. You can use Secure Sockets Layer (SSL) to encrypt connections between your client applications and your Amazon RDS DB instances running Microsoft SQL Server. SSL support is available in all AWS regions for all supported SQL Server editions.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": -1,
+    "criticality": "M",
+    "shortDesc": "Using SSL",
+    "ref": [
+      "[RDS SQLServer SSL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/SQLServer.Concepts.General.SSL.Using.html>"
+    ]
+  },
+  "MSSQL__ParamMaxMemoryTooLow":{
+    "category": "S",
+    "^description": "<TODO>",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": -1,
+    "criticality": "M",
+    "shortDesc": "Using SSL",
+    "ref": [
+      "[RDS SQLServer SSL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/SQLServer.Concepts.General.SSL.Using.html>"
+    ]
+  },
+  "MSSQL__ParamMaxMemoryTooHigh":{
+    "category": "S",
+    "^description": "<TODO>",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": -1,
+    "criticality": "M",
+    "shortDesc": "Using SSL",
+    "ref": [
+      "[RDS SQLServer SSL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/SQLServer.Concepts.General.SSL.Using.html>"
+    ]
+  },
+  "MSSQL__ParamCostThresholdTooLow":{
+    "category": "S",
+    "^description": "<TODO>",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": -1,
+    "criticality": "M",
+    "shortDesc": "Using SSL",
+    "ref": [
+      "[RDS SQLServer SSL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/SQLServer.Concepts.General.SSL.Using.html>"
+    ]
+  },
+  "DBInstanceWithoutTags": {
+    "category": "S",
+    "^description": "<TODO>",
     "downtime": 0,
     "slowness": 0,
     "additionalCost": 0,

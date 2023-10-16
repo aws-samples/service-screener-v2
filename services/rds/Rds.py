@@ -38,7 +38,7 @@ class Rds(Service):
         
         arr = results.get('DBInstances')
         while results.get('Maker') is not None:
-            results = self.ec2Client.describe_db_instances(
+            results = self.rdsClient.describe_db_instances(
                 Maker = results.get('Maker')
             )
             arr = arr + results.get('DBInstances')
@@ -101,7 +101,6 @@ class Rds(Service):
                 obj.run(self.__class__)
                 
                 objs[instance['Engine'] + '::' + instance['DBInstanceIdentifier']] = obj.getInfo()
-                print(obj.getInfo())
                 del obj
         
         for sg, rdsList in securityGroupArr.items():

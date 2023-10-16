@@ -1,1 +1,1 @@
-{"cloudfront": 8, "cloudtrail": 17, "dynamodb": 24, "ec2": 46, "efs": 3, "eks": 7, "elasticache": 7, "guardduty": 4, "iam": 31, "kms": 2, "lambda_": 14, "opensearch": 18, "rds": 40, "s3": 12}
+{"cloudfront": 8, "cloudtrail": 17, "dynamodb": 24, "ec2": 46, "efs": 3, "eks": 7, "elasticache": 7, "guardduty": 4, "iam": 31, "kms": 2, "lambda_": 14, "opensearch": 18, "rds": 47, "s3": 12}

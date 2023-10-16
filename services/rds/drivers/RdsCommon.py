@@ -17,6 +17,7 @@ class RdsCommon(Evaluator):
         self.rdsClient = rdsClient
         self.__configPrefix = 'rds::' + db['Engine'] + '::' + db['EngineVersion'] + '::'
         self.init()
+        self.getInstInfo()
         self.loadParameterInfo()
         
         self.ctClient = ctClient
@@ -27,6 +28,30 @@ class RdsCommon(Evaluator):
     def showInfo(self):
         print("Identifier: " + self.db['DBInstanceIdentifier'] + "\n")
         _pr(self.results)
+
+    def getInstInfo(self):
+        self.instInfo = aws_parseInstanceFamily(self.db['DBInstanceClass'])
+        
+        engine = self.db['Engine']
+        engineVersion = self.db['EngineVersion']
+        
+        key = self.__configPrefix + 'engineVersions'
+        details = Config.get(key, {})
+        
+        if not details:
+            versions = self.rdsClient.describe_db_engine_versions(
+                Engine=engine,
+                EngineVersion=engineVersion
+            )
+            version = versions.get('DBEngineVersions')
+            if not version:
+                self.results['EngineVersionMinor'] = [-1, "**DEPRECIATED**"]
+                self.results['EngineVersionMajor'] = [-1, "**DEPRECIATED**"]
+                return
+            details = version[0]
+            Config.set(key, details)
+        
+        self.enginePatches = details
         
     def loadParameterInfo(self):
         arr = {}
@@ -76,6 +101,16 @@ class RdsCommon(Evaluator):
             
         if len(publicSnapshots) > 0:
             self.results['SnapshotIsPublic'] = [-1, "At least " + str(len(publicSnapshots))]
+    
+    ## Move from MSSQL to Common as Postgres has similar settings
+    def _checkSSLParams(self):
+        validEngine = ['aurora-postgresql', 'postgres', 'sqlserver']
+        
+        if not self.engine in validEngine:
+            return
+        
+        if 'rds.force_ssl' in self.dbParams and self.dbParams['rds.force_ssl'] == '0':
+            self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [-1, 'rds.force_ssl==0']
     
     def _checkMasterUsername(self):
         defaultMasterUser = {
@@ -196,7 +231,7 @@ class RdsCommon(Evaluator):
             compressedLists = Config.get(key + '::zip')
             
         dbInstClass = self.db['DBInstanceClass'].split('.')
-        instInfo = aws_parseInstanceFamily(self.db['DBInstanceClass'])
+        instInfo = self.instInfo
         dbInstFamily = instInfo['prefixDetail']['family']
         dbInstGeneration = instInfo['prefixDetail']['version']
         
@@ -208,25 +243,9 @@ class RdsCommon(Evaluator):
     
     
     def _checkHasPatches(self):
-        engine = self.db['Engine']
         engineVersion = self.db['EngineVersion']
         
-        key = self.__configPrefix + 'engineVersions'
-        version = Config.get(key, [])
-        details = {}
-        
-        if not details:
-            versions = self.rdsClient.describe_db_engine_versions(
-                Engine=engine,
-                EngineVersion=engineVersion
-            )
-            version = versions.get('DBEngineVersions')
-            if not version:
-                self.results['EngineVersionMinor'] = [-1, "**DEPRECIATED**"]
-                self.results['EngineVersionMajor'] = [-1, "**DEPRECIATED**"]
-                return
-            details = version[0]
-            Config.set(key, details)
+        details = self.enginePatches
         
         upgrades = details['ValidUpgradeTarget']
         if not upgrades:
@@ -240,101 +259,105 @@ class RdsCommon(Evaluator):
         if lastInfo['IsMajorVersionUpgrade'] == True:
             self.results['EngineVersionMajor'] = [-1, engineVersion]
        
-def _checkClusterSize(self):
-    cluster = self.db.get('DBClusterIdentifier', None)
-    if not cluster:
-        return
-    
-    resp = self.rdsClient.describe_db_clusters(
-        DBClusterIdentifier=cluster
-    )
-    
-    clusters = resp.get('DBClusters')
-    if len(clusters) < 2 or len(clusters) > 7:
-        self.results['Aurora__ClusterSize'] = [-1, len(clusters)]
+    def _checkClusterSize(self):
+        cluster = self.db.get('DBClusterIdentifier', None)
+        if not cluster:
+            return
         
-def _checkOldSnapshots(self):
-    if self.db.get('DBClusterIdentifier'):
-        identifier = self.db['DBClusterIdentifier']
-        result = self.rdsClient.describe_db_cluster_snapshots(
-            DBClusterIdentifier=identifier,
-            SnapshotType='manual'
+        resp = self.rdsClient.describe_db_clusters(
+            DBClusterIdentifier=cluster
         )
         
-        snapshots = result.get('DBClusterSnapshots')
-        while result.get('Marker') is not None:
+        clusters = resp.get('DBClusters')
+        if len(clusters) < 2 or len(clusters) > 7:
+            self.results['Aurora__ClusterSize'] = [-1, len(clusters)]
+            
+    def _checkHasTags(self):
+        if len(self.db['TagList']) == 0:
+            self.results['DBInstanceWithoutTags'] = [-1, None]
+            
+    def _checkOldSnapshots(self):
+        if self.db.get('DBClusterIdentifier'):
+            identifier = self.db['DBClusterIdentifier']
             result = self.rdsClient.describe_db_cluster_snapshots(
                 DBClusterIdentifier=identifier,
-                SnapshotType='manual',
-                Marker=result.get('Marker')
+                SnapshotType='manual'
             )
             
-            snapshots = snapshots + result.get('DBSnapshots')
-    else:
-        identifier = self.db['DBInstanceIdentifier']
-        result = self.rdsClient.describe_db_snapshots(
-            DBInstanceIdentifier=identifier,
-            SnapshotType='manual'
-        )
-        
-        snapshots = result.get('DBSnapshots')
-        while result.get('Marker') is not None:
+            snapshots = result.get('DBClusterSnapshots')
+            while result.get('Marker') is not None:
+                result = self.rdsClient.describe_db_cluster_snapshots(
+                    DBClusterIdentifier=identifier,
+                    SnapshotType='manual',
+                    Marker=result.get('Marker')
+                )
+                
+                snapshots = snapshots + result.get('DBSnapshots')
+        else:
+            identifier = self.db['DBInstanceIdentifier']
             result = self.rdsClient.describe_db_snapshots(
                 DBInstanceIdentifier=identifier,
-                SnapshotType='manual',
-                Marker=result.get('Marker')
+                SnapshotType='manual'
             )
             
-            snapshots = snapshots + result.get('DBSnapshots')
-    
-        if not snapshots:
-            return
+            snapshots = result.get('DBSnapshots')
+            while result.get('Marker') is not None:
+                result = self.rdsClient.describe_db_snapshots(
+                    DBInstanceIdentifier=identifier,
+                    SnapshotType='manual',
+                    Marker=result.get('Marker')
+                )
+                
+                snapshots = snapshots + result.get('DBSnapshots')
+        
+            if not snapshots:
+                return
+                
+            oldest_copy = snapshots[-1]
             
-        oldest_copy = snapshots[-1]
+            oldest_copy_date = oldest_copy['SnapshotCreateTime']
+            
+            now = datetime.datetime.now().date()
+            
+            diff = now - oldest_copy_date
+            days = diff.days
+            
+            if len(snapshots) > 5:
+                self.results['SnapshotTooMany'] = [-1, len(snapshots)]
         
-        oldest_copy_date = oldest_copy['SnapshotCreateTime']
-        
-        now = datetime.datetime.now().date()
-        
-        diff = now - oldest_copy_date
-        days = diff.days
-        
-        if len(snapshots) > 5:
-            self.results['SnapshotTooMany'] = [-1, len(snapshots)]
+        if days > 180:
+            self.results['SnapshotTooOld'] = [-1, days]
+            
     
-    if days > 180:
-        self.results['SnapshotTooOld'] = [-1, days]
-        
-
-def check_free_storage(self):
-    cw_client = boto3.client('cloudwatch')
-
-    if not self.db['DBClusterIdentifier']:
-        # Aurora Volume auto increase until 128TB as of 23/Sep/2021
-        return
-    else:
-        metric = 'FreeStorageSpace'
-        dimensions = [
-            {
-                'Name': 'DBInstanceIdentifier',
-                'Value': self.db['DBInstanceIdentifier']
-            }
-        ]
-
-    results = cw_client.get_metric_statistics(
-        Dimensions=dimensions,
-        Namespace='AWS/RDS',
-        MetricName=metric,
-        StartTime=int(time.time()) - 300,
-        EndTime=int(time.time()),
-        Period=300,
-        Statistics=['Average']
-    )
-
-    GBYTES = 1024 * 1024 * 1024
-    dp = results['Datapoints']
-    freesize = round(dp[0]['Average'] / GBYTES, 4)
-
-    ratio = freesize / self.db['AllocatedStorage']
-    if ratio < 0.2:
-        self.results['FreeStorage20pct'] = [-1, str(ratio * 100) + ' / ' + str(freesize) + '(GB)']
+    def check_free_storage(self):
+        cw_client = boto3.client('cloudwatch')
+    
+        if not self.db['DBClusterIdentifier']:
+            # Aurora Volume auto increase until 128TB as of 23/Sep/2021
+            return
+        else:
+            metric = 'FreeStorageSpace'
+            dimensions = [
+                {
+                    'Name': 'DBInstanceIdentifier',
+                    'Value': self.db['DBInstanceIdentifier']
+                }
+            ]
+    
+        results = cw_client.get_metric_statistics(
+            Dimensions=dimensions,
+            Namespace='AWS/RDS',
+            MetricName=metric,
+            StartTime=int(time.time()) - 300,
+            EndTime=int(time.time()),
+            Period=300,
+            Statistics=['Average']
+        )
+    
+        GBYTES = 1024 * 1024 * 1024
+        dp = results['Datapoints']
+        freesize = round(dp[0]['Average'] / GBYTES, 4)
+    
+        ratio = freesize / self.db['AllocatedStorage']
+        if ratio < 0.2:
+            self.results['FreeStorage20pct'] = [-1, str(ratio * 100) + ' / ' + str(freesize) + '(GB)']

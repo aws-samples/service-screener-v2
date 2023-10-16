@@ -89,7 +89,6 @@ class Screener:
     def getServiceModuleDynamically(service):
         # .title() captilise the first character
         # e.g: services.iam.Iam
-        
         folder = service
         if service in Config.KEYWORD_SERVICES:
             folder = service + '_'

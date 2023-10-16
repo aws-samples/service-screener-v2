@@ -14,7 +14,7 @@ class Evaluator():
         
     def run(self, serviceName):
         servClass = self.classname
-        rulePrefix = servClass + '::rules'
+        rulePrefix = serviceName.__name__ + '::rules'
         rules = Config.get(rulePrefix, [])
         
         ecnt = cnt = 0
@@ -23,7 +23,7 @@ class Evaluator():
         for method in methods:
             if not rules or str.lower(method[6:]) in rules:
                 try:
-                    # print('--- --- fn: ' + method)
+                    print('--- --- fn: ' + method)
                     getattr(self, method)()
                     cnt += 1
                 except botocore.exceptions.ClientError as e:
