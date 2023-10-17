@@ -10,20 +10,73 @@ from utils.Tools import _warn
 from services.Evaluator import Evaluator
 
 class RdsCommon(Evaluator):
-    def __init__(self, db, rdsClient, ctClient):
+    def __init__(self, db, rdsClient, ctClient, cwClient):
         self.dbParams = {}
         self.results = {}
         self.db = db
         self.rdsClient = rdsClient
+        self.cwClient = cwClient
         self.__configPrefix = 'rds::' + db['Engine'] + '::' + db['EngineVersion'] + '::'
         self.init()
+        self.getInstInfo()
+        self.getCAInfo()
         self.loadParameterInfo()
         
         self.ctClient = ctClient
         
+    def setEngine(self, engine):
+        self.engine = engine
+        
+    def getCAInfo(self):
+        ca = self.db['CACertificateIdentifier']
+        k = 'RDSCaInfo::' + ca
+        
+        myCert = Config.get(k, None)
+        if myCert == None:
+            resp = self.rdsClient.describe_certificates(CertificateIdentifier=ca)
+            certInfo = resp.get('Certificates')
+            
+            for cert in certInfo:
+                diff = cert['ValidTill'].replace(tzinfo=None) - datetime.datetime.now()
+                
+                cert['expiredInDays'] = diff.days
+                cert['isExpireIn365days'] = False
+                if diff.days < 365:
+                    cert['isExpireIn365days'] = True
+                
+                myCert = cert
+                Config.set(k, cert)
+                break
+        
+        self.certInfo = myCert
+        
     def showInfo(self):
         print("Identifier: " + self.db['DBInstanceIdentifier'] + "\n")
         _pr(self.results)
+
+    def getInstInfo(self):
+        self.instInfo = aws_parseInstanceFamily(self.db['DBInstanceClass'])
+        
+        engine = self.db['Engine']
+        engineVersion = self.db['EngineVersion']
+        
+        key = self.__configPrefix + 'engineVersions'
+        details = Config.get(key, {})
+        
+        if not details:
+            versions = self.rdsClient.describe_db_engine_versions(
+                Engine=engine,
+                EngineVersion=engineVersion
+            )
+            version = versions.get('DBEngineVersions')
+            if not version:
+                self.results['EngineVersionMinor'] = [-1, "**DEPRECIATED**"]
+                self.results['EngineVersionMajor'] = [-1, "**DEPRECIATED**"]
+                return
+            details = version[0]
+            Config.set(key, details)
+        
+        self.enginePatches = details
         
     def loadParameterInfo(self):
         arr = {}
@@ -33,7 +86,6 @@ class RdsCommon(Evaluator):
         )
 
         for param in results.get('Parameters'):
-            
             if param['IsModifiable'] == 1 and 'ParameterValue' in param:
                 arr[param['ParameterName']] = param['ParameterValue']
         
@@ -53,6 +105,53 @@ class RdsCommon(Evaluator):
 
     ##Common Logic Belows
     ##All checks start from __check;
+    def _checkPublicSnapshot(self):
+        if self.engine[0:6] == 'aurora':
+            resp = self.rdsClient.describe_db_cluster_snapshots(
+                DBClusterIdentifier=self.db['DBClusterIdentifier'],
+                SnapshotType='public',
+                IncludePublic=True,
+                MaxRecords=20
+            )
+            publicSnapshots = resp.get('DBClusterSnapshots')
+        else:
+            resp = self.rdsClient.describe_db_snapshots(
+                DBInstanceIdentifier=self.db['DBInstanceIdentifier'],
+                SnapshotType='public',
+                IncludePublic=True,
+                MaxRecords=20
+            )
+            
+            publicSnapshots = resp.get('DBSnapshots')
+            
+        if len(publicSnapshots) > 0:
+            self.results['SnapshotIsPublic'] = [-1, "At least " + str(len(publicSnapshots))]
+    
+    ## Move from MSSQL to Common as Postgres has similar settings
+    def _checkSSLParams(self):
+        validEngine = ['aurora-postgresql', 'postgres', 'sqlserver']
+        
+        if not self.engine in validEngine:
+            return
+        
+        if 'rds.force_ssl' in self.dbParams and self.dbParams['rds.force_ssl'] == '0':
+            self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [-1, 'rds.force_ssl==0']
+    
+    def _checkMasterUsername(self):
+        defaultMasterUser = {
+            'mysql': 'admin',
+            'aurora-mysql': 'admin',
+            'postgres': 'postgres',
+            'aurora-postgresql': 'postgres',
+            'sqlserver': 'admin'
+        }
+        
+        if not self.engine in defaultMasterUser:
+            _warn("New Engine not being tracked (RDS-MasterUser), please submit an issue to github --> " + self.engine)
+            return
+        
+        if defaultMasterUser[self.engine] == self.db['MasterUsername']:
+            self.results['DefaultMasterAdmin'] = [-1, self.engine + "::" + self.db["MasterUsername"]]
     
     def _checkHasMultiAZ(self):
         multiAZ = -1 if self.db['MultiAZ'] == False else 1
@@ -157,7 +256,7 @@ class RdsCommon(Evaluator):
             compressedLists = Config.get(key + '::zip')
             
         dbInstClass = self.db['DBInstanceClass'].split('.')
-        instInfo = aws_parseInstanceFamily(self.db['DBInstanceClass'])
+        instInfo = self.instInfo
         dbInstFamily = instInfo['prefixDetail']['family']
         dbInstGeneration = instInfo['prefixDetail']['version']
         
@@ -169,25 +268,9 @@ class RdsCommon(Evaluator):
     
     
     def _checkHasPatches(self):
-        engine = self.db['Engine']
         engineVersion = self.db['EngineVersion']
         
-        key = self.__configPrefix + 'engineVersions'
-        version = Config.get(key, [])
-        details = {}
-        
-        if not details:
-            versions = self.rdsClient.describe_db_engine_versions(
-                Engine=engine,
-                EngineVersion=engineVersion
-            )
-            version = versions.get('DBEngineVersions')
-            if not version:
-                self.results['EngineVersionMinor'] = [-1, "**DEPRECIATED**"]
-                self.results['EngineVersionMajor'] = [-1, "**DEPRECIATED**"]
-                return
-            details = version[0]
-            Config.set(key, details)
+        details = self.enginePatches
         
         upgrades = details['ValidUpgradeTarget']
         if not upgrades:
@@ -201,101 +284,238 @@ class RdsCommon(Evaluator):
         if lastInfo['IsMajorVersionUpgrade'] == True:
             self.results['EngineVersionMajor'] = [-1, engineVersion]
        
-def _checkClusterSize(self):
-    cluster = self.db.get('DBClusterIdentifier', None)
-    if not cluster:
-        return
-    
-    resp = self.rdsClient.describe_db_clusters(
-        DBClusterIdentifier=cluster
-    )
-    
-    clusters = resp.get('DBClusters')
-    if len(clusters) < 2 or len(clusters) > 7:
-        self.results['Aurora__ClusterSize'] = [-1, len(clusters)]
+    def _checkClusterSize(self):
+        cluster = self.db.get('DBClusterIdentifier', None)
+        if not cluster:
+            return
         
-def _checkOldSnapshots(self):
-    if self.db.get('DBClusterIdentifier'):
-        identifier = self.db['DBClusterIdentifier']
-        result = self.rdsClient.describe_db_cluster_snapshots(
-            DBClusterIdentifier=identifier,
-            SnapshotType='manual'
+        resp = self.rdsClient.describe_db_clusters(
+            DBClusterIdentifier=cluster
         )
         
-        snapshots = result.get('DBClusterSnapshots')
-        while result.get('Marker') is not None:
+        clusters = resp.get('DBClusters')
+        if len(clusters) < 2 or len(clusters) > 7:
+            self.results['Aurora__ClusterSize'] = [-1, len(clusters)]
+            
+    def _checkHasTags(self):
+        if len(self.db['TagList']) == 0:
+            self.results['DBInstanceWithoutTags'] = [-1, None]
+            
+    def _checkOldSnapshots(self):
+        if self.db.get('DBClusterIdentifier'):
+            identifier = self.db['DBClusterIdentifier']
             result = self.rdsClient.describe_db_cluster_snapshots(
                 DBClusterIdentifier=identifier,
-                SnapshotType='manual',
-                Marker=result.get('Marker')
+                SnapshotType='manual'
             )
             
-            snapshots = snapshots + result.get('DBSnapshots')
-    else:
-        identifier = self.db['DBInstanceIdentifier']
-        result = self.rdsClient.describe_db_snapshots(
-            DBInstanceIdentifier=identifier,
-            SnapshotType='manual'
-        )
-        
-        snapshots = result.get('DBSnapshots')
-        while result.get('Marker') is not None:
+            snapshots = result.get('DBClusterSnapshots')
+            while result.get('Marker') is not None:
+                result = self.rdsClient.describe_db_cluster_snapshots(
+                    DBClusterIdentifier=identifier,
+                    SnapshotType='manual',
+                    Marker=result.get('Marker')
+                )
+                
+                snapshots = snapshots + result.get('DBSnapshots')
+        else:
+            identifier = self.db['DBInstanceIdentifier']
             result = self.rdsClient.describe_db_snapshots(
                 DBInstanceIdentifier=identifier,
-                SnapshotType='manual',
-                Marker=result.get('Marker')
+                SnapshotType='manual'
             )
             
-            snapshots = snapshots + result.get('DBSnapshots')
-    
-        if not snapshots:
-            return
+            snapshots = result.get('DBSnapshots')
+            while result.get('Marker') is not None:
+                result = self.rdsClient.describe_db_snapshots(
+                    DBInstanceIdentifier=identifier,
+                    SnapshotType='manual',
+                    Marker=result.get('Marker')
+                )
+                
+                snapshots = snapshots + result.get('DBSnapshots')
+        
+            if not snapshots:
+                return
+                
+            oldest_copy = snapshots[-1]
             
-        oldest_copy = snapshots[-1]
+            oldest_copy_date = oldest_copy['SnapshotCreateTime']
+            
+            now = datetime.datetime.now().date()
+            
+            diff = now - oldest_copy_date
+            days = diff.days
+            
+            if len(snapshots) > 5:
+                self.results['SnapshotTooMany'] = [-1, len(snapshots)]
         
-        oldest_copy_date = oldest_copy['SnapshotCreateTime']
-        
-        now = datetime.datetime.now().date()
-        
-        diff = now - oldest_copy_date
-        days = diff.days
-        
-        if len(snapshots) > 5:
-            self.results['SnapshotTooMany'] = [-1, len(snapshots)]
+        if days > 180:
+            self.results['SnapshotTooOld'] = [-1, days]
+            
+    def _checkCAExpiry(self):
+        if self.certInfo['isExpireIn365days'] == True:
+            exp = self.certInfo['ValidTill'].strftime("%Y-%m-%d")
+            self.results['CACertExpiringIn365days'] = [-1, "Expired on {}, ({} days left)".format(exp, self.certInfo['expiredInDays'])]
     
-    if days > 180:
-        self.results['SnapshotTooOld'] = [-1, days]
+    def _checkFreeStorage(self):
+        cw_client = self.cwClient
+    
+        if 'DBClusterIdentifier' in self.db:
+            # Aurora Volume auto increase until 128TB as of 23/Sep/2021
+            return
+        else:
+            metric = 'FreeStorageSpace'
+            dimensions = [
+                {
+                    'Name': 'DBInstanceIdentifier',
+                    'Value': self.db['DBInstanceIdentifier']
+                }
+            ]
+    
+        results = cw_client.get_metric_statistics(
+            Dimensions=dimensions,
+            Namespace='AWS/RDS',
+            MetricName=metric,
+            StartTime=int(time.time()) - 300,
+            EndTime=int(time.time()),
+            Period=300,
+            Statistics=['Average']
+        )
+    
+        GBYTES = 1024 * 1024 * 1024
+        dp = results['Datapoints']
+        freesize = round(dp[0]['Average'] / GBYTES, 4)
+    
+        ratio = freesize / self.db['AllocatedStorage']
+        if ratio < 0.2:
+            self.results['FreeStorage20pct'] = [-1, str(ratio * 100) + ' / ' + str(freesize) + '(GB)']
+
+    def _checkCPUUtilization(self):
+        cwClient = self.cwClient
+        serverVCPU = self.instInfo['specification']['vcpu']
         
-
-def check_free_storage(self):
-    cw_client = boto3.client('cloudwatch')
-
-    if not self.db['DBClusterIdentifier']:
-        # Aurora Volume auto increase until 128TB as of 23/Sep/2021
-        return
-    else:
-        metric = 'FreeStorageSpace'
+        metric = 'CPUUtilization'
         dimensions = [
             {
                 'Name': 'DBInstanceIdentifier',
                 'Value': self.db['DBInstanceIdentifier']
-            }
+            }    
         ]
+        
+        dayInSecond=(60*60*24)
+        monthInSecond=dayInSecond*30
+        resp = cwClient.get_metric_statistics(
+            Dimensions=dimensions,
+            Namespace='AWS/RDS',
+            MetricName=metric,
+            StartTime=int(time.time()) - monthInSecond,
+            EndTime=int(time.time()),
+            Period=dayInSecond,
+            Statistics=['Minimum', 'Maximum', 'Average']
+        )
+        dailyDp = resp.get('Datapoints')
+        
+        resp = cwClient.get_metric_statistics(
+            Dimensions=dimensions,
+            Namespace='AWS/RDS',
+            MetricName=metric,
+            StartTime=int(time.time()) - monthInSecond,
+            EndTime=int(time.time()),
+            Period=monthInSecond,
+            Statistics=['Minimum', 'Maximum', 'Average']
+        )
+        monthDp = resp.get('Datapoints')
+        monthAverage = monthDp[0]['Average']
+        monthMax = monthDp[0]['Maximum']
+        
+        ## check for right sizing
+        if monthMax <= 50:
+            self.results['RightSizingCpuMonthMaxLT50pct'] = [-1, "Monthly Max CPU Util: {}%".format(monthMax)]
+            return 
+        
+        ## if not, trying to build manual rules for reviewing
+        maxCnt = 0
+        avgCnt = 0
+        minCnt = 0
+        for dp in dailyDp:
+            if dp['Maximum'] > 70:
+                maxCnt = maxCnt + 1
+            if dp['Average'] < 30:
+                avgCnt = avgCnt + 1
+            if dp['Minimum'] < 3:
+                minCnt = minCnt + 1
+        
+        ## High CPU
+        if avgCnt < 10 and maxCnt > 10:
+            #do ntg
+            maxCnt 
+        ## Low CPU on average
+        elif minCnt >= 25 and avgCnt >= 20:
+            self.results['RightSizingCpuLowUsageDetected'] = [-1, "MinCPU < 5% for {} days<br>AvgCPU < 30% for {}days".format(minCnt, avgCnt)]
+        ## weekly spike once
+        elif maxCnt >= 4 and maxCnt <= 7 and minCnt >= 20 and avgCnt >= 15:
+            self.results['RightSizingCpuLowUsageDetectedWithWeeklySpike'] = [-1, "MinCPU < 5% for {} days<br>AvgCPU < 30% for {}days<br>MaxCPU > 70%  for {}days".format(minCnt, avgCnt, maxCnt)]
 
-    results = cw_client.get_metric_statistics(
-        Dimensions=dimensions,
-        Namespace='AWS/RDS',
-        MetricName=metric,
-        StartTime=int(time.time()) - 300,
-        EndTime=int(time.time()),
-        Period=300,
-        Statistics=['Average']
-    )
-
-    GBYTES = 1024 * 1024 * 1024
-    dp = results['Datapoints']
-    freesize = round(dp[0]['Average'] / GBYTES, 4)
-
-    ratio = freesize / self.db['AllocatedStorage']
-    if ratio < 0.2:
-        self.results['FreeStorage20pct'] = [-1, str(ratio * 100) + ' / ' + str(freesize) + '(GB)']
+    def _checkFreeMemory(self):
+        cwClient = self.cwClient
+        metric = 'FreeableMemory'
+        dimensions = [
+            {
+                'Name': 'DBInstanceIdentifier',
+                'Value': self.db['DBInstanceIdentifier']
+            }    
+        ]
+        
+        rawToGBRatio=1024*1024*1024
+        
+        ## Past 24 hours, might recovers back
+        dayInSecond=(60*60*24)
+        resp = cwClient.get_metric_statistics(
+            Dimensions=dimensions,
+            Namespace='AWS/RDS',
+            MetricName=metric,
+            StartTime=int(time.time()) - dayInSecond,
+            EndTime=int(time.time()),
+            Period=dayInSecond,
+            Statistics=['Minimum', 'Maximum', 'Average']
+        )
+        
+        dp = resp.get('Datapoints')
+        
+        serverGB = self.instInfo['specification']['memoryInGiB']
+        freeMemoryMin = dp[0]['Minimum'] / rawToGBRatio
+        freeMemoryMax = dp[0]['Maximum'] / rawToGBRatio
+        freeMemoryAvg = dp[0]['Average'] / rawToGBRatio
+        
+        freeMemoryMinRatio = freeMemoryMin/serverGB
+        freeMemoryMaxRatio = freeMemoryMax/serverGB
+        freeMemoryAvgRatio = freeMemoryAvg/serverGB
+        
+        monthInSecond = dayInSecond*30
+        resp = cwClient.get_metric_statistics(
+            Dimensions=dimensions,
+            Namespace='AWS/RDS',
+            MetricName=metric,
+            StartTime=int(time.time()) - monthInSecond,
+            EndTime=int(time.time()),
+            Period=monthInSecond,
+            Statistics=['Minimum', 'Maximum', 'Average']
+        )
+        
+        dp = resp.get('Datapoints')
+        freeMemoryMthMin = dp[0]['Minimum'] / rawToGBRatio
+        freeMemoryMthMax = dp[0]['Maximum'] / rawToGBRatio
+        freeMemoryMthAvg = dp[0]['Average'] / rawToGBRatio
+        freeMemoryMthMinRatio = freeMemoryMthMin/serverGB
+        freeMemoryMthMaxRatio = freeMemoryMthMax/serverGB
+        freeMemoryMthAvgRatio = freeMemoryMthAvg/serverGB
+        
+        # Less than 10%
+        if freeMemoryMinRatio < 0.1:
+            self.results['FreeMemoryLessThan10pct'] = [-1, "FreeableMemory: {}GB, %remains: {}".format(freeMemoryMin, round(freeMemoryMinRatio*100))]
+            
+            if freeMemoryMaxRatio - freeMemoryMinRatio > 0.5:
+                self.results['FreeMemoryDropMT50pctIn24hours'] = [-1, "Max FreeMemory: {}GB, Min FreeMemory {}GB".format(freeMemoryMax, freeMemoryMin)]
+        elif freeMemoryMthMinRatio > 0.60 and freeMemoryMthAvgRatio > 0.60:
+            self.results['RightSizingMemoryMonthMinMT60pct'] = [-1, "Monthly<br>Min FreeMemory: {}%, Avg FreeMemory {}%".format(round(freeMemoryMinRatio*100, 1), round(freeMemoryAvgRatio*100, 1))]

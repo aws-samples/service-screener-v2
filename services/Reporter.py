@@ -3,6 +3,7 @@ import json
 import re
 
 from utils.Config import Config, dashboard
+from utils.Tools import _warn
 import constants as _C
 
 class Reporter:
@@ -12,6 +13,9 @@ class Reporter:
         self.detail = {}
         self.config = {}
         self.service = service
+        self.warningList = []
+        self.stats = {}
+        self.findingsCount = 0
         
         folder = service
         if service in Config.KEYWORD_SERVICES:
@@ -26,6 +30,29 @@ class Reporter:
             raise Exception(serviceReporterJsonPath + " does not contain valid JSON")
         generalConfig = json.loads(open(_C.GENERAL_CONF_PATH).read())
         self.config = {**self.config, **generalConfig}
+        
+        ## KPI Building
+        self.acquireStatInfo()
+        
+    def acquireStatInfo(self):
+        checksCount = 0
+        
+        statpath = _C.FORK_DIR + '/' + self.service + '.stat.json'
+        f = open(statpath, "r")
+        stats = json.loads(f.read())
+        f.close()
+        
+        infopath = _C.ROOT_DIR + '/' + 'info.json'
+        f = open(infopath, "r")
+        checks = json.loads(f.read())
+        if not self.service in checks:
+            _warn( "[{}] is not available in checks, please submit an issue to github to update info.json through RuleCount.py.".format(self.service))
+        else:
+            checksCount = checks[self.service]
+            
+        stats['checksCount'] = checksCount
+        self.stats = stats
+            
 
     def process(self, serviceObjs):
         for region, objs in serviceObjs.items():
@@ -72,14 +99,20 @@ class Reporter:
 
     def _getConfigValue(self, check, field):
         if check not in self.config:
-            print("<{}> not exists in {}.reporter.json".format(check, self.service))
+            k = self.service + '::' + check
+            if not k in self.warningList:
+                _warn("Rule {}::{} is not available in reporter, please submit an issue to github.".format(self.service, check) )
+                self.warningList.append(k)
             return None
         
         if field == 'category' and field not in self.config[check]:
             field = '__categoryMain'
         
         if field not in self.config[check]:
-            print("<{}>::<{}> not exists in {}.reporter.json".format(check, field, self.service))
+            k = self.service + '::' + check + '::' + field
+            if not k in self.warningList:
+                _warn("Rule {}::{} available in reporter, but missing {}, please submit an issue to github.".format(self.service, check, field) )
+                self.warningList.append(k)
             return None
         
         return self.config[check][field]
@@ -154,8 +187,13 @@ class Reporter:
                     dashboard['MAP'][self.service]['_'][mainCategory] += itemSize
                 else:
                     pass
-                dashboard['MAP'][self.service][critical] += itemSize
-                dashboard['MAP'][self.service][mainCategory] += itemSize
+                
+                if critical == 'X':
+                    ## Error handling in _getConfigValue
+                    break
+                else:
+                    dashboard['MAP'][self.service][critical] += itemSize
+                    dashboard['MAP'][self.service][mainCategory] += itemSize
 
         self.cardSummary = {}
         service = self.service
@@ -163,7 +201,7 @@ class Reporter:
         sorted(self.summary)
         for check, items in self.summary.items():
             if check not in self.config:
-                print("<{}> not exists in {}.reporter.json".format(check, service))
+                # print("<{}> not exists in {}.reporter.json".format(check, service))
                 continue
             
             self.cardSummary[check] = self.config[check]
@@ -201,6 +239,7 @@ class Reporter:
                 
             resourceByRegion = {}
             for region, insts in self.summaryRegion[check].items():
+                self.findingsCount += len(insts)
                 resourceByRegion[region] = insts
                 
             self.cardSummary[check]['__affectedResources'] = resourceByRegion

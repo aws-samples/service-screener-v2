@@ -199,6 +199,32 @@
 		"[Modify RDS Storage]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PIOPS.StorageTypes.html>"
 		]
   },
+  "DefaultMasterAdmin":{
+    "category": "S",
+    "^description": "[Login Info] {$COUNT} of your RDS are using default master admin. To make change, you first need to create a snapshot and create a new database instance from the snapshot with new --master-username parameter",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "L",
+    "shortDesc": "Rename Admin",
+    "ref": [
+      "[RDS Master Accounts]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.MasterAccounts.html>"
+    ]
+  },
+  "SnapshotIsPublic":{
+    "category": "S",
+    "^description": "[RDS Snapshot] {$COUNT} of your RDS is having at least 1 public snapshot.If you share an unencrypted manual snapshot as public, this makes the snapshot available to all AWS accounts. This may result in unintended data exposure of your RDS instance.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "H",
+    "shortDesc": "Snapshot should be private",
+    "ref": [
+      "[RDS Master Accounts]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.MasterAccounts.html>"
+    ]
+  },
   "MYSQL__param_syncBinLog":{
     "category": "R",
     "^description": "[Transaction Durability] {$COUNT} of your RDS MySQL RDS instances are running with <b>sync_binlog</b> set to less durable setting. This parameter ensures that transaction commits are made durable to binlog synchronously before commit is confirmed. Switching off this parameter can offer performance gain but increases risk of data loss. You should test the impact of this parameter on your performance and RPO before making changes.",
@@ -394,6 +420,143 @@
       "[High Availability for MSSQL]<https://docs.aws.amazon.com/prescriptive-guidance/latest/migration-sql-server/rds-sql.html>"
     ]
   },
+  "MSSQL__EEUnderSize": {
+    "category": "C",
+    "^description": "[MSSQL Edition] You have {$COUNT} instances of the Enterprise Edition running, but using less than 48 vCPU or 128 GB of RAM. To save money, consider running the Standard Edition after reviewing application usage.",
+    "downtime": 1,
+    "slowness": 1,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "M",
+    "shortDesc": "Review SQL Edition",
+    "ref": [
+      "[RDS SQLServer EE]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_SQLServer.html#SQLServer.Concepts.General.FeatureSupport.Limits>",
+	  "[SQLServer Edition Comparison 2019]<https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2019?view=sql-server-ver16#Cross-BoxScaleLimits>"
+    ]
+  },
+  "MSSQL__EditionOversize": {
+    "category": "C",
+    "^description": "[MSSQL Edition] You have {$COUNT} instances of the Standard Edition running, but using more than 48 vCPU or 128 GB of RAM. To avoid paying for unused resources, consider downsizing your RDS instances.",
+    "downtime": 1,
+    "slowness": 1,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "H",
+    "shortDesc": "Review SQL Edition",
+    "ref": [
+      "[RDS SQLServer EE]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_SQLServer.html#SQLServer.Concepts.General.FeatureSupport.Limits>",
+	  "[SQLServer Edition Comparison 2019]<https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2019?view=sql-server-ver16#Cross-BoxScaleLimits>"
+    ]
+  },
+  "MSSQL__EE2017": {
+    "category": "C",
+    "^description": "[MSSQL Edition] You have {$COUNT} instances of SQL Server 2017 Enterprise Edition running. Most features that were once exclusive to the Enterprise Edition are now available in the Standard Edition. To save money, consider changing the edition of your SQL Server instances to Standard.",
+    "downtime": 1,
+    "slowness": 1,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "M",
+    "shortDesc": "Review SQL Edition",
+    "ref": [
+	  "[SQLServer 2019 Features Comparison]<https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2019?view=sql-server-ver15&preserve-view=true>",
+	  "[SQLServer 2017 Features Comparison]<https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2017?view=sql-server-2017&preserve-view=true>"
+    ]
+  },
+  "MSSQLorPG__TransportEncrpytionDisabled":{
+    "category": "S",
+    "^description": "[MSSQL Transport Encryption] You have {$COUNT} instance(s) does not enable transport encryption. You can use Secure Sockets Layer (SSL) to encrypt connections between your client applications and your Amazon RDS DB instances running Microsoft SQL Server. SSL support is available in all AWS regions for all supported SQL Server editions.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": -1,
+    "criticality": "M",
+    "shortDesc": "Using SSL",
+    "ref": [
+      "[RDS SQLServer SSL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/SQLServer.Concepts.General.SSL.Using.html>"
+    ]
+  },
+  "MSSQL__ParamMaxMemoryTooLow":{
+    "category": "P",
+    "^description": "[MSSQL Parameter] You have {$COUNT} MSSQL instances with configured maximum server memory values lower than the recommended value.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "I",
+    "shortDesc": "Review Memory Configuration",
+    "ref": [
+      "[Max Memory Guide (AWS)]<https://docs.aws.amazon.com/prescriptive-guidance/latest/sql-server-ec2-best-practices/max-server-memory.html>",
+	  "[Max Memory Guide (MSFT)]<https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/server-memory-server-configuration-options?view=sql-server-ver16#max_server_memory>"
+    ]
+  },
+  "MSSQL__ParamMaxMemoryTooLow":{
+    "category": "P",
+    "^description": "[MSSQL Parameter] You have {$COUNT} MSSQL instances with configured maximum server memory values higher than the recommended value.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "I",
+    "shortDesc": "Review Memory Configuration",
+    "ref": [
+      "[Max Memory Guide (AWS)]<https://docs.aws.amazon.com/prescriptive-guidance/latest/sql-server-ec2-best-practices/max-server-memory.html>",
+	  "[Max Memory Guide (MSFT)]<https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/server-memory-server-configuration-options?view=sql-server-ver16#max_server_memory>"
+    ]
+  },
+  "MSSQL__ParamCostThresholdTooLow":{
+    "category": "P",
+    "^description": "[MSSQL Parameter] You have {$COUNT} MSSQL instances with a configured cost threshold for parallelism lower than the default value of 5. The recommended value to start with is 50.",
+    "downtime": 0,
+    "slowness": 1,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "I",
+    "shortDesc": "Review Cost Threshold For Parallelism setting",
+    "ref": [
+      "[Cost Threshold for Parallelism Guide (AWS)]<https://docs.aws.amazon.com/prescriptive-guidance/latest/sql-server-ec2-best-practices/parallelism.html>",
+	  "[Max Memory Guide (MSFT)]<https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/configure-the-cost-threshold-for-parallelism-server-configuration-option?view=sql-server-ver16#recommendations>"
+    ]
+  },
+  "MSSQL__ParamMaxDegreeParallism":{
+    "category": "P",
+    "^description": "[MSSQL Parameter] You have {$COUNT} MSSQL instances using the default value for the maximum degree of parallelism. Review the guide for tuning it for optimal performance.",
+    "downtime": 0,
+    "slowness": 1,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "I",
+    "shortDesc": "Review Cost Threshold For Parallelism setting",
+    "ref": [
+      "[MAXDOP Guide (AWS)]<https://docs.aws.amazon.com/prescriptive-guidance/latest/sql-server-ec2-best-practices/maxdop.html>",
+	  "[MAXDOP Guide (MSFT)]<https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/configure-the-max-degree-of-parallelism-server-configuration-option?view=sql-server-ver16#considerations>"
+    ]
+  },
+  "CACertExpiringIn365days": {
+    "category": "O",
+    "^description": "[RDS Certificate] You have {$COUNT} RDS instances are using nearly expired CA Certificate. If you use or plan to use Secure Sockets Layer (SSL) or Transport Layer Security (TLS) with certificate verification to connect to your RDS DB instances, you should consider using one of the new CA certificates. If you currently do not use SSL/TLS with certificate verification, you might still have an expired CA certificate and must update them to a new CA certificate if you plan to use SSL/TLS with certificate verification to connect to your RDS databases.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "H",
+    "shortDesc": "Rotate CA",
+    "ref": [
+      "[Rotate RDS SSL/TLS Certificate]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL-certificate-rotation.html>"
+    ]
+  },
+  "DBInstanceWithoutTags": {
+    "category": "C",
+    "^description": "[RDS] You can use Amazon RDS tags to add metadata to your Amazon RDS resources. You can use the tags to add your own notations about database instances, snapshots, Aurora clusters, and so on. Doing so can help you to document your Amazon RDS resources. You can also use the tags with automated maintenance procedures.<br><br>In particular, you can use these tags with IAM policies. You can use them to manage access to RDS resources and to control what actions can be applied to the RDS resources. You can also use these tags to track costs by grouping expenses for similarly tagged resources.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Tags the resources",
+    "ref": [
+      "[RDS Tags]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Tagging.html>"
+    ]
+  },
   "DBwithoutSecretManager": {
     "category": "S",
     "^description": "[Secrets Manager] Secrets Manager helps you improve the security posture of your organization. Secrets include database credentials, passwords, and third-party API keys. You can use Secrets Manager to store secrets centrally, encrypt secrets automatically, control access to secrets, and rotate secrets safely and automatically.",
@@ -444,6 +607,110 @@
     "shortDesc": "Review & Remove unused secrets",
     "ref": [
       "[Delete a secet]<https://docs.aws.amazon.com/secretsmanager/latest/userguide/manage_delete-secret.html>"
+    ]
+  },
+  "SecurityGroupIPRangeNotPrivateCidr": {
+    "category": "S",
+    "^description": "[RDS Security Group] You have {$COUNT} security group(s) inbound rules setting that allows public ip ranges. The recommended configuration for a security group rule is to allow access only from specific Amazon Elastic Compute Cloud (Amazon EC2) security groups or from a specific IP address to lower the risk posture.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": -1,
+    "criticality": "M",
+    "shortDesc": "Restrict access to authorized IP addresses or IP ranges.",
+    "ref": [
+      "[RDS Infrastructure Security]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/infrastructure-security.html>"
+    ]
+  },
+  "SecurityGroupDefault": {
+    "category": "S",
+    "^description": "[RDS Security Group] AWS does not recommend using the default security group. Because the default security group cannot be deleted, you should change the default security group rules setting to restrict inbound and outbound traffic. This prevents unintended traffic if the default security group is accidentally configured for resources such as EC2 instances.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": -1,
+    "criticality": "M",
+    "shortDesc": "Create custom Security Group",
+    "ref": [
+      "[Default Security Group]<https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html#DefaultSecurityGroup>"
+    ]
+  },
+  "FreeMemoryLessThan10pct": {
+    "category": "CP",
+    "^description": "[RDS Rightsizing] You have {$COUNT} instances with less than 10% freeable memory in the last 24 hours. Review whether you need more memory and increase the instance size accordingly.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 1,
+    "criticality": "M",
+    "shortDesc": "Freeable Memory Less than 10%",
+    "ref": [
+      "[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+    ]
+  },
+  "FreeMemoryDropMT50pctIn24hours":{
+    "category": "CP",
+    "^description": "[RDS Rightsizing]You have {$COUNT} instances with a freeable memory drop of more than 50% in the last 24 hours. Review the drop and ensure that no unknown influx of queries or operations occurred.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "H",
+    "shortDesc": "Freeable Memory Drop > 50%",
+    "ref": [
+      "[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+    ]
+  },
+  "RightSizingMemoryMonthMinMT60pct":{
+    "category": "CP",
+    "^description": "[RDS Rightsizing] You have {$COUNT} instances with more than 60% freeable memory in the past 30 days. Review whether you can choose instances with lower memory.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "M",
+    "shortDesc": "Freeable Memory > 60% (months)",
+    "ref": [
+      "[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+    ]
+  },
+  "RightSizingCpuMonthMaxLT50pct":{
+    "category": "CP",
+    "^description": "[RDS Rightsizing] You have {$COUNT} instances with a maximum CPU utilization of less than 50% in the past 30 days. Review whether you can choose instances with fewer vCPUs.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "H",
+    "shortDesc": "Max CPU < 50% (months)",
+    "ref": [
+      "[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+    ]
+  },
+  "RightSizingCpuLowUsageDetected":{
+    "category": "CP",
+    "^description": "[RDS Rightsizing] You have {$COUNT} instances with more than 25 days of low minimum CPU utilization (less than 3%) and more than 20 days of low average CPU utilization (less than 30%) in the past 30 days. Review whether you can choose instances with fewer vCPUs.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "M",
+    "shortDesc": "Low Minumum & Average CPUUtilization",
+    "ref": [
+      "[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+    ]
+  },
+  "RightSizingCpuLowUsageDetectedWithWeeklySpike":{
+    "category": "CP",
+    "^description": "[RDS Rightsizing] You have {$COUNT} instances that have a weekly spike pattern, while normal days have consistently low CPU utilization. Consider rearchitecting your workload according to the maximum CPU utilization.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "L",
+    "shortDesc": "Weekly CPU Usage Spike detected",
+    "ref": [
+      "[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
     ]
   }
 }

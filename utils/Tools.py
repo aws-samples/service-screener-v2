@@ -4,6 +4,7 @@ import re
 from pprint import pprint
 from utils.Config import Config
 from typing import Set, Dict, Union
+from netaddr import *
 
 
 def _pr(s):
@@ -21,6 +22,9 @@ def _printStatus(status, s):
     p = "["+status+"] "+ s
     _pr(p)
 
+def checkIsPrivateIp(ipaddr):
+    ip = ipaddr.split('/')
+    return IPAddress(ip[0]).is_private()
 
 def aws_parseInstanceFamily(instanceFamily: str) -> Dict[str, str]:
     CURRENT_REGION = Config.CURRENT_REGION

@@ -13,13 +13,16 @@ from services.rds.drivers.RdsPostgresAurora import RdsPostgresAurora
 from services.rds.drivers.RdsMssql import RdsMssql
 from services.rds.drivers.SecretsManager import SecretsManager
 from services.rds.drivers.SecretsVsDB import SecretsVsDB
+from services.rds.drivers.RdsSecurityGroup import RdsSecurityGroup
 
 class Rds(Service):
     def __init__(self, region):
         super().__init__(region)
         self.rdsClient = boto3.client('rds', config=self.bConfig)
+        self.ec2Client = boto3.client('ec2', config=self.bConfig)
         self.ctClient = boto3.client('cloudtrail', config=self.bConfig)
         self.smClient = boto3.client('secretsmanager', config=self.bConfig)
+        self.cwClient = boto3.client('cloudwatch', config=self.bConfig)
         
         self.secrets = []
 
@@ -36,7 +39,7 @@ class Rds(Service):
         
         arr = results.get('DBInstances')
         while results.get('Maker') is not None:
-            results = self.ec2Client.describe_db_instances(
+            results = self.rdsClient.describe_db_instances(
                 Maker = results.get('Maker')
             )
             arr = arr + results.get('DBInstances')
@@ -68,19 +71,20 @@ class Rds(Service):
         
     def advise(self):
         objs = {}
-        self.getSecrets()
-        for secret in self.secrets:
-            print('... (SecretsManager) inspecting ' + secret['Name'])
-            obj = SecretsManager(secret, self.smClient, self.ctClient)
-            obj.run(self.__class__)
-            
-            objs['SecretsManager::'+ secret['Name']] = obj.getInfo()
-            del obj
-        
         instances = self.getResources()
+        securityGroupArr = {}
         
         for instance in instances:
             print('... (RDS) inspecting ' + instance['DBInstanceIdentifier'])
+            
+            if 'VpcSecurityGroups' in instance:
+                for sg in instance['VpcSecurityGroups']:
+                    if 'Status' in sg and (sg['Status'] == 'active' or sg['Status'] == 'adding'):
+                        if sg['VpcSecurityGroupId'] in securityGroupArr:
+                            securityGroupArr[sg['VpcSecurityGroupId']].append(instance['DBInstanceIdentifier'])
+                        else:
+                            securityGroupArr[sg['VpcSecurityGroupId']] = [instance['DBInstanceIdentifier']]
+                
             engine = instance['Engine']
             
             # grouping mssql versions together
@@ -90,18 +94,35 @@ class Rds(Service):
             if engine not in self.engineDriver:
                 continue
             
-            engine = self.engineDriver[engine]
-            driver = 'Rds' + engine
+            driver_ = self.engineDriver[engine]
+            driver = 'Rds' + driver_
             if driver in globals():
-                obj = globals()[driver](instance, self.rdsClient, self.ctClient)
+                obj = globals()[driver](instance, self.rdsClient, self.ctClient, self.cwClient)
+                obj.setEngine(engine)
                 obj.run(self.__class__)
                 
                 objs[instance['Engine'] + '::' + instance['DBInstanceIdentifier']] = obj.getInfo()
                 del obj
         
+        for sg, rdsList in securityGroupArr.items():
+            print('... (RDS-SG) inspecting ' + sg)
+            obj = RdsSecurityGroup(sg, self.ec2Client, rdsList)
+            obj.run(self.__class__)
+            objs['RDS_SG::' + sg] = obj.getInfo()
+            del obj
+
+        self.getSecrets()
+        for secret in self.secrets:
+            print('... (SecretsManager) inspecting ' + secret['Name'])
+            obj = SecretsManager(secret, self.smClient, self.ctClient)
+            obj.run(self.__class__)
+            
+            objs['SecretsManager::'+ secret['Name']] = obj.getInfo()
+            del obj
+        
         obj = SecretsVsDB(len(self.secrets), len(instances))
         obj.run(self.__class__)
-        objs['Secrets__General'] = obj.getInfo()
+        objs['SecretsRDS::General'] = obj.getInfo()
         del obj
         
         return objs

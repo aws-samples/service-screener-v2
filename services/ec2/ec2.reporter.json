@@ -622,5 +622,20 @@
         "ref": [
             "[Auto Scaling Group Metadata Response Hop Limit]<https://docs.aws.amazon.com/securityhub/latest/userguide/autoscaling-controls.html#autoscaling-5>"    
         ]
+    },
+    "SQLServerEOL": {
+        "category": "O",
+        "^description": "You have {$COUNT} EC2 running on EOL SQL Server version. To modernize your SQL Server workloads, consider refactoring to AWS Cloud native databases like Amazon Aurora.<br>To move to a fully managed database, consider replatforming to Amazon Relational Database Service (Amazon RDS).<br>To upgrade your SQL Server on Amazon EC2, consider using the automation runbook to simplify your upgrade. For more information, see the AWS Systems Manager documentation.<br><br>If you can’t upgrade your SQL Server on Amazon EC2, consider the End-of-Support Migration Program (EMP) for Windows Server.Each SQL Server version offers 10 years of support, including 5 years of mainstream support and 5 years of extended support. After the end of support, the SQL Server version won’t receive regular security updates. Running applications with unsupported SQL Server versions can bring security or compliance risks.",  
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "Use supported SQL Server version",
+        "ref": [
+            "[Windows Modernization]<https://aws.amazon.com/windows/modernization/>",
+            "[RDS SQL Server]<https://aws.amazon.com/rds/sqlserver/>",
+            "[endoflife]<https://endoflife.date/mssqlserver>"
+        ]
     }
 }

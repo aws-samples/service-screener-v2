@@ -34,6 +34,7 @@ class Service:
         print('PREPARING -- ' + classname.upper()+ '::'+region)
         
     def setRules(self, rules):
+        ## Class method is case insensitive, lower to improve accessibilities
         rules = rules.lower().split('^')
         Config.set(self.RULESPREFIX, rules)
         

@@ -509,10 +509,84 @@ class PageBuilder:
             return True
         else:
             return False
+            
+    def buildKpiCard(self): 
+        output=[]
+        stats = self.reporter.stats
+        
+        ## 1st kpi: #Resources
+        output.append(self._buildIndividualKpiCard(stats['resources'], 'resources'))
+        
+        output.append(self._buildIndividualKpiCard(self.reporter.findingsCount, 'findings'))
+        output.append(self._buildIndividualKpiCard(stats['rules'], 'rules'))
+        
+        output.append(self._buildIndividualKpiCard(stats['checksCount'], 'checksCount'))
+        output.append(self._buildIndividualKpiCard(stats['exceptions'], 'exceptions'))
+        
+        output.append(self._buildIndividualKpiCard(str(round(stats['timespent'], 3)) + 's', 'timespent'))
+        
+        return output
+        
+    def _buildIndividualKpiCard(self, stat, cat):
+        settings = {
+            'resources': {
+                'description': 'Resources',
+                'icon': 'server',
+                'bg': 'info'
+            },
+            'findings': {
+                'description': 'Total Findings',
+                'icon': 'search-plus',
+                'bg': 'warning'
+            },
+            'rules': {
+                'description': 'Rules Executed',
+                'icon': 'check-square',
+                'bg': 'success'
+            },
+            'checksCount': {
+                'description': 'Unique Rules',
+                'icon': 'check-double',
+                'bg': 'secondary'
+            },
+            'exceptions': {
+                'description': 'Exception',
+                'icon': 'radiation-alt',
+                'bg': 'danger'
+            },
+            'timespent': {
+                'description': 'Timespent',
+                'icon': 'clock',
+                'bg': 'pink'
+            }
+            
+        }
+        
+        inf = settings[cat]
+        
+        s = """<div class='small-box bg-{}'>
+            <div class='inner'>
+                <h3>{}</h3>
+                <p>{}</p>
+            </div>
+            <div class='icon'>
+                <i class='fas fa-{}'></i>
+            </div>
+        </div>""".format(inf['bg'], stat, inf['description'], inf['icon'])
+        
+        return s
     
     def buildContentSummary_default(self):
         output = []
 
+        ## KPI Building, 2023-10-16
+        items = []
+        kpiCards = self.buildKpiCard()
+        for kpi in kpiCards:
+            items.append([kpi, ''])
+            
+        output.append(self.generateRowWithCol(size=2, items=items))
+        
         ## Chart Building
         summary = self.reporter.cardSummary
         regions = self.regions
@@ -607,8 +681,6 @@ $('span.detailCategory').each(function(){
         return output
         
     def generateFilterByCheck(self, labels):
-        output = []
-
         opts = []
         for label in labels:
             opts.append("<option value='{}'>{}</option>".format(label, label))
