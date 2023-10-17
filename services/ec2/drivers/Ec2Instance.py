@@ -297,3 +297,8 @@ class Ec2Instance(Evaluator):
                 self.results['EC2SubnetAutoPublicIP'] = [-1, subnet.get('SubnetId')]
         
         return
+    
+    def _checkEC2HasTag(self):
+        if self.ec2InstanceData.get('Tags') is None:
+            self.results['EC2HasTag'] = [-1, '']
+        return
