@@ -6,6 +6,7 @@ import botocore
 
 from utils.Config import Config
 from utils.Policy import Policy
+from utils.Tools import _warn
 from services.Evaluator import Evaluator
 
 class Macie(Evaluator):
@@ -15,8 +16,10 @@ class Macie(Evaluator):
         
         self.init()
     
-    def _checkAccountPublicAccessBlock(self):
+    def _checkMacieEnable(self):
         try:
             self.macieV2Client.list_findings()
         except self.macieV2Client.exceptions.AccessDeniedException as e:
             self.results['MacieToEnable'] = [-1, None]
+        except botocore.exceptions.EndpointConnectionError as connErr:
+            _warn(str(connErr))
