@@ -168,6 +168,19 @@
             "[Amazon EC2 public IP]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-9>"
         ]
     },
+    "EC2HasTag": {
+        "category": "O",
+        "^description": "EC2 without tagging: {$COUNT} of your instances has no tagging. Tag your EC2 instances.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "EC2 without tagging",
+        "ref": [
+            "[Tag your EC2 resources]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html>"
+        ]
+    },
     "EBSEncrypted": {
         "category": "S",
         "^description": "Storage Encyrption: {$COUNT} of EBS storage volumes are not encrypted. Enable encryption for EBS volumes to meet security and compliance requirements.",
@@ -231,6 +244,19 @@
         "shortDesc": "Enable EBS Snapshot",
         "ref": [
             "[Best practices for Amazon EC2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html>"    
+        ]
+    },
+    "EBSSnapshotIsPublic": {
+        "category": "S",
+        "^description": "Public Snapshot: {$COUNT} of EBS snapshots is available to public. Modify snapshot permission to private.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Snapshot is Public",
+        "ref": [
+            "[Best practices for Amazon EBS Encryption]<https://aws.amazon.com/blogs/compute/must-know-best-practices-for-amazon-ebs-encryption/>"    
         ]
     },
     "EBSLowUtilization": {
@@ -491,6 +517,19 @@
         "shortDesc": "ALB Web Application Firewall",
         "ref": [
             "[AWS WAF for Applicatoin Load Balancers]<https://aws.amazon.com/blogs/aws/aws-web-application-firewall-waf-for-application-load-balancers/>"    
+        ]
+    },
+    "ELBSGRulesMatch": {
+        "category": "S",
+        "^description": "ALB Security Group Rules Configuration: {$COUNT} of Security Group in your ALBs has different port opened.",        
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "ALB SG Rules Config",
+        "ref": [
+            "[Security groups for Applicatoin Load Balancers]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-update-security-groups.html>"    
         ]
     },
     "ASGELBHealthCheckValidation": {

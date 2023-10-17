@@ -23,6 +23,8 @@ class IamAccount(IamCommon):
         self.budgetClient = awsClients['budgetClient']
         self.orgClient = awsClients['orgClient']
         
+        
+        self.curClient = boto3.client('cur', config=bConfig(region_name='us-east-1'))
         self.ctClient = boto3.client('cloudtrail', config=bConfig(region_name='us-east-1'))
         
         self.noOfUsers = len(users)
@@ -235,5 +237,10 @@ class IamAccount(IamCommon):
             if ecode == 'AWSOrganizationsNotInUseException':
                 self.results['hasOrganization'] = [-1, '']
                 return 0
-
+    
+    def _checkCURReport(self):
+        results = self.curClient.describe_report_definitions()
+        if len(results.get('ReportDefinitions')) == 0:
+            self.results['enableCURReport'] = [-1, '']
         
+        return
