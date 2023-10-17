@@ -301,15 +301,15 @@ class Ec2(Service):
         # ELB checks
         loadBalancers = self.getELB()
         for lb in loadBalancers:
-            print(f"... (ELB::Load Balancer) inspecting {lb['LoadBalancerName']}")
-            obj = Ec2ElbCommon(lb, self.elbClient, self.wafv2Client)
-            obj.run(self.__class__)
-            objs[f"ELB::{lb['LoadBalancerName']}"] = obj.getInfo()
-            
-            
             elbSGList = self.getELBSecurityGroup(lb)
             for group in elbSGList:
                 secGroups[group['GroupId']] = group
+            
+            print(f"... (ELB::Load Balancer) inspecting {lb['LoadBalancerName']}")
+            obj = Ec2ElbCommon(lb, elbSGList, self.elbClient, self.wafv2Client)
+            obj.run(self.__class__)
+            objs[f"ELB::{lb['LoadBalancerName']}"] = obj.getInfo()
+            
         
         # ELB classic checks
         lbClassic = self.getELBClassic()

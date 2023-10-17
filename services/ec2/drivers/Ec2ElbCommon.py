@@ -7,9 +7,10 @@ from services.Evaluator import Evaluator
 from services.ec2.drivers.Ec2SecGroup import Ec2SecGroup
 
 class Ec2ElbCommon(Evaluator):
-    def __init__(self, elb, elbClient, wafv2Client):
+    def __init__(self, elb, sgList, elbClient, wafv2Client):
         super().__init__()
         self.elb = elb
+        self.sgList = sgList
         self.wafv2Client = wafv2Client
         self.elbClient = elbClient
         self.init()
@@ -64,5 +65,32 @@ class Ec2ElbCommon(Evaluator):
         
         if 'WebACL' not in results:
             self.results['ELBEnableWAF'] = [-1, 'Disabled']
+        
+        return
+    
+    def _checkALBSGPortMatch(self):
+        ## NLB not supported
+        if self.elb['Type'] != 'application':
+            return
+        
+        arn = self.elb['LoadBalancerArn']
+        results = self.elbClient.describe_listeners(
+            LoadBalancerArn = arn
+        )
+        
+        portList = []
+        for listener in results.get('Listeners'):
+            portList.append(listener.get('Port'))
+            
+        unmatchPortList = portList
+        
+        flaggedSGs = []
+        for group in self.sgList:
+            for perm in group.get('IpPermissions'):
+                if perm.get('FromPort') != perm.get('ToPort') or perm.get('FromPort') not in portList:
+                    flaggedSGs.append(group.get('GroupId'))
+        
+        if len(flaggedSGs) > 0:
+            self.results['ELBSGRulesMatch'] = [-1, ', '.join(flaggedSGs)]
         
         return

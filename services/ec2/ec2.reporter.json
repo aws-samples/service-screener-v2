@@ -506,6 +506,19 @@
             "[AWS WAF for Applicatoin Load Balancers]<https://aws.amazon.com/blogs/aws/aws-web-application-firewall-waf-for-application-load-balancers/>"    
         ]
     },
+    "ELBSGRulesMatch": {
+        "category": "S",
+        "^description": "ALB Security Group Rules Configuration: {$COUNT} of Security Group in your ALBs has different port opened.",        
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "ALB SG Rules Config",
+        "ref": [
+            "[Security groups for Applicatoin Load Balancers]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-update-security-groups.html>"    
+        ]
+    },
     "ASGELBHealthCheckValidation": {
         "category": "O",
         "^description": "ELB Health Check Validation: {$COUNT} of your ASG have ELB health check enabled without ELB association.",        
