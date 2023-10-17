@@ -168,6 +168,19 @@
             "[Amazon EC2 public IP]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-9>"
         ]
     },
+    "EC2HasTag": {
+        "category": "O",
+        "^description": "EC2 without tagging: {$COUNT} of your instances has no tagging. Tag your EC2 instances.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "EC2 without tagging",
+        "ref": [
+            "[Tag your EC2 resources]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html>"
+        ]
+    },
     "EBSEncrypted": {
         "category": "S",
         "^description": "Storage Encyrption: {$COUNT} of EBS storage volumes are not encrypted. Enable encryption for EBS volumes to meet security and compliance requirements.",
