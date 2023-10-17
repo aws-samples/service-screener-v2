@@ -96,8 +96,11 @@ def formSummaryPrettyTable(tableType):
         totalRules = totalRules + totalPerService
         
         ## Does not matter, just need it to run once
+        sname = service
         if(tableType == 'PILLAR'):
-            info[service] = totalPerService
+            if sname == 'lambda_':
+                sname = 'lambda'
+            info[sname] = totalPerService
 
     if len(info) > 0:
         f = open("info.json", "w+")

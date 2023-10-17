@@ -431,7 +431,7 @@ class RdsCommon(Evaluator):
         
         ## check for right sizing
         if monthMax <= 50:
-            self.results['RightSizingCpuMonthMaxLT50pct'] = [-1, "Monthly Max CPU Util: {}%".format(monthMax)]
+            self.results['RightSizingCpuMonthMaxLT50pct'] = [-1, "Monthly Max CPU Util: {}%".format(round(monthMax, 100))]
             return 
         
         ## if not, trying to build manual rules for reviewing

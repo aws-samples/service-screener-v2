@@ -489,7 +489,7 @@
 	  "[Max Memory Guide (MSFT)]<https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/server-memory-server-configuration-options?view=sql-server-ver16#max_server_memory>"
     ]
   },
-  "MSSQL__ParamMaxMemoryTooLow":{
+  "MSSQL__ParamMaxMemoryTooHigh":{
     "category": "P",
     "^description": "[MSSQL Parameter] You have {$COUNT} MSSQL instances with configured maximum server memory values higher than the recommended value.",
     "downtime": 0,
