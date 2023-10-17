@@ -431,7 +431,7 @@
     "shortDesc": "Review SQL Edition",
     "ref": [
       "[RDS SQLServer EE]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_SQLServer.html#SQLServer.Concepts.General.FeatureSupport.Limits>",
-	  "[SQLServer Edition Comparison 2019]<https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2019?view=sql-server-ver16#Cross-BoxScaleLimits>
+	  "[SQLServer Edition Comparison 2019]<https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2019?view=sql-server-ver16#Cross-BoxScaleLimits>"
     ]
   },
   "MSSQL__EditionOversize": {
@@ -445,7 +445,7 @@
     "shortDesc": "Review SQL Edition",
     "ref": [
       "[RDS SQLServer EE]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/CHAP_SQLServer.html#SQLServer.Concepts.General.FeatureSupport.Limits>",
-	  "[SQLServer Edition Comparison 2019]<https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2019?view=sql-server-ver16#Cross-BoxScaleLimits>
+	  "[SQLServer Edition Comparison 2019]<https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2019?view=sql-server-ver16#Cross-BoxScaleLimits>"
     ]
   },
   "MSSQL__EE2017": {
@@ -458,8 +458,8 @@
     "criticality": "M",
     "shortDesc": "Review SQL Edition",
     "ref": [
-	  "[SQLServer 2019 Features Comparison]<https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2019?view=sql-server-ver15&preserve-view=true>,
-	  "[SQLServer 2017 Features Comparison]<https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2017?view=sql-server-2017&preserve-view=true>
+	  "[SQLServer 2019 Features Comparison]<https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2019?view=sql-server-ver15&preserve-view=true>",
+	  "[SQLServer 2017 Features Comparison]<https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2017?view=sql-server-2017&preserve-view=true>"
     ]
   },
   "MSSQLorPG__TransportEncrpytionDisabled":{
