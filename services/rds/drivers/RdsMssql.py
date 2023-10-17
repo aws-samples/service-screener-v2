@@ -4,8 +4,8 @@ from utils.Tools import _pr
 from .RdsCommon import RdsCommon
 
 class RdsMssql(RdsCommon):
-    def __init__(self, db, rdsClient, ctClient):
-        super().__init__(db, rdsClient, ctClient)
+    def __init__(self, db, rdsClient, ctClient, cwClient):
+        super().__init__(db, rdsClient, ctClient, cwClient)
         self.loadParameterInfo()
         
         self.getMSSQLEdition()
@@ -42,7 +42,8 @@ class RdsMssql(RdsCommon):
     def _checkParamCostThresholdParallelism(self):
         costT = self.dbParams['cost threshold for parallelism']
         recommendedThreshold = 50
-        if int(costT) < recommendedThreshold:
+        defaultThreshold = 5
+        if int(costT) <= defaultThreshold:
             self.results['MSSQL__ParamCostThresholdTooLow'] = [-1, "Recommended: >{}<br>Current:{}".format(recommendedThreshold, costT)]
     
     def _checkParamMaxServerMemory(self):
@@ -72,11 +73,13 @@ class RdsMssql(RdsCommon):
         
         ## Need to be review
         diff = (memRecommend - maxMemorySettings)/maxMemorySettings
+        
         if maxMemorySettings > memRecommend and diff < -0.1:
             self.results['MSSQL__ParamMaxMemoryTooHigh'] = [-1, "Recommended: {}<br>current: {}<br>diff: {}%".format(memRecommend, maxMemorySettings, round(diff*100, 2))]
         elif (memTotal <= 16 and diff > 0.2) or (memTotal > 16 and diff > 0.3):
             self.results['MSSQL__ParamMaxMemoryTooLow'] = [-1, "Recommended: {}<br>current: {}<br>diff: {}%".format(memRecommend, maxMemorySettings, round(diff*100, 2))]
-            
-    def _checkParamMaxWorkerThreads(self):
-        print(None)
-        # print(self.dbParams['max worker threads'])    
+    
+    def _checkParamMaxDOP(self):
+        maxDegreeParallism = self.dbParams['max degree of parallelism']
+        if maxDegreeParallism == 0:
+            self.results['MSSQL__ParamMaxDegreeParallism'] = [-1, 0]

@@ -10,20 +10,45 @@ from utils.Tools import _warn
 from services.Evaluator import Evaluator
 
 class RdsCommon(Evaluator):
-    def __init__(self, db, rdsClient, ctClient):
+    def __init__(self, db, rdsClient, ctClient, cwClient):
         self.dbParams = {}
         self.results = {}
         self.db = db
         self.rdsClient = rdsClient
+        self.cwClient = cwClient
         self.__configPrefix = 'rds::' + db['Engine'] + '::' + db['EngineVersion'] + '::'
         self.init()
         self.getInstInfo()
+        self.getCAInfo()
         self.loadParameterInfo()
         
         self.ctClient = ctClient
         
     def setEngine(self, engine):
         self.engine = engine
+        
+    def getCAInfo(self):
+        ca = self.db['CACertificateIdentifier']
+        k = 'RDSCaInfo::' + ca
+        
+        myCert = Config.get(k, None)
+        if myCert == None:
+            resp = self.rdsClient.describe_certificates(CertificateIdentifier=ca)
+            certInfo = resp.get('Certificates')
+            
+            for cert in certInfo:
+                diff = cert['ValidTill'].replace(tzinfo=None) - datetime.datetime.now()
+                
+                cert['expiredInDays'] = diff.days
+                cert['isExpireIn365days'] = False
+                if diff.days < 365:
+                    cert['isExpireIn365days'] = True
+                
+                myCert = cert
+                Config.set(k, cert)
+                break
+        
+        self.certInfo = myCert
         
     def showInfo(self):
         print("Identifier: " + self.db['DBInstanceIdentifier'] + "\n")
@@ -328,11 +353,15 @@ class RdsCommon(Evaluator):
         if days > 180:
             self.results['SnapshotTooOld'] = [-1, days]
             
+    def _checkCAExpiry(self):
+        if self.certInfo['isExpireIn365days'] == True:
+            exp = self.certInfo['ValidTill'].strftime("%Y-%m-%d")
+            self.results['CACertExpiringIn365days'] = [-1, "Expired on {}, ({} days left)".format(exp, self.certInfo['expiredInDays'])]
     
-    def check_free_storage(self):
-        cw_client = boto3.client('cloudwatch')
+    def _checkFreeStorage(self):
+        cw_client = self.cwClient
     
-        if not self.db['DBClusterIdentifier']:
+        if 'DBClusterIdentifier' in self.db:
             # Aurora Volume auto increase until 128TB as of 23/Sep/2021
             return
         else:
@@ -361,3 +390,132 @@ class RdsCommon(Evaluator):
         ratio = freesize / self.db['AllocatedStorage']
         if ratio < 0.2:
             self.results['FreeStorage20pct'] = [-1, str(ratio * 100) + ' / ' + str(freesize) + '(GB)']
+
+    def _checkCPUUtilization(self):
+        cwClient = self.cwClient
+        serverVCPU = self.instInfo['specification']['vcpu']
+        
+        metric = 'CPUUtilization'
+        dimensions = [
+            {
+                'Name': 'DBInstanceIdentifier',
+                'Value': self.db['DBInstanceIdentifier']
+            }    
+        ]
+        
+        dayInSecond=(60*60*24)
+        monthInSecond=dayInSecond*30
+        resp = cwClient.get_metric_statistics(
+            Dimensions=dimensions,
+            Namespace='AWS/RDS',
+            MetricName=metric,
+            StartTime=int(time.time()) - monthInSecond,
+            EndTime=int(time.time()),
+            Period=dayInSecond,
+            Statistics=['Minimum', 'Maximum', 'Average']
+        )
+        dailyDp = resp.get('Datapoints')
+        
+        resp = cwClient.get_metric_statistics(
+            Dimensions=dimensions,
+            Namespace='AWS/RDS',
+            MetricName=metric,
+            StartTime=int(time.time()) - monthInSecond,
+            EndTime=int(time.time()),
+            Period=monthInSecond,
+            Statistics=['Minimum', 'Maximum', 'Average']
+        )
+        monthDp = resp.get('Datapoints')
+        monthAverage = monthDp[0]['Average']
+        monthMax = monthDp[0]['Maximum']
+        
+        ## check for right sizing
+        if monthMax <= 50:
+            self.results['RightSizingCpuMonthMaxLT50pct'] = [-1, "Monthly Max CPU Util: {}%".format(monthMax)]
+            return 
+        
+        ## if not, trying to build manual rules for reviewing
+        maxCnt = 0
+        avgCnt = 0
+        minCnt = 0
+        for dp in dailyDp:
+            if dp['Maximum'] > 70:
+                maxCnt = maxCnt + 1
+            if dp['Average'] < 30:
+                avgCnt = avgCnt + 1
+            if dp['Minimum'] < 3:
+                minCnt = minCnt + 1
+        
+        ## High CPU
+        if avgCnt < 10 and maxCnt > 10:
+            #do ntg
+            maxCnt 
+        ## Low CPU on average
+        elif minCnt >= 25 and avgCnt >= 20:
+            self.results['RightSizingCpuLowUsageDetected'] = [-1, "MinCPU < 5% for {} days<br>AvgCPU < 30% for {}days".format(minCnt, avgCnt)]
+        ## weekly spike once
+        elif maxCnt >= 4 and maxCnt <= 7 and minCnt >= 20 and avgCnt >= 15:
+            self.results['RightSizingCpuLowUsageDetectedWithWeeklySpike'] = [-1, "MinCPU < 5% for {} days<br>AvgCPU < 30% for {}days<br>MaxCPU > 70%  for {}days".format(minCnt, avgCnt, maxCnt)]
+
+    def _checkFreeMemory(self):
+        cwClient = self.cwClient
+        metric = 'FreeableMemory'
+        dimensions = [
+            {
+                'Name': 'DBInstanceIdentifier',
+                'Value': self.db['DBInstanceIdentifier']
+            }    
+        ]
+        
+        rawToGBRatio=1024*1024*1024
+        
+        ## Past 24 hours, might recovers back
+        dayInSecond=(60*60*24)
+        resp = cwClient.get_metric_statistics(
+            Dimensions=dimensions,
+            Namespace='AWS/RDS',
+            MetricName=metric,
+            StartTime=int(time.time()) - dayInSecond,
+            EndTime=int(time.time()),
+            Period=dayInSecond,
+            Statistics=['Minimum', 'Maximum', 'Average']
+        )
+        
+        dp = resp.get('Datapoints')
+        
+        serverGB = self.instInfo['specification']['memoryInGiB']
+        freeMemoryMin = dp[0]['Minimum'] / rawToGBRatio
+        freeMemoryMax = dp[0]['Maximum'] / rawToGBRatio
+        freeMemoryAvg = dp[0]['Average'] / rawToGBRatio
+        
+        freeMemoryMinRatio = freeMemoryMin/serverGB
+        freeMemoryMaxRatio = freeMemoryMax/serverGB
+        freeMemoryAvgRatio = freeMemoryAvg/serverGB
+        
+        monthInSecond = dayInSecond*30
+        resp = cwClient.get_metric_statistics(
+            Dimensions=dimensions,
+            Namespace='AWS/RDS',
+            MetricName=metric,
+            StartTime=int(time.time()) - monthInSecond,
+            EndTime=int(time.time()),
+            Period=monthInSecond,
+            Statistics=['Minimum', 'Maximum', 'Average']
+        )
+        
+        dp = resp.get('Datapoints')
+        freeMemoryMthMin = dp[0]['Minimum'] / rawToGBRatio
+        freeMemoryMthMax = dp[0]['Maximum'] / rawToGBRatio
+        freeMemoryMthAvg = dp[0]['Average'] / rawToGBRatio
+        freeMemoryMthMinRatio = freeMemoryMthMin/serverGB
+        freeMemoryMthMaxRatio = freeMemoryMthMax/serverGB
+        freeMemoryMthAvgRatio = freeMemoryMthAvg/serverGB
+        
+        # Less than 10%
+        if freeMemoryMinRatio < 0.1:
+            self.results['FreeMemoryLessThan10pct'] = [-1, "FreeableMemory: {}GB, %remains: {}".format(freeMemoryMin, round(freeMemoryMinRatio*100))]
+            
+            if freeMemoryMaxRatio - freeMemoryMinRatio > 0.5:
+                self.results['FreeMemoryDropMT50pctIn24hours'] = [-1, "Max FreeMemory: {}GB, Min FreeMemory {}GB".format(freeMemoryMax, freeMemoryMin)]
+        elif freeMemoryMthMinRatio > 0.60 and freeMemoryMthAvgRatio > 0.60:
+            self.results['RightSizingMemoryMonthMinMT60pct'] = [-1, "Monthly<br>Min FreeMemory: {}%, Avg FreeMemory {}%".format(round(freeMemoryMinRatio*100, 1), round(freeMemoryAvgRatio*100, 1))]
