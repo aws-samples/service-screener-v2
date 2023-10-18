@@ -38,7 +38,7 @@
       "10": ["lambda.lambdaPublicAccess"],
       "11": ["kms.KeyRotationEnabled"],
       "12": ["kms.AdminIsGrantor"],
-      "13": ["rds.SnapshotIsPublic", "ec2.snapshotEBSIsPublic"],
+      "13": ["rds.SnapshotRDSIsPublic", "ec2.snapshotEBSIsPublic"],
       "14": ["ec2.ELBSGRulesMatch"],
       "15": ["ec2.SQLServerEOL"],
       "16": ["rds.PubliclyAccessible", "rds.SecurityGroupIPRangeNotPrivateCidr"]
