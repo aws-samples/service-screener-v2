@@ -125,7 +125,7 @@ class RdsCommon(Evaluator):
             publicSnapshots = resp.get('DBSnapshots')
             
         if len(publicSnapshots) > 0:
-            self.results['SnapshotIsPublic'] = [-1, "At least " + str(len(publicSnapshots))]
+            self.results['SnapshotRDSIsPublic'] = [-1, "At least " + str(len(publicSnapshots))]
     
     ## Move from MSSQL to Common as Postgres has similar settings
     def _checkSSLParams(self):

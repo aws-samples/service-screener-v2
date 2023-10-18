@@ -212,7 +212,7 @@
       "[RDS Master Accounts]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.MasterAccounts.html>"
     ]
   },
-  "SnapshotIsPublic":{
+  "SnapshotRDSIsPublic":{
     "category": "S",
     "^description": "[RDS Snapshot] {$COUNT} of your RDS is having at least 1 public snapshot.If you share an unencrypted manual snapshot as public, this makes the snapshot available to all AWS accounts. This may result in unintended data exposure of your RDS instance.",
     "downtime": 0,
