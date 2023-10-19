@@ -57,7 +57,7 @@
             "[Latest memcached supported nodes]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/CacheNodes.SupportedTypes.html>"
         ]
     },
-    "RinstanceType": {
+    "RInstanceType": {
         "category": "PCS",
         "^description": "You have {$COUNT} instances not running on R instance (Memory-Optimised). It is recommended to use R instance for better performance over cost efficiency. (Only flagged this when you are running instance with more than 8GB ram)",
         "shortDesc": "Use R instance type",

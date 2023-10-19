@@ -44,7 +44,7 @@ class ElasticacheCommon(Evaluator):
     def _checkRInstanceFamily(self):
         instance_type = self.cluster.get('CacheNodeType').lstrip('cache.')
         if instance_type[0] != 'r':
-            self.results['RinstanceType'] = [-1, instance_type]
+            self.results['RInstanceType'] = [-1, instance_type]
 
     def _checkLatestInstanceFamily(self):
         instance_type = self.cluster.get('CacheNodeType').lstrip('cache.')
