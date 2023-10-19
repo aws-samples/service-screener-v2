@@ -108,6 +108,9 @@ The report provides you an easy-to-navigate dashboard of the various best-practi
 
 Use the left navigation bar to explore the checks per service. You can then expand on each check to read a description of the check, find out which resources were highlighted, and read a recommendation on how to remediate the finding.  
 
+## Sample Report
+See [SAMPLE REPORT](https://bit.ly/ssv2demo) for the sample report
+
 ## Contributing to service-screener
 We encourage public contributions! Please review [CONTRIBUTING](./CONTRIBUTING.md) for details on our code of conduct and development process.
 
