@@ -61,12 +61,12 @@ class FrameworkPageBuilder(PageBuilder):
         self.fwDetail = detailArr
     
     def initJSLib(self):
-        pref = 'plugins/datatables'
+        pref = '../res/plugins/datatables'
         for js in self.FRAMEWORK_JS_LIB:
             self.addJSLib(pref + js)
     
     def initCSS(self):
-        pref = "plugins/datatables-"
+        pref = "../res/plugins/datatables-"
         for css in self.FRAMEWORK_CSS_LIB:
             self.addCSSLib(pref + css)
         pass

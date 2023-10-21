@@ -236,6 +236,7 @@
     "shortDesc": "Set value to ON",
     "ref": [
       "[RDS MySQL Autocommit]<https://docs.aws.amazon.com/whitepapers/latest/amazon-aurora-mysql-db-admin-handbook/transaction-management-and-autocommit.html>"
+    ]
   },
   "MYSQL__parammInnodbStatsPersistent":{
     "category": "P",
@@ -248,6 +249,7 @@
     "shortDesc": "Set value to ON",
     "ref": [
       "[Aurora_Lab_Mode]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Updates.LabMode.html>"
+    ]
   },
   "MYSQLA__paramAuroraLabMode":{
     "category": "P",

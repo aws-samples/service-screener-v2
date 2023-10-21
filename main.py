@@ -86,6 +86,32 @@ if len(_cli_options['frameworks']) > 0:
 tempConfig = _AWS_OPTIONS.copy();
 tempConfig['region'] = regions[0]
 
+## Test with CrossRoles
+## REMEMBER TO DELETE
+## REMEMBER TO DELETE
+## REMEMBER TO DELETE
+## REMEMBER TO DELETE
+## REMEMBER TO DELETE
+## REMEMBER TO DELETE
+## TO BE DELETE
+'''
+sts = boto3.client('sts')
+resp = sts.assume_role(RoleArn = 'arn:aws:iam::193657562131:role/screener-test-assume-role', RoleSessionName = 'XXX')
+ 
+boto3.setup_default_session(aws_access_key_id=resp['Credentials']['AccessKeyId'],
+                  aws_secret_access_key=resp['Credentials']['SecretAccessKey'],
+                  aws_session_token=resp['Credentials']['SessionToken'])
+'''
+## REMEMBER TO DELETE
+## REMEMBER TO DELETE
+## REMEMBER TO DELETE
+## REMEMBER TO DELETE
+## REMEMBER TO DELETE
+## REMEMBER TO DELETE
+## REMEMBER TO DELETE
+## REMEMBER TO DELETE
+## REMEMBER TO DELETE
+
 Config.setAccountInfo(tempConfig)
 contexts = {}
 serviceStat = {}
@@ -96,6 +122,7 @@ oo = Config.get('_AWS_OPTIONS')
 if testmode == False:
     CfnFaker = CfnFaker()
     CfnFaker.createStack()
+    CfnFaker.deleteStack()
 
 overallTimeStart = time.time()
 # os.chdir('__fork')
@@ -117,7 +144,7 @@ for service in services:
     input_ranges = [(service, regions, filters) for service in services]
 
 # pool = Pool(processes=len(services))
-pool = Pool(processes=4)
+pool = Pool(processes=2)
 pool.starmap(Screener.scanByService, input_ranges)
 
 ## <TODO>
@@ -199,7 +226,6 @@ Config.set('cli_regions', regions)
 Config.set('cli_frameworks', frameworks)
 
 Screener.generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS3, bucket)
-CfnFaker.deleteStack()
 
 os.chdir(_C.FORK_DIR)
 filetodel = _C.FORK_DIR + '/tail.txt'
