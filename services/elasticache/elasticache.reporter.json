@@ -72,8 +72,8 @@
     },
     "EncInTransitAndRest": {
         "category": "S",
-        "^description": "toImplement",
-        "shortDesc": "toImplement",
+        "^description": "Encryption in Transit: {$COUNT} of ElastiCache are not enable encryption in transit",
+        "shortDesc": "Encryption in Transit",
         "criticality": "L",
         "downtime": 0,
         "slowness": 0,
@@ -88,8 +88,8 @@
     },
     "DefaultParamGroup": {
         "category": "O",
-        "^description": "todo",
-        "shortDesc": "Customise Parameter Group",
+        "^description": "Customize Parameter Group: {$COUNT} of ElastiCache are using default parameter group. Please review and configure suitable parameter.",
+        "shortDesc": "Customize Parameter Group",
         "criticality": "I",
         "downtime": 0,
         "slowness": 0,
@@ -100,6 +100,45 @@
             "[New Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/GettingStarted.CreateCluster.html>",
             "[Modify Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/Clusters.Modify.html>",
             "[Modify Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Clusters.Modify.html>"
+        ]
+    },
+    "EnableNotification":{
+        "category": "O",
+        "^description": "Enable Notification: {$COUNT} of ElastiCache have not configure notification.",
+        "shortDesc": "Enable Notification",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Managing ElastiCache Notification]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/ECEvents.SNS.html>"
+        ]
+    },
+    "EnableReadReplica":{
+        "category": "P",
+        "^description": "Enable Read Replica: {$COUNT} of ElastiCache have no replica nodes. Leverage Read Replica to gain better performance",
+        "shortDesc": "Enable Read Replica",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Changing Number of Replicas]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/increase-decrease-replica-count.html>"
+        ]
+    },
+    "EnableSlowLog":{
+        "category": "P",
+        "^description": "Enable Slow Log: {$COUNT} of ElastiCache have not enable Slow Log.",
+        "shortDesc": "Enable Slow Log",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[ElastiCache Redis Log Delivery]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Log_Delivery.html>"
         ]
     }
 }

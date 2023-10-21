@@ -8,7 +8,6 @@ class ElasticacheRedis(ElasticacheCommon):
         # self.init()
 
     def _checkDefaultPort(self):
-        
         ## Error handling when cluster is creating
         if self.cluster.get('CacheClusterStatus') in ['creating', 'deleting', 'deleted']:
             return

@@ -50,3 +50,8 @@ class ElasticacheCommon(Evaluator):
         instance_type = self.cluster.get('CacheNodeType').lstrip('cache.')
         if instance_type.split('.')[0] not in self.driver_info.get('latest_instances').get(self.cluster.get('Engine')):
             self.results['LatestInstance'] = [-1, instance_type]
+
+    def _checkClusterNotification(self):
+        if self.cluster.get('NotificationConfiguration') is None:
+            self.results['EnableNotification'] = [-1, '']
+        return
