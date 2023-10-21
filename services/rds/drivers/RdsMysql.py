@@ -30,3 +30,27 @@ class RdsMysql(RdsCommon):
         ps = self.dbParams.get('performance_schema', False)
         if not ps:
             self.results['MYSQL__PerfSchema'] = [-1, ps]
+            
+    def _checkParamQueryCacheType(self):
+        tt = self.dbParams.get('query_cache_type', None)
+        if tt in [None, 'off', '0']:
+            if self.engine == 'aurora-mysql':
+                self.results['MYSQLA__paramQueryCacheType'] = [-1, tt]
+        else:
+            if self.engine == 'mysql':
+                self.results['MYSQL__paramQueryCacheType'] = [-1, tt]
+
+    def _checkParamAuroraLabMode(self):
+        lm = self.dbParams.get('aurora_lab_mode', None)
+        if lm in (True, '1', 1, 'on'):
+            self.results['MYSQLA__paramAuroraLabMode'] = [-1, lm]
+            
+    def _checkParamInnodbStats(self):
+        innodbStats = self.dbParams.get('innodb_stats_persistent', None)
+        if innodbStats in (None,  'OFF', 0, '0'):
+            self.results['MYSQL__parammInnodbStatsPersistent'] = [-1, innodbStats]
+    
+    def _checkParamAutoCommit(self):
+        ac = self.dbParams.get('autocommit', None)
+        if ac in (None,  'OFF', 0, '0'):
+            self.results['MYSQL__parammAutoCommit'] = [-1, ac]

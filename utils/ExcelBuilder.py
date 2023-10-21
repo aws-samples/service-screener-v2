@@ -4,7 +4,7 @@ from datetime import datetime, date
 from utils.Config import Config, dashboard
 
 class ExcelBuilder:
-    XLSX_FILENAME = 'adminlte/html/workItem.xlsx'
+    # XLSX_FILENAME = 'adminlte/html/workItem.xlsx'
     XLSX_CREATOR = "Service Screener - AWS Malaysia"
     XLSX_TITLE = "Service Screener WorkList"
     SHEET_TRACKER = []
@@ -18,6 +18,9 @@ class ExcelBuilder:
     ]]
     
     def __init__(self, accountId, ssParams):
+        acctPath = Config.get('HTML_ACCOUNT_FOLDER_PATH')
+        self.XLSX_FILENAME = acctPath + '/workItem.xlsx'
+        
         self.obj = xlsxwriter.Workbook(self.XLSX_FILENAME)
         self.accountId = accountId
         self.ssParams = ssParams

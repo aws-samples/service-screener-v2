@@ -1,10 +1,10 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
-  <link rel="stylesheet" href="plugins/fontawesome-free/css/all.min.css">
   <link rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
-  <link rel="stylesheet" href="plugins/icheck-bootstrap/icheck-bootstrap.min.css">
-  <link rel="stylesheet" href="dist/css/adminlte.min.css">
-  <link rel="stylesheet" href="plugins/overlayScrollbars/css/OverlayScrollbars.min.css">
-  <link rel="stylesheet" href="plugins/select2/css/select2.min.css">
+  <link rel="stylesheet" href="../res/plugins/fontawesome-free/css/all.min.css">
+  <link rel="stylesheet" href="../res/plugins/icheck-bootstrap/icheck-bootstrap.min.css">
+  <link rel="stylesheet" href="../res/dist/css/adminlte.min.css">
+  <link rel="stylesheet" href="../res/plugins/overlayScrollbars/css/OverlayScrollbars.min.css">
+  <link rel="stylesheet" href="../res/plugins/select2/css/select2.min.css">
 </head>
 <body class="hold-transition sidebar-mini layout-navbar-fixed">
 <div class="wrapper">
@@ -16,12 +16,20 @@
         <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
       </li>
       <li class="nav-item d-none d-sm-inline-block">
-        <a href="https://github.com/aws-samples/service-screener" target=_blank rel="noopener noreferrer" class="nav-link">Visit Github</a>
+        <a href="https://github.com/aws-samples/service-screener-v2" target=_blank rel="noopener noreferrer" class="nav-link">Visit Github</a>
       </li>
     </ul>
 
     <!-- Right navbar links -->
     <ul class="navbar-nav ml-auto">
+      <li class="nav-item d-none d-sm-inline-block">
+        <span class="nav-link">Change Account ID: </span>
+      </li>
+      <li class="nav-item">
+        <select class="form-control" id='changeAcctId'>
+          {$OPTIONS_ACCOUNTS}
+        </select>
+      </li>
       <li class="nav-item">
         <a class="nav-link" data-widget="fullscreen" href="#" role="button">
           <i class="fas fa-expand-arrows-alt"></i>

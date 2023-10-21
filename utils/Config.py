@@ -1,6 +1,7 @@
 import traceback
 import os
 import boto3
+import constants as _C
 
 class Config:
     AWS_SDK = {
@@ -49,6 +50,12 @@ class Config:
         }
 
         Config.set('stsInfo', stsInfo)
+        acctId = stsInfo['Account']
+        
+        adir = 'adminlte/aws/' + acctId[0:-2] + 'XX'
+        
+        Config.set('HTML_ACCOUNT_FOLDER_FULLPATH', _C.ROOT_DIR + '/' + adir)
+        Config.set('HTML_ACCOUNT_FOLDER_PATH', adir)
        
     @staticmethod 
     def set(key, val):
