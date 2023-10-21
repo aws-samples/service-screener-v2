@@ -185,6 +185,10 @@ class RdsCommon(Evaluator):
             if 'default.' in param['DBParameterGroupName']:
                 self.results['DefaultParams'] = [-1, param['DBParameterGroupName']]
 
+    def _checkMonitoringIntervals(self):
+        if self.db['MonitoringInterval'] > 30 or self.db['MonitoringInterval'] == 0:
+            self.results['MonitoringIntervalTooLow'] = [-1, self.db['MonitoringInterval']]
+
     def _checkHasEnhancedMonitoring(self):
         flag = 1 if 'EnhancedMonitoringResourceArn' in self.db else -1
         self.results['EnhancedMonitor'] = [flag, 'On' if flag == -1 else 'Off']
@@ -350,8 +354,8 @@ class RdsCommon(Evaluator):
             if len(snapshots) > 5:
                 self.results['SnapshotTooMany'] = [-1, len(snapshots)]
         
-        if days > 180:
-            self.results['SnapshotTooOld'] = [-1, days]
+            if days > 180:
+                self.results['SnapshotTooOld'] = [-1, days]
             
     def _checkCAExpiry(self):
         if self.certInfo['isExpireIn365days'] == True:

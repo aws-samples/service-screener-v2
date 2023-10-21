@@ -24,6 +24,15 @@ class RdsMssql(RdsCommon):
             self.results['MSSQL__EngineHasMultiAZSupport'] = [-1,engine]
 
     def _checkEntSpecs(self):
+        # if engine.find('sqlserver') != -1:
+        ## Skip RDS Custom checks on this
+        if self.sqlEdition.find('custom') == 1:
+            return
+        if self.sqlEdition in ['ex', 'web']:
+            self.results['MSSQL_EditionIsWebOrExpress'] = [-1, self.sqlEdition]
+            return
+
+    def _checkEntSpecs(self):
         if self.sqlEdition == 'ee':
             if self.instInfo['specification']['vcpu'] <= 48 or self.instInfo['specification']['memoryInGiB'] <= 128:
                 self.results['MSSQL__EEUnderSize'] = [-1, self.db['DBInstanceClass']]

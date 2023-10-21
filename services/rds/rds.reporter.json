@@ -225,6 +225,69 @@
       "[RDS Master Accounts]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.MasterAccounts.html>"
     ]
   },
+  "MYSQL__parammAutoCommit":{
+    "category": "R",
+    "^description": "[MySQL Parameter] {$COUNT} of your RDS MySQL resources including RDS instances, RDS Aurora instances, and RDS Aurora clusters are running with autocommit disabled. When autocommit is enabled, MySQL automatically commits transactions. Switching off may have an impact on how your applications transactions are committed and can cause functional isssue. You should do proper functional testing when changing this parameter. For Aurora MySQL clusters, this parameter can be changed in DB Parameter Group for instance or DB Cluster Parameter group attached to cluster level. If you have already set it at cluster level, it will be applicable to all instances in the cluster and this recommendation can be ignored for those instances.",
+    "downtime": 1,
+    "slowness": -1,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "L",
+    "shortDesc": "Set value to ON",
+    "ref": [
+      "[RDS MySQL Autocommit]<https://docs.aws.amazon.com/whitepapers/latest/amazon-aurora-mysql-db-admin-handbook/transaction-management-and-autocommit.html>"
+  },
+  "MYSQL__parammInnodbStatsPersistent":{
+    "category": "P",
+    "^description": "[MySQL Parameter] {$COUNT} of your RDS MySQL resources including RDS instances, RDS Aurora instances, and RDS Aurora clusters are running with innodb_stats_persistent switched off. Setting it ON (default) ensures that optimizer statistics that are persisted across instance restart. This can be helpful in debugging performance issues. For Aurora MySQL clusters, this parameter can be changed in DB Parameter Group for instance or DB Cluster Parameter group attached to cluster level. If you have already set it at cluster level, it will be applicable to all instances in the cluster and this recommendation can be ignored for those instances.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "L",
+    "shortDesc": "Set value to ON",
+    "ref": [
+      "[Aurora_Lab_Mode]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Updates.LabMode.html>"
+  },
+  "MYSQLA__paramAuroraLabMode":{
+    "category": "P",
+    "^description": "[MySQL Aurora Parameter] {$COUNT} of your production RDS MySQL resources including RDS instances, RDS Aurora instances, and RDS Aurora clusters are running with Aurora Lab Mode (aurora_lab_mode) switched on. aurora_lab_mode is by default off and can be enabled to enable Aurora features that are available in the current Aurora database version, but are not enabled by default. While Aurora lab mode features are not recommended for use in production DB clusters, you can use Aurora lab mode to enable these features for DB clusters in your development and test environments. This parameter can be set at both instance level and cluster level. You should ideally keep it off at instance as well as at cluster level.",
+    "downtime": 1,
+    "slowness": -1,
+    "additionalCost": -1,
+    "needFullTest": 1,
+    "criticality": "L",
+    "shortDesc": "Set value to 1",
+    "ref": [
+      "[Aurora_Lab_Mode]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Updates.LabMode.html>"
+    ]
+  },
+  "MYSQLA__paramQueryCacheType":{
+    "category": "P",
+    "^description": "[MySQL Aurora Parameter] {$COUNT} of your RDS Aurora MySQL instances and clusters have Query Cache disabled. Disabling query caching in Aurora might affect database performance if your workload reuses queries, like repeatable SQL statements. However, it's fine to disable the query cache if you know that your workload doesn't benefit from it. You can see query cache use in the output of a SHOW STATUS command under the 'Qcache' section. This parameter can be changed in DB Parameter Group for instance or DB Cluster Parameter group attached to cluster level. If you have already set it at cluster level, it will be applicable to all instances in the cluster and this recommendation can be ignored for those instances.",
+    "downtime": 1,
+    "slowness": -1,
+    "additionalCost": -0,
+    "needFullTest": 1,
+    "criticality": "L",
+    "shortDesc": "Set value to 1",
+    "ref": [
+      "[Aurora MySQL Parameter Tuning]<https://aws.amazon.com/blogs/database/best-practices-for-amazon-aurora-mysql-database-configuration/>"
+    ]
+  },
+  "MYSQL__paramQueryCacheType":{
+    "category": "P",
+    "^description": "[MySQL Parameter] {$COUNT} of your RDS MySQL instance has Query Cache enabled. Enabling query cache can have a negative impact on the performance of MySQL instace. We recommend that you switch it off. You should throughly test the impact of this parameter on your workload before changing it in production.",
+    "downtime": 1,
+    "slowness": -1,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "L",
+    "shortDesc": "Set value to 0",
+    "ref": [
+      "[RDS MySQL Parameters Tuning]<https://aws.amazon.com/blogs/database/best-practices-for-configuring-parameters-for-amazon-rds-for-mysql-part-1-parameters-related-to-performance/>"
+    ]
+  },
   "MYSQL__param_syncBinLog":{
     "category": "R",
     "^description": "[Transaction Durability] {$COUNT} of your RDS MySQL RDS instances are running with <b>sync_binlog</b> set to less durable setting. This parameter ensures that transaction commits are made durable to binlog synchronously before commit is confirmed. Switching off this parameter can offer performance gain but increases risk of data loss. You should test the impact of this parameter on your performance and RPO before making changes.",
@@ -325,7 +388,7 @@
     "criticality": "L",
     "shortDesc": "Set non-zero value",
     "ref": [
-      "[What Is]<https://postgresqlco.nf/doc/en/param/log_temp_files/>"
+      "[Postgres Param: log_temp_files]<https://postgresqlco.nf/doc/en/param/log_temp_files/>"
     ]
   },
   "PG__param_tempFileLimit":{
@@ -338,7 +401,7 @@
     "criticality": "L",
     "shortDesc": "Set non-zero value",
     "ref": [
-      "[What Is]<https://postgresqlco.nf/doc/en/param/log_temp_files/>"
+      "[Postgres Param: log_temp_files]<https://postgresqlco.nf/doc/en/param/log_temp_files/>"
     ]
   },
   "PG__param_rdsAutoVacuum":{
@@ -351,7 +414,7 @@
     "criticality": "L",
     "shortDesc": "Set to 'warning'",
     "ref": [
-      "[What Is]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.Autovacuum.html>"
+      "[Postgres Param: Auto Vacuum]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.Autovacuum.html>"
     ]
   },
   "PG__param_autoVacDuration":{
@@ -364,7 +427,7 @@
     "criticality": "L",
     "shortDesc": "Set non-zero value",
     "ref": [
-      "[What Is]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.Autovacuum.html>"
+      "[Postgres Param: Autovacuum]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Appendix.PostgreSQL.CommonDBATasks.Autovacuum.html>"
     ]
   },
   "PG__param_trackIoTime":{
@@ -377,7 +440,7 @@
     "criticality": "L",
     "shortDesc": "Set non-zero value",
     "ref": [
-      "[What Is]<https://postgresqlco.nf/doc/en/param/track_io_timing/>"
+      "[Postgres Param: track_io_timing]<https://postgresqlco.nf/doc/en/param/track_io_timing/>"
     ]
   },
   "PG__param_logStatement":{
@@ -390,7 +453,46 @@
     "criticality": "L",
     "shortDesc": "Set value to: 'ddl' or 'none'",
     "ref": [
-      "[What Is]<https://postgresqlco.nf/doc/en/param/log_statement/>"
+      "[Postgres Param: log_statement]<https://postgresqlco.nf/doc/en/param/log_statement/>"
+    ]
+  },
+  "PG__param_trackActivities":{
+    "category": "O",
+    "^description": "[Logging] {$COUNT} of your RDS PostgreSQL resources including RDS instances, RDS Aurora instances, and RDS Aurora clusters are running with track_activities switched off. track_activities is useful for debugging performance issues and also important for activity tracking which is used by Performance Insights. For Aurora PostgreSQL clusters, this parameter can be changed in DB Parameter Group for instance or DB Cluster Parameter group attached to cluster level. If you have already set it at cluster level, it will be applicable to all instances in the cluster and this recommendation can be ignored for those instances.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "criticality": "L",
+    "shortDesc": "Set value to: 1",
+    "ref": [
+      "[Postgres Param: runtime-config]<https://www.postgresql.org/docs/current/runtime-config-statistics.html>"
+    ]
+  },
+  "PG__param_trackCounts":{
+    "category": "O",
+    "^description": "[Logging] {$COUNT} of your RDS PostgreSQL resources including RDS instances, RDS Aurora instances, and RDS Aurora clusters are running with track_counts switched off. track_counts is useful for debugging performance issues and also needed for autovacuum to work properly. For Aurora PostgreSQL clusters, this parameter can be changed in DB Parameter Group for instance or DB Cluster Parameter group attached to cluster level. If you have already set it at cluster level, it will be applicable to all instances in the cluster and this recommendation can be ignored for those instances.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "L",
+    "shortDesc": "Set value to: 1",
+    "ref": [
+      "[Postgres Param: runtime-config]<https://www.postgresql.org/docs/current/runtime-config-statistics.html>"
+    ]
+  },
+  "PG__param_synchronousCommit":{
+    "category": "P",
+    "^description": "[Logging] {$COUNT} of your RDS PostgreSQL resources including RDS instances, RDS Aurora instances, and RDS Aurora clusters are running with synchronous_commit switched off. This parameter ensures that PostgreSQL writes transactions to WAL upon every commit. In case of Aurora this parameter ensures that every commit will wait for acknowledgement from a quorum of 4 out of 6 storage copies. Switching off this parameter can offer performance gain but increases risk of data loss.",
+    "downtime": 0,
+    "slowness": 1,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "criticality": "L",
+    "shortDesc": "Set value to: 1",
+    "ref": [
+      "[Postgres Param: synchrounous commit]<https://postgresqlco.nf/doc/en/param/synchronous_commit/>"
     ]
   },
   "Aurora__ClusterSize":{
@@ -529,6 +631,32 @@
     "ref": [
       "[MAXDOP Guide (AWS)]<https://docs.aws.amazon.com/prescriptive-guidance/latest/sql-server-ec2-best-practices/maxdop.html>",
 	  "[MAXDOP Guide (MSFT)]<https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/configure-the-max-degree-of-parallelism-server-configuration-option?view=sql-server-ver16#considerations>"
+    ]
+  },
+  "MSSQL_EditionIsWebOrExpress":{
+    "category": "P",
+    "^description": "[MSSQL Edition] {$COUNT} of your SQL Server instances which are identified as PROD environment are using SQL Server Express Edition or SQL Server Web Edition. These editions of SQL Server don't offer Multi-AZ support. For production workload you should consider using SQL Server Enterprise Edition or SQL Server Standard Edition with multi-AZ support.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "criticality": "L",
+    "shortDesc": "Avoid Express or Web edition for Prod",
+    "ref": [
+      "[SQL Server Edition Comparison, E2022 (MSFT)]<https://learn.microsoft.com/en-us/sql/sql-server/editions-and-components-of-sql-server-2022?view=sql-server-ver16>"
+    ]
+  },
+  "MonitoringIntervalTooLow":{
+    "category": "O",
+    "^description": "[OS Monitoring] {$COUNT} of your instances have sub-optimal settings for Enhanced Monitoring. Enable Enhanced Monitoring for all your production instances with at least 30 seconds monitoring interval. Enhanced Monitoring uses an agent to collect information that is stored in CloudWatch.  Lower granularity allows more details to be collected, which can be helpful while debugging performance issues. Enabling Enhanced Monitoring will lead to additional cost for CloudWatch. More granularity causes more details to be logged to CloudWatch.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "criticality": "L",
+    "shortDesc": "Setup with sub-optimal setting for Enhanced Monitoring",
+    "ref": [
+      "[RDS Enhanced Monitoring]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Monitoring.OS.overview.html>"
     ]
   },
   "CACertExpiringIn365days": {
