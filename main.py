@@ -1,5 +1,6 @@
 import time
 import os
+import shutil
 import json
 import locale
 from multiprocessing import Pool
@@ -84,8 +85,8 @@ if len(_cli_options['frameworks']) > 0:
 
 tempConfig = _AWS_OPTIONS.copy();
 tempConfig['region'] = regions[0]
-Config.setAccountInfo(tempConfig)
 
+Config.setAccountInfo(tempConfig)
 contexts = {}
 serviceStat = {}
 # GLOBALRESOURCES = []
@@ -158,21 +159,21 @@ print("Time consumed (seconds): " + str(timespent))
 
 # Cleanup
 # os.chdir(_C.HTML_DIR)
-filetodel = _C.HTML_DIR + '/error.txt'
+filetodel = _C.HTMLRES_DIR + '/error.txt'
 if os.path.exists(filetodel):
     os.remove(filetodel)
 
-directory = _C.HTML_DIR
+directory = _C.ADMINLTE_DIR
 files_in_directory = os.listdir(directory)
-filtered_files = [file for file in files_in_directory if file.endswith(".html")]
-for file in filtered_files:
-	path_to_file = os.path.join(directory, file)
-	os.remove(path_to_file)
+filtered_folders = [folder for folder in files_in_directory if folder.endswith("XX")]
+for folder in filtered_folders:
+	path_to_folder = os.path.join(directory, folder)
+	shutil.rmtree(path_to_folder)
 
 src = _C.FORK_DIR + '/error.txt'
 if os.path.exists(src):
     # os.chdir(_C.FORK_DIR)
-    dest = _C.HTML_DIR + '/error.txt'
+    dest = _C.HTMLRES_DIR + '/error.txt'
     os.rename(src, dest)
     # os.system('mv error.txt ' + _C.HTML_DIR + '/error.txt')
 

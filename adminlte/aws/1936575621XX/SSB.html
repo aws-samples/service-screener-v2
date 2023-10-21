@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Service Screener | SSB</title>
+<link rel='stylesheet' href='plugins/datatables-bs4/css/dataTables.bootstrap4.min.css'>
+<link rel='stylesheet' href='plugins/datatables-responsive/css/responsive.bootstrap4.min.css'>
+<link rel='stylesheet' href='plugins/datatables-buttons/css/buttons.bootstrap4.min.css'>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
+  <link rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
+  <link rel="stylesheet" href="../res/plugins/fontawesome-free/css/all.min.css">
+  <link rel="stylesheet" href="../res/plugins/icheck-bootstrap/icheck-bootstrap.min.css">
+  <link rel="stylesheet" href="../res/dist/css/adminlte.min.css">
+  <link rel="stylesheet" href="../res/plugins/overlayScrollbars/css/OverlayScrollbars.min.css">
+  <link rel="stylesheet" href="../res/plugins/select2/css/select2.min.css">
+</head>
+<body class="hold-transition sidebar-mini layout-navbar-fixed">
+<div class="wrapper">
+  <!-- Navbar -->
+  <nav class="main-header navbar navbar-expand navbar-white navbar-light">
+    <!-- Left navbar links -->
+    <ul class="navbar-nav">
+      <li class="nav-item">
+        <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
+      </li>
+      <li class="nav-item d-none d-sm-inline-block">
+        <a href="https://github.com/aws-samples/service-screener-v2" target=_blank rel="noopener noreferrer" class="nav-link">Visit Github</a>
+      </li>
+    </ul>
+
+    <!-- Right navbar links -->
+    <ul class="navbar-nav ml-auto">
+      <li class="nav-item d-none d-sm-inline-block">
+        <span class="nav-link">Change Account ID: </span>
+      </li>
+      <li class="nav-item">
+        <select class="form-control" id='changeAcctId'>
+          {$OPTIONS_ACCOUNTS}
+        </select>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" data-widget="fullscreen" href="#" role="button">
+          <i class="fas fa-expand-arrows-alt"></i>
+        </a>
+      </li>
+    </ul>
+  </nav>
+  <!-- /.navbar --><!-- Main Sidebar Container -->
+  <aside class="main-sidebar sidebar-dark-primary elevation-4">
+    <!-- Brand Logo -->
+    <a href="#" class="brand-link">
+      <img src="../res/dist/img/AdminLTELogo.png" alt="AdminLTE Logo" class="brand-image img-circle elevation-3" style="opacity: .8">
+      <span class="brand-text font-weight-light">Service Screener</span>
+    </a>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <!-- Sidebar user panel (optional) -->
+      <div class="user-panel mt-3 pb-3 mb-3 d-flex" style="padding-bottom:0px !important">
+        <div class="image">
+          <img src="https://a0.awsstatic.com/libra-css/images/logos/aws_smile-header-desktop-en-white_59x35.png" class="" alt="AWS Logo">
+        </div>
+        <div class="info">
+          <a href="#" class="d-block" style="color: #ec902e">- <strong>Open Source Project</strong></a>
+        </div>
+      </div>
+      <!-- Sidebar Menu -->
+      <nav class="mt-2">
+        <ul class="nav nav-pills nav-sidebar flex-column" data-widget="treeview" role="menu" data-accordion="false">
+		  <li class="nav-item">
+        <a href="index.html" class="nav-link ">
+          <i class="nav-icon fas fa-home"></i>
+          <p>
+            Home
+          </p>
+        </a>
+      </li>
+<li class='nav-header'>Services</li>
+<li class='nav-item'>
+<a href='kms.html' class='nav-link '>
+<i class='nav-icon fas fa-tasks'></i>
+<p>KMS <span class='badge badge-info right' data-count=''></span></p>
+</a>
+</li>
+<li class='nav-header'>Frameworks</li>
+<li class='nav-item'>
+<a href='FTR.html' class='nav-link '>
+<i class='nav-icon fas fa-tasks'></i>
+<p>FTR <span class='badge badge-info right' data-count=''></span></p>
+</a>
+</li>
+<li class='nav-item'>
+<a href='SSB.html' class='nav-link active'>
+<i class='nav-icon fas fa-tasks'></i>
+<p>SSB <span class='badge badge-info right' data-count=''></span></p>
+</a>
+</li>
+<li class='nav-item'>
+<a href='WAFS.html' class='nav-link '>
+<i class='nav-icon fas fa-tasks'></i>
+<p>WAFS <span class='badge badge-info right' data-count=''></span></p>
+</a>
+</li>
+          <li class="nav-header">Others</li>
+          <li class="nav-item">
+            <a href="https://github.com/aws-samples/service-screener-v2/issues" target=_blank rel="noopener noreferrer" class="nav-link">
+              <i class="nav-icon fas fa-ellipsis-h"></i>
+              <p>Raise Issues</p>
+            </a>
+          </li>
+        </ul>
+      </nav>
+    </div>
+  </aside><div class="content-wrapper">
+    <div class="content-header">
+      <div class="container-fluid">
+        <div class="row mb-2">
+          <div class="col-sm-6">
+            <h1 class="m-0">SSB</h1>
+          </div>
+          <div class="col-sm-6">
+            <ol class="breadcrumb float-sm-right">
+              <li class="breadcrumb-item"><a href="#">Home</a></li>
+              <li class="breadcrumb-item active">SSB</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+    <section class='content'>
+      <div class='container-fluid'><div class='row' data-context='Brief'>
+<div class='col-md-6' >
+<div id='Framework' class='card card-warning '>
+<div class='card-header'><h3 class='card-title'>AWS Startup Security Baseline</h3>
+<div class='card-tools'><button type='button' class='btn btn-tool' data-card-widget='collapse'><i class='fas fa-minus'></i></button></div>
+</div>
+<div class='card-body '>
+The AWS Startup Security Baseline (SSB) is a set of controls that create a minimum foundation for businesses to build securely on AWS without decreasing their agility. These controls form the basis of your security posture and are focused on securing credentials, enabling logging and visibility, managing contact information, and implementing basic data boundaries.<br><br>The controls in this guide are designed with early startups in mind, mitigating the most common security risks without requiring significant effort. Many startups begin their journey in the AWS Cloud with a single AWS account. As organizations grow, they migrate to multi-account architectures. The guidance in this guide is designed for single-account architectures, but it helps you set up security controls that are easily migrated or modified as you transition to a multi-account architecture.<br><br>The controls in the AWS SSB are separated into two categories: account and workload. Account controls help keep your AWS account secure. It includes recommendations for setting up user access, policies, and permissions, and it includes recommendations for how to monitor your account for unauthorized or potentially malicious activity. Workload controls help secure your resources and code in the cloud, such as applications, backend processes, and data. It includes recommendations such as encryption and reducing the scope of access.<br><a href='https://docs.aws.amazon.com/prescriptive-guidance/latest/aws-startup-security-baseline/welcome.html' target=_blank rel='noopener noreferrer'>Read more</a>
+</div>
+</div>
+</div>
+<div class='col-md-6' >
+<div id='SSB-SummaryDoughnut' class='card card-warning '>
+<div class='card-header'><h3 class='card-title'>Summary: [Not available:15] | [Compliant:12] | [Need Attention:0]</h3>
+<div class='card-tools'><button type='button' class='btn btn-tool' data-card-widget='collapse'><i class='fas fa-minus'></i></button></div>
+</div>
+<div class='card-body '>
+<div class='chart'><canvas id='doughnut5838529c-6f6c-11ee-b5f5-022b1d29d4d2' style='min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;'></canvas></div>
+</div>
+</div>
+</div>
+</div>
+<div class='row' data-context='summaryChart'>
+<div class='col-md-12' >
+<div id='SSB-SummaryBarChart' class='card card-warning '>
+<div class='card-header'><h3 class='card-title'>Breakdown</h3>
+<div class='card-tools'><button type='button' class='btn btn-tool' data-card-widget='collapse'><i class='fas fa-minus'></i></button></div>
+</div>
+<div class='card-body '>
+<div class='chart'><canvas id='bar5838572e-6f6c-11ee-b5f5-022b1d29d4d2' style='min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;'></canvas></div>
+</div>
+</div>
+</div>
+</div><div class='row' data-context=detail>
+<div class='col-md-12' >
+<div id='SSB' class='card card-warning '>
+<div class='card-header'><h3 class='card-title'>Framework. AWS Startup Security Baseline <span class='detailCategory' data-span-category='SSB'></span></h3>
+</div>
+<div class='card-body '>
+<table id='screener-framework' class='table table-bordered table-striped'> <thead><tr><th>Category</th><th>Rule ID</th><th>Compliance Status</th><th>Description</th><th>Reference</th></tr></thead>
+<tbody><tr><td>Account</td><td>ACCT.01</td><td class='bg-success color-palette'>Compliant</td><td><dl><dt class='text-success'><i class='fas fa-check'></i> [hasAlternateContact]</i></dt></dl></td><td></td></tr><tr><td>Account</td><td>ACCT.02</td><td class='bg-success color-palette'>Compliant</td><td><dl><dt class='text-success'><i class='fas fa-check'></i> [noUsersFound]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [rootHasAccessKey]</i></dt></dl></td><td></td></tr><tr><td>Account</td><td>ACCT.03</td><td class='bg-success color-palette'>Compliant</td><td><dl><dt class='text-success'><i class='fas fa-check'></i> [noUsersFound]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [hasExternalIdentityProvider]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [hasSSORoles]</i></dt></dl></td><td></td></tr><tr><td>Account</td><td>ACCT.04</td><td class='bg-success color-palette'>Compliant</td><td><dl><dt class='text-success'><i class='fas fa-check'></i> [InlinePolicyFullAccessOneServ]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [InlinePolicyFullAdminAccess]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [ManagedPolicyFullAccessOneServ]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [FullAdminAccess]</i></dt></dl></td><td></td></tr><tr><td>Account</td><td>ACCT.05</td><td class='bg-success color-palette'>Compliant</td><td><dl><dt class='text-success'><i class='fas fa-check'></i> [rootMfaActive]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [mfaActive]</i></dt></dl></td><td></td></tr><tr><td>Account</td><td>ACCT.06</td><td class='bg-success color-palette'>Compliant</td><td><dl><dt class='text-success'><i class='fas fa-check'></i> [passwordPolicy]</i></dt></dl></td><td></td></tr><tr><td>Account</td><td>ACCT.07</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr><tr><td>Account</td><td>ACCT.08</td><td class='bg-success color-palette'>Compliant</td><td><dl><dt class='text-success'><i class='fas fa-check'></i> [PublicAccessBlock]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [S3AccountPublicAccessBlock]</i></dt></dl></td><td></td></tr><tr><td>Account</td><td>ACCT.09</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr><tr><td>Account</td><td>ACCT.10</td><td class='bg-success color-palette'>Compliant</td><td><dl><dt class='text-success'><i class='fas fa-check'></i> [enableCostBudget]</i></dt></dl></td><td></td></tr><tr><td>Account</td><td>ACCT.11</td><td class='bg-success color-palette'>Compliant</td><td><dl><dt class='text-success'><i class='fas fa-check'></i> [enableGuardDuty]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [guardDutyNotification]</i></dt></dl></td><td></td></tr><tr><td>Account</td><td>ACCT.12</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr><tr><td>Workloads</td><td>WKLD.01</td><td class='bg-success color-palette'>Compliant</td><td><dl><dt class='text-success'><i class='fas fa-check'></i> [EC2IamProfile]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [lambdaMissingRole]</i></dt></dl></td><td></td></tr><tr><td>Workloads</td><td>WKLD.02</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr><tr><td>Workloads</td><td>WKLD.03</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr><tr><td>Workloads</td><td>WKLD.04</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr><tr><td>Workloads</td><td>WKLD.05</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr><tr><td>Workloads</td><td>WKLD.06</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr><tr><td>Workloads</td><td>WKLD.07</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr><tr><td>Workloads</td><td>WKLD.08</td><td class='bg-success color-palette'>Compliant</td><td><dl><dt class='text-success'><i class='fas fa-check'></i> [EBSEncrypted]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [StorageEncrypted]</i></dt></dl></td><td></td></tr><tr><td>Workloads</td><td>WKLD.09</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr><tr><td>Workloads</td><td>WKLD.10</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr><tr><td>Workloads</td><td>WKLD.11</td><td class='bg-success color-palette'>Compliant</td><td><dl><dt class='text-success'><i class='fas fa-check'></i> [SGSensitivePortOpenToAll]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [SGTCPAllOpen]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [SGAllOpen]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [SGAllOpenToAll]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [ELBListenerInsecure]</i></dt><dt class='text-success'><i class='fas fa-check'></i> [PubliclyAccessible]</i></dt></dl></td><td></td></tr><tr><td>Workloads</td><td>WKLD.12</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr><tr><td>Workloads</td><td>WKLD.13</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr><tr><td>Workloads</td><td>WKLD.14</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr><tr><td>Workloads</td><td>WKLD.15</td><td class='bg-info color-palette'>Not available</td><td></td><td></td></tr></tbody></table>
+</div>
+</div>
+</div>
+</div>  </div>
+</section>
+</div>
+<footer class='main-footer'>
+    <div class='float-right d-none d-sm-inline-block'>
+		<strong>Service Screener</strong>, <b>Version</b> 2.0.1 is distributed under the <strong><a target=_blank rel='noopener noreferrer' href='https://www.apache.org/licenses/LICENSE-2.0'>Apache 2.0 License</a>, powered by <a target=_blank rel='noopener noreferrer' href='https://adminlte.io'>AdminLTE.io</a></strong>
+    </div>
+</footer>
+
+<script src='../res/plugins/jquery/jquery.js'></script>
+<script src='../res/plugins/bootstrap/js/bootstrap.bundle.min.js'></script>
+<script src='../res/plugins/chart.js/Chart.min.js'></script>
+<script src='../res/plugins/overlayScrollbars/js/jquery.overlayScrollbars.min.js'></script>
+<script src='../res/plugins/select2/js/select2.full.min.js'></script>
+<script src='../res/dist/js/adminlte.js'></script>
+<script src='../res/dist/js/demo.js'></script>
+
+<script src='plugins/datatables/jquery.dataTables.min.js'></script>
+<script src='plugins/datatables-bs4/js/dataTables.bootstrap4.min.js'></script>
+<script src='plugins/datatables-responsive/js/dataTables.responsive.min.js'></script>
+<script src='plugins/datatables-responsive/js/responsive.bootstrap4.min.js'></script>
+<script src='plugins/datatables-buttons/js/dataTables.buttons.min.js'></script>
+<script src='plugins/datatables-buttons/js/buttons.bootstrap4.min.js'></script>
+<script src='plugins/datatables-buttons/js/buttons.html5.min.js'></script>
+<script src='plugins/datatables-buttons/js/buttons.print.min.js'></script>
+<script src='plugins/datatables-buttons/js/buttons.colVis.min.js'></script>
+<script>$(function(){
+$("#screener-framework").DataTable({
+      "responsive": true, "lengthChange": true, "autoWidth": false,
+      "pageLength": 50,
+      "buttons": ["copy", "csv", "colvis"]
+    }).buttons().container().appendTo('#screener-framework_wrapper .col-md-6:eq(0)');
+; var donutPieChartCanvas = $('#doughnut5838529c-6f6c-11ee-b5f5-022b1d29d4d2').get(0).getContext('2d'); var donutPieData = {labels: ["Not available", "Compliant", "Need Attention"],datasets: [{"data": [15, 12, 0], "backgroundColor": ["#e27c7c", "#a86464", "#6d4b4b"]}]}; var donutPieOptions= {maintainAspectRatio : false,responsive : true}; new Chart(donutPieChartCanvas, {type: 'doughnut', data: donutPieData, options: donutPieOptions}); var areaChartData = {labels: ["Account", "Workloads"], datasets: [{"label": "Not available", "backgroundColor": "rgba(226, 124, 124, 1)", "data": [3, 12]}, {"label": "Compliant", "backgroundColor": "rgba(168, 100, 100, 1)", "data": [9, 3]}, {"label": "Need Attention", "backgroundColor": "rgba(109, 75, 75, 1)", "data": [0, 0]}]}; var barChartData = $.extend(true, {}, areaChartData); var stackedBarChartCanvas = $('#bar5838572e-6f6c-11ee-b5f5-022b1d29d4d2').get(0).getContext('2d'); var stackedBarChartData = $.extend(true, {}, barChartData); 
+        var stackedBarChartOptions = {
+          responsive              : true,
+          maintainAspectRatio     : false,
+          scales: {
+            xAxes: [{
+              stacked: true,
+            }],
+            yAxes: [{
+              stacked: true
+            }]
+          },
+         onClick: function(e, i){
+            checkCtrl = $('#checkCtrl')
+            var v = i[0]['_model']['label'];
+            if(typeof v == 'undefined')
+                return
+            curVal = checkCtrl.val()
+            idx = curVal.indexOf(v)
+            if (idx == -1){
+                curVal.push(v)
+            }else{
+                curVal.splice(idx, 1);
+            }
+            checkCtrl.val(curVal).trigger('change')
+        }
+    }
+            new Chart(stackedBarChartCanvas, {
+                type: 'bar',
+                data: stackedBarChartData,
+                options: stackedBarChartOptions
+            })})</script>
+</body>
+</html>

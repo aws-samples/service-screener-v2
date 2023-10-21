@@ -51,6 +51,8 @@ class PageBuilder:
         self.jsLib = []
         self.cssLib = []
         
+        self.htmlFolder = Config.get('HTML_ACCOUNT_FOLDER_FULLPATH')
+        
     def getHtmlId(self, el=''):
         o = uuid.uuid4().hex
         el = el or o[0:11]
@@ -72,7 +74,10 @@ class PageBuilder:
             if arrayOfText:
                 finalHTML += "\n".join(arrayOfText)
 
-        with open(_C.HTML_DIR + '/' + self.service + '.html', 'w') as f:
+        if not os.path.exists(self.htmlFolder):
+            os.makedirs(self.htmlFolder)
+
+        with open(self.htmlFolder + '/' + self.service + '.html', 'w') as f:
             f.write(finalHTML)
     
     def init(self):

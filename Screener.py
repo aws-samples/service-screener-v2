@@ -11,8 +11,7 @@ from services.dashboard.DashboardPageBuilder import DashboardPageBuilder
 
 from frameworks.FrameworkPageBuilder import FrameworkPageBuilder
 from utils.ExcelBuilder import ExcelBuilder
-import zipfile
-import glob
+import shutil
 # import zlib
 
 import constants as _C
@@ -192,18 +191,8 @@ class Screener:
 
                 # Create object of ZipFile
                 # os.system('cd adminlte; zip -q -r output.zip html; mv output.zip ../output.zip')
-                adminlteDir = _C.ROOT_DIR + '/adminlte'
-                with zipfile.ZipFile('output.zip', 'w', zipfile.ZIP_DEFLATED) as zip_object:
-                    folder='html'
-                    os.chdir(adminlteDir)
-                    for subdir, dirs, files in os.walk(folder):
-                        for file in files:
-                            # Read file
-                            srcpath = os.path.join(subdir, file)
-                            dstpath_in_zip = os.path.relpath(srcpath, start=folder)
-                            with open(srcpath, 'rb') as infile:
-                                # Write to zip
-                                zip_object.writestr(dstpath_in_zip, infile.read())
+                adminlteDir = _C.ADMINLTE_ROOT_DIR
+                shutil.make_archive('output', 'zip', adminlteDir)
                 
                 print("Pages generated, download \033[1;42moutput.zip\033[0m to view")
                 print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m ~/service-screener-v2/output.zip \033[1;42m <===== \033[0m")
