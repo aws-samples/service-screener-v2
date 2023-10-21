@@ -7,6 +7,7 @@ from utils.Tools import _pr, aws_get_latest_instance_generations
 from services.Service import Service
 from services.elasticache.drivers.ElasticacheMemcached import ElasticacheMemcached
 from services.elasticache.drivers.ElasticacheRedis import ElasticacheRedis
+from services.elasticache.drivers.ElasticacheReplicationGroup import ElasticacheReplicationGroup
 from typing import Dict, List, Set
 
 
@@ -90,8 +91,16 @@ class Elasticache(Service):
         return ({k: aws_get_latest_instance_generations(v) for (k, v) in families.items()})
 
     def getReplicationGroupInfo(self):
-        t = self.elasticacheClient.describe_replication_groups()
-        _pr(t)
+        results = self.elasticacheClient.describe_replication_groups()
+        
+        arr = results.get("ReplicationGroups")
+        while results.get("Marker") is not None:
+            results = self.elasticacheClient.describe_replication_groups(
+                Marker=results.get("Marker")
+            )
+            arr = arr + results.get("ReplicationGroups")
+            
+        return arr
 
 
     def getSnapshots(self):
@@ -128,8 +137,15 @@ class Elasticache(Service):
 
     def advise(self):
         objs = {}
+        
+        repGroups = self.getReplicationGroupInfo()
+        for group in repGroups:
+            print(f"... (ElastiCache::ReplicationGroup) inspecting {group.get('ReplicationGroupId')}")
+            obj = ElasticacheReplicationGroup(group, self.elasticacheClient)
+            obj.run(self.__class__)
+            objs[f"ElastiCache::{group.get('ReplicationGroupId')}"] = obj.getInfo()
+        
         self.cluster_info = self.getECClusterInfo()
-        # _pr(self.cluster_info)
 
         # loop through EC nodes
         if len(self.cluster_info) > 0:
@@ -157,7 +173,6 @@ class Elasticache(Service):
             else:
                 print(
                     f"Engine {cluster.get('Engine')} of Cluster {cluster.get('CacheClusterId')} is not recognised")
-
         return objs
     pass
 
