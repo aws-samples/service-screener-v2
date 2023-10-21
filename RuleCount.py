@@ -68,7 +68,6 @@ def getCntSummary(reporterPath, cntType):
             category = rules[ruleName]['criticality']
 
         cntTable[category] += 1
-    
     return cntTable
 
 def formSummaryPrettyTable(tableType):
@@ -80,6 +79,7 @@ def formSummaryPrettyTable(tableType):
     table = []
 
     ## Form per service row and calculate total number of rules
+    info = {}
     for service in reporterPaths:
         path = reporterPaths[service]
         cntResult = getCntSummary(path, tableType)
@@ -94,6 +94,18 @@ def formSummaryPrettyTable(tableType):
         table.append(serviceRow)
 
         totalRules = totalRules + totalPerService
+        
+        ## Does not matter, just need it to run once
+        sname = service
+        if(tableType == 'PILLAR'):
+            if sname == 'lambda_':
+                sname = 'lambda'
+            info[sname] = totalPerService
+
+    if len(info) > 0:
+        f = open("info.json", "w+")
+        f.write(json.dumps(info))
+        f.close()
 
     ## Form splitter row
     splitRow = ['-------']

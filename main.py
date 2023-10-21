@@ -125,7 +125,8 @@ pool.starmap(Screener.scanByService, input_ranges)
 scanned = {
     'resources': 0,
     'rules': 0,
-    'exceptions': 0
+    'exceptions': 0,
+    'timespent': 0
 }
 
 inventory = {}
@@ -138,12 +139,13 @@ for file in os.listdir(_C.FORK_DIR):
     if len(f) == 2:
         contexts[f[0]] = json.loads(open(_C.FORK_DIR + '/' + file).read())
     else:
-        cnt, rules, exceptions = list(json.loads(open(_C.FORK_DIR + '/' + file).read()).values())
+        cnt, rules, exceptions, timespent = list(json.loads(open(_C.FORK_DIR + '/' + file).read()).values())
         
         serviceStat[f[0]] = cnt
         scanned['resources'] += cnt
         scanned['rules'] += rules
         scanned['exceptions'] += exceptions
+        scanned['timespent'] += timespent
         if f[0] in Config.GLOBAL_SERVICES:
             hasGlobal = True
 

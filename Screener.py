@@ -25,7 +25,8 @@ class Screener:
         _zeroCount = {
             'resources': 0,
             'rules': 0,
-            'exceptions': 0
+            'exceptions': 0,
+            'timespent': 0
         }
         
         contexts = {}
@@ -75,6 +76,8 @@ class Screener:
         scanned = Config.get(scannedKey)
         # print(scannedKey)
         
+        scanned['timespent'] = time_end - time_start
+        
         with open(_C.FORK_DIR + '/' + service[0] + '.json', 'w') as f:
             json.dump(contexts[service[0]], f)
         
@@ -85,7 +88,6 @@ class Screener:
     def getServiceModuleDynamically(service):
         # .title() captilise the first character
         # e.g: services.iam.Iam
-        
         folder = service
         if service in Config.KEYWORD_SERVICES:
             folder = service + '_'

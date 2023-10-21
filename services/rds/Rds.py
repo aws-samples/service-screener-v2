@@ -22,6 +22,7 @@ class Rds(Service):
         self.ec2Client = boto3.client('ec2', config=self.bConfig)
         self.ctClient = boto3.client('cloudtrail', config=self.bConfig)
         self.smClient = boto3.client('secretsmanager', config=self.bConfig)
+        self.cwClient = boto3.client('cloudwatch', config=self.bConfig)
         
         self.secrets = []
 
@@ -38,7 +39,7 @@ class Rds(Service):
         
         arr = results.get('DBInstances')
         while results.get('Maker') is not None:
-            results = self.ec2Client.describe_db_instances(
+            results = self.rdsClient.describe_db_instances(
                 Maker = results.get('Maker')
             )
             arr = arr + results.get('DBInstances')
@@ -96,12 +97,11 @@ class Rds(Service):
             driver_ = self.engineDriver[engine]
             driver = 'Rds' + driver_
             if driver in globals():
-                obj = globals()[driver](instance, self.rdsClient, self.ctClient)
+                obj = globals()[driver](instance, self.rdsClient, self.ctClient, self.cwClient)
                 obj.setEngine(engine)
                 obj.run(self.__class__)
                 
                 objs[instance['Engine'] + '::' + instance['DBInstanceIdentifier']] = obj.getInfo()
-                print(obj.getInfo())
                 del obj
         
         for sg, rdsList in securityGroupArr.items():

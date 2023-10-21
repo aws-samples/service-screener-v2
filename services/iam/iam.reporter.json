@@ -409,5 +409,18 @@
 			"[IAM Credential Reports]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_getting-report.html>",
 			"[Rotate Keys]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html#Using_RotateAccessKey>"
 		]
+	},
+	"enableCURReport": {
+		"category": "C",
+		"^description": "Cost and Usage Reports (CUR) has not been setup in this accounts. Setup CUR for better cost analysis.",
+		"shortDesc": "Setup Cost and Usage Report ",
+		"criticality": "I",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Creating Cost and Usage Reports]<https://docs.aws.amazon.com/cur/latest/userguide/cur-create.html>"
+		]
 	}
 }

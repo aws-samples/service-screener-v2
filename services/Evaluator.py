@@ -14,7 +14,7 @@ class Evaluator():
         
     def run(self, serviceName):
         servClass = self.classname
-        rulePrefix = servClass + '::rules'
+        rulePrefix = serviceName.__name__ + '::rules'
         rules = Config.get(rulePrefix, [])
         
         ecnt = cnt = 0
