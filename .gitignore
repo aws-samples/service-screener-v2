@@ -2,9 +2,10 @@
 test.py
 output.zip
 __fork/*.json
-adminlte/html/*.html
-adminlte/html/*.xlsx
-adminlte/html/error.txt
+adminlte/**XX/
+adminlte/**/*.html
+adminlte/**/*.xlsx
+adminlte/**/error.txt
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

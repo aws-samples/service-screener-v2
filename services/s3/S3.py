@@ -19,9 +19,10 @@ class S3(Service):
     def __init__(self, region):
         super().__init__(region)
         self.region = region
-        conf = bConfig(region_name=region)
-        self.s3Client = boto3.client('s3')
-        self.s3Control = boto3.client('s3control')
+        # conf = bConfig(region_name=region)
+        # print(self.bConfig)
+        self.s3Client = boto3.client('s3', config=self.bConfig)
+        self.s3Control = boto3.client('s3control', config=self.bConfig)
         self.macieV2Client = boto3.client('macie2', config=self.bConfig)
         
         # buckets = Config.get('s3::buckets', [])
