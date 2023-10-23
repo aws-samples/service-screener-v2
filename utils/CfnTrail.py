@@ -8,7 +8,7 @@ from botocore.config import Config as bConfig
 from utils.Config import Config
 from utils.Tools import _warn, _info
 
-class CfnFaker():
+class CfnTrail():
     def __init__(self):
         self.stackName = None
         self.cfnTemplate = "zNullResourcesCfn.yml"

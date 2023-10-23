@@ -8,7 +8,7 @@ import boto3
 
 from utils.Config import Config
 from utils.ArguParser import ArguParser
-from utils.CfnFaker import CfnFaker
+from utils.CfnTrail import CfnTrail
 import constants as _C
 from utils.AwsRegionSelector import AwsRegionSelector
 from Screener import Screener
@@ -93,8 +93,8 @@ serviceStat = {}
 oo = Config.get('_AWS_OPTIONS')
 
 if testmode == False:
-    CfnFaker = CfnFaker()
-    CfnFaker.createStack()
+    CfnTrail = CfnTrail()
+    CfnTrail.createStack()
 
 overallTimeStart = time.time()
 # os.chdir('__fork')
