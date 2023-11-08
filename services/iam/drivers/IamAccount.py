@@ -1,4 +1,3 @@
-import boto3
 import botocore
 from botocore.config import Config as bConfig
 
@@ -24,8 +23,8 @@ class IamAccount(IamCommon):
         self.orgClient = awsClients['orgClient']
         
         
-        self.curClient = boto3.client('cur', config=bConfig(region_name='us-east-1'))
-        self.ctClient = boto3.client('cloudtrail', config=bConfig(region_name='us-east-1'))
+        self.curClient = awsClients['curClient']
+        self.ctClient = awsClients['ctClient']
         
         self.noOfUsers = len(users)
         self.roles = roles

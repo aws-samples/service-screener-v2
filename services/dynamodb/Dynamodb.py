@@ -1,4 +1,3 @@
-import boto3
 import botocore
 import json
 import datetime
@@ -14,12 +13,14 @@ class Dynamodb(Service):
     
     def __init__(self, region):
         super().__init__(region)
-        self.dynamoDbClient = boto3.client('dynamodb', config=self.bConfig)
-        self.cloudWatchClient = boto3.client('cloudwatch', config=self.bConfig)
-        self.serviceQuotaClient = boto3.client('service-quotas', config=self.bConfig)
-        self.appScalingPolicyClient = boto3.client('application-autoscaling', config=self.bConfig)
-        self.backupClient = boto3.client('backup', config=self.bConfig)
-        self.cloudTrailClient = boto3.client('cloudtrail', config=self.bConfig)
+        ssBoto = self.ssBoto
+        
+        self.dynamoDbClient = ssBoto.client('dynamodb', config=self.bConfig)
+        self.cloudWatchClient = ssBoto.client('cloudwatch', config=self.bConfig)
+        self.serviceQuotaClient = ssBoto.client('service-quotas', config=self.bConfig)
+        self.appScalingPolicyClient = ssBoto.client('application-autoscaling', config=self.bConfig)
+        self.backupClient = ssBoto.client('backup', config=self.bConfig)
+        self.cloudTrailClient = ssBoto.client('cloudtrail', config=self.bConfig)
     
     
     def list_tables(self):

@@ -9,6 +9,12 @@ class AwsRegionSelector:
 
     @staticmethod
     def get_all_enabled_regions(minimal=False):
+        
+        ssBoto = Config.get('ssBoto', None)
+        if ssBoto == None:
+            print('BOTO3 SESSION IS MISSING IN REGION SELECTOR')
+            exit()
+       
         DEBUG = Config.get('DEBUG')
         if not minimal and AwsRegionSelector.prompt_confirm_get_all_regions() == False:
             sys.exit('__SCRIPT HALT__, user decided not to proceed')
@@ -16,7 +22,7 @@ class AwsRegionSelector:
         conf = bConfig(
             region_name = 'us-east-1'    
         )
-        acct = boto3.client('account')
+        acct = ssBoto.client('account')
         
         results = {}
         regions = []
@@ -41,9 +47,9 @@ class AwsRegionSelector:
             if not token:
                 break
         
-        if DEBUG and not minimal:
-            _info("The following region(s) are enabled/opt-in")
-            _info('[' + str(len(regions)) + "] | " + ', '.join(regions))
+        # if DEBUG and not minimal:
+        _info("The following region(s) are enabled/opt-in")
+        _info('[' + str(len(regions)) + "] | " + ', '.join(regions))
         
         return regions
         

@@ -8,9 +8,10 @@ from utils.Tools import aws_parseInstanceFamily
 from services.Evaluator import Evaluator
 
 class Ec2Instance(Evaluator):
-    def __init__(self, ec2InstanceData,ec2Client):
+    def __init__(self, ec2InstanceData,ec2Client, cwClient):
         super().__init__()
         self.ec2Client = ec2Client
+        self.cwClient = cwClient
         self.ec2InstanceData = ec2InstanceData
         self.setTimeDeltaInDays()
         self.init()
@@ -18,7 +19,7 @@ class Ec2Instance(Evaluator):
     # supporting functions
     
     def getEC2UtilizationMetrics(self, metricName, verifyDay):
-        cwClient = boto3.client('cloudwatch')
+        cwClient = self.cwClient
         instance = self.ec2InstanceData
         
         dimensions = [
@@ -128,7 +129,7 @@ class Ec2Instance(Evaluator):
         return
     
     def _checkCWMemoryMetrics(self):
-        cw_client = boto3.client('cloudwatch')
+        cw_client = self.cwClient
         instance = self.ec2InstanceData
     
         dimensions = [
@@ -160,7 +161,7 @@ class Ec2Instance(Evaluator):
         return
         
     def _checkCWDiskMetrics(self):
-        cwClient = boto3.client('cloudwatch')
+        cwClient = self.cwClient
         instance = self.ec2InstanceData
         
         dimensions = [
@@ -194,7 +195,7 @@ class Ec2Instance(Evaluator):
     def _checkEC2Active(self):
         verifyDay = 7
     
-        cwClient = boto3.client('cloudwatch')
+        cwClient = self.cwClient
         instance = self.ec2InstanceData
         launchDay = self.launchTimeDeltaInDays
         

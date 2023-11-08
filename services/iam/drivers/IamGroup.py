@@ -1,4 +1,3 @@
-import boto3
 import datetime
 from dateutil.tz import tzlocal
 
@@ -29,6 +28,3 @@ class IamGroup(IamCommon):
         inlinePolicies = resp.get('PolicyNames')
         self.evaluateInlinePolicy(inlinePolicies, group, 'group')
         
-if __name__ == "__main__":
-    c = boto3.client('iam')
-    o = IamGroup('ok', c)

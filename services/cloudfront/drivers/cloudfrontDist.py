@@ -1,6 +1,5 @@
 import urllib.parse
 from datetime import date
-import boto3
 
 from utils.Config import Config
 from services.Evaluator import Evaluator
@@ -77,5 +76,6 @@ class cloudfrontDist(Evaluator):
     
     
 if __name__ == "__main__":
-    c = boto3.client('cloudfront')
+    ssBoto = Config.get('ssBoto')
+    c = ssBoto.client('cloudfront')
     o = cloudfrontDist('ok', c)

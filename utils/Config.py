@@ -40,7 +40,10 @@ class Config:
     @staticmethod
     def setAccountInfo(__AWS_CONFIG):
         print(" -- Acquiring identify info...")
-        stsClient = boto3.client('sts')
+        
+        ssBoto = Config.get('ssBoto', None)
+        
+        stsClient = ssBoto.client('sts')
         
         resp = stsClient.get_caller_identity()
         stsInfo = {
@@ -52,7 +55,7 @@ class Config:
         Config.set('stsInfo', stsInfo)
         acctId = stsInfo['Account']
         
-        adir = 'adminlte/aws/' + acctId[0:-2] + 'XX'
+        adir = 'adminlte/aws/' + acctId
         
         Config.set('HTML_ACCOUNT_FOLDER_FULLPATH', _C.ROOT_DIR + '/' + adir)
         Config.set('HTML_ACCOUNT_FOLDER_PATH', adir)

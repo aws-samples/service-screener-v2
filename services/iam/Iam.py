@@ -1,4 +1,3 @@
-import boto3
 import botocore
 
 import json
@@ -15,15 +14,19 @@ from services.iam.drivers.IamAccount import IamAccount
 class Iam(Service):
     def __init__(self, region):
         super().__init__(region)
-        self.iamClient = boto3.client('iam', config=self.bConfig)
+        
+        ssBoto = self.ssBoto
+        self.iamClient = ssBoto.client('iam', config=self.bConfig)
         
         self.awsClients = {
             'iamClient': self.iamClient,
-            'orgClient': boto3.client('organizations'),
-            'accClient': boto3.client('account', config=self.bConfig),
-            'sppClient': boto3.client('support', config=self.bConfig),
-            'gdClient': boto3.client('guardduty', config=self.bConfig),
-            'budgetClient': boto3.client('budgets', config=self.bConfig)
+            'orgClient': ssBoto.client('organizations'),
+            'accClient': ssBoto.client('account', config=self.bConfig),
+            'sppClient': ssBoto.client('support', config=self.bConfig),
+            'gdClient': ssBoto.client('guardduty', config=self.bConfig),
+            'budgetClient': ssBoto.client('budgets', config=self.bConfig),
+            'curClient': ssBoto.client('cur', config=self.bConfig),
+            'ctClient': ssBoto.client('cloudtrail', config=self.bConfig)
         }
     
     def getGroups(self):

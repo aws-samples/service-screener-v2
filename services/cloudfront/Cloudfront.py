@@ -1,4 +1,3 @@
-import boto3
 import botocore
 
 import json
@@ -13,7 +12,9 @@ from services.cloudfront.drivers.cloudfrontDist import cloudfrontDist
 class Cloudfront(Service):
     def __init__(self, region):
         super().__init__(region)
-        self.cloudfrontClient = boto3.client('cloudfront')
+        
+        ssBoto = self.ssBoto
+        self.cloudfrontClient = ssBoto.client('cloudfront')
         
     def getDistributions(self):
         

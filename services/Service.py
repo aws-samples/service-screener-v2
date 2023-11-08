@@ -26,10 +26,9 @@ class Service:
             region_name = region    
         )
         
-        # param = Config.get('_SS_PARAMS')
-        # profile = param['profile']
-        # if not profile == False:
-        #    boto3.setup_default_session(profile_name=profile)
+        self.ssBoto = Config.get('ssBoto', None)
+        if self.ssBoto == None:
+            print('BOTO3 SESSION IS MISSING')
         
         print('PREPARING -- ' + classname.upper()+ '::'+region)
         
