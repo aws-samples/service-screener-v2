@@ -90,7 +90,6 @@ for file in os.listdir(_C.ADMINLTE_DIR):
     if file.isnumeric() == True:
         shutil.rmtree(_C.ADMINLTE_DIR + '/' + file)
 
-exit()
 acctLoop = 0
 CfnTrailObj = CfnTrail()
 for acctId, cred in rolesCred.items():
