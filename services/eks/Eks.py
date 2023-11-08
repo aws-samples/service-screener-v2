@@ -12,10 +12,10 @@ class Eks(Service):
     def __init__(self, region):
         super().__init__(region)
         
-        awsConfig = AWSConfig(region_name=region)
-        self.eksClient = boto3.client('eks', config=awsConfig)
-        self.ec2Client = boto3.client('ec2', config=awsConfig)
-        self.iamClient = boto3.client('iam')
+        ssBoto = self.ssBoto
+        self.eksClient = ssBoto.client('eks', config=self.bConfig)
+        self.ec2Client = ssBoto.client('ec2', config=self.bConfig)
+        self.iamClient = ssBoto.client('iam')
         
     def getClusters(self):
         arr = []

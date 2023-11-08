@@ -10,10 +10,11 @@ from services.Evaluator import Evaluator
 class Ec2EbsVolume(Evaluator):
     OLDGENBLOCK = ('gp2', 'io1')
     
-    def __init__(self, ebsVolumeData,ec2Client):
+    def __init__(self, ebsVolumeData,ec2Client,cwClient):
         super().__init__()
         self.ec2Client = ec2Client
         self.ebsVolumeData = ebsVolumeData
+        self.cwClient = cwClient
         self.setCreateTimeDeltaInDays()
         self.init()
         
@@ -87,7 +88,7 @@ class Ec2EbsVolume(Evaluator):
         return
     
     def _checkLowEBSLowUtilization(self):
-        cwClient = boto3.client('cloudwatch')
+        cwClient = self.cwClient
         verifyDay = 7
         
         #if created within the last 7 days, ignore this check

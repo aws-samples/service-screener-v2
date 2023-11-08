@@ -74,6 +74,11 @@ class ArguParser:
             "required": False,
             "default": None,
             "help": "reserved for future development"
+        },
+        'crossAccounts':{
+            "required": False,
+            "default": False,
+            "help": "Screener to run multiple accounts"
         }
     }
 

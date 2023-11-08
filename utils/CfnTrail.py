@@ -8,7 +8,7 @@ from botocore.config import Config as bConfig
 from utils.Config import Config
 from utils.Tools import _warn, _info
 
-class CfnFaker():
+class CfnTrail():
     def __init__(self):
         self.stackName = None
         self.cfnTemplate = "zNullResourcesCfn.yml"
@@ -34,14 +34,15 @@ Outputs:
       Name: !Sub 'ExportsStackName-${AWS::StackName}'
 '''
 
-        self.boto3init()
+        # self.boto3init()
         
     def boto3init(self):
         self.bConfig = bConfig(
             region_name = self.getRegion()
         )
         
-        self.cfClient = boto3.client('cloudformation', config=self.bConfig)
+        ssBoto = Config.get('ssBoto', None)
+        self.cfClient = ssBoto.client('cloudformation', config=self.bConfig)
         
     def createStack(self):
         try:

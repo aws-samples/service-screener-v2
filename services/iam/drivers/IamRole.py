@@ -1,4 +1,3 @@
-import boto3
 import datetime
 from dateutil.tz import tzlocal
 
@@ -66,8 +65,3 @@ class IamRole(IamCommon):
         inlinePolicies = resp.get('PolicyNames')
         self.evaluateInlinePolicy(inlinePolicies, role, 'role') 
         
-if __name__ == "__main__":
-    c = boto3.client('iam')
-    r = IamRole('a', c)
-    # r._checkMocktest()
-    

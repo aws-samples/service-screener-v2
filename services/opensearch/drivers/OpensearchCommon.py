@@ -1,5 +1,3 @@
-import boto3
-
 import time
 import datetime
 
@@ -13,11 +11,12 @@ from services.Evaluator import Evaluator
 class OpensearchCommon(Evaluator):
     NODES_LIMIT = 200
     
-    def __init__(self, bConfig, domain, osClient):
+    def __init__(self, bConfig, domain, osClient, cwClient):
         self.results = {}
         self.clientConfig = bConfig
         self.domain = domain
         self.osClient = osClient
+        self.cwClient = cwClient
         
         self.attribute = self.osClient.describe_domain(DomainName=self.domain)
         self.cluster_config = self.attribute["DomainStatus"]["ClusterConfig"]
@@ -39,7 +38,7 @@ class OpensearchCommon(Evaluator):
         self.init()
     
     def getCloudWatchData(self, metric, statistics=["Average"], time_ago=300, period=300):
-        cw_client = boto3.client('cloudwatch', config=self.clientConfig)
+        cw_client = self.cwClient
         
         sts_info = Config.get("stsInfo")
         client_id = sts_info["Account"]

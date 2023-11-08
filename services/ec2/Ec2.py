@@ -24,14 +24,17 @@ from services.ec2.drivers.Ec2EbsSnapshot import Ec2EbsSnapshot
 class Ec2(Service):
     def __init__(self, region):
         super().__init__(region)
-        self.ec2Client = boto3.client('ec2', config=self.bConfig)
-        self.ssmClient = boto3.client('ssm', config=self.bConfig)
-        self.compOptClient = boto3.client('compute-optimizer', config=self.bConfig)
-        self.ceClient = boto3.client('ce', config=self.bConfig)
-        self.elbClient = boto3.client('elbv2', config=self.bConfig)
-        self.elbClassicClient = boto3.client('elb', config=self.bConfig)
-        self.asgClient = boto3.client('autoscaling', config=self.bConfig)
-        self.wafv2Client = boto3.client('wafv2', config=self.bConfig)
+        ssBoto = self.ssBoto
+        
+        self.ec2Client = ssBoto.client('ec2', config=self.bConfig)
+        self.ssmClient = ssBoto.client('ssm', config=self.bConfig)
+        self.compOptClient = ssBoto.client('compute-optimizer', config=self.bConfig)
+        self.ceClient = ssBoto.client('ce', config=self.bConfig)
+        self.elbClient = ssBoto.client('elbv2', config=self.bConfig)
+        self.elbClassicClient = ssBoto.client('elb', config=self.bConfig)
+        self.asgClient = ssBoto.client('autoscaling', config=self.bConfig)
+        self.wafv2Client = ssBoto.client('wafv2', config=self.bConfig)
+        self.cwClient = ssBoto.client('cloudwatch', config=self.bConfig)
         
         self.getOutdateSQLVersion()
     
@@ -294,7 +297,7 @@ class Ec2(Service):
         for instance in instances:
             instanceData = instance['Instances'][0]
             print('... (EC2) inspecting ' + instanceData['InstanceId'])
-            obj = Ec2Instance(instanceData,self.ec2Client)
+            obj = Ec2Instance(instanceData,self.ec2Client, self.cwClient)
             obj.run(self.__class__)
             
             objs[f"EC2::{instanceData['InstanceId']}"] = obj.getInfo()
@@ -308,7 +311,7 @@ class Ec2(Service):
         volumes = self.getEBSResources()
         for volume in volumes:
             print('... (EBS) inspecting ' + volume['VolumeId'])
-            obj = Ec2EbsVolume(volume,self.ec2Client)
+            obj = Ec2EbsVolume(volume,self.ec2Client, self.cwClient)
             obj.run(self.__class__)
             objs[f"EBS::{volume['VolumeId']}"] = obj.getInfo()
             

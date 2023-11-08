@@ -16,7 +16,7 @@ def _info(s):
     _printStatus("info", s)
 
 def _warn(s):
-    _printStatus("[\033[1;41m__!! WARNING !!__\033[0m]", s)
+    _printStatus("\033[1;41m__!! WARNING !!__\033[0m", s)
     
 def _printStatus(status, s):
     p = "["+status+"] "+ s
@@ -49,8 +49,9 @@ def aws_parseInstanceFamily(instanceFamily: str) -> Dict[str, str]:
     family = p+'.'+s
     CACHE_KEYWORD = 'INSTANCE_SPEC::' + family
     spec = Config.get(CACHE_KEYWORD, [])
+    ssBoto = Config.get('ssBoto', None)
     if not spec:
-        ec2c = boto3.client('ec2', region_name=CURRENT_REGION)
+        ec2c = ssBoto.client('ec2', region_name=CURRENT_REGION)
         
         resp = ec2c.describe_instance_types(InstanceTypes=[family])
 

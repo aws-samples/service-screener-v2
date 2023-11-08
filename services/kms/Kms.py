@@ -1,4 +1,3 @@
-import boto3
 import botocore
 
 from utils.Config import Config
@@ -10,7 +9,9 @@ from services.kms.drivers.KmsCommon import KmsCommon
 class Kms(Service):
     def __init__(self, region):
         super().__init__(region)
-        self.kmsClient = boto3.client('kms', config=self.bConfig)
+        
+        ssBoto = self.ssBoto
+        self.kmsClient = ssBoto.client('kms', config=self.bConfig)
         self.kmsCustomerManagedKeys = []
     
     def getResources(self):

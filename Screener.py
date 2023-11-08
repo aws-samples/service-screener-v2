@@ -42,12 +42,14 @@ class Screener:
         Config.set(scannedKey, _zeroCount)
 
         for region in _regions:
-            CURRENT_REGION = region
-            cw = Cloudwatch(region)
-            
             reg = region
             if region == 'GLOBAL':
-                reg = regions[0]
+                reg = 'us-east-1'
+                # reg = regions[0]
+            
+            
+            CURRENT_REGION = reg
+            cw = Cloudwatch(reg)
             
             ServiceClass = Screener.getServiceModuleDynamically(service[0])    
             serv = ServiceClass(reg)
@@ -188,16 +190,6 @@ class Screener:
                             p = o.buildPage()
                         else:
                             print(framework + " GATECHECK==FALSE")
-                
-                # os.chdir(_C.ROOT_DIR)
-
-                # Create object of ZipFile
-                # os.system('cd adminlte; zip -q -r output.zip html; mv output.zip ../output.zip')
-                adminlteDir = _C.ADMINLTE_ROOT_DIR
-                shutil.make_archive('output', 'zip', adminlteDir)
-                
-                print("Pages generated, download \033[1;42moutput.zip\033[0m to view")
-                print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m ~/service-screener-v2/output.zip \033[1;42m <===== \033[0m")
                 
                 # <TODO>
                 ## Upload to S3

@@ -1,4 +1,3 @@
-import boto3
 import botocore
 
 from utils.Config import Config
@@ -10,7 +9,10 @@ from services.opensearch.drivers.OpensearchCommon import OpensearchCommon
 class Opensearch(Service):
     def __init__(self, region):
         super().__init__(region)
-        self.osClient = boto3.client('opensearch', config=self.bConfig)
+        
+        ssBoto = self.ssBoto
+        self.osClient = ssBoto.client('opensearch', config=self.bConfig)
+        self.cwClient = ssBoto.client('cloudwatch', config=self.bConfig)
         
         # o = Config.get('stsInfo')
     
@@ -27,7 +29,7 @@ class Opensearch(Service):
             domain_name = domain["DomainName"]
             print("... (OpenSearch) inspecting " + domain_name)
             
-            obj = OpensearchCommon(self.bConfig, domain_name, self.osClient)
+            obj = OpensearchCommon(self.bConfig, domain_name, self.osClient, self.cwClient)
             obj.run(self.__class__)
             
             #objs["OpenSearch::Common"] = obj.getInfo()

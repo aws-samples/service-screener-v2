@@ -11,8 +11,10 @@ class Lambda(Service):
     def __init__(self, region):
         super().__init__(region)
         self.region = region
-        self.lambda_client = boto3.client("lambda", config=self.bConfig)
-        self.iam_client = boto3.client("iam", config=self.bConfig)
+        
+        ssBoto = self.ssBoto
+        self.lambda_client = ssBoto.client("lambda", config=self.bConfig)
+        self.iam_client = ssBoto.client("iam", config=self.bConfig)
         self.tags = []
 
     def get_resources(self):

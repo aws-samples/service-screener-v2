@@ -1,4 +1,3 @@
-import boto3
 import botocore
 
 import json
@@ -12,9 +11,11 @@ from services.cloudtrail.drivers.CloudtrailAccount import CloudtrailAccount
 class Cloudtrail(Service):
     def __init__(self, region):
         super().__init__(region)
-        self.ctClient = boto3.client('cloudtrail', config=self.bConfig)
-        self.snsClient = boto3.client('sns', config=self.bConfig)
-        self.s3Client = boto3.client('s3')
+        
+        ssBoto = self.ssBoto
+        self.ctClient = ssBoto.client('cloudtrail', config=self.bConfig)
+        self.snsClient = ssBoto.client('sns', config=self.bConfig)
+        self.s3Client = ssBoto.client('s3')
         
     def getTrails(self):
         results = []

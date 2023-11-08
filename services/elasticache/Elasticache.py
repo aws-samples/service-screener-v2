@@ -14,7 +14,8 @@ from typing import Dict, List, Set
 class Elasticache(Service):
     def __init__(self, region) -> None:
         super().__init__(region)
-        self.elasticacheClient = boto3.client('elasticache', config=self.bConfig)
+        ssBoto = self.ssBoto
+        self.elasticacheClient = ssBoto.client('elasticache', config=self.bConfig)
 
     def getECClusterInfo(self):
         # list all Elasticahe clusters

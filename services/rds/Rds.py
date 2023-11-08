@@ -1,4 +1,3 @@
-import boto3
 import botocore
 
 from utils.Config import Config
@@ -18,11 +17,13 @@ from services.rds.drivers.RdsSecurityGroup import RdsSecurityGroup
 class Rds(Service):
     def __init__(self, region):
         super().__init__(region)
-        self.rdsClient = boto3.client('rds', config=self.bConfig)
-        self.ec2Client = boto3.client('ec2', config=self.bConfig)
-        self.ctClient = boto3.client('cloudtrail', config=self.bConfig)
-        self.smClient = boto3.client('secretsmanager', config=self.bConfig)
-        self.cwClient = boto3.client('cloudwatch', config=self.bConfig)
+        
+        ssBoto = self.ssBoto
+        self.rdsClient = ssBoto.client('rds', config=self.bConfig)
+        self.ec2Client = ssBoto.client('ec2', config=self.bConfig)
+        self.ctClient = ssBoto.client('cloudtrail', config=self.bConfig)
+        self.smClient = ssBoto.client('secretsmanager', config=self.bConfig)
+        self.cwClient = ssBoto.client('cloudwatch', config=self.bConfig)
         
         self.secrets = []
 

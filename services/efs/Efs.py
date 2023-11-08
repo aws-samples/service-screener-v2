@@ -10,8 +10,9 @@ from services.efs.drivers.EfsDriver import EfsDriver
 class Efs(Service):
     def __init__(self, region):
         super().__init__(region)
-
-        self.efs_client = boto3.client('efs', config=self.bConfig)
+        
+        ssBoto = self.ssBoto
+        self.efs_client = ssBoto.client('efs', config=self.bConfig)
 
     def get_resources(self):
         resources = self.efs_client.describe_file_systems()
