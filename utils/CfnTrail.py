@@ -8,10 +8,7 @@ from botocore.config import Config as bConfig
 from utils.Config import Config
 from utils.Tools import _warn, _info
 
-<<<<<<< HEAD
-=======
 ## Class name decided by Sarika
->>>>>>> 16f6b9b897d083f5508d4c5a8580995ce5f893ca
 class CfnTrail():
     def __init__(self):
         self.stackName = None
