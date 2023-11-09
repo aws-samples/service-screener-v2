@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from dateutil.tz import tzlocal
 
 from utils.Config import Config
+from utils.Tools import _warn
 from .IamCommon import IamCommon
  
 class IamAccount(IamCommon):
@@ -244,28 +245,7 @@ class IamAccount(IamCommon):
                 self.results['enableCURReport'] = [-1, '']
         except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']
-            print(ecode)
-        
-        # try:
-        #     resp = self.iamClient.get_account_password_policy()
-        #     policies = resp.get('PasswordPolicy')
-            
-        #     score = self.passwordPolicyScoring(policies)
-            
-        #     currVal = []
-        #     if score <= self.PASSWORD_POLICY_MIN_SCORE:
-        #         for policy, num in policies.items():
-        #             currVal.append(f"{policy}={num}")
-                    
-        #         output = '<br>'.join(currVal)
-        #         self.results['passwordPolicyWeak'] = [-1, output]
-                
-        # except botocore.exceptions.ClientError as e:
-        #     ecode = e.response['Error']['Code']
-        #     print(ecode)
-        #     if ecode == 'NoSuchEntity':
-        #         self.results['passwordPolicy'] = [-1, ecode]
-        
-        
+            if e.response['Error']['Code'] == 'NoSuchEntity':
+                _warn('Unable describe CUR report. Likely this account is part of AWS Organizations')
         
         return
