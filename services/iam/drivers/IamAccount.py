@@ -238,8 +238,34 @@ class IamAccount(IamCommon):
                 return 0
     
     def _checkCURReport(self):
-        results = self.curClient.describe_report_definitions()
-        if len(results.get('ReportDefinitions')) == 0:
-            self.results['enableCURReport'] = [-1, '']
+        try:
+            results = self.curClient.describe_report_definitions()
+            if len(results.get('ReportDefinitions')) == 0:
+                self.results['enableCURReport'] = [-1, '']
+        except botocore.exceptions.ClientError as e:
+            ecode = e.response['Error']['Code']
+            print(ecode)
+        
+        # try:
+        #     resp = self.iamClient.get_account_password_policy()
+        #     policies = resp.get('PasswordPolicy')
+            
+        #     score = self.passwordPolicyScoring(policies)
+            
+        #     currVal = []
+        #     if score <= self.PASSWORD_POLICY_MIN_SCORE:
+        #         for policy, num in policies.items():
+        #             currVal.append(f"{policy}={num}")
+                    
+        #         output = '<br>'.join(currVal)
+        #         self.results['passwordPolicyWeak'] = [-1, output]
+                
+        # except botocore.exceptions.ClientError as e:
+        #     ecode = e.response['Error']['Code']
+        #     print(ecode)
+        #     if ecode == 'NoSuchEntity':
+        #         self.results['passwordPolicy'] = [-1, ecode]
+        
+        
         
         return
