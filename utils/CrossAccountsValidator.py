@@ -11,6 +11,7 @@ import constants as _C
 class CrossAccountsValidator():
     DEFAULT_ROLENAME = 'ServiceScreenerAutomationRole'
     DEFAULT_ROLESESSIONNAME = 'ServiceScreenerCrossAcct'    #For CloudTrail tracking purpose, does not impact any logic
+    DEFAULT_DURATIONSECONDS = 7200
     ROLEARN_PREFIX = 'arn:aws:iam::{accountId}:role/{roleName}'
     
     ## Remove sample in future
@@ -49,6 +50,7 @@ class CrossAccountsValidator():
             
             res['RoleSessionName'] = self.DEFAULT_ROLESESSIONNAME    
             res['RoleArn'] = self.getRoleArn(acct, None if not 'RoleName' in res else res['RoleName'])
+            res['DurationSeconds'] = self.DEFAULT_DURATIONSECONDS
             res.pop('RoleName')
             
             try:

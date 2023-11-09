@@ -1,7 +1,8 @@
 {
     "general":{
+        "IncludeThisAccount": true,
         "ExternalId":"abc123",
-        "RoleName":"ServiceScreenerRoleName"
+        "RoleName":"ServiceScreenerAssumeRole"
     },
     "accountLists":{
         "123456":{

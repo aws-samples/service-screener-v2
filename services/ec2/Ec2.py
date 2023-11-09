@@ -316,7 +316,7 @@ class Ec2(Service):
             objs[f"EBS::{volume['VolumeId']}"] = obj.getInfo()
             
         #EBS Snapshots
-        print('... (EBS Snapshots Recommendations) inspecting')
+        print('... (EBS::Snapshots) inspecting')
         obj = Ec2EbsSnapshot(self.ec2Client)
         obj.run(self.__class__)
         objs["EBS::Snapshots"] = obj.getInfo()
