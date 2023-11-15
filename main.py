@@ -37,6 +37,7 @@ workerCounts = _cli_options['workerCounts']
 DEBUG = True if debugFlag in _C.CLI_TRUE_KEYWORD_ARRAY or debugFlag is True else False
 testmode = True if testmode in _C.CLI_TRUE_KEYWORD_ARRAY or testmode is True else False
 crossAccounts = True if crossAccounts in _C.CLI_TRUE_KEYWORD_ARRAY or crossAccounts is True else False
+_cli_options['crossAccounts'] = crossAccounts
 
 runmode = runmode if runmode in ['api-raw', 'api-full', 'report'] else 'report'
 
@@ -71,6 +72,9 @@ rolesCred = {}
 if crossAccounts == True:
     _info('Cross Accounts requested, validating necessary configurations...')
     cav = CrossAccountsValidator()
+    cav.setIamGlobalEndpointTokenVersion()
+    cav.runValidation()
+    cav.resetIamGlobalEndpointTokenVersion()
     if cav.isValidated() == False:
         print('CrossAccountsFlag=True but failed to validate, exit...')
         exit()
@@ -82,7 +86,6 @@ if crossAccounts == True:
     rolesCred.update(tmp)
 else:
     rolesCred = {'default': {}}
-    
 
 ## Cleanup existing static resources if any
 for file in os.listdir(_C.ADMINLTE_DIR):
@@ -189,8 +192,7 @@ for acctId, cred in rolesCred.items():
     for service in services:
         input_ranges = [(service, regions, filters) for service in services]
     
-    # pool = Pool(processes=len(services))
-    pool = Pool(processes=workerCounts)
+    pool = Pool(processes=int(workerCounts))
     pool.starmap(Screener.scanByService, input_ranges)
     
     ## <TODO>

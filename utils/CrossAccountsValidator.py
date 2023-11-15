@@ -1,6 +1,7 @@
 import os
 import json
 import boto3
+import time
 import botocore
 from botocore.config import Config as bConfig
 
@@ -11,7 +12,7 @@ import constants as _C
 class CrossAccountsValidator():
     DEFAULT_ROLENAME = 'ServiceScreenerAutomationRole'
     DEFAULT_ROLESESSIONNAME = 'ServiceScreenerCrossAcct'    #For CloudTrail tracking purpose, does not impact any logic
-    DEFAULT_DURATIONSECONDS = 7200
+    DEFAULT_DURATIONSECONDS = 3600
     ROLEARN_PREFIX = 'arn:aws:iam::{accountId}:role/{roleName}'
     
     ## Remove sample in future
@@ -20,8 +21,29 @@ class CrossAccountsValidator():
     
     VALIDATED = False
     IncludeThisAccount = True
+    MAXTOKENCHECKRETRY = 5
+    WAIT_TOKENCHECKRETRY = 3
     
     def __init__(self):
+        iam = boto3.client('iam', region_name = 'us-east-1')
+        self.iamClient = iam
+        
+    def setIamGlobalEndpointTokenVersion(self):
+        resp = self.iamClient.get_account_summary()
+        SummaryMap = resp.get('SummaryMap')
+        token = 1
+        if 'GlobalEndpointTokenVersion' in SummaryMap:
+            token = SummaryMap['GlobalEndpointTokenVersion']
+        
+        self.GlobalEndpointTokenVersion = token
+        if self.GlobalEndpointTokenVersion == 1:
+            print('Detected GlobalEndpointTokenVersion=1, changing to 2...')
+            self.iamClient.set_security_token_service_preferences(
+                GlobalEndpointTokenVersion='v2Token'
+            )
+            time.sleep(5)
+            
+    def runValidation(self):
         fileValidation = self.readConfig()
         
         if fileValidation == True:
@@ -30,8 +52,7 @@ class CrossAccountsValidator():
         if fileValidation == True and roleValidation == True:
             self.VALIDATED = True
         else:
-            print('Cross Account Roles failed, script end')
-            exit()
+            print('Cross Account Roles failed')
             
     def isValidated(self):
         return self.VALIDATED
@@ -39,11 +60,18 @@ class CrossAccountsValidator():
     def getCred(self):
         return self.ROLEINFO
         
+    def resetIamGlobalEndpointTokenVersion(self):
+        if self.GlobalEndpointTokenVersion == 1:
+            print('Cross Accounts Validation completed. Resetting GlobalEndpointTokenVersion=1')
+            self.iamClient.set_security_token_service_preferences(
+                GlobalEndpointTokenVersion='v1Token'    
+            )
+        
     def validateRoles(self):
         canProceedFlag = True
-        sts = boto3.client('sts')
         
         generalDicts = self.crossAccountsDict['general']
+        
         for acct, cfg in self.crossAccountsDict['accountLists'].items():
             params = {**generalDicts, **cfg}
             res = {k: v for k, v in params.items() if v}
@@ -53,9 +81,27 @@ class CrossAccountsValidator():
             res['DurationSeconds'] = self.DEFAULT_DURATIONSECONDS
             res.pop('RoleName')
             
+            
+            sts = boto3.client('sts')
+            
+            tokenCheckPass = False
+            tokenCheckCounter = 1
             try:
-                resp = sts.assume_role(**res)
-                cred = resp.get('Credentials')
+                while(tokenCheckPass == False and tokenCheckCounter <= self.MAXTOKENCHECKRETRY):
+                    resp = sts.assume_role(**res)
+                    cred = resp.get('Credentials')
+                    if len(cred['SessionToken']) < 700:
+                        print('Attempt #{}. Waiting IAM GlobalEndpointTokenVersion to reflect V2 token, retry in {} seconds'.format(tokenCheckCounter, self.WAIT_TOKENCHECKRETRY))
+                        tokenCheckCounter = tokenCheckCounter + 1
+                        time.sleep(self.WAIT_TOKENCHECKRETRY)
+                    else:
+                        tokenCheckPass = True
+                        
+                if tokenCheckPass == False:
+                    print('... unable to acquired V2 token ...')
+                    canProceedFlag = False
+                    break
+                
                 if 'AccessKeyId' in cred and 'SecretAccessKey' in cred and 'SessionToken' in cred:
                     print('[\u2714] {}, assume_role passed'.format(acct))
                     
