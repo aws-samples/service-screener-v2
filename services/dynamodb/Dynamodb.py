@@ -51,6 +51,8 @@ class Dynamodb(Service):
         
         #Retrieve all tables with descriptions from DynamoDb
         listOfTables = self.list_tables()
+        if listOfTables == None:
+            return objs
         
         try:
             #Run generic checks
