@@ -54,7 +54,20 @@ class Rds(Service):
                 finalArr.append(arr[i])
         
         return finalArr    
-    
+        
+    def getClusters(self):
+        p = {}
+        results = self.rdsClient.describe_db_clusters(**p)
+        
+        arr = results.get('DBClusters')
+        while results.get('Maker') is not None:
+            p['Maker'] = results.get('Maker')
+            results = self.rdsClient.describe_db_clusters(**p)
+            
+            arr = arr + results.get('DBClusters')
+            
+        return arr
+            
     def getSecrets(self):
         results = self.smClient.list_secrets(IncludePlannedDeletion=False, MaxResults=10)
         self.registerSecrets(results)
@@ -72,19 +85,30 @@ class Rds(Service):
         
     def advise(self):
         objs = {}
-        instances = self.getResources()
+        # instances = self.getResources()
+        instances = []
         securityGroupArr = {}
         
-        for instance in instances:
-            print('... (RDS) inspecting ' + instance['DBInstanceIdentifier'])
+        clusters = self.getClusters()
+        
+        groupedResources = instances + clusters
+        
+        for instance in groupedResources:
+            dbKey = 'DBClusterIdentifier'
+            dbInfo = 'Cluster'
+            if 'DBInstanceIdentifier' in instance:
+                dbInfo = 'Instance'
+                dbKey = 'DBInstanceIdentifier'
+            
+            print('... (RDS) inspecting {}::{}'.format(dbInfo, instance[dbKey]))
             
             if 'VpcSecurityGroups' in instance:
                 for sg in instance['VpcSecurityGroups']:
                     if 'Status' in sg and (sg['Status'] == 'active' or sg['Status'] == 'adding'):
                         if sg['VpcSecurityGroupId'] in securityGroupArr:
-                            securityGroupArr[sg['VpcSecurityGroupId']].append(instance['DBInstanceIdentifier'])
+                            securityGroupArr[sg['VpcSecurityGroupId']].append(instance[dbKey])
                         else:
-                            securityGroupArr[sg['VpcSecurityGroupId']] = [instance['DBInstanceIdentifier']]
+                            securityGroupArr[sg['VpcSecurityGroupId']] = [instance[dbKey]]
                 
             engine = instance['Engine']
             
@@ -102,7 +126,7 @@ class Rds(Service):
                 obj.setEngine(engine)
                 obj.run(self.__class__)
                 
-                objs[instance['Engine'] + '::' + instance['DBInstanceIdentifier']] = obj.getInfo()
+                objs[instance['Engine'] + '::' + dbInfo + '=' + instance[dbKey]] = obj.getInfo()
                 del obj
         
         for sg, rdsList in securityGroupArr.items():

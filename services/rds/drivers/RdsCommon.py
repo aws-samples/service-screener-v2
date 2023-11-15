@@ -16,18 +16,30 @@ class RdsCommon(Evaluator):
         self.db = db
         self.rdsClient = rdsClient
         self.cwClient = cwClient
+        self.ctClient = ctClient
+        
         self.__configPrefix = 'rds::' + db['Engine'] + '::' + db['EngineVersion'] + '::'
+        self.isCluster = False
+        if 'DBClusterIdentifier' in db:
+            self.isCluster = True
+            
         self.init()
         self.getInstInfo()
         self.getCAInfo()
         self.loadParameterInfo()
         
-        self.ctClient = ctClient
         
     def setEngine(self, engine):
         self.engine = engine
         
+        self.isAurora = False
+        if engine[0:6]=='aurora':
+            self.isAurora = True
+        
     def getCAInfo(self):
+        if self.isCluster == True:
+            return
+        
         ca = self.db['CACertificateIdentifier']
         k = 'RDSCaInfo::' + ca
         
@@ -55,7 +67,9 @@ class RdsCommon(Evaluator):
         _pr(self.results)
 
     def getInstInfo(self):
-        self.instInfo = aws_parseInstanceFamily(self.db['DBInstanceClass'])
+        
+        if self.isCluster == False:
+            self.instInfo = aws_parseInstanceFamily(self.db['DBInstanceClass'])
         
         engine = self.db['Engine']
         engineVersion = self.db['EngineVersion']
@@ -80,7 +94,12 @@ class RdsCommon(Evaluator):
         
     def loadParameterInfo(self):
         arr = {}
-        paramGroupName = self.db['DBParameterGroups'][0]['DBParameterGroupName']
+        
+        if self.isCluster == False:
+            paramGroupName = self.db['DBParameterGroups'][0]['DBParameterGroupName']
+        else: 
+            paramGroupName = self.db['DBClusterParameterGroup']
+            
         results = self.rdsClient.describe_db_parameters(
             DBParameterGroupName = paramGroupName
         )
@@ -166,6 +185,9 @@ class RdsCommon(Evaluator):
         self.results['StorageEncrypted'] = [flag, 'Off' if flag == -1 else 'On']
     
     def _checkHasPerformanceInsightsEnabled(self):
+        if self.isCluster == True:
+            return
+        
         flag = -1 if self.db['PerformanceInsightsEnabled'] == False else 1
         self.results['PerformanceInsightsEnabled'] = [flag, 'Off' if flag == -1 else 'On']
         
@@ -180,12 +202,20 @@ class RdsCommon(Evaluator):
             self.results[kk] = [-1, backupDay]
 
     def _checkIsUsingDefaultParameterGroups(self):
-        params = self.db['DBParameterGroups']
-        for param in params:
-            if 'default.' in param['DBParameterGroupName']:
-                self.results['DefaultParams'] = [-1, param['DBParameterGroupName']]
-
+        if self.isCluster == False:
+            params = self.db['DBParameterGroups']
+            for param in params:
+                if 'default.' in param['DBParameterGroupName']:
+                    self.results['DefaultParams'] = [-1, param['DBParameterGroupName']]
+        else:
+            param = self.db['DBClusterParameterGroup']
+            if param[0:7] == 'default.':
+                self.results['DefaultParams'] = [-1, param['DBClusterParameterGroup']]
+            
     def _checkMonitoringIntervals(self):
+        if self.isCluster == True:
+            return
+        
         if self.db['MonitoringInterval'] > 30 or self.db['MonitoringInterval'] == 0:
             self.results['MonitoringIntervalTooLow'] = [-1, self.db['MonitoringInterval']]
 
@@ -198,23 +228,34 @@ class RdsCommon(Evaluator):
         self.results['DeleteProtection'] = [flag, 'Off' if flag == -1 else 'On']
 
     def _checkIsPublicAccessible(self):
+        if self.isCluster == True:
+            return
+        
         flag = -1 if self.db['PubliclyAccessible'] == True else 1
         self.results['PubliclyAccessible'] = [flag, 'Off' if flag == -1 else 'On']
 
     def _checkSubnet3Az(self):
-        subnets = self.db['DBSubnetGroup']['Subnets']
-        
-        subnetName = []
-        for subnet in subnets:
-            subnetName.append(subnet['SubnetAvailabilityZone']['Name'])
-        
-        flag = 1
-        if len(subnets) < 3:
-            flag = -1
+        if self.isCluster == False:
+            subnets = self.db['DBSubnetGroup']['Subnets']
             
-        self.results['Subnets3Az'] = [flag, ', '.join(subnetName)]
+            subnetName = []
+            for subnet in subnets:
+                subnetName.append(subnet['SubnetAvailabilityZone']['Name'])
+            
+            flag = 1
+            if len(subnets) < 3:
+                flag = -1
+                
+            self.results['Subnets3Az'] = [flag, ', '.join(subnetName)]
+        else:
+            subnets = self.db['AvailabilityZones']
+            if len(subnets) < 3:
+                self.results['Subnets3Az'] = [-1, ', '.join(subnets)]
         
     def _checkIsInstanceLatestGeneration(self):
+        if self.isCluster == True:
+            return
+        
         key = self.__configPrefix + 'orderableInstanceType'
         instTypes = Config.get(key, [])
         
@@ -358,7 +399,7 @@ class RdsCommon(Evaluator):
                 self.results['SnapshotTooOld'] = [-1, days]
             
     def _checkCAExpiry(self):
-        if self.certInfo['isExpireIn365days'] == True:
+        if self.isCluster == False and self.certInfo['isExpireIn365days'] == True:
             exp = self.certInfo['ValidTill'].strftime("%Y-%m-%d")
             self.results['CACertExpiringIn365days'] = [-1, "Expired on {}, ({} days left)".format(exp, self.certInfo['expiredInDays'])]
     
@@ -395,7 +436,75 @@ class RdsCommon(Evaluator):
         if ratio < 0.2:
             self.results['FreeStorage20pct'] = [-1, str(ratio * 100) + ' / ' + str(freesize) + '(GB)']
 
+    def _checkClusterIOvsStorage(self):
+        if self.isCluster == False:
+            return
+        
+        storageType = 'aurora'
+        if 'StorageType' in self.db:
+            storageType = self.db['StorageType']
+        
+        MILLION = 1000*1000
+        ByteToGigaBytesRatio = 1024*1024*1024
+        cwClient = self.cwClient
+        metrics = ['VolumeReadIOPs', 'VolumeWriteIOPs']
+        
+        volumeMetric = 'VolumeBytesUsed'
+        dimensions = [
+            {
+                'Name': 'DBClusterIdentifier',
+                'Value': self.db['DBClusterIdentifier']
+            }
+        ]
+        
+        dayInSecond=(60*60*24)
+        monthInSecond=dayInSecond*30
+        
+        statsParams = {
+            'Dimensions':dimensions,
+            'Namespace':'AWS/RDS',
+            'StartTime':int(time.time()) - monthInSecond,
+            'EndTime':int(time.time()),
+            'Period':monthInSecond,
+            'Statistics':['Sum']
+        }
+        
+        ioCnt = 0
+        volumeSize = 0
+        for metric in metrics:
+            statsParams['MetricName'] = metric
+            resp = cwClient.get_metric_statistics(**statsParams)
+            data = resp.get('Datapoints')
+            
+            if data:
+                ioCnt = ioCnt + int(data[0]['Sum'])/MILLION
+            
+        statsParams['MetricName'] = volumeMetric
+        statsParams['Statistics'] = ['Maximum']
+        resp = cwClient.get_metric_statistics(**statsParams)
+        data = resp.get('Datapoints')
+        
+        if data:
+            volumeSize = data[0]['Maximum']/ByteToGigaBytesRatio
+        
+        if volumeSize == 0:
+            return
+        ratio = ioCnt / volumeSize
+        
+        ratioInfo = "Type: {}<br>[Ratio=ioCnt(million)/volumeSize(GB)]<br>[{}={}/{}]".format(storageType, round(ratio, 1), round(ioCnt, 1), round(volumeSize, 1))
+        
+        if ratio > 0.7 and storageType == 'aurora':
+            self.results['AuroraStorageTypeToUseIOOpt'] = [-1, ratioInfo]
+        elif ratio <= 0.7 and storageType == 'aurora-iopt1':
+            self.results['AuroraStorageTypeToUseStnd'] = [-1, ratioInfo]
+        else:
+            self.results['AuroraStorageTypeOK'] = [-1, ratioInfo]
+            return
+
     def _checkCPUUtilization(self):
+        if self.isCluster == True:
+            return
+        
         cwClient = self.cwClient
         serverVCPU = self.instInfo['specification']['vcpu']
         
@@ -462,6 +571,9 @@ class RdsCommon(Evaluator):
             self.results['RightSizingCpuLowUsageDetectedWithWeeklySpike'] = [-1, "MinCPU < 5% for {} days<br>AvgCPU < 30% for {}days<br>MaxCPU > 70%  for {}days".format(minCnt, avgCnt, maxCnt)]
 
     def _checkFreeMemory(self):
+        if self.isCluster == True:
+            return
+        
         cwClient = self.cwClient
         metric = 'FreeableMemory'
         dimensions = [
