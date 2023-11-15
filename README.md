@@ -1,6 +1,6 @@
 # Service Screener
 
-An open source guidance tool for AWS environments.
+An open source guidance tool for AWS environments. Click [here](https://bit.ly/ssv2demo) for sample report.
 
 ## Overview
 Service Screener is a tool that runs automated checks on AWS environments and provide recommendations based on the [AWS Well Architected Framework](https://aws.amazon.com/architecture/well-architected/). 
@@ -107,9 +107,6 @@ You can navigate to the service(s) listed to see detailed findings on each servi
 The report provides you an easy-to-navigate dashboard of the various best-practice checks that were run. 
 
 Use the left navigation bar to explore the checks per service. You can then expand on each check to read a description of the check, find out which resources were highlighted, and read a recommendation on how to remediate the finding.  
-
-## Sample Report
-See [SAMPLE REPORT](https://bit.ly/ssv2demo) for the sample report
 
 ## Contributing to service-screener
 We encourage public contributions! Please review [CONTRIBUTING](./CONTRIBUTING.md) for details on our code of conduct and development process.
