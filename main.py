@@ -19,6 +19,7 @@ from Screener import Screener
 def number_format(num, places=2):
     return locale.format_string("%.*f", (places, num), True)
 
+scriptStartTime = time.time()
 _cli_options = ArguParser.Load()
 
 debugFlag = _cli_options['debug']
@@ -29,12 +30,14 @@ bucket = _cli_options['bucket']
 runmode = _cli_options['mode']
 filters = _cli_options['tags']
 crossAccounts = _cli_options['crossAccounts']
+workerCounts = _cli_options['workerCounts']
 
 # print(crossAccounts)
 
 DEBUG = True if debugFlag in _C.CLI_TRUE_KEYWORD_ARRAY or debugFlag is True else False
 testmode = True if testmode in _C.CLI_TRUE_KEYWORD_ARRAY or testmode is True else False
 crossAccounts = True if crossAccounts in _C.CLI_TRUE_KEYWORD_ARRAY or crossAccounts is True else False
+_cli_options['crossAccounts'] = crossAccounts
 
 runmode = runmode if runmode in ['api-raw', 'api-full', 'report'] else 'report'
 
@@ -62,13 +65,16 @@ _AWS_OPTIONS = {
 Config.set("_SS_PARAMS", _cli_options)
 Config.set("_AWS_OPTIONS", _AWS_OPTIONS)
 
-defaultSessionRegion = 'ap-southeast-1'
+defaultSessionRegion = 'us-east-1'
 defaultBoto3 = boto3.Session(region_name=defaultSessionRegion)
 
 rolesCred = {}
 if crossAccounts == True:
     _info('Cross Accounts requested, validating necessary configurations...')
     cav = CrossAccountsValidator()
+    cav.setIamGlobalEndpointTokenVersion()
+    cav.runValidation()
+    cav.resetIamGlobalEndpointTokenVersion()
     if cav.isValidated() == False:
         print('CrossAccountsFlag=True but failed to validate, exit...')
         exit()
@@ -80,10 +86,6 @@ if crossAccounts == True:
     rolesCred.update(tmp)
 else:
     rolesCred = {'default': {}}
-    
-
-## ssBoto = boto3._get_default_session()
-## Config.set('ssBoto', ssBoto)
 
 ## Cleanup existing static resources if any
 for file in os.listdir(_C.ADMINLTE_DIR):
@@ -143,7 +145,22 @@ for acctId, cred in rolesCred.items():
     
     Config.setAccountInfo(tempConfig)
     acctInfo = Config.get('stsInfo')
+    print("")
+    print("=================================================")
     print("Processing the following account id: " + acctInfo['Account'])
+    print("=================================================")
+    print("")
+    ## Build List of Accounts for dropdown...
+    if acctLoop == 1:
+        listOfAccts = []
+        if acctId == 'default':
+            listOfAccts.append(acctInfo['Account'])
+        
+        for tacctId, tcred in rolesCred.items():
+            if tacctId != 'default':
+                listOfAccts.append(tacctId)
+            
+        Config.set('ListOfAccounts', listOfAccts)
     
     contexts = {}
     serviceStat = {}
@@ -175,8 +192,7 @@ for acctId, cred in rolesCred.items():
     for service in services:
         input_ranges = [(service, regions, filters) for service in services]
     
-    # pool = Pool(processes=len(services))
-    pool = Pool(processes=2)
+    pool = Pool(processes=int(workerCounts))
     pool.starmap(Screener.scanByService, input_ranges)
     
     ## <TODO>
@@ -266,4 +282,5 @@ shutil.make_archive('output', 'zip', adminlteDir)
 print("Pages generated, download \033[1;42moutput.zip\033[0m to view")
 print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m ~/service-screener-v2/output.zip \033[1;42m <===== \033[0m")
 
-print("@ Thank you for using " + Config.ADVISOR['TITLE'] + " @")
+scriptTimeSpent = round(time.time() - scriptStartTime, 3)
+print("@ Thank you for using {}, script spent {}s to complete @".format(Config.ADVISOR['TITLE'], scriptTimeSpent))

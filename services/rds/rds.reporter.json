@@ -842,5 +842,47 @@
     "ref": [
       "[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
     ]
+  },
+  "AuroraStorageTypeToUseIOOpt":{
+    "category": "C",
+    "^description": "[Aurora Rightsizing] You have {$COUNT} Aurora Cluster(s) are operating in Aurora Standard which you likely able to enjoy further cost-saving by changing the storage type to I/O-Optimized. Scroll down to the cluster detail session to look into the IO/storage ratio. If the ratio is more than 0.7, using Aurora I/O-Optimized is definitely provide better cost-saving. For higher accuracy, please review cost breakdown and ensure Aurora IO cost is 25% more than overall Aurora Cluster cost",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Consider using I/O-Optimized",
+    "ref": [
+      "[Choosing Aurora StorageType]<https://youtu.be/OlFeaVd6Ll4?si=r_2V66HqA83tJOkg&t=351>",
+      "[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications/"
+    ]
+  },
+  "AuroraStorageTypeToUseStnd":{
+    "category": "C",
+    "^description": "[Aurora Rightsizing] You have {$COUNT} Aurora Cluster(s) are operating in Aurora I/O-Optimized which you likely able to enjoy further cost-saving by changing the storage type to Aurora Standard. Scroll down to the cluster detail session to look into the IO/storage ratio. If the ratio is less than 0.7, using Aurora Standard is definitely provide better cost-saving. For higher accuracy, please review cost breakdown and ensure Aurora IO cost is NOT 25% more than overall Aurora Cluster cost",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Consider using Aurora Standard",
+    "ref": [
+      "[Choosing Aurora StorageType]<https://youtu.be/OlFeaVd6Ll4?si=r_2V66HqA83tJOkg&t=351>",
+      "[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications/"
+    ]
+  },
+  "AuroraStorageTypeOK":{
+    "category": "C",
+    "^description": "[Aurora Rightsizing] You have {$COUNT} Aurora Cluster(s) are operating in cost-efficient storageType setting in the cluster",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "I",
+    "shortDesc": "(Informational) Cluster IO/Storage Ratio",
+    "ref": [
+      "[Choosing Aurora StorageType]<https://youtu.be/OlFeaVd6Ll4?si=r_2V66HqA83tJOkg&t=351>",
+      "[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications/"
+    ]
   }
 }

@@ -23,11 +23,13 @@ class RdsPostgres(RdsCommon):
 
         ## seems no such things
         tempFileLimit = params.get('temp_file_limit', False)
-        if tempFileLimit in (False, None) or tempFileLimit < 10:
+        if tempFileLimit in (False, None) or int(tempFileLimit) < 10:
             self.results['PG__param_tempFileLimit'] = [-1, "Configured: {}, Recommended: {}".format(tempFileLimit, '10-500000001')]
 
         alevel = params.get('rds.force_autovacuum_logging_level', False)
-        alevel = alevel.upper()
+        if not isinstance(alevel, bool):
+            alevel = alevel.upper()
+        
         if not alevel in (False, 'INFO', 'DEBUG1'):
             self.results['PG__param_rdsAutoVacuum'] = [-1, "Configured: {}, Recommended: {}".format(alevel, 'INFO or DEBUG1')]
 

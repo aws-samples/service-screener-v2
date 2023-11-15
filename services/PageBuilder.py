@@ -386,9 +386,33 @@ class PageBuilder:
         headerPostCSS = open(self._getTemplateByKey('header.postcss'), 'r').read()
         output.append(
             headerPostCSS.replace('{$ADVISOR_TITLE}', Config.ADVISOR['TITLE'])
+                .replace('{$OPTIONS_ACCOUNTS', self.accountListsHTML())
         )
+        
+        js = """
+$('#changeAcctId').change(function(){
+    var url = window.location.href
+    var arr = url.split("/")
+    arr[arr.length - 2] = $(this).val()
+    var newLink = arr.join('/')
+    window.location.href = newLink
+})
+"""
+        self.addJS(js)
 
         return output
+    
+    def accountListsHTML(self):
+        accts = Config.get("ListOfAccounts", None)
+        acctInfo = Config.get('stsInfo')
+        html = []
+        for acct in accts:
+            slct = ''
+            if acct == acctInfo['Account']:
+                slct = ' selected'
+            html.append("<option value='{}'{}>{}</option>".format(acct, slct, acct))
+        
+        return ''.join(html);
     
     def buildFooter(self):
         output = []
