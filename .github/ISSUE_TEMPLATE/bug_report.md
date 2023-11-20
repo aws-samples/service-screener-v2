@@ -36,8 +36,8 @@ If applicable, add screenshots to help explain your problem.
  - OS: [e.g. Linux]
  - EBS volume size [e.g. 20GiB]
  - Region: [e.g. us-east-1]
- - PHP version [e.g. 7.2]
- - AWS SDK version [e.g. 3.0]
+ - Python version [e.g. 3.8]
+ - AWS SDK version (boto3) [e.g. 1.29.3]
  - Browser (to display output) [e.g. chrome, safari]
 
 **Additional context**
