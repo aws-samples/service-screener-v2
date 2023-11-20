@@ -12,9 +12,9 @@ A clear and concise description of what the bug is.
 
 **To Reproduce**
 Steps to reproduce the behavior:
-1.
-2.
-3.
+1. Clone Repo
+2. Setup Alias
+3. Run command
 
 **Full commands used to reproduce this bug**
 e.g: screener --regions ALL --services rds,iam,ec2
