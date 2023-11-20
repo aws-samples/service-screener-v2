@@ -171,7 +171,6 @@ for acctId, cred in rolesCred.items():
     if testmode == False:
         CfnTrailObj.boto3init()
         CfnTrailObj.createStack()
-        CfnTrailObj.deleteStack()
     
     overallTimeStart = time.time()
     # os.chdir('__fork')
@@ -194,6 +193,9 @@ for acctId, cred in rolesCred.items():
     
     pool = Pool(processes=int(workerCounts))
     pool.starmap(Screener.scanByService, input_ranges)
+    
+    if testmode == False:
+        CfnTrailObj.deleteStack()
     
     ## <TODO>
     ## parallel logic to be implement in Python
