@@ -6,6 +6,12 @@ labels: ''
 assignees: ''
 
 ---
+**Pick a category**
+[] New Checks/Rules
+[] New Services coverage
+[] UI improvement
+[] New Features (e.g: new parameter, new filter, new page)
+[] Others...
 
 **Is your feature request related to a problem? Please describe.**
 A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
