@@ -246,7 +246,7 @@ class IamAccount(IamCommon):
         except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']
             if e.response['Error']['Code'] == 'AccessDeniedException':
-               _warn('Unable describe CUR report. Likely this account is part of AWS Organizations')
+               _warn('Unable to describe the CUR report. It is likely that this account is part of AWS Organizations')
             else:
                 print(e)
         
