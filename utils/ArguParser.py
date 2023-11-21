@@ -79,6 +79,11 @@ class ArguParser:
             "required": False,
             "default": False,
             "help": "Screener to run multiple accounts"
+        },
+        'workerCounts':{
+            "required": False,
+            "default": 4,
+            "help": "Number of parallel threads, recommend 4 for Cloudshell"
         }
     }
 

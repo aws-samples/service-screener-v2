@@ -91,7 +91,7 @@ class Ec2Instance(Evaluator):
                 pos = image['Name'].find('SQL')
                 if pos > 0:
                     sqlVers = image['Name'][pos+4:pos+8]
-                    if EolVersion < sqlVers:
+                    if EolVersion >= sqlVers:
                         self.results['SQLServerEOL'] = [-1, image['Name']]
     
     def _checkInstanceTypeGeneration(self):

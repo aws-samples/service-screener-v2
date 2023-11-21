@@ -17,10 +17,13 @@ Please delete options that are not relevant, and add any that may be relevant.
 
 Please describe the tests that you ran to verify your changes. Provide instructions so we can reproduce. Please also list any relevant details for your test configuration
 
-- [ ] Test A
-- [ ] Test B
+- [ ] Single Account, Single Service and Single Region
+- [ ] Single Account, Single Service and Multiple Regions
+- [ ] Single Account, Multiple Services and Single Region
+- [ ] Single Account, Multiple Services and Multiple Regions
+- [ ] CrossAccounts, Multiple Services and Multiple Regions
 
-**Test Configuration**:
+**Test Configuration (Please declare if you are not using CloudShell)**:
 * Firmware version:
 * Hardware:
 * Toolchain:

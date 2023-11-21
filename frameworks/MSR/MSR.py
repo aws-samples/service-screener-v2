@@ -4,7 +4,7 @@ import constants as _C
 from utils.Config import Config
 from frameworks.Framework import Framework
 
-class PMSR(Framework):
+class MSR(Framework):
     def __init__(self, data):
         super().__init__(data)
         pass
@@ -27,7 +27,7 @@ class PMSR(Framework):
 if __name__ == "__main__":
     data = json.loads(open(_C.FRAMEWORK_DIR + '/api.json').read())
     # print(data)
-    o = PMSR(data)
+    o = MSR(data)
     o.readFile()
     # o.obj()
     o.generateMappingInformation()

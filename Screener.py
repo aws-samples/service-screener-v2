@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import botocore
 
 import time
 from utils.Config import Config
@@ -8,6 +9,7 @@ from services.Cloudwatch import Cloudwatch
 from services.Reporter import Reporter
 from services.PageBuilder import PageBuilder
 from services.dashboard.DashboardPageBuilder import DashboardPageBuilder
+from utils.Tools import _warn, _info
 
 from frameworks.FrameworkPageBuilder import FrameworkPageBuilder
 from utils.ExcelBuilder import ExcelBuilder
@@ -22,6 +24,8 @@ class Screener:
     
     @staticmethod
     def scanByService(service, regions, filters):
+        _cli_options = Config.get('_SS_PARAMS', {})
+        
         _zeroCount = {
             'resources': 0,
             'rules': 0,
@@ -65,8 +69,17 @@ class Screener:
                 contexts[service[0]] = {}
             
             Config.set('CWClient', cw.getClient())
+            
+            try:
+                contexts[service[0]][region] = serv.advise()
+            except botocore.exceptions.ClientError as e:
+                contexts[service[0]][region] = {}
+                eCode = e.response['Error']['Code']
+                print(eCode)
+                print(_cli_options['crossAccounts'])
+                if eCode == 'InvalidClientTokenId' and _cli_options['crossAccounts'] == True:
+                    _warn('Impacted Region: [{}], Services: {}... Cross Account limitation, encounted errors: {}'.format(reg, service[0], e))
                 
-            contexts[service[0]][region] = serv.advise()
             tempCount += len(contexts[service[0]][region])
             del serv
         

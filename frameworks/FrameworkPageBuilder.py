@@ -4,7 +4,7 @@ from services.PageBuilder import PageBuilder
 from frameworks.FTR.FTR import FTR
 from frameworks.SSB.SSB import SSB
 from frameworks.WAFS.WAFS import WAFS
-from frameworks.PMSR.PMSR import PMSR
+from frameworks.MSR.MSR import MSR
 
 class FrameworkPageBuilder(PageBuilder):
     COMPLIANCE_STATUS = ["Not available", "Compliant", "Need Attention"]
