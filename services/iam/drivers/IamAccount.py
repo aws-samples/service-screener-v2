@@ -245,7 +245,9 @@ class IamAccount(IamCommon):
                 self.results['enableCURReport'] = [-1, '']
         except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']
-            if e.response['Error']['Code'] == 'NoSuchEntity':
-                _warn('Unable describe CUR report. Likely this account is part of AWS Organizations')
+            if e.response['Error']['Code'] == 'AccessDeniedException':
+               _warn('Unable describe CUR report. Likely this account is part of AWS Organizations')
+            else:
+                print(e)
         
         return
