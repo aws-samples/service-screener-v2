@@ -86,7 +86,6 @@ class Rds(Service):
     def advise(self):
         objs = {}
         instances = self.getResources()
-        instances = []
         securityGroupArr = {}
         
         clusters = self.getClusters()
