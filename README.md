@@ -1,11 +1,11 @@
 # Service Screener
 
-An open source guidance tool for AWS environments. Click [here](https://bit.ly/ssv2demo) for sample report.
+An open source guidance tool for the AWS environment. Click [here](https://bit.ly/ssv2demo) for sample report.
 
 ## Overview
-Service Screener is a tool that runs automated checks on AWS environments and provide recommendations based on the [AWS Well Architected Framework](https://aws.amazon.com/architecture/well-architected/). 
+Service Screener is a tool that runs automated checks on AWS environments and provides recommendations based on AWS and community best practices. 
 
-AWS customers can use this tool on their own environments and use the recommendations to improve the Security, Reliability, Operational Excellence, Performance Efficiency and Cost Optimisation of their workloads. 
+AWS customers can use this tool on their own environments and use the recommendations to improve the Security, Reliability, Operational Excellence, Performance Efficiency and Cost Optimisation at the service level. 
 
 This tool aims to complement the [AWS Well Architected Tool](https://aws.amazon.com/well-architected-tool/). 
 
@@ -18,7 +18,9 @@ Running this tool is free as it is covered under the AWS Free Tier. If you have 
 ## Prerequisites
 1. Please review the [DISCLAIMER](./DISCLAIMER.md) before proceeding. 
 2. You must have an existing AWS Account.
-3. You must have an IAM User with sufficient read permissions. Here is a sample [policy](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_examples_iam_read-only-console.html). Additionally, The IAM User must also have both full access to AWS CloudShell i.e. AWSCloudShellFullAccess, and "cloudformation:CreateStack"
+3. You must have an IAM User with sufficient read permissions. Here is a sample [policy](https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_examples_iam_read-only-console.html). Additionally, the IAM User must also have the following permissions:
+   a. AWSCloudShellFullAccess
+   b. cloudformation:CreateStack
 
 ## Installing service-screener V2
 1. [Log in to your AWS account](https://docs.aws.amazon.com/cloudshell/latest/userguide/getting-started.html#start-session) using the IAM User with sufficient permissions described above. 
@@ -46,33 +48,33 @@ When running Service Screener, you will need to specify the regions and services
 
 We recommend running it in all regions where you have deployed workloads in. Adjust the code samples below to suit your needs then copy and paste it into Cloudshell to run Service Screener. 
 
-**Example 1: Running in the Singapore region, checking all services**
+**Example 1: Run in the Singapore region, check all services**
 ```
 screener --regions ap-southeast-1 
 ```
 
-**Example 2: Running in the Singapore region, checking only Amazon S3**
+**Example 2: Run in the Singapore region, check only Amazon S3**
 ```
 screener --regions ap-southeast-1 --services s3
 ```
 
-**Example 3: Running in the Singapore & North Virginia regions, checking all services**
+**Example 3: Run in the Singapore & North Virginia regions, check all services**
 ```
 screener --regions ap-southeast-1,us-east-1
 ```
 
-**Example 4: Running in the Singapore & North Virginia regions, checking RDS and IAM**
+**Example 4: Run in the Singapore & North Virginia regions, check RDS and IAM**
 ```
 screener --regions ap-southeast-1,us-east-1 --services rds,iam
 ```
 
-**Example 5: Running in the Singapore regions, by filtered resources based on tags (e.g: Name=env Values=prod and Name=department Values=hr,coe)**
+**Example 5: Run in the Singapore region, filter resources based on tags (e.g: Name=env Values=prod and Name=department Values=hr,coe)**
 ```
-## NOT SUPPORTED YET, RELEASE SOON
+## NOT SUPPORTED YET, TO BE RELEASED SOON
 screener --regions ap-southeast-1 --filters env=prod%department=hr,coe
 ```
 
-**Example 6: Running in all regions, and all services**
+**Example 6: Runn in all regions and all services**
 ```
 screener --regions ALL
 ```
@@ -89,7 +91,7 @@ screener --regions ALL
 ![Get Report](https://d39bs20xyg7k53.cloudfront.net/services-screener/p3-getreport.gif)
 
 ### Downloading the report
-The output is generated as an ~/service-screener-v2/output.zip file. 
+The output is generated as a ~/service-screener-v2/output.zip file. 
 You can [download the file](https://docs.aws.amazon.com/cloudshell/latest/userguide/working-with-cloudshell.html#files-storage) in the CloudShell console by clicking the *Download file* button under the *Actions* menu on the top right of the Cloudshell console. 
 
 ![Download Output](https://d39bs20xyg7k53.cloudfront.net/services-screener/p4-outputzip.gif)
@@ -106,7 +108,7 @@ You can navigate to the service(s) listed to see detailed findings on each servi
 ## Using the report 
 The report provides you an easy-to-navigate dashboard of the various best-practice checks that were run. 
 
-Use the left navigation bar to explore the checks per service. You can then expand on each check to read a description of the check, find out which resources were highlighted, and read a recommendation on how to remediate the finding.  
+Use the left navigation bar to explore the checks for each service. Expand each check to read the description, find out which resources were highlighted, and get recommendations on how to remediate the findings.  
 
 ## Contributing to service-screener
 We encourage public contributions! Please review [CONTRIBUTING](./CONTRIBUTING.md) for details on our code of conduct and development process.
