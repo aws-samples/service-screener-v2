@@ -26,7 +26,7 @@ When running Service Screener across the targeted accounts, follow these steps t
             1. ***ExecAccountNo*** - This indicates the AWS 12-digit account number for the account you are running the Service Screener from
             2. ***ExternalID*** - This indicates the unique identifier that third parties use to access a customer’s account. This is used to grant access from one AWS role to another.
             3. ***RoleName*** - This indicates the name of role created by the CloudFormation template. You can keep this as default (*ServiceScreenerAssumeRole*)
-    5. In the **Set deployment options** page, select all the regions that you are operating in
+    5. In the **Set deployment options** page, select **us-east-1** for region to be deployed to
     6. Review all the information, and check the acknowledgement box. Press **Submit**
 
 Now that the cross-account role is created, you will include the account numbers in the crossAccounts.json file. For an example of how the json look like, please look at [crossAccounts.sample.json](https://github.com/aws-samples/service-screener-v2/blob/main/crossAccounts.sample.json)
@@ -44,7 +44,7 @@ Now that the cross-account role is created, you will include the account numbers
 
 4. Move the file to the service-screener-v2 directory
 ```
-mv crossAccounts.json service-screener-v2
+mv ~/crossAccounts.json ~/service-screener-v2/
 ```
 Once you have completed that, you are ready to run Service Screener across multiple accounts based on the account number listed in the crossAccounts.json by running any of the commands listed below:
 
