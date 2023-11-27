@@ -10,6 +10,8 @@ Once the checks are being done, the report can be downloaded from the CloudShell
 
 ## Using Service Screener across multiple accounts
 
+Additional IAM Policy is required for cross accounts to work. We need permission to set iam assume-role SecurityToken to use V2 via **iam:SetSecurityTokenServicePreferences** (Service-Screener will first check the current version. If is already V2, no action required. If it is V1, it will set to V2 temporary while assume all the roles, then set it back to V1). We need V2 here as V1 does not support the default-non-opt-in regions (e.g: Jakarta)
+
 When running Service Screener across the targeted accounts, follow these steps to create the necessary role needed for Service Screener to assume:
 
 1. Download the [CloudFormation template](https://github.com/aws-samples/service-screener-v2/blob/cebd00c943b5f74d9384a5ff5a26f98ea114e445/usecases/crossAccounts/crossAccountRoleCF.yml).
