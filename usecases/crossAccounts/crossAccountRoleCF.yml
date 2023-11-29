@@ -39,3 +39,6 @@ Resources:
               - Effect: Allow
                 Action: 'cloudformation:CreateStack'
                 Resource: '*'
+              - Effect: Allow
+                Action: 'cloudformation:DeleteStack'
+                Resource: 'arn:aws:cloudformation:*:*:stack/ssv2-*'
