@@ -19,9 +19,9 @@ class RdsCommon(Evaluator):
         self.ctClient = ctClient
         
         self.__configPrefix = 'rds::' + db['Engine'] + '::' + db['EngineVersion'] + '::'
-        self.isCluster = False
-        if 'DBClusterIdentifier' in db:
-            self.isCluster = True
+        self.isCluster = True
+        if 'DBInstanceIdentifier' in db:
+            self.isCluster = False
             
         self.init()
         self.getInstInfo()
@@ -67,9 +67,15 @@ class RdsCommon(Evaluator):
         _pr(self.results)
 
     def getInstInfo(self):
+        self.isServerless = False
         
         if self.isCluster == False:
+            if 'serverless' in self.db['DBInstanceClass']:
+                self.isServerless = True
+                return
+            
             self.instInfo = aws_parseInstanceFamily(self.db['DBInstanceClass'])
+        
         
         engine = self.db['Engine']
         engineVersion = self.db['EngineVersion']
@@ -253,7 +259,7 @@ class RdsCommon(Evaluator):
                 self.results['Subnets3Az'] = [-1, ', '.join(subnets)]
         
     def _checkIsInstanceLatestGeneration(self):
-        if self.isCluster == True:
+        if self.isCluster == True or self.isServerless == True:
             return
         
         key = self.__configPrefix + 'orderableInstanceType'
@@ -313,6 +319,9 @@ class RdsCommon(Evaluator):
     
     
     def _checkHasPatches(self):
+        if self.isServerless == True:
+            return
+        
         engineVersion = self.db['EngineVersion']
         
         details = self.enginePatches
@@ -502,7 +511,7 @@ class RdsCommon(Evaluator):
             return
 
     def _checkCPUUtilization(self):
-        if self.isCluster == True:
+        if self.isCluster == True or self.isServerless == True:
             return
         
         cwClient = self.cwClient
@@ -571,7 +580,7 @@ class RdsCommon(Evaluator):
             self.results['RightSizingCpuLowUsageDetectedWithWeeklySpike'] = [-1, "MinCPU < 5% for {} days<br>AvgCPU < 30% for {}days<br>MaxCPU > 70%  for {}days".format(minCnt, avgCnt, maxCnt)]
 
     def _checkFreeMemory(self):
-        if self.isCluster == True:
+        if self.isCluster == True or self.isServerless == True:
             return
         
         cwClient = self.cwClient
