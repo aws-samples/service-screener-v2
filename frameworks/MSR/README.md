@@ -5,5 +5,5 @@
 
 Sample Execution
 ```
---frameworks MSR,WAFS,SSB,FTR --others F-SMP-CASH-c3f4544014a0-b9d1877f2a62
+screener --regions ALL --frameworks MSR,WAFS,SSB,FTR --others F-SMP-CASH-c3f4544014a0-b9d1877f2a62
 ```
