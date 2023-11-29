@@ -1,3 +1,4 @@
+
 AWSTemplateFormatVersion: "2010-09-09"
 Description: Create cross account role for service screener
 Parameters:
@@ -6,11 +7,16 @@ Parameters:
     Default: ServiceScreenerAssumeRole
   ExecAccountNo:
     Type: String
+    AllowedPattern : "[0-9]{12}"
+  ExternalID:
+    Type: String
+    AllowedPattern : "[a-zA-Z0-9]+"
 Resources:
-  SSRole: #An inline comment
+  SSRoleExternalID: #An inline comment
     Type: "AWS::IAM::Role"
     Properties: 
       RoleName: !Ref RoleName
+      MaxSessionDuration: 14400
       AssumeRolePolicyDocument: 
         Version: "2012-10-17"
         Statement: 
@@ -20,6 +26,9 @@ Resources:
                 - !Sub 'arn:aws:iam::${ExecAccountNo}:root'
             Action: 
               - "sts:AssumeRole"
+            Condition:
+              StringEquals:
+                sts:ExternalId: !Ref ExternalID
       ManagedPolicyArns:
         - "arn:aws:iam::aws:policy/ReadOnlyAccess"
       Policies:
@@ -30,3 +39,6 @@ Resources:
               - Effect: Allow
                 Action: 'cloudformation:CreateStack'
                 Resource: '*'
+              - Effect: Allow
+                Action: 'cloudformation:DeleteStack'
+                Resource: 'arn:aws:cloudformation:*:*:stack/ssv2-*'

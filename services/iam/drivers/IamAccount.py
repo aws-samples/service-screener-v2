@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from dateutil.tz import tzlocal
 
 from utils.Config import Config
+from utils.Tools import _warn
 from .IamCommon import IamCommon
  
 class IamAccount(IamCommon):
@@ -238,8 +239,15 @@ class IamAccount(IamCommon):
                 return 0
     
     def _checkCURReport(self):
-        results = self.curClient.describe_report_definitions()
-        if len(results.get('ReportDefinitions')) == 0:
-            self.results['enableCURReport'] = [-1, '']
+        try:
+            results = self.curClient.describe_report_definitions()
+            if len(results.get('ReportDefinitions')) == 0:
+                self.results['enableCURReport'] = [-1, '']
+        except botocore.exceptions.ClientError as e:
+            ecode = e.response['Error']['Code']
+            if e.response['Error']['Code'] == 'AccessDeniedException':
+               _warn('Unable to describe the CUR report. It is likely that this account is part of AWS Organizations')
+            else:
+                print(e)
         
         return

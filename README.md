@@ -74,7 +74,7 @@ screener --regions ap-southeast-1,us-east-1 --services rds,iam
 screener --regions ap-southeast-1 --filters env=prod%department=hr,coe
 ```
 
-**Example 6: Runn in all regions and all services**
+**Example 6: Run in all regions and all services**
 ```
 screener --regions ALL
 ```

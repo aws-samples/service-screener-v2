@@ -23,12 +23,6 @@ Please describe the tests that you ran to verify your changes. Provide instructi
 - [ ] Single Account, Multiple Services and Multiple Regions
 - [ ] CrossAccounts, Multiple Services and Multiple Regions
 
-**Test Configuration (Please declare if you are not using CloudShell)**:
-* Firmware version:
-* Hardware:
-* Toolchain:
-* SDK:
-
 # Checklist:
 
 - [ ] My code follows the style guidelines of this project
