@@ -48,7 +48,8 @@ class IamCommon(Evaluator):
 
                     doc = detail.get('PolicyVersion')
                     # doc = urllib.parse.unquote(doc['Document'])
-                    pObj = Policy(doc)
+                    pObj = Policy(doc['Document'])
+                    pObj.inspectAccess()
 
                     if pObj.hasFullAccessToOneResource() == True:
                         hasFullAccess = 1
@@ -60,7 +61,7 @@ class IamCommon(Evaluator):
             self.results['ManagedPolicyFullAccessOneServ'] = [-1, '<br>'.join(policyWithFullAccess)]
             
     def evaluateInlinePolicy(self, inlinePolicies, identifier, entityType):
-        if inlinePolicies is None:
+        if inlinePolicies is None or not inlinePolicies:
             return
         
         self.results['InlinePolicy'] = [-1, '<br>'.join(inlinePolicies)]
@@ -75,7 +76,6 @@ class IamCommon(Evaluator):
                 resp = self.iamClient.get_role_policy(PolicyName=policy, RoleName=identifier)
             
             doc = resp.get('PolicyDocument')
-            # print(doc)
             # doc = urllib.parse.unquote(doc)
             
             pObj = Policy(doc)

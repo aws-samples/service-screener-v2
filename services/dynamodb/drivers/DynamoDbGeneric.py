@@ -88,6 +88,35 @@ class DynamoDbGeneric(Evaluator):
             ecode = e.response['Error']['Code']
             emsg = e.response['Error']['Message']
             print(ecode, emsg)
+    
+     # logic to check CW Sum UserErrors > 0
+    def _check_user_errors(self):
+        _sampleCount = 0;
+        
+        try:
+            #Count the number active reads on the table on the GSIs
+            result = self.cloudWatchClient.get_metric_statistics(
+                Namespace = 'AWS/DynamoDB',
+                MetricName = 'UserErrors',
+                StartTime = datetime.datetime.now() - datetime.timedelta(7),
+                EndTime = datetime.datetime.now(),
+                Period = 900,
+                Statistics = [
+                    'SampleCount',
+                ],
+                Unit = 'Count'
+            )
+            
+            for eachDatapoints in result['Datapoints']:
+                _sampleCount += eachDatapoints['SampleCount']
+            
+            if _sampleCount >= 1.0:
+                self.results['userErrors'] = [-1, str(_sampleCount) + ' : SystemError in past 7 days']
+                    
+        except botocore.exceptions.ClientError as e:
+            ecode = e.response['Error']['Code']
+            emsg = e.response['Error']['Message']
+            print(ecode, emsg)
         
     # logic to check trail of deleteTable
     def _check_trail_delete_table(self):

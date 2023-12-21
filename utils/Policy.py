@@ -9,6 +9,11 @@ class Policy:
     publicAccess = False
     
     def __init__(self, document):
+        self.fullAccessList = {
+            'oneService': False,
+            'fullAdmin': False
+        }
+        
         self.doc = document
         # self.doc = json.loads(document)
         
@@ -33,12 +38,12 @@ class Policy:
                 else:
                     serv = perm = '*'
                     
-                if perm == '*':
-                    self.fullAccessList['oneService'] = True
-                    
                 if perm == '*' and serv == '*':
                     self.fullAccessList['fullAdmin'] = True
                     return
+                
+                if perm == '*':
+                    self.fullAccessList['oneService'] = True
                     
         return False
         

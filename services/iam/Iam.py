@@ -121,13 +121,16 @@ class Iam(Service):
         
         roles = self.getRoles()
         for role in roles:
+            if role['Arn'] != "arn:aws:iam::956288449190:role/auroraMeowRole":
+                continue
+            
             print('... (IAM::Role) inspecting ' + role['RoleName'])
             obj = IamRole(role, self.iamClient)
             obj.run(self.__class__)
             
             objs['Role::' + role['RoleName']] = obj.getInfo()
             del obj
-        
+
         groups = self.getGroups()
         for group in groups:
             print('... (IAM::Group) inspecting ' + group['GroupName'])
@@ -136,12 +139,11 @@ class Iam(Service):
             
             objs['Group::' + group['GroupName']] = obj.getInfo()
             del obj
-        
+            
         print('... (IAM:Account) inspecting')
         obj = IamAccount(None, self.awsClients, users, roles)
         obj.run(self.__class__)
         objs['Account::Config'] = obj.getInfo()
-
         
         return objs
     
