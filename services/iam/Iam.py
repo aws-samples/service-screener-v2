@@ -118,7 +118,7 @@ class Iam(Service):
             identifier = "<b>root_id</b>" if user['user'] == "<root_account>" else user['user']
             objs['User::' + identifier] = obj.getInfo()
             del obj
-        
+            
         roles = self.getRoles()
         for role in roles:
             print('... (IAM::Role) inspecting ' + role['RoleName'])
@@ -127,7 +127,7 @@ class Iam(Service):
             
             objs['Role::' + role['RoleName']] = obj.getInfo()
             del obj
-        
+
         groups = self.getGroups()
         for group in groups:
             print('... (IAM::Group) inspecting ' + group['GroupName'])
@@ -136,12 +136,11 @@ class Iam(Service):
             
             objs['Group::' + group['GroupName']] = obj.getInfo()
             del obj
-        
+            
         print('... (IAM:Account) inspecting')
         obj = IamAccount(None, self.awsClients, users, roles)
         obj.run(self.__class__)
         objs['Account::Config'] = obj.getInfo()
-
         
         return objs
     

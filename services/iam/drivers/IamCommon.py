@@ -60,7 +60,7 @@ class IamCommon(Evaluator):
             self.results['ManagedPolicyFullAccessOneServ'] = [-1, '<br>'.join(policyWithFullAccess)]
             
     def evaluateInlinePolicy(self, inlinePolicies, identifier, entityType):
-        if inlinePolicies is None:
+        if inlinePolicies is None or not inlinePolicies:
             return
         
         self.results['InlinePolicy'] = [-1, '<br>'.join(inlinePolicies)]
