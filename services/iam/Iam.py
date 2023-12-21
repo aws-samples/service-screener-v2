@@ -118,9 +118,12 @@ class Iam(Service):
             identifier = "<b>root_id</b>" if user['user'] == "<root_account>" else user['user']
             objs['User::' + identifier] = obj.getInfo()
             del obj
-            
+        
         roles = self.getRoles()
         for role in roles:
+            if role['Arn'] != "arn:aws:iam::956288449190:role/auroraMeowRole":
+                continue
+            
             print('... (IAM::Role) inspecting ' + role['RoleName'])
             obj = IamRole(role, self.iamClient)
             obj.run(self.__class__)

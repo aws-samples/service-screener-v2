@@ -48,7 +48,8 @@ class IamCommon(Evaluator):
 
                     doc = detail.get('PolicyVersion')
                     # doc = urllib.parse.unquote(doc['Document'])
-                    pObj = Policy(doc)
+                    pObj = Policy(doc['Document'])
+                    pObj.inspectAccess()
 
                     if pObj.hasFullAccessToOneResource() == True:
                         hasFullAccess = 1
@@ -75,7 +76,6 @@ class IamCommon(Evaluator):
                 resp = self.iamClient.get_role_policy(PolicyName=policy, RoleName=identifier)
             
             doc = resp.get('PolicyDocument')
-            # print(doc)
             # doc = urllib.parse.unquote(doc)
             
             pObj = Policy(doc)
