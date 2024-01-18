@@ -121,9 +121,6 @@ class Iam(Service):
         
         roles = self.getRoles()
         for role in roles:
-            if role['Arn'] != "arn:aws:iam::956288449190:role/auroraMeowRole":
-                continue
-            
             print('... (IAM::Role) inspecting ' + role['RoleName'])
             obj = IamRole(role, self.iamClient)
             obj.run(self.__class__)

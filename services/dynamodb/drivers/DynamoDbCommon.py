@@ -15,6 +15,7 @@ class DynamoDbCommon(Evaluator):
     def __init__(self, tables, dynamoDbClient, cloudWatchClient, serviceQuotaClient, appScalingPolicyClient, backupClient, cloudTrailClient):
         super().__init__()
         self.tables = tables
+        self.tablename = self.tables['Table']['TableName']
         self.dynamoDbClient = dynamoDbClient
         self.cloudWatchClient = cloudWatchClient
         self.serviceQuotaClient = serviceQuotaClient

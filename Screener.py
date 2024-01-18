@@ -69,9 +69,14 @@ class Screener:
                 contexts[service[0]] = {}
             
             Config.set('CWClient', cw.getClient())
-            
             try:
+                ## Enhancement 20240117 - Capture all scanned resources
+                classPrefix = Config.getDriversClassPrefix(service[0])
+                Config.set(classPrefix, reg)
+                
                 contexts[service[0]][region] = serv.advise()
+                Config.set(classPrefix, None)
+                
             except botocore.exceptions.ClientError as e:
                 contexts[service[0]][region] = {}
                 eCode = e.response['Error']['Code']
