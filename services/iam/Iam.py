@@ -121,7 +121,6 @@ class Iam(Service):
         
         roles = self.getRoles()
         for role in roles:
-            
             print('... (IAM::Role) inspecting ' + role['RoleName'])
             obj = IamRole(role, self.iamClient)
             obj.run(self.__class__)

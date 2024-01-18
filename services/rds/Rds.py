@@ -10,8 +10,8 @@ from services.rds.drivers.RdsMysqlAurora import RdsMysqlAurora
 from services.rds.drivers.RdsPostgres import RdsPostgres
 from services.rds.drivers.RdsPostgresAurora import RdsPostgresAurora
 from services.rds.drivers.RdsMssql import RdsMssql
-from services.rds.drivers.SecretsManager import SecretsManager
-from services.rds.drivers.SecretsVsDB import SecretsVsDB
+from services.rds.drivers.RdsSecretsManager import RdsSecretsManager
+from services.rds.drivers.RdsSecretsVsDB import RdsSecretsVsDB
 from services.rds.drivers.RdsSecurityGroup import RdsSecurityGroup
 
 class Rds(Service):
@@ -138,13 +138,13 @@ class Rds(Service):
         self.getSecrets()
         for secret in self.secrets:
             print('... (SecretsManager) inspecting ' + secret['Name'])
-            obj = SecretsManager(secret, self.smClient, self.ctClient)
+            obj = RdsSecretsManager(secret, self.smClient, self.ctClient)
             obj.run(self.__class__)
             
             objs['SecretsManager::'+ secret['Name']] = obj.getInfo()
             del obj
         
-        obj = SecretsVsDB(len(self.secrets), len(instances))
+        obj = RdsSecretsVsDB(len(self.secrets), len(instances))
         obj.run(self.__class__)
         objs['SecretsRDS::General'] = obj.getInfo()
         del obj

@@ -9,7 +9,7 @@ from utils.Tools import aws_parseInstanceFamily
 from utils.Tools import _warn
 from services.Evaluator import Evaluator
 
-class SecretsVsDB(Evaluator):
+class RdsSecretsVsDB(Evaluator):
     def __init__(self, noOfSecret, noOfDB):
         super().__init__()
         self.noOfSecret = noOfSecret

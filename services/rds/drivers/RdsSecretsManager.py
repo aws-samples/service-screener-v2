@@ -10,7 +10,7 @@ from utils.Tools import aws_parseInstanceFamily
 from utils.Tools import _warn
 from services.Evaluator import Evaluator
 
-class SecretsManager(Evaluator):
+class RdsSecretsManager(Evaluator):
     def __init__(self, secret, smClient, ctClient):
         super().__init__()
         self.secret = secret

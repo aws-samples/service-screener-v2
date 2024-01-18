@@ -12,7 +12,7 @@ from botocore.config import Config as bConfig
 # import drivers here
 from services.s3.drivers.S3Bucket import S3Bucket
 from services.s3.drivers.S3Control import S3Control
-from services.s3.drivers.Macie import Macie
+from services.s3.drivers.S3Macie import S3Macie
 
 class S3(Service):
     def __init__(self, region):
@@ -114,7 +114,7 @@ class S3(Service):
             objs["Bucket::" + bucket['Name']] = obj.getInfo()
             del obj
         
-        obj = Macie(self.macieV2Client)
+        obj = S3Macie(self.macieV2Client)
         obj.run(self.__class__)
         objs["Macie"] = obj.getInfo()
         return objs

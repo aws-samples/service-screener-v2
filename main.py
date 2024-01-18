@@ -179,7 +179,7 @@ for acctId, cred in rolesCred.items():
         os.mkdir(directory)
     
     files_in_directory = os.listdir(directory)
-    filtered_files = [file for file in files_in_directory if file.endswith(".json")]
+    filtered_files = [file for file in files_in_directory if (file.endswith(".json") or file=='all.csv')]
     for file in filtered_files:
     	path_to_file = os.path.join(directory, file)
     	os.remove(path_to_file)
@@ -210,7 +210,7 @@ for acctId, cred in rolesCred.items():
     
     hasGlobal = False
     for file in os.listdir(_C.FORK_DIR):
-        if file[0] == '.' or file == _C.SESSUID_FILENAME or file == 'tail.txt' or file == 'error.txt' or file == 'empty.txt':
+        if file[0] == '.' or file == _C.SESSUID_FILENAME or file == 'tail.txt' or file == 'error.txt' or file == 'empty.txt' or file == 'all.csv':
             continue
         f = file.split('.')
         if len(f) == 2:
@@ -238,7 +238,13 @@ for acctId, cred in rolesCred.items():
     
     # Cleanup
     # os.chdir(_C.HTML_DIR)
-    filetodel = _C.HTMLRES_DIR + '/error.txt'
+    ACCTDIR = Config.get('HTML_ACCOUNT_FOLDER_FULLPATH')
+    
+    filetodel = ACCTDIR + '/error.txt'
+    if os.path.exists(filetodel):
+        os.remove(filetodel)
+        
+    filetodel = ACCTDIR + '/all.csv'
     if os.path.exists(filetodel):
         os.remove(filetodel)
     
@@ -248,12 +254,7 @@ for acctId, cred in rolesCred.items():
     for folder in filtered_folders:
     	path_to_folder = os.path.join(directory, folder)
     	shutil.rmtree(path_to_folder)
-    
-    src = _C.FORK_DIR + '/error.txt'
-    if os.path.exists(src):
-        dest = _C.HTMLRES_DIR + '/error.txt'
-        os.rename(src, dest)
-    
+
     os.chdir(_C.ROOT_DIR)
     filetodel = _C.ROOT_DIR + '/output.zip'
     if os.path.exists(filetodel):
@@ -277,6 +278,17 @@ for acctId, cred in rolesCred.items():
     if os.path.exists(filetodel):
         os.remove(filetodel)
     # os.system('rm -f tail.txt')
+    
+    src = _C.FORK_DIR + '/error.txt'
+    if os.path.exists(src):
+        dest = ACCTDIR + '/error.txt'
+        os.rename(src, dest)
+        
+    src = _C.FORK_DIR + '/all.csv'
+    if os.path.exists(src):
+        dest = ACCTDIR + '/all.csv'
+        os.rename(src, dest)
+    
 
 adminlteDir = _C.ADMINLTE_ROOT_DIR
 shutil.make_archive('output', 'zip', adminlteDir)

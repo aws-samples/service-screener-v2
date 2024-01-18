@@ -23,27 +23,34 @@ class Policy:
     
     def inspectAccess(self):
         doc = self.doc
-        for statement in doc['Statement']:
+        docState = doc['Statement']
+        if type(doc['Statement']).__name__ == 'dict':
+            docState = [doc['Statement']]
+        for statement in docState:
             if statement['Effect'] != 'Allow':
                 continue
                 
-            actions = statement['Action']
-            actions = actions if isinstance(actions, list) else [actions]
+            if 'Action' in statement:    
+                actions = statement['Action']
+                actions = actions if isinstance(actions, list) else [actions]
             
-            for action in actions:
-                perm = action.split(':')
-                
-                if len(perm) != 1:
-                    serv, perm = perm
-                else:
-                    serv = perm = '*'
+                for action in actions:
+                    perm = action.split(':')
                     
-                if perm == '*' and serv == '*':
-                    self.fullAccessList['fullAdmin'] = True
-                    return
-                
-                if perm == '*':
-                    self.fullAccessList['oneService'] = True
+                    if len(perm) != 1:
+                        serv, perm = perm
+                    else:
+                        serv = perm = '*'
+                        
+                    if perm == '*' and serv == '*':
+                        self.fullAccessList['fullAdmin'] = True
+                        return
+                    
+                    if perm == '*':
+                        self.fullAccessList['oneService'] = True
+            
+            elif 'NotAction' in statement:
+                self.fullAccessList['oneService'] = True
                     
         return False
         

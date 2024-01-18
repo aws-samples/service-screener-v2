@@ -3,6 +3,7 @@ import time
 import boto3
 from botocore.config import Config as bConfig
 from utils.Config import Config
+import constants as _C
 
 class Service:
     _AWS_OPTIONS = {}
@@ -55,6 +56,15 @@ class Service:
     def __del__(self):
         timespent = round(time.time() - self.overallTimeStart, 3)
         print('\033[1;42mCOMPLETED\033[0m -- ' + self.__class__.__name__.upper() + '::'+self.region+' (' + str(timespent) + 's)')
+        
+        items = Config.retrieveAllCache()
+        key = [k for k in items.keys() if 'AllScannedResources' in k]
+        f = open(_C.FORK_DIR + '/' + 'all.csv', 'a+')
+        for ke in key:
+            f.write('\r\n'.join(items[ke]) + '\r\n')
+        f.close()
+            
+        
         Config.set(self.RULESPREFIX, [])
         
     def resourceHasTags(self, tags):
