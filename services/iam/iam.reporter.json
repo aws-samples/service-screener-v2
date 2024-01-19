@@ -232,7 +232,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Alternate Contact]<https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-update-contact.html/>"
+			"[Alternate Contact]<https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-update-contact-alternate.html/>"
 		]
 	},
 	"noUsersFound": {

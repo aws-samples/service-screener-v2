@@ -87,7 +87,7 @@
         "needFullTest": 0,
         "shortDesc": "EC2 Active",
         "ref": [
-            ""
+            "[Compute Optimizer]<https://aws.amazon.com/compute-optimizer/getting-started/>"
         ]
     },
     "EC2SGNumber": {
@@ -100,7 +100,7 @@
         "needFullTest": 0,
         "shortDesc": "EC2 Security Group Association",
         "ref": [
-            "https://docs.aws.amazon.com/vpc/latest/userguide/amazon-vpc-limits.html#vpc-limits-security-groups"
+            "[Security Groups Limit]<https://docs.aws.amazon.com/vpc/latest/userguide/amazon-vpc-limits.html#vpc-limits-security-groups>"
         ]
     },
     "EC2LowUtilization": {
@@ -113,7 +113,7 @@
         "needFullTest": 1,
         "shortDesc": "EC2 Low Utilization",
         "ref": [
-            "https://d1.awsstatic.com/whitepapers/cost-optimization-right-sizing.pdf"
+            "[Rightsizing Whitepaper]<https://d1.awsstatic.com/whitepapers/cost-optimization-right-sizing.pdf>"
         ]
     },
     "EC2HighUtilization": {
@@ -126,7 +126,7 @@
         "needFullTest": 0,
         "shortDesc": "EC2 High Utilization",
         "ref": [
-            "https://d1.awsstatic.com/whitepapers/cost-optimization-right-sizing.pdf"
+            "[Rightsizing Whitepaper]<https://d1.awsstatic.com/whitepapers/cost-optimization-right-sizing.pdf>"
         ]
     },
     "EC2InstancePublicIP": {
@@ -282,7 +282,7 @@
         "needFullTest": 0,
         "shortDesc": "EBS Fast Snapshot Enabled",
         "ref": [
-            "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-fast-snapshot-restore.html#fsr-pricing"    
+            "[EBS FastSnapshot Pricing]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-fast-snapshot-restore.html#fsr-pricing>"    
         ]
     },
     "SGDefaultInUsed": {
@@ -425,7 +425,7 @@
         "needFullTest": 0,
         "shortDesc": "Reserved Instance Recommendation",
         "ref": [
-            "https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/ri-recommendations.html"    
+            "[Reserved Instance]<https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/ri-recommendations.html>"    
         ]
     },
     "CESavingsPlans": {
@@ -438,7 +438,7 @@
         "needFullTest": 0,
         "shortDesc": "Savings Plans Recommendation",
         "ref": [
-            "https://docs.aws.amazon.com/savingsplans/latest/userguide/sp-recommendations.html"    
+            "[Saving Plans]<https://docs.aws.amazon.com/savingsplans/latest/userguide/sp-recommendations.html>"    
         ]
     },
     "ELBListenerInsecure": {
@@ -451,7 +451,7 @@
         "needFullTest": 0,
         "shortDesc": "Insecure Listener",
         "ref": [
-            "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html"    
+            "[ALB Configuration Guide]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html>"    
         ]
     },
     "ELBSGNumber": {
@@ -464,7 +464,7 @@
         "needFullTest": 0,
         "shortDesc": "ELB Security Group Association",
         "ref": [
-            "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-update-security-groups.html"    
+            "[Update ALB security groups]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-update-security-groups.html>"    
         ]
     },
     "ELBCrossZone": {
@@ -477,7 +477,7 @@
         "needFullTest": 0,
         "shortDesc": "ELB Cross Zone Load Balancing",
         "ref": [
-            "https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-disable-az.html"    
+            "[To Enable ALB Az]<https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-disable-az.html>"    
         ]
     },
     "ELBConnectionDraining": {
@@ -490,7 +490,7 @@
         "needFullTest": 0,
         "shortDesc": "ELB Connection Draining",
         "ref": [
-            "[ELB Connection Draining]<https://aws.amazon.com/blogs/aws/elb-connection-draining-remove-instances-from-service-with-care/>"    
+            "[ELB Connection Draining]<https://aws.amazon.com/blogs/aws/elb-connection-draining-remove-instances-from-service-with-care>"    
         ]
     },
     "ELBClassicLB": {
@@ -503,7 +503,7 @@
         "needFullTest": 1,
         "shortDesc": "ELB Classic Load Balancer",
         "ref": [
-            "[Migrate your Classic Load Balancer]<https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/migrate-classic-load-balancer.html/>"    
+            "[Migrate your Classic Load Balancer]<https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/migrate-classic-load-balancer.html>"    
         ]
     },
     "ELBEnableWAF": {
@@ -516,7 +516,7 @@
         "needFullTest": 1,
         "shortDesc": "ALB Web Application Firewall",
         "ref": [
-            "[AWS WAF for Applicatoin Load Balancers]<https://aws.amazon.com/blogs/aws/aws-web-application-firewall-waf-for-application-load-balancers/>"    
+            "[AWS WAF for Applicatoin Load Balancers]<https://aws.amazon.com/blogs/aws/aws-web-application-firewall-waf-for-application-load-balancers>"    
         ]
     },
     "ELBSGRulesMatch": {
@@ -542,7 +542,7 @@
         "needFullTest": 0,
         "shortDesc": "ELB Health Check Validation",
         "ref": [
-            ""    
+            "[Setup Target Groups' Health Checks]<https://docs.aws.amazon.com/elasticloadbalancing/latest/network/target-group-health-checks.html>"    
         ]
     },
     "ASGELBHealthCheckEnabled": {
@@ -555,7 +555,7 @@
         "needFullTest": 0,
         "shortDesc": "ELB Health Check Enabled",
         "ref": [
-            ""    
+            "[Setup Target Groups' Health Checks]<https://docs.aws.amazon.com/elasticloadbalancing/latest/network/target-group-health-checks.html>"    
         ]
     },
     "ASGInstancesRemoved": {
@@ -568,7 +568,7 @@
         "needFullTest": 0,
         "shortDesc": "No Instance Associated",
         "ref": [
-            ""    
+            "[Attached or Detached, Instances or LB to ASG]<https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-detach-attach-instances.html>"    
         ]
     },
     "ASGTargetGroupELBExist": {
@@ -581,7 +581,7 @@
         "needFullTest": 1,
         "shortDesc": "Target Group without ELB",
         "ref": [
-            ""    
+            "[Attached or Detached, Instances or LB to ASG]<https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-detach-attach-instances.html>"    
         ]
     },
     "ASGClassicLBExist": {
@@ -594,7 +594,7 @@
         "needFullTest": 1,
         "shortDesc": "Classic LB Deleted",
         "ref": [
-            ""    
+            "[Update ALB in ASG]<https://docs.aws.amazon.com/autoscaling/ec2/userguide/attach-load-balancer-asg.html>"    
         ]
     },
     "ASGAMIExist": {
@@ -607,7 +607,7 @@
         "needFullTest": 1,
         "shortDesc": "Launch Configuration/Template AMI Deleted",
         "ref": [
-            ""    
+            "[Update Launch Template in ASG]<https://docs.aws.amazon.com/autoscaling/ec2/userguide/create-auto-scaling-groups-launch-template.html>"    
         ]
     },
     "ASGIMDSv2": {

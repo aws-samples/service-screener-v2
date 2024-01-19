@@ -152,7 +152,7 @@
         "needFullTest": 0,
         "shortDesc": "Function not in used for 7 days",
         "ref": [
-            ""    
+            "[]<>"    
         ]
     },
     "lambdaNotInUsed30Days":{
@@ -165,7 +165,7 @@
         "needFullTest": 0,
         "shortDesc": "Function not in used for 30 days",
         "ref": [
-            ""    
+            "[]<>"    
         ]
     },
     "lambdaPublicAccess":{
