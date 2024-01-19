@@ -2,6 +2,8 @@
 
 An open source guidance tool for the AWS environment. Click [here](https://bit.ly/ssv2demo) for sample report.
 
+Disclaimer: The generated report has to be hosted locally and MUST NOT be internet accessible
+
 ## Overview
 Service Screener is a tool that runs automated checks on AWS environments and provides recommendations based on AWS and community best practices. 
 
