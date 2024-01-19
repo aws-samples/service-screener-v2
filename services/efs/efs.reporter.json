@@ -9,7 +9,7 @@
         "needFullTest": 1,
         "shortDesc": "Migrate your files to encrypted EFS",
         "ref": [
-            "[]<https://docs.aws.amazon.com/efs/latest/ug/encryption-at-rest.html>"    
+            "[EFS Encryption at Rest]<https://docs.aws.amazon.com/efs/latest/ug/encryption-at-rest.html>"    
         ]
     },
     "EnabledLifecycle": {
@@ -22,7 +22,7 @@
         "needFullTest": 0,
         "shortDesc": "Enable Lifecycle Management for EFS.",
         "ref": [
-            "[]<>"    
+            "[EFS Lifecycle]<https://docs.aws.amazon.com/efs/latest/ug/lifecycle-management-efs.html>"    
         ]
     },
     "AutomatedBackup": {
@@ -35,7 +35,7 @@
         "needFullTest": 0,
         "shortDesc": "Enable automatic backup for EFS.",
         "ref": [
-            "[]<>"    
+            "[EFS Backup]<https://docs.aws.amazon.com/efs/latest/ug/awsbackup.html>"    
         ]
     }
 }
