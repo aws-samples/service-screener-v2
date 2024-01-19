@@ -9,7 +9,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0, 
 		"ref": [
-			"[Tagging in Cost Analysis]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableLevelCostAnalysis.html/>"
+			"[Tagging in Cost Analysis]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableLevelCostAnalysis.html>"
 		]
 	},
 	"autoScalingHighUtil":{

@@ -9,7 +9,7 @@ from utils.Policy import Policy
 from utils.Tools import _warn
 from services.Evaluator import Evaluator
 
-class Macie(Evaluator):
+class S3Macie(Evaluator):
     def __init__(self, macieV2Client):
         super().__init__()
         self.macieV2Client = macieV2Client

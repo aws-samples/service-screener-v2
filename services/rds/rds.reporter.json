@@ -76,7 +76,7 @@
     "needFullTest": 0,
     "criticality": "I",
     "shortDesc": "Enable auto minor version upgrade",
-    "ref": [""]
+    "ref": ["[DB Version Upgrade]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_UpgradeDBInstance.Upgrading.html>"]
   },
   "StorageEncrypted":{
     "category": "S",
@@ -116,7 +116,7 @@
     "needFullTest": 0,
     "criticality": "M",
     "shortDesc": "Do not use default params",
-    "ref": [""]
+    "ref": ["[Working with Paramater Groups]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithParamGroups.html>"]
   },
   "EnhancedMonitor":{
     "category": "O",
@@ -127,7 +127,7 @@
     "needFullTest": 0,
     "criticality": "L",
     "shortDesc": "Enable Enhanced Monitoring",
-    "ref": [""]
+    "ref": ["[Enable Enhanced Monitoring]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Monitoring.OS.html>"]
   },
   "DeleteProtection":{
       "category": "O",
@@ -138,7 +138,7 @@
       "needFullTest": 0,
       "criticality": "H",
       "shortDesc": "Enable Delete Protection",
-      "ref": [""]
+      "ref": ["[Enable Delete Protection]<https://docs.fugue.co/FG_R00280.html>"]
   },
   "PubliclyAccessible":{
     "category": "S",
@@ -149,7 +149,7 @@
     "needFullTest": 0,
     "criticality": "H",
     "shortDesc": "Disable publically accesible flag.",
-    "ref": [""]
+    "ref": ["[How to connect to private RDS]<https://repost.aws/knowledge-center/rds-connectivity-instance-subnet-vpc>"]
   },
   "Subnets3Az":{
     "category": "R",
@@ -160,7 +160,7 @@
     "needFullTest": 0,
     "criticality": "M",
     "shortDesc": "Use three AZs for DB SubnetGroup",
-    "ref": [""]
+    "ref": ["[Setup Subnets Group in RDS]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_VPC.WorkingWithRDSInstanceinaVPC.html>"]
   },
   "LatestInstanceGeneration":{
     "category": "PC",
@@ -171,7 +171,7 @@
     "needFullTest": 0,
     "criticality": "M",
     "shortDesc": "Upgrade to Latest Generation",
-    "ref": [""]
+    "ref": ["[Upgrade RDS instance]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.DBInstance.Modifying.html>"]
   },
   "BurstableInstance":{
     "category": "P",
@@ -312,7 +312,7 @@
     "needFullTest": 1,
     "criticality": "M",
     "shortDesc": "Set value to 1",
-    "ref": [""]
+    "ref": ["[MySQL Param Best Practices]<https://aws.amazon.com/blogs/database/best-practices-for-configuring-parameters-for-amazon-rds-for-mysql-part-1-parameters-related-to-performance>"]
   },
   "MYSQL__LogsErrorEnable":{
     "category": "O",
@@ -854,7 +854,7 @@
     "shortDesc": "Consider using I/O-Optimized",
     "ref": [
       "[Choosing Aurora StorageType]<https://youtu.be/OlFeaVd6Ll4?si=r_2V66HqA83tJOkg&t=351>",
-      "[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications/"
+      "[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications>"
     ]
   },
   "AuroraStorageTypeToUseStnd":{
@@ -868,7 +868,7 @@
     "shortDesc": "Consider using Aurora Standard",
     "ref": [
       "[Choosing Aurora StorageType]<https://youtu.be/OlFeaVd6Ll4?si=r_2V66HqA83tJOkg&t=351>",
-      "[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications/"
+      "[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications>"
     ]
   },
   "AuroraStorageTypeOK":{
@@ -882,7 +882,7 @@
     "shortDesc": "(Informational) Cluster IO/Storage Ratio",
     "ref": [
       "[Choosing Aurora StorageType]<https://youtu.be/OlFeaVd6Ll4?si=r_2V66HqA83tJOkg&t=351>",
-      "[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications/"
+      "[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications>"
     ]
   }
 }

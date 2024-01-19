@@ -32,6 +32,54 @@ class Config:
     
     CURRENT_REGION = 'us-east-1'
     
+    ######
+    ## This is for capturing 
+    # TEXT = plain text
+    # DICT = self.0[1]
+    # ATTR = self.0
+    # SKIP = literally skip, not showing
+    SERVICES_IDENTIFIER_MAPPING = {
+        'cloudfrontdist': ['ATTR', 'dist'],
+        'cloudtrailaccount': ['TEXT', 'General'],
+        'cloudtrailcommon': ['DICT', 'trail', 'TrailARN'],
+        'dynamodbgeneric': ['TEXT', 'General'],
+        'dynamodbcommon': ['ATTR', 'tablename'],
+        'ec2autoscaling': ['DICT', 'asg', 'AutoScalingGroupName'],
+        'ec2compopt': ['TEXT', 'ComputeOptimizer'],
+        'ec2costexplorerrecs': ['TEXT', 'ReservedInstance&SavingPlans'],
+        'ec2ebssnapshot': ['TEXT', 'AllEC2Snapshots'],
+        'ec2ebsvolume': ['DICT', 'ebsVolumeData', 'VolumeId'],
+        'ec2eip': ['DICT', 'eip', 'PublicIp'],
+        'ec2elbclassic': ['DICT', 'elb', 'LoadBalancerName'],
+        'ec2elbcommon': ['DICT', 'elb', 'LoadBalancerArn'],
+        'ec2instance': ['DICT', 'ec2InstanceData', 'InstanceId'],
+        'ec2secgroup': ['DICT', 'secGroup', 'GroupId'],
+        'efsdriver': ['DICT', 'efs', 'FileSystemId'],
+        'ekscommon': ['ATTR', 'cluster'],
+        'elasticachememcached': ['DICT', 'cluster', 'ARN'],
+        'elasticacheredis': ['DICT', 'cluster', 'ARN'],
+        'elasticachereplicationgroup': ['DICT', 'group', 'ReplicationGroupId'],
+        'guarddutydriver': ['ATTR', 'detector_id'],
+        'iamaccount': ['TEXT', 'General'],
+        'iamgroup': ['DICT', 'group', 'GroupName'],
+        'iamrole': ['DICT', 'role', 'RoleName'],
+        'iamuser': ['DICT', 'user', 'user'],
+        'kmscommon': ['DICT', 'kms', 'Arn'],
+        'lambdacommon': ['ATTR', 'function_name', ],
+        'opensearchcommon': ['ATTR', 'domain'],
+        'rdsmysql': ['DICT', 'db', ['DBInstanceIdentifier']],
+        'rdsmssql': ['DICT', 'db', ['DBInstanceIdentifier']],
+        'rdspostgres': ['DICT', 'db', ['DBInstanceIdentifier']],
+        'rdsmysqlaurora': ['DICT', 'db', ['DBClusterIdentifier', 'DBInstanceIdentifier']],
+        'rdspostgresaurora': ['DICT', 'db', ['DBClusterIdentifier', 'DBInstanceIdentifier']],
+        'rdssecuritygroup': ['ATTR', 'sg'],
+        'rdssecretsmanager': ['DICT', 'secret', 'Name'],
+        'rdssecretsvsdb': ['SKIP'],
+        's3bucket': ['ATTR', 'bucket'],
+        's3control': ['TEXT', 'S3AccountLevel'],
+        's3macie': ['TEXT', 'Macie']
+    }
+    
     @staticmethod
     def init():
         global cache
@@ -76,6 +124,33 @@ class Config:
                 traceback.print_exc()
         
         return defaultValue
+        
+    @staticmethod
+    def retrieveAllCache():
+        return cache
+        
+    
+    ## do checking for prefix=cloud, if found, use first 8character instead
+    ## other than that, first 3 prefix should be unique
+    @staticmethod
+    def getDriversClassPrefix(driver):
+        name = Config.extractDriversClassPrefix(driver)
+        return 'regionInfo::' + name
+    
+    @staticmethod
+    def extractDriversClassPrefix(driver):
+        ## handling for S3
+        if driver[:2].lower() == 's3':
+            return 's3'
+            
+        if driver[:7].lower() == 'elastic':
+            classPrefix = driver[:10]
+        else:
+            classPrefix = driver[:3]
+            if len(driver) > 3 and driver[:5] == 'cloud':
+                classPrefix = driver[:8]
+            
+        return classPrefix
 
 try:
     if configHasInit:

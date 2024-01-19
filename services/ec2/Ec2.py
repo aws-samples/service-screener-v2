@@ -370,9 +370,9 @@ class Ec2(Service):
             objs[f"SG::{group['GroupId']}"] = obj.getInfo()
         
         # EIP checks    
-        print('... (Elastic IP Recommendations) inspecting')
         eips = self.getEIPResources()
         for eip in eips:
+            print('... (Elastic IP Recommendations) inspecting {}'.format(eip['PublicIp']))
             obj = Ec2EIP(eip)
             obj.run(self.__class__)
             objs[f"ElasticIP::{eip['AllocationId']}"] = obj.getInfo()

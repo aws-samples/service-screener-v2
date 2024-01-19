@@ -163,3 +163,4 @@ class DynamoDbGeneric(Evaluator):
             ecode = e.response['Error']['Code']
             emsg = e.response['Error']['Message']
             print(ecode, emsg)          
+            
