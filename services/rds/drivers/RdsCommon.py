@@ -2,6 +2,7 @@ import boto3
 
 import time
 import datetime
+from datetime import timezone
 
 from utils.Config import Config
 from utils.Tools import _pr
@@ -396,7 +397,7 @@ class RdsCommon(Evaluator):
             
             oldest_copy_date = oldest_copy['SnapshotCreateTime']
             
-            now = datetime.datetime.now().date()
+            now = datetime.datetime.now(timezone.utc)
             
             diff = now - oldest_copy_date
             days = diff.days
