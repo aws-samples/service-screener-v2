@@ -11,11 +11,11 @@ class DashboardPageBuilder(PageBuilder):
         output = []
         items = []
         dataSets = {
-            'S': 0,
-            'R': 0,
-            'C': 0,
-            'P': 0,
-            'O': 0
+            'S': {'T': 0, 'H': 0, 'M': 0, 'L': 0, 'I': 0},
+            'R': {'T': 0, 'H': 0, 'M': 0, 'L': 0, 'I': 0},
+            'C': {'T': 0, 'H': 0, 'M': 0, 'L': 0, 'I': 0},
+            'P': {'T': 0, 'H': 0, 'M': 0, 'L': 0, 'I': 0},
+            'O': {'T': 0, 'H': 0, 'M': 0, 'L': 0, 'I': 0}
         }
         
         hriSets = {
@@ -41,12 +41,14 @@ class DashboardPageBuilder(PageBuilder):
             items.append(self.getHRIInfo(cat, count, total))
         
         for region, details in dashboard['CATEGORY'].items():
-            for cat, cnt in details.items():
+            for cat, grp in details.items():
                 if cat == 'T':
                     continue
                 
                 if not cat == 'X':
-                    dataSets[cat] += cnt
+                    for sev, cnt in grp.items():
+                        dataSets[cat][sev] += cnt
+                        dataSets[cat]['T'] += cnt
         
         xhtml = "<dl class='row'>" + '\n'.join(items) + "</dl>"
         items = []
@@ -139,7 +141,7 @@ class DashboardPageBuilder(PageBuilder):
         colorArr = {
             'S': ['danger', 'Security', 'cog'],
             'R': ['fuchsia', 'Reliability', 'globe'],
-            'C': ['warning', 'Cost Optimization', 'dollar-sign'],
+            'C': ['primary', 'Cost Optimization', 'dollar-sign'],
             'P': ['success', 'Performance Efficiency', 'seedling'],
             'O': ['navy', 'Operation Excellence', 'wrench']
         }
@@ -148,14 +150,30 @@ class DashboardPageBuilder(PageBuilder):
         
         style = "style='color: #dfdfdf'" if key == 'O' else ""
         
+        total = cnt['T']
+        highCnt = cnt['H']
+        mediumCnt = cnt['M']
+        lowCnt = cnt['L']
+        infoCnt = cnt['I']
+        
         output = f"""
 <div class="small-box bg-{colorClass}">
   <div class="inner">
-    <h3>{cnt}</h3>
+    <h3>{total}</h3>
     <p>{title}</p>
   </div>
   <div class="icon">
     <i {style} class="fas fa-{icon}"></i>
+  </div>
+  <div class="row" style="
+    background-color: rgba(0,0,0,.1);
+    text-align: center;
+    margin: 1px;
+    ">
+    <div class="col-lg-3 col-sm-6"><i class="fas fa-ban"></i> {highCnt}</div>
+    <div class="col-lg-3 col-sm-6"><i class="fas fa-exclamation-triangle"></i> {mediumCnt}</div>
+    <div class="col-lg-3 col-sm-6"><i class="fas fa-eye"></i> {lowCnt}</div>
+    <div class="col-lg-3 col-sm-6"><i class="fas fa-info-circle"></i> {infoCnt}</div>
   </div>
 </div>
 """
@@ -188,15 +206,27 @@ class DashboardPageBuilder(PageBuilder):
         return output
         
     def generateSecurityBigBox(self, cnt):
+        total = cnt['T']
+        highCnt = cnt['H']
+        mediumCnt = cnt['M']
+        lowCnt = cnt['L']
+        infoCnt = cnt['I']
+        
         output = f"""
 <div class="col-sm-4">
 	<div class="small-box bg-danger" style='height: 357px'>
 	  <div class="inner">
-		<h3>{cnt}</h3>
+		<h3>{total}</h3>
 		<p>Security</p>
 	  </div>
 	  <div class="icon">
 		<i style='color: #dfdfdf' class="fas fa-skull-crossbones"></i>
+	  </div>
+	  <div class="row" style="background-color: rgba(0,0,0,.1); text-align: center; font-size:26px; margin: 1px; margin-top: 167px">
+	    <div class="col-lg-6 col-sm-6"><i class="fas fa-ban"></i> {highCnt}</div>
+        <div class="col-lg-6 col-sm-6"><i class="fas fa-exclamation-triangle"></i> {mediumCnt}</div>
+        <div class="col-lg-6 col-sm-6"><i class="fas fa-eye"></i> {lowCnt}</div>
+        <div class="col-lg-6 col-sm-6"><i class="fas fa-info-circle"></i> {infoCnt}</div>
 	  </div>
 	</div>
 </div>
