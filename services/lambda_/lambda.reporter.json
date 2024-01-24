@@ -152,7 +152,7 @@
         "needFullTest": 0,
         "shortDesc": "Function not in used for 7 days",
         "ref": [
-            "[]<>"    
+            "[API to delete Lambda]<https://docs.aws.amazon.com/lambda/latest/dg/API_DeleteFunction.html>"    
         ]
     },
     "lambdaNotInUsed30Days":{
@@ -165,7 +165,7 @@
         "needFullTest": 0,
         "shortDesc": "Function not in used for 30 days",
         "ref": [
-            "[]<>"    
+            "[API to delete Lambda]<https://docs.aws.amazon.com/lambda/latest/dg/API_DeleteFunction.html>" 
         ]
     },
     "lambdaPublicAccess":{
