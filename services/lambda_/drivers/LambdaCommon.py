@@ -109,6 +109,9 @@ class LambdaCommon(Evaluator):
         return
 
     def _check_code_signing_disabled(self):
+        if self.lambda_['PackageType'] != 'Zip':
+            return
+        
         code_sign = self.lambda_client.get_function_code_signing_config(
             FunctionName=self.function_name
         )
