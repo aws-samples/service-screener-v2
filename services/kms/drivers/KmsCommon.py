@@ -1,7 +1,7 @@
 import boto3
 
 import time
-import datetime
+from datetime import datetime, tzinfo
 
 from utils.Config import Config
 from utils.Tools import _pr
@@ -24,7 +24,7 @@ class KmsCommon(Evaluator):
             self.results['KeyRotationEnabled'] = [-1, False]
             
         if self.kms['KeyState'] == 'PendingDeletion':
-            self.results['KeyInPendingDeletion'] = [-1, self.kms['DeletionDate']]
+            self.results['KeyInPendingDeletion'] = [-1, self.kms['DeletionDate'].strftime("%Y-%m-%d %H:%M:%S %Z")]
             
         if self.kms['KeyState'] == 'Disabled':
             self.results['DisabledKey'] = [-1, None]
