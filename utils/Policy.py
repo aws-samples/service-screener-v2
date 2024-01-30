@@ -83,8 +83,16 @@ class Policy:
         doc = self.doc
         
         policy = {'allow': {}, 'deny': {}}
+        cnt = 1;
         for statement in doc['Statement']:
             effect = statement['Effect'].lower()
-            policy[effect][statement['Sid']] = {'Principal': statement['Principal'], 'Action': statement['Action']}
+            
+            if 'Sid' in statement:
+                sid = statement['Sid']
+            else:
+                sid = 'noSid:' + str(cnt)
+                cnt = cnt + 1
+            
+            policy[effect][sid] = {'Principal': statement['Principal'], 'Action': statement['Action']}
             
         return policy
