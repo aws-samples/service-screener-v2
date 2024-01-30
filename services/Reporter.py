@@ -153,7 +153,13 @@ class Reporter:
                 itemSize = len(obj)
 
                 #check criticality
+                category = self._checkCategory(check)
+                mainCategory = category[0]
+                if mainCategory == 'T':
+                    continue
+                
                 critical = self._checkCriticality(check)
+                
                 if 'CRITICALITY' not in dashboard:
                     dashboard['CRITICALITY'] = {}
                 if region not in dashboard['CRITICALITY']:
@@ -175,9 +181,9 @@ class Reporter:
                 if region not in dashboard['CATEGORY']:
                     dashboard['CATEGORY'][region] = {}
                 if mainCategory not in dashboard['CATEGORY'][region]:
-                    dashboard['CATEGORY'][region][mainCategory] = 0
+                    dashboard['CATEGORY'][region][mainCategory] = {'H': 0, 'M': 0, 'L': 0, 'I': 0}
                 
-                dashboard['CATEGORY'][region][mainCategory] += itemSize
+                dashboard['CATEGORY'][region][mainCategory][critical] += itemSize
 
                 # Enhance for MAP summary
                 if mainCategory == 'T':
