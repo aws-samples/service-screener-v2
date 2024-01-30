@@ -109,6 +109,9 @@ class LambdaCommon(Evaluator):
         return
 
     def _check_code_signing_disabled(self):
+        if self.lambda_['PackageType'] != 'Zip':
+            return
+        
         code_sign = self.lambda_client.get_function_code_signing_config(
             FunctionName=self.function_name
         )
@@ -169,6 +172,10 @@ class LambdaCommon(Evaluator):
     def _check_runtime(self):
         if not os.path.exists(self.RUNTIME_PATH):
             print("Skipped runtime version check due to unable to locate runtime option path")
+            return
+        
+        ## Container based will skip
+        if self.lambda_['PackageType'] != 'Zip':
             return
 
         arr = Config.get('lambdaRunTimeList', False)
