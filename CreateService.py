@@ -16,7 +16,6 @@ serviceName = args.service
 serviceName = serviceName.replace("-","")
 
 servicePath = _C.SERVICE_DIR + '/' + serviceName + '/'
-# serviceReporterJsonPath = _C.SERVICE_DIR + '/' + folder + '/' + service + '.reporter.json'
 
 if os.path.isdir(servicePath):
     print(servicePath + ' is existing. Please make sure the service name is correct')
