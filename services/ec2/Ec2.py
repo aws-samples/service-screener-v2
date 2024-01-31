@@ -67,16 +67,22 @@ class Ec2(Service):
             Filters = filters
         )
         
-            
-        arr = results.get('Reservations')
+        arrs = results.get('Reservations')
         while results.get('NextToken') is not None:
             results = self.ec2Client.describe_instances(
                 Filters = filters,
                 NextToken = results.get('NextToken')
             )    
-            arr = arr + results.get('Reservations')
-
-        return arr
+            arrs = arrs + results.get('Reservations')
+        
+        resources = []
+        for arr in arrs:
+            for instance in arr['Instances']:
+                if instance['State']['Name'] != 'terminated':
+                    resources.append(arr)
+                    break
+        
+        return resources
     
     def getEC2SecurityGroups(self,instance):
         if 'SecurityGroups' not in instance:
