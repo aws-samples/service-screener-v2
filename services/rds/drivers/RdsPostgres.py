@@ -31,7 +31,7 @@ class RdsPostgres(RdsCommon):
             alevel = alevel.upper()
         
         if not alevel in (False, 'INFO', 'DEBUG1'):
-            self.results['PG__param_rdsAutoVacuum'] = [-1, "Configured: {}, Recommended: {}".format(alevel, 'INFO or DEBUG1')]
+            self.results['PG__param_rdsAutoVacuumLevel'] = [-1, "Configured: {}, Recommended: {}".format(alevel, 'INFO or DEBUG1')]
 
         adlevel = params.get('log_autovacuum_min_duration', False)
         if adlevel in (False, None) or int(adlevel) > 120000:
@@ -57,3 +57,15 @@ class RdsPostgres(RdsCommon):
         synchronous_commit = params.get('synchronous_commit', False)
         if not synchronous_commit in ('on', '1', 1, False):
             self.results['PG__param_synchronousCommit'] = [-1, "Configured: {}, Recommended: {}".format(synchronous_commit, '1')]
+            
+        autovacuum = params.get('autovacuum', False)
+        if autovacuum in ('False', 'off', 0):
+            self.results['PG__param_autovacuum'] = [-1, "Configured: {}, Recommended: {}".format(autovacuum, '1')]
+            
+        enable_indexonlyscan = params.get('enable_indexonlyscan', False)
+        if enable_indexonlyscan in ('False', 'off', 0):
+            self.results['PG__param_enable_indexonlyscan'] = [-1, "Configured: {}, Recommended: {}".format(enable_indexonlyscan, '1')]
+            
+        enable_indexscan = params.get('enable_indexscan', False)
+        if enable_indexscan in ('False', 'off', 0):
+            self.results['PG__param_enable_indexscan'] = [-1, "Configured: {}, Recommended: {}".format(enable_indexscan, '1')]

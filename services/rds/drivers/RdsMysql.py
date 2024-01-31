@@ -54,3 +54,12 @@ class RdsMysql(RdsCommon):
         ac = self.dbParams.get('autocommit', None)
         if ac in (None,  'OFF', 0, '0'):
             self.results['MYSQL__parammAutoCommit'] = [-1, ac]
+            
+    def _checkParamInnodbSettings(self):
+        cb = self.dbParams.get('innodb_change_buffering', False)
+        if not cb in ('False', 'off', 0):
+            self.results['MYSQL__innodb_change_buffering'] = [-1, "Configured: {}, Recommended: {}".format(cb, 0)]
+            
+        of = self.dbParams.get('innodb_open_files', 0)
+        if of < 65:
+            self.results['MYSQL__innodb_open_files'] = [-1, "Configured: {}, Recommended: {}".format(of, 65)]

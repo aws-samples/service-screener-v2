@@ -406,7 +406,7 @@
       "[Postgres Param: log_temp_files]<https://postgresqlco.nf/doc/en/param/log_temp_files/>"
     ]
   },
-  "PG__param_rdsAutoVacuum":{
+  "PG__param_rdsAutoVacuumLevel":{
     "category": "O",
     "^description": "[Loggings] {$COUNT} of your production RDS PostgreSQL resources including RDS instances, RDS Aurora instances, and RDS Aurora clusters don't have autovacuum logging level set. By default autovacuum workers in RDS PostgreSQL and Amazon Aurora PostgreSQL will not generate any logs (even if log_autovacuum_min_duration is set). You should set <b>rds.force_autovacuum_logging_level</b> to 'warning' autovacuum logs to be captured in PostgreSQL logs.",
     "downtime": 1,
@@ -883,6 +883,103 @@
     "ref": [
       "[Choosing Aurora StorageType]<https://youtu.be/OlFeaVd6Ll4?si=r_2V66HqA83tJOkg&t=351>",
       "[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications>"
+    ]
+  },
+  "RdsIsIdle7days":{
+    "category": "C",
+    "^description": "[Cost Optimization] You have {$COUNT} RDS instance(s) have not had a connection for a prolonged period of time (more than 7 days), you can delete the instance to reduce costs. If persistent storage is needed for data on the instance, you can use lower-cost options such as taking and retaining a DB snapshot. Manually created DB snapshots are retained until you delete them.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "RDS is idle",
+    "ref": [
+      "[Idle DB Instances]<https://docs.aws.amazon.com/awssupport/latest/user/cost-optimization-checks.html#amazon-rds-idle-dbs-instances>",
+      "[Taking RDS Snapshot Manually]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_CreateSnapshot.html>"
+    ]
+  },
+  "PG__param_autovacuum": {
+    "category": "P",
+    "^description": "[Performance] You have {$COUNT} RDS Postgresql instance(s) do not have autovacuum parameter turned on. Turning autovacuum off increases the table and index bloat and impacts the performance. AWS recommend that you turn on autovacuum in the DB parameter groups",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "M",
+    "shortDesc": "RDS is idle",
+    "ref": [
+      "[Impact on Turning off Autovacuum]<https://docs.aws.amazon.com/awssupport/latest/user/performance-checks.html#rds-autovacuum-off>",
+      "[Autovacuum Best Practices]<https://aws.amazon.com/blogs/database/understanding-autovacuum-in-amazon-rds-for-postgresql-environments>"
+    ]
+  },
+  "AuroraStorage64TBLimit": {
+    "category": "P",
+    "^description": "[Performance] You have {$COUNT} DB clusters support volumes up to 64 TiB. The latest engine versions support volumes up to 128 TiB. AWS recommend that you upgrade the engine version of your DB cluster to latest versions to support volumes up to 128 TiB.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "M",
+    "shortDesc": "Aurora DB instances supports only up to 64 TiB",
+    "ref": [
+      "[Aurora DB Clusters 64TiB Volume]<https://docs.aws.amazon.com/awssupport/latest/user/performance-checks.html#rds-db-clusters-64-tib-volume>",
+      "[Aurora DB Clusters size limits]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/CHAP_Limits.html#RDS_Limits.FileSize.Aurora>"
+    ]
+  },
+  "PG__param_enable_indexonlyscan": {
+    "category": "P",
+    "^description": "[Performance] You have {$COUNT} RDS Postgresql instance(s) cannot use the index-only scan plan when it is turned off. When you turn off enable_indexonlyscan parameter, it prevents the query planner from selecting an optimal execution plan. The query planner uses a different plan type, such as index scan which can increase the query cost and execution time. The index only scan plan type retrieves the data without accessing the table data.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "M",
+    "shortDesc": "Update enable_indexonlyscan value to 1",
+    "ref": [
+      "[PostgreSQL Documentation on IndexOnlyScan]<https://www.postgresql.org/docs/current/runtime-config-query.html#GUC-ENABLE-INDEXONLYSCAN>",
+      "[AWS view on enable_indexonlyscan]<https://docs.aws.amazon.com/awssupport/latest/user/performance-checks.html#rds-enable-indexonlyscan-parameter-off>"
+    ]
+  },
+  "PG__param_enable_indexscan": {
+    "category": "P",
+    "^description": "[Performance] You have {$COUNT} RDS Postgresql instance(s) query planner or optimizer cant use the index scan plan type when it is turned off. When you turn off enable_indexscan parameter, it prevents the query planner from selecting an optimal execution plan. The query planner uses a different plan type, such as index scan which can increase the query cost and execution time.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "M",
+    "shortDesc": "Update enable_indexonlyscan value to 1",
+    "ref": [
+      "[PostgreSQL Documentation on IndexScan]<https://www.postgresql.org/docs/current/runtime-config-query.html#GUC-ENABLE-INDEXSCAN>",
+      "[AWS view on enable_indexscan]<https://docs.aws.amazon.com/awssupport/latest/user/performance-checks.html#rds-enable-indexscan-parameter-off>"
+    ]
+  },
+  "MYSQL__innodb_change_buffering":{
+    "category": "P",
+    "^description": "[Performance] You have {$COUNT} RDS MySQL instance(s) is having innodb_change_buffering enabled. We recommend that you set the value of innodb_change_buffering parameter to NONE. Change buffering allows a MySQL DB instance to defer a few writes, which are required to maintain secondary indexes. This feature was useful in environments with slow disks. The change buffering configuration improved the DB performance slightly but caused a delay in crash recovery and long shutdown times during upgrade.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "M",
+    "shortDesc": "Set innodb_change_buffering paramater value to NONE",
+    "ref": [
+      "[AWS view on innodb_change_buffering]<https://docs.aws.amazon.com/awssupport/latest/user/performance-checks.html#rds-innodb-parameter-less-than-optimal>"
+    ]
+  },
+  "MYSQL__innodb_open_files":{
+    "category": "P",
+    "^description": "[Performance] You have {$COUNT} RDS MySQL instance(s) is having innodb_open_files parameter is set to less than 65. The innodb_open_files parameter controls the number of files InnoDB can open at one time. InnoDB opens all of the log and system tablespace files when mysqld is running. Your DB instance has a low value for the maximum number of files InnoDB can open at one time. We recommend that you set the innodb_open_files parameter to a minimum value of 65.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "M",
+    "shortDesc": "Set the innodb_open_files parameter to a minimum value of 65",
+    "ref": [
+      "[Mysql Doc on innodb_open_files]<https://dev.mysql.com/doc/refman/5.7/en/innodb-parameters.html#sysvar_innodb_open_files>",
+      "[AWS view on innodb_open_files]<https://docs.aws.amazon.com/awssupport/latest/user/performance-checks.html#rds-innodb-open-files-parameter-low>"
     ]
   }
 }

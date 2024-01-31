@@ -45,6 +45,10 @@ class Rds(Service):
             )
             arr = arr + results.get('DBInstances')
         
+        for k, v in enumerate(arr):
+            if v['DBInstanceStatus'].lower() in ['deleting', 'failed', 'restore-error', 'failed'] or v['DBInstanceStatus'].lower().startswith('incompatible'):
+                del arr[k]
+        
         if not self.tags:
             return arr
         

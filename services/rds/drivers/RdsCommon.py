@@ -446,6 +446,35 @@ class RdsCommon(Evaluator):
         if ratio < 0.2:
             self.results['FreeStorage20pct'] = [-1, str(ratio * 100) + ' / ' + str(freesize) + '(GB)']
 
+    def _checkHasDatabaseConnection(self):
+        if self.isCluster == True:
+            return
+        
+        metric = 'DatabaseConnections'
+        dimensions = [
+            {
+                'Name': 'DBInstanceIdentifier',
+                'Value': self.db['DBInstanceIdentifier']
+            }   
+        ]
+        
+        day7 = 60 * 60 * 24 * 7
+        
+        cw_client = self.cwClient
+        results = cw_client.get_metric_statistics(
+            Dimensions=dimensions,
+            Namespace='AWS/RDS',
+            MetricName=metric,
+            StartTime=int(time.time()) - day7,
+            EndTime=int(time.time()),
+            Period=day7,
+            Statistics=['Sum']
+        )
+        
+        dp = results['Datapoints']
+        if dp and dp[0]['Sum'] == 0:
+            self.results['RdsIsIdle7days'] = [-1, None]
+
     def _checkClusterIOvsStorage(self):
         if self.isCluster == False:
             return
