@@ -68,7 +68,7 @@
 	"originFailover": {
 		"category": "R",
 		"^description": "Your CloudFront distributions is not setup for origin failover. To set up origin failover, you must have a distribution with at least two origins.",
-		"shortDesc": "Create an origin group with two origins: a primary and a secondary for your default origin.",
+		"shortDesc": "Create an origin group with two origins: a primary and a secondary.",
 		"criticality": "M",
 		"downtime": 0,
 		"slowness": 0,
