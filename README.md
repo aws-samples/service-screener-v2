@@ -30,6 +30,7 @@ Running this tool is free as it is covered under the AWS Free Tier. If you have 
 
 <details>
 <summary>Launch AWS Cloudshell Walkthrough</summary>
+   
 ![Launch AWS CloudShell](https://d39bs20xyg7k53.cloudfront.net/services-screener/p1-cloudshell.gif)
 </details>
 
@@ -47,6 +48,7 @@ alias screener="python3 $(pwd)/main.py"
 ```
 <details>
 <summary>Install Dependecies Walkthrough</summary>
+   
 ![Install dependencies](https://d39bs20xyg7k53.cloudfront.net/services-screener/p2-dependencies.gif)
 </details>
 
