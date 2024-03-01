@@ -24,13 +24,22 @@ class Cloudfront(Service):
         while True:
             if "DistributionList" in response and "Items" in response["DistributionList"]:
                 for dist in response["DistributionList"]["Items"]:
-                    arr.append(dist["Id"])
+                    toAppend = True
+                    if self.tags:
+                        myTags = self.cloudfrontClient.list_tags_for_resource(Resource=dist['ARN'])
+                        if self.resourceHasTags(myTags.get('Tags')['Items']) == False:
+                            toAppend = False
+                           
+                    if toAppend:    
+                        arr.append(dist["Id"])
+                        
                 if "NextMarker" not in response["DistributionList"]:
                     break
     
                 response = self.cloudfrontClient.list_distributions(Marker=response["DistributionList"]["NextMarker"])
             else:
                 break
+        
         return arr
         
     

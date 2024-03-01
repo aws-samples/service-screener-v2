@@ -40,25 +40,15 @@ class Lambda(Service):
         filtered_functions = []
 
         for function in functions:
-            try:
-                response = self.lambda_client.list_tags(
-                    Resource=function["FunctionArn"]
-                )
-                tags = response["Tags"]
-                if self.resource_has_tags(tags):
-                    filtered_functions.append(function)
-            except ClientError as e:
-                print(f"Error listing tags for {function['FunctionArn']}: {e}")
+            response = self.lambda_client.list_tags(
+                Resource=function["FunctionArn"]
+            )
+            tags = response.get("Tags")
+            nTags = self.convertKeyPairTagToTagFormat(tags)
+            if self.resourceHasTags(nTags):
+                filtered_functions.append(function)
 
         return filtered_functions
-
-    def resource_has_tags(self, tags):
-        for tag in self.tags:
-            key = tag["Name"].replace("tag:", "")
-            value = tag["Values"][0]
-            if key in tags and tags[key] == value:
-                return True
-        return False
 
     def advise(self):
         objs = {}

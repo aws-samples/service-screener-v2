@@ -38,21 +38,6 @@ class Service:
         rules = rules.lower().split('^')
         Config.set(self.RULESPREFIX, rules)
         
-    def setTags(self, tags):
-        rawTags = []
-        if not tags:
-            return
-        
-        result = []
-        t = tags.split(self.TAGS_SEPARATOR)
-        for tag in t:
-            k, v = tag.split(self.KEYVALUE_SEPARATOR)
-            rawTags = {k: v.split(self.VALUES_SEPARATOR) for k, v in tag.items()}
-            result.append({"Name": "tag:" + k, "Values": v.split(self.VALUES_SEPARATOR)})
-        
-        self._tags = rawTags
-        self.tags = result
-        
     def __del__(self):
         timespent = round(time.time() - self.overallTimeStart, 3)
         print('\033[1;42mCOMPLETED\033[0m -- ' + self.__class__.__name__.upper() + '::'+self.region+' (' + str(timespent) + 's)')
@@ -66,6 +51,23 @@ class Service:
             
         
         Config.set(self.RULESPREFIX, [])
+        
+    def setTags(self, tags):
+        rawTags = {}
+        if not tags:
+            return
+        
+        result = []
+        t = tags.split(self.TAGS_SEPARATOR)
+        for tag in t:
+            k, v = tag.split(self.KEYVALUE_SEPARATOR)
+            rawTags[k] = v.split(self.VALUES_SEPARATOR)
+            result.append({"Name": "tag:" + k, "Values": v.split(self.VALUES_SEPARATOR)})
+        
+        self._tags = rawTags
+        self.tags = result
+        
+        # print(self._tags, self.tags)
         
     def resourceHasTags(self, tags):
         if not self._tags:
@@ -94,6 +96,22 @@ class Service:
                 return False
         
         return True    
+        
+    # convert normal keypair to tag format
+    # {env: prod, costcenter: hr} => [{'Key': 'env', 'Value': 'prod'}, {'Key': 'costcenter', 'Value': 'hr'}] 
+    def convertKeyPairTagToTagFormat(self, tags):
+        nTags = []
+        for k, v in tags.items():
+            nTags.append({'Key': k, 'Value': v})
+            
+        return nTags
+        
+    def convertTagKeyTagValueIntoKeyValue(self, tags):
+        nTags = []
+        for i in tags:
+            nTags.append({'Key': i['TagKey'], 'Value': i['TagValue']})
+            
+        return nTags
 
 if __name__ == "__main__":
     Config.init()

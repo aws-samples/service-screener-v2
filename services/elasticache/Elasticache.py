@@ -38,8 +38,23 @@ class Elasticache(Service):
         except botocore.exceptions.ClientError as e:
             # print out error to console for now
             print(e)
+            
+        fArr = []    
+        for i, detail in enumerate(arr):
+            if detail['CacheClusterStatus'] == 'available':
+                fArr.append(arr[i])
 
-        return arr
+        if not self.tags:
+            return fArr
+            
+        finalArr = []
+        for i, detail in enumerate(fArr):
+            tag = self.elasticacheClient.list_tags_for_resource(ResourceName=detail['ARN'])
+            nTag = tag.get('TagList')
+            if self.resourceHasTags(nTag):
+                finalArr.append(arr[i])
+                
+        return finalArr    
 
     def getEngineVersions(self) -> Dict[str, List]:
         lookup = {}
@@ -100,10 +115,25 @@ class Elasticache(Service):
                 Marker=results.get("Marker")
             )
             arr = arr + results.get("ReplicationGroups")
-            
-        return arr
+        
+        fArr = []    
+        for i, detail in enumerate(arr):
+            if detail['Status'] == 'available':
+                fArr.append(arr[i])    
+        
+        if not self.tags:
+            return fArr
+        
+        finalArr = []
+        for i, detail in enumerate(fArr):
+            tag = self.elasticacheClient.list_tags_for_resource(ResourceName=detail['ARN'])
+            nTag = tag.get('TagList')
+            if self.resourceHasTags(nTag):
+                finalArr.append(arr[i])
+        
+        return finalArr
 
-
+    ## NOT IN USED
     def getSnapshots(self):
         replicationGroupId = set()
         last_updated = {}
@@ -150,7 +180,7 @@ class Elasticache(Service):
 
         # loop through EC nodes
         if len(self.cluster_info) > 0:
-            print("evaluating Elasticache Clusters")
+            # print("evaluating Elasticache Clusters")
             self.driverInfo = {}
             self.driverInfo['engine_veresions'] = self.getEngineVersions()
             self.driverInfo['latest_instances'] = self.getLatestInstanceTypes()

@@ -32,6 +32,12 @@ class Kms(Service):
                 rr = self.kmsClient.get_key_rotation_status(KeyId = key['KeyId'])
                 metadata['KeyRotationEnabled'] = rr.get('KeyRotationEnabled')
                 
+                if self.tags:
+                    tags = self.kmsClient.list_resource_tags(KeyId = key['KeyId'])
+                    nTags = self.convertTagKeyTagValueIntoKeyValue(tags.get('Tags'))
+                    if self.resourceHasTags(nTags) == False:
+                        continue
+                
                 self.kmsCustomerManagedKeys.append(metadata)
         
         return []

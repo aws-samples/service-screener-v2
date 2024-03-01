@@ -44,9 +44,16 @@ class Eks(Service):
         for cluster in clusters:
             print('...(EKS:Cluster) inspecting ' + cluster)
             clusterInfo = self.describeCluster(cluster)
-            if clusterInfo.get('status') == 'CREATING':
-                print(cluster + " cluster is creating. Skipped")
-                continue
+            
+            #if clusterInfo.get('status') == 'CREATING':
+            #    print(cluster + " cluster is creating. Skipped")
+            #    continue
+            
+            if self.tags:
+                resp = self.eksClient.list_tags_for_resource(resourceArn=clusterInfo['arn'])
+                nTags = self.convertKeyPairTagToTagFormat(resp.get('tags'))
+                if self.resourceHasTags(nTags) == False:
+                    continue
             
             obj = EksCommon(cluster, clusterInfo, self.eksClient, self.ec2Client, self.iamClient)
             obj.run(self.__class__)

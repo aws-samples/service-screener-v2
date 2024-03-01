@@ -4,6 +4,7 @@ import json
 import time
 
 from utils.Config import Config
+from botocore.config import Config as bConfig
 from services.Service import Service
 from services.cloudtrail.drivers.CloudtrailCommon import CloudtrailCommon
 from services.cloudtrail.drivers.CloudtrailAccount import CloudtrailAccount
@@ -30,7 +31,24 @@ class Cloudtrail(Service):
             resp = ctClient.list_trails(NextToken = resp.get('NextToken'))
             results += resp.get('Trails')
         
-        return results
+        
+        if not self.tags:
+            return results    
+        
+        finalArr = []
+        for i, detail in enumerate(results):
+            ctInfo = detail['TrailARN'].split(':')
+            
+            ## despite cloudtrail seems like a "global api", for list_tags, need to call based on region tho.
+            ## need to create separate boto instance for that region
+            myTmpCtClient = self.ssBoto.client('cloudtrail', config=bConfig(region_name=ctInfo[3]))
+            tags = myTmpCtClient.list_tags(ResourceIdList=[detail['TrailARN']])
+            
+            if self.resourceHasTags(tags.get('ResourceTagList')[0]['TagsList']):
+                finalArr.append(results[i])
+        
+        return finalArr
+        
     
     def advise(self):
         ## Will loop through all trail, and set to True if any has MultiRegion

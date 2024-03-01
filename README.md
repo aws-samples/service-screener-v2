@@ -28,7 +28,11 @@ Running this tool is free as it is covered under the AWS Free Tier. If you have 
 1. [Log in to your AWS account](https://docs.aws.amazon.com/cloudshell/latest/userguide/getting-started.html#start-session) using the IAM User with sufficient permissions described above. 
 2. Launch [AWS CloudShell](https://docs.aws.amazon.com/cloudshell/latest/userguide/getting-started.html#launch-region-shell) in any region. 
 
+<details>
+<summary>Launch AWS Cloudshell Walkthrough</summary>
+   
 ![Launch AWS CloudShell](https://d39bs20xyg7k53.cloudfront.net/services-screener/p1-cloudshell.gif)
+</details>
 
 In the AWS CloudShell terminal, run this script this to install the dependencies:
 ```bash
@@ -42,8 +46,11 @@ pip install -r requirements.txt
 alias screener="python3 $(pwd)/main.py"
 
 ```
-
+<details>
+<summary>Install Dependecies Walkthrough</summary>
+   
 ![Install dependencies](https://d39bs20xyg7k53.cloudfront.net/services-screener/p2-dependencies.gif)
+</details>
 
 ## Using Service Screener
 When running Service Screener, you will need to specify the regions and services you would like it to run on. It currently supports Amazon Cloudfront, AWS Cloudtrail, Amazon Dynamodb, Amazon EC2, Amazon EFS, Amazon RDS, Amazon EKS, Amazon Elasticache, Amazon Guardduty, AWS IAM, Amazon Opensearch, AWS Lambda, and Amazon S3.
@@ -72,7 +79,6 @@ screener --regions ap-southeast-1,us-east-1 --services rds,iam
 
 **Example 5: Run in the Singapore region, filter resources based on tags (e.g: Name=env Values=prod and Name=department Values=hr,coe)**
 ```
-## NOT SUPPORTED YET, TO BE RELEASED SOON
 screener --regions ap-southeast-1 --filters env=prod%department=hr,coe
 ```
 
@@ -90,12 +96,19 @@ screener --regions ALL
 # api-raw: raw findings
 # report: generate default web html
 ```
+<details>
+<summary>Get Report Walkthrough</summary>
+   
 ![Get Report](https://d39bs20xyg7k53.cloudfront.net/services-screener/p3-getreport.gif)
+</details>
 
 ### Downloading the report
 The output is generated as a ~/service-screener-v2/output.zip file. 
 You can [download the file](https://docs.aws.amazon.com/cloudshell/latest/userguide/working-with-cloudshell.html#files-storage) in the CloudShell console by clicking the *Download file* button under the *Actions* menu on the top right of the Cloudshell console. 
 
+<details>
+<summary>Download Output & Report Viewing Walkthrough</summary>
+   
 ![Download Output](https://d39bs20xyg7k53.cloudfront.net/services-screener/p4-outputzip.gif)
 
 Once downloaded, unzip the file and open 'index.html' in your browser. You should see a page like this:
@@ -104,8 +117,13 @@ Once downloaded, unzip the file and open 'index.html' in your browser. You shoul
 
 Ensure that you can see the service(s) run on listed on the left pane.
 You can navigate to the service(s) listed to see detailed findings on each service. 
+</details>
 
+<details>
+<summary>Sample Output Walkthrough</summary>
+   
 ![Sample Output](https://d39bs20xyg7k53.cloudfront.net/services-screener/p5-sample.gif)
+</details>
 
 ## Using the report 
 The report provides you an easy-to-navigate dashboard of the various best-practice checks that were run. 

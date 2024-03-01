@@ -23,7 +23,7 @@ class Efs(Service):
 
         filtered_results = []
         for efs in results:
-            if self.resource_has_tags(efs['Tags']):
+            if self.resourceHasTags(efs['Tags']):
                 filtered_results.append(efs)
 
         return filtered_results
