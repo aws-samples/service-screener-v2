@@ -36,13 +36,14 @@ class Rds(Service):
     }
     
     def getResources(self):
-        results = self.rdsClient.describe_db_instances()
+        p = {}
+        
+        results = self.rdsClient.describe_db_instances(**p)
         
         arr = results.get('DBInstances')
         while results.get('Maker') is not None:
-            results = self.rdsClient.describe_db_instances(
-                Maker = results.get('Maker')
-            )
+            p['Maker'] = results.get('Maker')
+            results = self.rdsClient.describe_db_instances(**p)
             arr = arr + results.get('DBInstances')
         
         for k, v in enumerate(arr):
@@ -69,21 +70,37 @@ class Rds(Service):
             results = self.rdsClient.describe_db_clusters(**p)
             
             arr = arr + results.get('DBClusters')
+
+        if not self.tags:
+            return arr
+        
+        finalArr = []
+        for i, detail in enumerate(arr):
+            if self.resourceHasTags(detail['TagList']):
+                finalArr.append(arr[i])
             
-        return arr
+        return finalArr
             
     def getSecrets(self):
-        results = self.smClient.list_secrets(IncludePlannedDeletion=False, MaxResults=10)
+        p = {"IncludePlannedDeletion": False, "MaxResults": 10}
+        
+        results = self.smClient.list_secrets(**p)
         self.registerSecrets(results)
+        
         NextToken = results.get('NextToken')
         while NextToken != None:
-            results = self.smClient.list_secrets(IncludePlannedDeletion=False, MaxResults=10, NextToken=NextToken)
+            p['NextToken'] = NextToken
+            results = self.smClient.list_secrets(**p)
             NextToken = results.get('NextToken')
             
             self.registerSecrets(results)
             
     def registerSecrets(self, results):
         for secret in results.get('SecretList'):
+            if self.tags:
+                if self.resourceHasTags(secret['Tags']) == False:
+                    continue
+            
             resp = self.smClient.describe_secret(SecretId=secret['ARN'])
             self.secrets.append(resp)
         

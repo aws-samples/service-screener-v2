@@ -29,6 +29,8 @@ class Iam(Service):
             'ctClient': ssBoto.client('cloudtrail', config=self.bConfig)
         }
     
+    ## Groups has no TAG attribute
+    ## Unable to implement "TAG" filter
     def getGroups(self):
         arr = []
         results = self.iamClient.list_groups()
@@ -55,7 +57,17 @@ class Iam(Service):
                 if (v['Path'] != '/service-role/' and v['Path'][0:18] != '/aws-service-role/') and (self._roleFilterByName(v['RoleName'])):
                     arr.append(v)
         
-        return arr
+        if not self.tags:
+            return arr
+            
+        finalArr = []
+        for i, detail in enumerate(arr):
+            tag = self.iamClient.list_role_tags(RoleName=detail['RoleName'])
+            nTag = tag.get('Tags')
+            if self.resourceHasTags(nTag):
+                finalArr.append(arr[i])
+            
+        return finalArr
         
     def getUsers(self):
         self.getUserFlag = True
@@ -101,7 +113,22 @@ class Iam(Service):
         for temp in row:
             arr.append(dict(zip(fields, temp.split(','))))
         
-        return arr
+        if not self.tags:
+            return arr
+            
+        finalArr = []
+        for i, detail in enumerate(arr):
+            if detail['user'] == '<root_account>':
+                finalArr.append(arr[i])
+                continue
+            
+            tag = self.iamClient.list_user_tags(UserName=detail['user'])
+            nTag = tag.get('Tags')
+            if self.resourceHasTags(nTag):
+                finalArr.append(arr[i])
+            
+            
+        return finalArr
         
     def advise(self):
         objs = {}

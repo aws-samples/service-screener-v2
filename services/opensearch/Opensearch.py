@@ -18,8 +18,27 @@ class Opensearch(Service):
     
     def getResources(self):
         arr = []
+        fArr = []
         results = self.osClient.list_domain_names()
-        return results.get('DomainNames')
+        
+        arr = results.get('DomainNames')
+        for domain in arr:
+            r = self.osClient.describe_domain(DomainName=domain['DomainName'])
+            info = r.get('DomainStatus')
+            if info['Processing'] == True or info['Deleted'] == True:
+                continue
+            
+            t = domain
+            t['info'] = info
+            if not self.tags:
+                fArr.append(t)
+            else:
+                tags = self.osClient.list_tags(ARN=info['ARN'])
+                nTags = tags.get('TagList')
+                if self.resourceHasTags(nTags):
+                    fArr.append(t)
+        
+        return fArr
         
     def advise(self):
         domains = self.getResources()
@@ -29,7 +48,7 @@ class Opensearch(Service):
             domain_name = domain["DomainName"]
             print("... (OpenSearch) inspecting " + domain_name)
             
-            obj = OpensearchCommon(self.bConfig, domain_name, self.osClient, self.cwClient)
+            obj = OpensearchCommon(self.bConfig, domain_name, domain['info'], self.osClient, self.cwClient)
             obj.run(self.__class__)
             
             #objs["OpenSearch::Common"] = obj.getInfo()

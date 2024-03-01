@@ -5,7 +5,7 @@ import time
 
 
 from utils.Config import Config
-from utils.Tools import _pr
+from utils.Tools import _pr, _warn
 from services.Service import Service
 from botocore.config import Config as bConfig
 
@@ -73,19 +73,17 @@ class S3(Service):
             return _buckets
         
         filteredBuckets = []
-        '''
-        # <TODO> to support tagging
         for bucket in _buckets:
             try:
                 result = self.s3Client.get_bucket_tagging(Bucket = bucket['Name'])
                 tags =result.get('TagSet')
-            
                 if self.resourceHasTags(tags):
                     filteredBuckets.append(bucket)
-            except S3E as e:
-                ## Do nothing, no tags has been define;clear
-                pass
-        '''    
+            except botocore.exceptions.ClientError as e:
+                if e.response['Error']['Code'] != 'NoSuchTagSet':
+                    emsg = e.response['Error']
+                    _warn("S3 Error:({}, {}) is not being handled by S3::Service, please submit an issue to github.".format(emsg['Code'], emsg['Message']))
+        
         return filteredBuckets    
     
     def advise(self):

@@ -40,7 +40,17 @@ class Dynamodb(Service):
                     tableDescription = self.dynamoDbClient.describe_table(TableName = tables)
                     tableArr.append(tableDescription)
             
-            return tableArr 
+            if not self.tags:
+                return tableArr 
+                
+            finalArr = []
+            for i, detail in enumerate(tableArr):
+                tableArn = detail['Table']['TableArn']
+                tags = self.dynamoDbClient.list_tags_of_resource(ResourceArn=tableArn)
+                if self.resourceHasTags(tags.get('Tags')):
+                    finalArr.append(tableArr[i])
+                
+            return finalArr
             
         except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']

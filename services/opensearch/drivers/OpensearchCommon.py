@@ -11,14 +11,15 @@ from services.Evaluator import Evaluator
 class OpensearchCommon(Evaluator):
     NODES_LIMIT = 200
     
-    def __init__(self, bConfig, domain, osClient, cwClient):
+    def __init__(self, bConfig, domain, attr, osClient, cwClient):
         self.results = {}
         self.clientConfig = bConfig
         self.domain = domain
         self.osClient = osClient
         self.cwClient = cwClient
         
-        self.attribute = self.osClient.describe_domain(DomainName=self.domain)
+        # self.attribute = self.osClient.describe_domain(DomainName=self.domain)
+        self.attribute = {'DomainStatus': attr}
         self.cluster_config = self.attribute["DomainStatus"]["ClusterConfig"]
         self.domain_config = self.osClient.describe_domain_config(DomainName=self.domain)
 
@@ -176,6 +177,9 @@ class OpensearchCommon(Evaluator):
         stats = self.getCloudWatchData(metric)
 
         dp = stats.get("Datapoints")
+        if len(dp) == 0:
+            return
+        
         free_space = dp[0]["Average"]
 
         try:
@@ -212,7 +216,11 @@ class OpensearchCommon(Evaluator):
         primary = "Shards.activePrimary"
 
         stats_active = self.getCloudWatchData(active)
-        dp_active = stats_active.get("Datapoints")[0]["Average"]
+        dp = stats_active.get("Datapoints")
+        if len(dp) == 0:
+            return
+        
+        dp_active = dp[0]["Average"]
 
         stats_primary = self.getCloudWatchData(primary)
         dp_primary = stats_primary.get("Datapoints")[0]["Average"]

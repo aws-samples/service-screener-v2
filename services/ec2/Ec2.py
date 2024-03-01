@@ -112,7 +112,15 @@ class Ec2(Service):
                 )
             arr = arr + results.get('SecurityGroups')
         
-        return arr
+        if not self.tags:
+            return arr
+        
+        finalArr = []
+        for i, detail in enumerate(arr):
+            if 'Tags' in detail and self.resourceHasTags(detail['Tags']):
+                finalArr.append(arr[i])
+        
+        return finalArr    
     
     def getEBSResources(self):
         filters = []
@@ -146,24 +154,22 @@ class Ec2(Service):
             
         ## TO DO: support tagging later
         
-        # if self.tags is None:
-        #     return arr
+        if not self.tags:
+            return arr
         
-        # filteredResults = []
-        # for lb in arr:
-        #     tagResults = self.elbClient.describe_tags(
-        #         ResourceArns = [lb['LoadBalancerArn']]
-        #     )
-        #     tagDesc = tagResults.get('TagDescriptions')
-        #     if len(tagDesc) > 0:
-        #         for desc in tagDesc:
-        #             if self.resourceHasTags(desc['Tags']):
-        #                 filteredResults.append(lb)
-        #                 break
+        filteredResults = []
+        for lb in arr:
+            tagResults = self.elbClient.describe_tags(
+                ResourceArns = [lb['LoadBalancerArn']]
+            )
+            tagDesc = tagResults.get('TagDescriptions')
+            if len(tagDesc) > 0:
+                for desc in tagDesc:
+                    if self.resourceHasTags(desc['Tags']):
+                        filteredResults.append(lb)
+                        break
                     
-        # return filteredResults
-        
-        return arr
+        return filteredResults
         
     def getELBClassic(self):
         results = self.elbClassicClient.describe_load_balancers()
@@ -208,6 +214,14 @@ class Ec2(Service):
                 NextToken = results.get('NextToken')
             )
             arr = arr + results.get('SecurityGroups')
+        
+        if not self.tags:
+            return arr
+        
+        finalArr = []
+        for i, detail in enumerate(arr):
+            if self.resourceHasTags(detail['Tags']):
+                finalArr.append(arr[i])
             
         return arr
         
@@ -240,7 +254,15 @@ class Ec2(Service):
         )
         arr = result.get('Addresses')
         
-        return arr
+        if not self.tags:
+            return arr
+        
+        finalArr = []
+        for i, detail in enumerate(arr):
+            if 'Tags' in detail and self.resourceHasTags(detail['Tags']):
+                finalArr.append(arr[i])
+        
+        return finalArr    
         
     def getDefaultSG(self):
         defaultSGs = {}
@@ -257,7 +279,16 @@ class Ec2(Service):
                 if group.get('GroupName') == 'default':
                     defaultSGs[group.get('GroupId')] = group
         
-        return defaultSGs
+        if not self.tags:
+            return defaultSGs
+        
+        finalArr = []
+        
+        for i, detail in defaultSGs.items():
+            if 'Tags' in detail and self.resourceHasTags(detail['Tags']):
+                finalArr.append(defaultSGs[i])
+        
+        return finalArr
     
     def advise(self):
         objs = {}
@@ -362,18 +393,20 @@ class Ec2(Service):
             objs[f"ASG::{group['AutoScalingGroupName']}"] = obj.getInfo()
         
         defaultSGs = self.getDefaultSG()
-        for groupId in defaultSGs.keys():
-            if groupId not in secGroups:
-                secGroups[groupId] = defaultSGs[groupId]
-                secGroups[groupId]['inUsed'] = 'False'
+        if defaultSGs:
+            for groupId in defaultSGs.keys():
+                if groupId not in secGroups:
+                    secGroups[groupId] = defaultSGs[groupId]
+                    secGroups[groupId]['inUsed'] = 'False'
             
         # SG checks
-        for group in secGroups.values():
-            print(f"... (EC2::Security Group) inspecting {group['GroupId']}")
-            obj = Ec2SecGroup(group, self.ec2Client)
-            obj.run(self.__class__)
-            
-            objs[f"SG::{group['GroupId']}"] = obj.getInfo()
+        if secGroups:
+            for group in secGroups.values():
+                print(f"... (EC2::Security Group) inspecting {group['GroupId']}")
+                obj = Ec2SecGroup(group, self.ec2Client)
+                obj.run(self.__class__)
+                
+                objs[f"SG::{group['GroupId']}"] = obj.getInfo()
         
         # EIP checks    
         eips = self.getEIPResources()
