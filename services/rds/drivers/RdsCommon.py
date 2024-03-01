@@ -390,23 +390,23 @@ class RdsCommon(Evaluator):
                 
                 snapshots = snapshots + result.get('DBSnapshots')
         
-            if not snapshots:
-                return
+        if not snapshots:
+            return
                 
-            oldest_copy = snapshots[-1]
-            
-            oldest_copy_date = oldest_copy['SnapshotCreateTime']
-            
-            now = datetime.datetime.now(timezone.utc)
-            
-            diff = now - oldest_copy_date
-            days = diff.days
-            
-            if len(snapshots) > 5:
-                self.results['SnapshotTooMany'] = [-1, len(snapshots)]
+        oldest_copy = snapshots[-1]
         
-            if days > 180:
-                self.results['SnapshotTooOld'] = [-1, days]
+        oldest_copy_date = oldest_copy['SnapshotCreateTime']
+        
+        now = datetime.datetime.now(timezone.utc)
+        
+        diff = now - oldest_copy_date
+        days = diff.days
+        
+        if len(snapshots) > 5:
+            self.results['ManualSnapshotTooMany'] = [-1, len(snapshots)]
+    
+        if days > 180:
+            self.results['ManualSnapshotTooOld'] = [-1, days]
             
     def _checkCAExpiry(self):
         if self.isCluster == False and self.certInfo['isExpireIn365days'] == True:

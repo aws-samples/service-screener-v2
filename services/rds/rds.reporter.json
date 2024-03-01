@@ -981,5 +981,33 @@
       "[Mysql Doc on innodb_open_files]<https://dev.mysql.com/doc/refman/5.7/en/innodb-parameters.html#sysvar_innodb_open_files>",
       "[AWS view on innodb_open_files]<https://docs.aws.amazon.com/awssupport/latest/user/performance-checks.html#rds-innodb-open-files-parameter-low>"
     ]
+  },
+  "ManualSnapshotTooOld":{
+    "category": "C",
+    "^description": "[Cost Optimisation] You have {$COUNT} RDS/Aurora MANUAL Snapshot instance(s) is having age of more than 180 days. Review if this snapshot is still required. Considering export and backup data into S3 Glacier for long term archival for cost saving purposes.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "L",
+    "shortDesc": "Check if old RDS snapshot(s) is required/relevant",
+    "ref": [
+      "[RDS - Delete Snapshot]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_DeleteSnapshot.html>",
+      "[RDS Snapshot retention cost]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithAutomatedBackups.html#USER_WorkingWithAutomatedBackups.RetentionCosts>"
+    ]
+  },
+  "ManualSnapshotTooMany":{
+    "category": "C",
+    "^description": "[Cost Optimisation] You have {$COUNT} RDS/Aurora MANUAL Snapshot instance(s) is having more than 5 manual snapshot. Review if this snapshot is still required. Considering export and backup data into S3 Glacier for long term archival for cost saving purposes.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "L",
+    "shortDesc": "Check if lists of RDS snapshots are required/relevant",
+    "ref": [
+      "[RDS - Delete Snapshot]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_DeleteSnapshot.html>",
+      "[RDS Snapshot retention cost]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithAutomatedBackups.html#USER_WorkingWithAutomatedBackups.RetentionCosts>"
+    ]
   }
 }
