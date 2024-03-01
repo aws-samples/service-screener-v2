@@ -45,7 +45,7 @@ class Ec2(Service):
         
         try:
             outdateVersion = 2012
-            resp = requests.get("https://endoflife.date/api/mssqlserver.json")
+            resp = requests.get("https://endoflife.date/api/mssqlserver.json", timeout=10)
             for prod in resp.json():
                 if date.today() > datetime.strptime(prod['eol'], '%Y-%m-%d').date():
                     outdateVersion = prod['cycle'][0:4]
