@@ -98,6 +98,7 @@ screener --regions ALL
 ```
 <details>
 <summary>Get Report Walkthrough</summary>
+   
 ![Get Report](https://d39bs20xyg7k53.cloudfront.net/services-screener/p3-getreport.gif)
 </details>
 
@@ -107,6 +108,7 @@ You can [download the file](https://docs.aws.amazon.com/cloudshell/latest/usergu
 
 <details>
 <summary>Download Output & Report Viewing Walkthrough</summary>
+   
 ![Download Output](https://d39bs20xyg7k53.cloudfront.net/services-screener/p4-outputzip.gif)
 
 Once downloaded, unzip the file and open 'index.html' in your browser. You should see a page like this:
@@ -119,6 +121,7 @@ You can navigate to the service(s) listed to see detailed findings on each servi
 
 <details>
 <summary>Sample Output Walkthrough</summary>
+   
 ![Sample Output](https://d39bs20xyg7k53.cloudfront.net/services-screener/p5-sample.gif)
 </details>
 
