@@ -8,3 +8,5 @@ Administrators for this service reserve the right to moderate all information us
 The use of this tool implies that the user has consented to their personal data being collected. This data consists of IP Address (e.g. for CloudShell users, this would be the CloudShell IP address), services scanned (name of service only) and regions scanned. This data will not be collected by default, and will only be collected if the user adds a `--feedback 1` attribute when running the tool. 
 
 AWS CloudTrail logs Service Screener activities based on each API request. Each time you run this tool, CloudTrail records the API activity and you can view details about the event in your logs.
+
+Note: The solution is NOT hosted locally. Only the report is downloaded onto the user machine. 
