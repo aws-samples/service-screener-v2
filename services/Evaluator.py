@@ -59,6 +59,7 @@ class Evaluator():
         
         if debugFlag:
             self.showInfo()
+            print()
         
     def showInfo(self):
         print("Class: {}".format(self.classname))
