@@ -440,6 +440,9 @@ class RdsCommon(Evaluator):
     
         GBYTES = 1024 * 1024 * 1024
         dp = results['Datapoints']
+        if len(dp) == 0:
+            return
+        
         freesize = round(dp[0]['Average'] / GBYTES, 4)
     
         ratio = freesize / self.db['AllocatedStorage']
@@ -578,6 +581,9 @@ class RdsCommon(Evaluator):
             Statistics=['Minimum', 'Maximum', 'Average']
         )
         monthDp = resp.get('Datapoints')
+        if len(monthDp) == 0:
+            return
+        
         monthAverage = monthDp[0]['Average']
         monthMax = monthDp[0]['Maximum']
         
@@ -637,8 +643,11 @@ class RdsCommon(Evaluator):
         )
         
         dp = resp.get('Datapoints')
+        if len(dp) == 0:
+            return
         
         serverGB = self.instInfo['specification']['memoryInGiB']
+        
         freeMemoryMin = dp[0]['Minimum'] / rawToGBRatio
         freeMemoryMax = dp[0]['Maximum'] / rawToGBRatio
         freeMemoryAvg = dp[0]['Average'] / rawToGBRatio
