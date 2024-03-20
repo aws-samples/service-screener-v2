@@ -19,7 +19,6 @@ class Evaluator():
         rules = Config.get(rulePrefix, [])
         
         debugFlag = Config.get('DEBUG')
-        print(debugFlag)
         
         ecnt = cnt = 0
         emsg = []
@@ -60,6 +59,7 @@ class Evaluator():
         
         if debugFlag:
             self.showInfo()
+            print()
         
     def showInfo(self):
         print("Class: {}".format(self.classname))
