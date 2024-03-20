@@ -19,6 +19,7 @@ class Evaluator():
         rules = Config.get(rulePrefix, [])
         
         debugFlag = Config.get('DEBUG')
+        print(debugFlag)
         
         ecnt = cnt = 0
         emsg = []

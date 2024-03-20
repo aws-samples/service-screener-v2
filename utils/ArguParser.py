@@ -28,7 +28,7 @@ class ArguParser:
         },
         "debug": {
             "required": False,
-            "default": True,
+            "default": False,
             "help": "--debug True|False"
         },
         "log": {
