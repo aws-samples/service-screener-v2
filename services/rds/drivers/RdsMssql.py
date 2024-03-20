@@ -1,4 +1,4 @@
-import math
+import math, ast
 
 from utils.Tools import _pr
 from .RdsCommon import RdsCommon
@@ -78,6 +78,7 @@ class RdsMssql(RdsCommon):
         if 'DBInstanceClassMemory' in maxMemorySettings:
             maxMemorySettings = maxMemorySettings.replace("{", "")
             maxMemorySettings = maxMemorySettings.replace("}", "")
+            
             maxMemorySettings = eval(maxMemorySettings, {"DBInstanceClassMemory": memInKBytes})
         
         ## Need to be review

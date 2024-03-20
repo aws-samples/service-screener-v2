@@ -7,20 +7,20 @@ from typing import Set, Dict, Union
 from netaddr import IPAddress
 
 
-def _pr(s):
+def _pr(s, forcePrint = False):
     DEBUG = Config.get('DEBUG')
-    if DEBUG == True:
+    if forcePrint or DEBUG == True:
         print(s)
 
 def _info(s):
     _printStatus("info", s)
 
 def _warn(s):
-    _printStatus("\033[1;41m__!! WARNING !!__\033[0m", s)
+    _printStatus("\033[1;41m__!! WARNING !!__\033[0m", s, forcePrint=True)
     
-def _printStatus(status, s):
+def _printStatus(status, s, forcePrint = False):
     p = "["+status+"] "+ s
-    _pr(p)
+    _pr(p, forcePrint)
 
 def checkIsPrivateIp(ipaddr):
     ip = ipaddr.split('/')

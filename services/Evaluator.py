@@ -18,13 +18,17 @@ class Evaluator():
         rulePrefix = serviceName.__name__ + '::rules'
         rules = Config.get(rulePrefix, [])
         
+        debugFlag = Config.get('DEBUG')
+        
         ecnt = cnt = 0
         emsg = []
         methods = [method for method in dir(self) if method.startswith('__') is False and method.startswith('_check') is True]
         for method in methods:
             if not rules or str.lower(method[6:]) in rules:
                 try:
-                    # print('--- --- fn: ' + method)
+                    if debugFlag:
+                        print('--- --- fn: ' + method)
+                        
                     getattr(self, method)()
                     cnt += 1
                 except botocore.exceptions.ClientError as e:
@@ -52,6 +56,9 @@ class Evaluator():
             'rules': scanned['rules'] + cnt,
             'exceptions': scanned['exceptions'] + ecnt
         })
+        
+        if debugFlag:
+            self.showInfo()
         
     def showInfo(self):
         print("Class: {}".format(self.classname))
