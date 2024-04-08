@@ -52,7 +52,7 @@ Outputs:
                 TemplateBody=self.ymlBody
             )
             msg = "Empty CF stacked created successfully, name:" + self.getStackName()
-            _info(msg)
+            _info(msg, alwaysPrint=True)
         
         except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']
@@ -68,7 +68,7 @@ Outputs:
             )
             
             msg = "Empty CF stacked deleted successfully, name:" + self.getStackName()
-            _info(msg)
+            _info(msg, alwaysPrint=True)
         except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']
             emsg = e.response['Error']['Message']

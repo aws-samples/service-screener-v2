@@ -24,5 +24,25 @@
       "ref": [
           "[Best practices for AWS KMS grants]<https://docs.aws.amazon.com/kms/latest/developerguide/grants.html#grant-best-practices>"
       ]
+  },
+  "KeyInPendingDeletion":{
+    "category": "O",
+      "^description": "[Informational], no action needed. {$COUNT} KMS key is under Pending Deletion Stage.",
+      "downtime": 0,
+      "slowness": 0,
+      "additionalCost": 0,
+      "needFullTest": 0,
+      "criticality": "I",
+      "shortDesc": "[Info] No Action Needed"
+  },
+  "DisabledKey":{
+    "category": "O",
+      "^description": "[Informational], no action needed. {$COUNT} KMS key is under Disabled Stage.",
+      "downtime": 0,
+      "slowness": 0,
+      "additionalCost": 0,
+      "needFullTest": 0,
+      "criticality": "I",
+      "shortDesc": "[Info] No Action Needed"
   }
 }

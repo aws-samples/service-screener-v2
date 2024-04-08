@@ -12,8 +12,8 @@ def _pr(s, forcePrint = False):
     if forcePrint or DEBUG == True:
         print(s)
 
-def _info(s):
-    _printStatus("info", s)
+def _info(s, alwaysPrint = False):
+    _printStatus("info", s, alwaysPrint)
 
 def _warn(s):
     _printStatus("\033[1;41m__!! WARNING !!__\033[0m", s, forcePrint=True)
