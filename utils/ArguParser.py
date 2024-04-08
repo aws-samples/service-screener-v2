@@ -68,7 +68,7 @@ class ArguParser:
         },
         "frameworks": {
             "required": False,
-            "default": 'FTR,SSB,WAFS'
+            "default": 'MSR,FTR,SSB,WAFS'
         },
         "others":{
             "required": False,
