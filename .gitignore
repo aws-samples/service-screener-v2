@@ -3,11 +3,11 @@ test.py
 crossAccounts.json
 output.zip
 __fork/*.json
-adminlte/**XX/
-adminlte/**/*.html
-adminlte/**/*.xlsx
-adminlte/**/error.txt
-
+adminlte/aws/**/
+adminlte/aws/**/*.html
+adminlte/aws/**/*.xlsx
+adminlte/aws/**/error.txt
+.~c9_invoke*
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
