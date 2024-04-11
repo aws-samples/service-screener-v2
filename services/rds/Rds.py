@@ -98,6 +98,10 @@ class Rds(Service):
     def registerSecrets(self, results):
         for secret in results.get('SecretList'):
             if self.tags:
+                if not 'Tags' in secret:
+                    print('Tags not supported in this region: [{}], ignoring tags filter'.format(self.region))
+                    continue
+                
                 if self.resourceHasTags(secret['Tags']) == False:
                     continue
             
