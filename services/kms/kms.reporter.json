@@ -33,7 +33,10 @@
       "additionalCost": 0,
       "needFullTest": 0,
       "criticality": "I",
-      "shortDesc": "[Info] No Action Needed"
+      "shortDesc": "[Info] No Action Needed",
+      "ref": [
+          "[KMS Key State Explanation]<https://docs.aws.amazon.com/kms/latest/developerguide/key-state.html>"
+      ]
   },
   "DisabledKey":{
     "category": "O",
@@ -43,6 +46,9 @@
       "additionalCost": 0,
       "needFullTest": 0,
       "criticality": "I",
-      "shortDesc": "[Info] No Action Needed"
+      "shortDesc": "[Info] No Action Needed",
+      "ref": [
+          "[KMS Key State Explanation]<https://docs.aws.amazon.com/kms/latest/developerguide/key-state.html>"
+      ]
   }
 }
