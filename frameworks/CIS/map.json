@@ -9,7 +9,7 @@
     },
     "mapping": {
         "CloudTrail.": {
-            "1": ["cloudtrail.HasOneMultiRegionTrail"],
+            "1": ["cloudtrail.NeedToEnableCloudTrail, cloudtrail.HasOneMultiRegionTrail"],
             "2": ["cloudtrail.RequiresKmsKey"],
             "4": ["cloudtrail.LogFileValidationEnabled"],
             "5": ["cloudtrail.CloudWatchLogsLogGroupArn"],
