@@ -135,6 +135,10 @@ for acctId, cred in rolesCred.items():
         ## Can pass in True for RegionSelector to skip prompt
         regions = AwsRegionSelector.get_all_enabled_regions(flagSkipPromptForRegionConfirmation)
     
+    
+    if acctLoop == 1:
+        Config.set('REGIONS_SELECTED', regions)
+    
     frameworks = []
     if len(_cli_options['frameworks']) > 0:
         frameworks = _cli_options['frameworks'].split(',')

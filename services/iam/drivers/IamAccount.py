@@ -13,9 +13,10 @@ class IamAccount(IamCommon):
     PASSWORD_POLICY_MIN_SCORE = 4
     ROOT_LOGIN_MAX_COUNT = 3
     
-    def __init__(self, none, awsClients, users, roles):
+    def __init__(self, none, awsClients, users, roles, ssBoto):
         super().__init__()
         
+        self.ssBoto = ssBoto
         self.iamClient = awsClients['iamClient']
         self.accClient = awsClients['accClient']
         self.sppClient = awsClients['sppClient']
@@ -251,3 +252,31 @@ class IamAccount(IamCommon):
                 print(e)
         
         return
+
+    def _checkConfigEnabled(self):
+        ssBoto = self.ssBoto
+        regions = Config.get("REGIONS_SELECTED")
+        
+        results = {}
+        badResults = []
+        cnt = 0
+        for region in regions:
+            conf = bConfig(region_name = region)
+            cfg = ssBoto.client('config', config=conf)
+            
+            resp = cfg.describe_configuration_recorders()
+            recorders = resp.get('ConfigurationRecorders')
+            r = 1
+            if len(recorders) == 0:
+                r = 0
+                badResults.append(region)
+            
+            cnt = cnt + r
+            results[region] = r
+        
+        if cnt == 0:
+            self.results['EnableConfigService'] = [-1, None]
+        elif cnt < len(regions):
+            self.results['PartialEnableConfigService'] = [-1, ', '.join(badResults)]
+        else:
+            return

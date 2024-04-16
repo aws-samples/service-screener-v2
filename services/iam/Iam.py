@@ -132,6 +132,8 @@ class Iam(Service):
         
     def advise(self):
         objs = {}
+        users = {}
+        roles = {}
         
         users = self.getUsers()
         if self.getUserFlag == False:
@@ -163,9 +165,9 @@ class Iam(Service):
             
             objs['Group::' + group['GroupName']] = obj.getInfo()
             del obj
-            
+        
         print('... (IAM:Account) inspecting')
-        obj = IamAccount(None, self.awsClients, users, roles)
+        obj = IamAccount(None, self.awsClients, users, roles, self.ssBoto)
         obj.run(self.__class__)
         objs['Account::Config'] = obj.getInfo()
         
