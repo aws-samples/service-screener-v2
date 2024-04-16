@@ -33,6 +33,8 @@ class IamUser(IamCommon):
             key = "consoleLastAccess365"
         elif daySinceLastAccess > 90:
             key = "consoleLastAccess90"
+        elif daySinceLastAccess > 45:
+            key = "consoleLastAccess45"
         else:
             key = False
             

@@ -78,6 +78,19 @@
 			"[Finds unused credentials]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_finding-unused.html>"
 		]
 	},
+	"consoleLastAccess45": {
+		"category": "S",
+		"^description": "{$COUNT} IAM users have not accessed the AWS console in more than 45 days. Please identify the need for these IAM users to access the console and delete them if not needed.",
+		"shortDesc": "Validate IAM user console access",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Finds unused credentials]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_finding-unused.html>"
+		]
+	},
 	"passwordPolicy": {
 		"category": "S",
 		"^description": "You have not set a custom password policy. Setting a custom password policy will allow you to have the ability to require strong password practices, such as complexity level, avoiding re-use, and enforcing multi-factor authentication (MFA). If you don't set a custom password policy, IAM user passwords must meet the default AWS password policy.",
@@ -91,7 +104,20 @@
 			"[IAM Password Policy]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_account-policy.html#IAMPasswordPolicy>"
 		]
 	},
-	"passwordPolicyWeak": {
+	"passwordPolicyReuse": {
+		"category": "S",
+		"^description": "Your current password policy is not strong. Improving the strength of your password policy would improve the security of your account. Consider implementing best practices when setting the password policy. If you already configure as per your organization ",
+		"shortDesc": "Set a stronger password policy",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[IAM Password Policy]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#configure-strong-password-policy>"
+		]
+	},
+	"passwordPolicyLength": {
 		"category": "S",
 		"^description": "Your current password policy is not strong. Improving the strength of your password policy would improve the security of your account. Consider implementing best practices when setting the password policy. If you already configure as per your organization ",
 		"shortDesc": "Set a stronger password policy",
