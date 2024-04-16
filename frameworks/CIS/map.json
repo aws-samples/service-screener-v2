@@ -45,10 +45,10 @@
             "4": ["iam.rootHasAccessKey"],
             "5": ["iam.mfaActive"], 
             "9": ["iam.rootMfaActive"],
-            "15": [],
-            "16": [],
+            "15": ["iam.passwordPolicyLength"],
+            "16": ["iam.passwordPolicyReuse"],
             "18": [],
-            "22": []
+            "22": ["iam.consoleLastAccess45"]
         },
         "KMS.": {
             "4": ["kms.KeyRotationEnabled"]
