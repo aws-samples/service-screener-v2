@@ -46,11 +46,11 @@ class IamAccount(IamCommon):
                 score += 1
                 self.results['passwordPolicyReuse'] = [-1, value]
                 continue
-            
+
             if policy == 'MaxPasswordAge' and value <= 90:
                 score += 1
                 continue
-            
+
             if policy == 'PasswordReusePrevention' and value >= 24:
                 score += 1
                 self.results['passwordPolicyReuse'] = [-1, value]

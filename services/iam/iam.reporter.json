@@ -448,5 +448,31 @@
 		"ref": [
 			"[Creating Cost and Usage Reports]<https://docs.aws.amazon.com/cur/latest/userguide/cur-create.html>"
 		]
+	},
+	"EnableConfigService":{
+		"category": "S",
+		"^description": "AWS Config is not enabled. The AWS Config service performs configuration management of supported AWS resources in your account and delivers log files to you. The recorded information includes the configuration item (AWS resource), relationships between configuration items, and any configuration changes between resources.",
+		"shortDesc": "Enable AWS Config",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Enable AWS Config]<https://docs.aws.amazon.com/config/latest/developerguide/gs-console.html>"
+		]
+	},
+	"PartialEnableConfigService":{
+		"category": "S",
+		"^description": "Not all regions has Config enabled. The AWS Config service performs configuration management of supported AWS resources in your account and delivers log files to you. The recorded information includes the configuration item (AWS resource), relationships between configuration items, and any configuration changes between resources.",
+		"shortDesc": "Enable AWS Config",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Enable AWS Config]<https://docs.aws.amazon.com/config/latest/developerguide/gs-console.html>"
+		]
 	}
 }
