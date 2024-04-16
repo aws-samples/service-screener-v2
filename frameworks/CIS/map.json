@@ -1,0 +1,66 @@
+{
+    "metadata": {
+      "originator": "CIS",
+      "shortname": "CIS AWS",
+      "fullname": "CIS Amazon Web Services Foundations Benchmark",
+      "description": "The CIS Amazon Web Services Foundations Benchmark is a set of security configuration best practices for AWS accounts and resources. The benchmark covers identity and access management, logging and monitoring, networking, data protection, and incident response.",
+      "_": "https://docs.aws.amazon.com/securityhub/latest/userguide/cis-aws-foundations-benchmark.html#cis1v4-standard",
+      "emptyCheckDefaultMsg": "<small><i>Please refer to the CIS control section for further details. Kindly provide evidence or artifacts demonstrating compliance with the respective CIS control.</i></small>"
+    },
+    "mapping": {
+        "CloudTrail.": {
+            "1": ["cloudtrail.HasOneMultiRegionTrail"],
+            "2": ["cloudtrail.RequiresKmsKey"],
+            "4": ["cloudtrail.LogFileValidationEnabled"],
+            "5": ["cloudtrail.CloudWatchLogsLogGroupArn"],
+            "6": [],
+            "7": ["cloudtrail.EnableTrailS3BucketLogging"]
+          },
+        "CloudWatch.": {
+            "1": [],
+            "4": [],
+            "5": [],
+            "6": [],
+            "7": [],
+            "8": [],
+            "9": [],
+            "10": [],
+            "11": [],
+            "12": [],
+            "13": [],
+            "14": []
+        },
+        "Config.": {
+            "1": []
+        },
+        "EC2.": {
+            "2": ["ec2.SGDefaultDisallowTraffic"],
+            "6": [],
+            "7": ["ec2.EBSEncrypted"],
+            "21": []
+        },
+        "IAM.": {
+            "1": ["iam.FullAdminAccess"],
+            "3": ["iam.hasAccessKeyNoRotate90days"],
+            "4": ["iam.rootHasAccessKey"],
+            "5": ["iam.mfaActive"], 
+            "9": ["iam.rootMfaActive"],
+            "15": ["iam.passwordPolicyLength"],
+            "16": ["iam.passwordPolicyReuse"],
+            "18": [],
+            "22": ["iam.consoleLastAccess45"]
+        },
+        "KMS.": {
+            "4": ["kms.KeyRotationEnabled"]
+        },
+        "RDS.": {
+            "3": ["rds.StorageEncrypted"]
+        },
+        "S3.": {
+            "1": ["s3.S3AccountPublicAccessBlock"],
+            "5": ["s3.TlsEnforced"],
+            "8": ["s3.PublicAccessBlock"],
+            "20": ["s3.MFADelete"]
+        }
+    }
+  }
