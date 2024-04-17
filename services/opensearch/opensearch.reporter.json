@@ -194,6 +194,19 @@
             "[Enable node-to-node encryption]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"    
         ]
     },
+    "TLSEnforced": {
+        "category": "S",
+        "^description": "HTTPS (TLS) can be used to help prevent potential attackers from using person-in-the-middle or similar attacks to eavesdrop on or manipulate network traffic. Only encrypted connections over HTTPS (TLS) should be allowed. Encrypting data in transit can affect performance. You should test your application with this feature to understand the performance profile and the impact of TLS. TLS 1.2 provides several security enhancements over previous versions of TLS. ",
+        "downtime": -1,
+        "slowness": -1,
+        "additionalCost": 0,
+        "criticality": "I",
+        "needFullTest": 0,
+        "shortDesc": "If your domain stores sensitive data, make sure the domain endpoint is configured to use the latest TLS security policy.",
+        "ref": [
+            "[Enable node-to-node encryption]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"    
+        ]
+    },
     "SearchSlowLogs": {
         "category": "P",
         "^description": "OpenSearch Service exposes OpenSearch error logs, search slow logs, indexing slow logs, and audit logs in Amazon CloudWatch Logs. Search slow logs, indexing slow logs, and error logs are useful for troubleshooting performance and stability issues. Audit logs, which are only available if you enable fine-grained access control to track user activity. For more information, see Logs in the OpenSearch documentation. Search slow logs and indexing slow logs are an important tool for understanding and troubleshooting the performance of your search and indexing operations. Enable search and index slow log delivery for all production domains. You must also configure logging thresholds—otherwise, CloudWatch won't capture the logs.",

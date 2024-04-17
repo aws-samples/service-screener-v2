@@ -164,6 +164,13 @@ class OpensearchCommon(Evaluator):
                 if 'Enabled' in self.attribute['DomainStatus']['NodeToNodeEncryptionOptions']:
                     self.results["NodeToNodeEncryption"] = [1, "Enabled"]
     
+    def _checkTLSEnforced(self):
+        self.results["TLSEnforced"] = [-1, "Disabled"]
+        if 'DomainStatus' in self.attribute:
+            if 'DomainEndpointOptions' in self.attribute['DomainStatus']:
+                if 'EnforceHTTPS' in self.attribute['DomainStatus']['DomainEndpointOptions']:
+                    self.results["TLSEnforced"] = [1, "Enabled"]
+    
     def _checkSearchSlowLogs(self):
         self.results["SearchSlowLogs"] = [-1, "Disabled"]
         if 'DomainStatus' in self.attribute:
