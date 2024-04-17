@@ -38,7 +38,7 @@ if __name__ == "__main__":
                 print('.', end="", flush=True)
                 conn = Request(url)
                 conn.add_header('User-Agent', 'aws-cli')
-                resp = urlopen(conn)
+                resp = urlopen(conn, timeout=10)
             
                 if resp.getcode() != 200:
                     if e.code not in invalidRefDict:
