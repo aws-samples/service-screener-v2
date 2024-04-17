@@ -48,7 +48,7 @@
             "15": ["iam.passwordPolicyLength"],
             "16": ["iam.passwordPolicyReuse"],
             "18": [],
-            "22": ["iam.consoleLastAccess45"]
+            "22": ["iam.consoleLastAccess45,iam.consoleLastAccess90, iam.consoleLastAccess365"]
         },
         "KMS.": {
             "4": ["kms.KeyRotationEnabled"]
