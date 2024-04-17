@@ -1,0 +1,210 @@
+{
+	"trailWOMAroot1": {
+		"category": "O",
+		"^description": "No alarm found for usage of 'root' user. The root user has unrestricted access to all services and resources in an AWS account. We highly recommend that you avoid using the root user for daily tasks. Minimizing the use of the root user and adopting the principle of least privilege for access management reduce the risk of accidental changes and unintended disclosure of highly privileged credentials.",
+		"shortDesc": "Create alarm: 'root' user usage",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 1]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-1>"
+		]
+	},
+	"trailWOMAunauthAPI2": {
+		"category": "O",
+		"^description": "CIS recommends that you create a metric filter and alarm unauthorized API calls. Monitoring unauthorized API calls helps reveal application errors and might reduce time to detect malicious activity.",
+		"shortDesc": "Create alarm: unauthorized API calls",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 2]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-2>"
+		]
+	},
+	"trailWOMAnoMFA3": {
+		"category": "O",
+		"^description": "CIS recommends that you create a metric filter and alarm console logins that aren't protected by MFA. Monitoring for single-factor console logins increases visibility into accounts that aren't protected by MFA.",
+		"shortDesc": "Create alarm: Console Sign-in without MFA",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 3]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-3>"
+		]
+	},
+	"trailWOMAalarm4": {
+		"category": "O",
+		"^description": "CIS recommends that you create a metric filter and alarm for changes made to IAM policies. Monitoring these changes helps ensure that authentication and authorization controls remain intact.",
+		"shortDesc": "Create alarm: IAM policy changes",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 4]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-4>"
+		]
+	},
+	"trailWOMATrail5": {
+		"category": "O",
+		"^description": "CIS recommends that you create a metric filter and alarm for changes to CloudTrail configuration settings. Monitoring these changes helps ensure sustained visibility to activities in the account.",
+		"shortDesc": "Create alarm: CloudTrail changes",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 5]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-5>"
+		]
+	},
+	"trailWOMAAuthFail6": {
+		"category": "O",
+		"^description": "CIS recommends that you create a metric filter and alarm for failed console authentication attempts. Monitoring failed console logins might decrease lead time to detect an attempt to brute-force a credential, which might provide an indicator, such as source IP, that you can use in other event correlations.",
+		"shortDesc": "Create alarm: Auth Fail",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 6]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-6>"
+		]
+	},
+	"trailWOMACMK7": {
+		"category": "O",
+		"^description": "CIS recommends that you create a metric filter and alarm for customer managed keys that have changed state to disabled or scheduled deletion. Data encrypted with disabled or deleted keys is no longer accessible.",
+		"shortDesc": "Create alarm: CMK changes",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 7]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-7>"
+		]
+	},
+	"trailWOMAS3Policy8": {
+		"category": "O",
+		"^description": "CIS recommends that you create a metric filter and alarm for changes to S3 bucket policies. Monitoring these changes might reduce time to detect and correct permissive policies on sensitive S3 buckets.",
+		"shortDesc": "Create alarm: S3 Bucket Policy changes",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 8]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-8>"
+		]
+	},
+	"trailWOMAConfig9": {
+		"category": "O",
+		"^description": "CIS recommends that you create a metric filter and alarm for changes to AWS Config configuration settings. Monitoring these changes helps ensure sustained visibility of configuration items in the account.",
+		"shortDesc": "Create alarm: ConfigService changes",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 9]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-9>"
+		]
+	},
+	"trailWOMASecGroup10": {
+		"category": "O",
+		"^description": "CIS recommends that you create a metric filter and alarm for changes to security groups. Monitoring these changes helps ensure that resources and services aren't unintentionally exposed.",
+		"shortDesc": "Create alarm: SecurityGroups changes",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 10]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-10>"
+		]
+	},
+	"trailWOMASecGroup11": {
+		"category": "O",
+		"^description": "CIS recommends that you create a metric filter and alarm for changes to NACLs. Monitoring these changes helps ensure that AWS resources and services aren't unintentionally exposed.",
+		"shortDesc": "Create alarm: NACL changes",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 11]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-11>"
+		]
+	},
+	"trailWOMAGateway12": {
+		"category": "O",
+		"^description": "CIS recommends that you create a metric filter and alarm for changes to network gateways. Monitoring these changes helps ensure that all ingress and egress traffic traverses the VPC border via a controlled path.",
+		"shortDesc": "Create alarm: Network Gateway changes",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 12]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-12>"
+		]
+	},
+	"trailWOMASecGroup13": {
+		"category": "O",
+		"^description": "CIS recommends that you create a metric filter and alarm for changes to route tables. Monitoring these changes helps ensure that all VPC traffic flows through an expected path.",
+		"shortDesc": "Create alarm: Route Table changes",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 13]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-13>"
+		]
+	},
+	"trailWOMAGateway14": {
+		"category": "O",
+		"^description": "CIS recommends that you create a metric filter and alarm for changes to VPCs. Monitoring these changes helps ensure that authentication and authorization controls remain intact.",
+		"shortDesc": "Create alarm: VPC Changes",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 14]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-14>"
+		]
+	},
+	"trailWithoutCWLogs": {
+		"category": "O",
+		"^description": "CIS recommends that all CloudTrail to have logs store in CloudWatch so relevant CloudWatch log metrics control can be implement to heighten both AWS Security Pillar and Operation Excellence Pillar",
+		"shortDesc": "CloudTrail to have CloudWatch Log",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html>"
+		]
+	},
+	"trailWithCWLogsWithoutMetrics": {
+		"category": "O",
+		"^description": "No metrics found in CloudWatch Log Group. CIS recommends that you create relevant metric filters and alarms for CloudTrail's log that store in CloudWatch Log",
+		"shortDesc": "CloudTrail's Log to have log metrics",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html>"
+		]
+	}
+}
