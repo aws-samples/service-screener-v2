@@ -104,6 +104,19 @@
 			"[IAM Password Policy]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_passwords_account-policy.html#IAMPasswordPolicy>"
 		]
 	},
+	"passwordPolicyWeak": {
+		"category": "S",
+		"^description": "Your current password policy is not strong. Improving the strength of your password policy would improve the security of your account. Consider implementing best practices when setting the password policy. If you already configure as per your organization ",
+		"shortDesc": "Set a stronger password policy",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Docs]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#configure-strong-password-policy>"
+		]
+	},
 	"passwordPolicyReuse": {
 		"category": "S",
 		"^description": "Your current password policy is not strong. Improving the strength of your password policy would improve the security of your account. Consider implementing best practices when setting the password policy. If you already configure as per your organization ",
