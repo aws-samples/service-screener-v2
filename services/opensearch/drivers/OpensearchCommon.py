@@ -74,7 +74,24 @@ class OpensearchCommon(Evaluator):
                 self.results["DedicatedMasterNodes"] = [-1, "Wrong number of dedicated master nodes"]
                 return
             self.results["DedicatedMasterNodes"] = [1, "Sufficient dedicated master nodes"]
-    
+
+    def _checkDataNodes(self):
+        total_nodes = self.cluster_config['InstanceCount']
+        master_enabled = self.cluster_config["DedicatedMasterEnabled"]
+        master_nodes = 0
+        if master_enabled:
+            master_nodes = self.cluster_config['DedicatedMasterCount']
+        warm_enabled = self.cluster_config["WarmEnabled"]
+        warm_nodes = 0
+        if warm_enabled:
+            warm_nodes = self.cluster_config['WarmCount']
+        data_nodes = total_nodes - master_nodes - warm_nodes
+        
+        if data_nodes < 3:
+            self.results["DataNodes"] = [-1, "Insufficient data nodes"]
+            return
+        self.results["DataNodes"] = [1, "Sufficient data nodes"]
+
     def _checkAvailabilityZones(self):
         enabled = self.cluster_config["ZoneAwarenessEnabled"]
         self.results["AvailabilityZones"] = [-1, "Multi-AZ not enabled"]
