@@ -194,6 +194,32 @@
             "[Enable log publishing]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"    
         ]
     },
+    "ApplicationLogs": {
+        "category": "P",
+        "^description": "OpenSearch Service exposes OpenSearch error logs, search slow logs, indexing slow logs, and audit logs in Amazon CloudWatch Logs. Search slow logs, indexing slow logs, and error logs are useful for troubleshooting performance and stability issues. Audit logs, which are only available if you enable fine-grained access control to track user activity. For more information, see Logs in the OpenSearch documentation. Search slow logs and indexing slow logs are an important tool for understanding and troubleshooting the performance of your search and indexing operations. Enable search and index slow log delivery for all production domains. You must also configure logging thresholds—otherwise, CloudWatch won't capture the logs.",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 1,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": " Enable error log delivery for all production domains.",
+        "ref": [
+            "[Enable log publishing]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"    
+        ]
+    },
+    "AuditLogs": {
+        "category": "P",
+        "^description": "OpenSearch Service exposes OpenSearch error logs, search slow logs, indexing slow logs, and audit logs in Amazon CloudWatch Logs. Search slow logs, indexing slow logs, and error logs are useful for troubleshooting performance and stability issues. Audit logs, which are only available if you enable fine-grained access control to track user activity. For more information, see Logs in the OpenSearch documentation. Search slow logs and indexing slow logs are an important tool for understanding and troubleshooting the performance of your search and indexing operations. Enable search and index slow log delivery for all production domains. You must also configure logging thresholds—otherwise, CloudWatch won't capture the logs.",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 1,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": " Enable audit log delivery for all production domains.",
+        "ref": [
+            "[Enable log publishing]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"    
+        ]
+    },
     "AutoTune": {
         "category": "P",
         "^description": "Auto-Tune uses performance and usage metrics from your OpenSearch cluster to suggest changes to queue sizes, cache sizes, and Java virtual machine (JVM) settings on your nodes. These optional changes improve cluster speed and stability. You can revert to the default OpenSearch Service settings at any time. Auto-Tune is enabled by default on new domains unless you explicitly disable it.",

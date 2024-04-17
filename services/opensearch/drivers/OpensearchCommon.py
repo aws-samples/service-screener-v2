@@ -154,6 +154,20 @@ class OpensearchCommon(Evaluator):
                 if 'SEARCH_SLOW_LOGS' in self.attribute['DomainStatus']['LogPublishingOptions']:
                     self.results["SearchSlowLogs"] = [1, "Enabled"]
 
+    def _checkApplicationLogs(self):
+        self.results["ApplicationLogs"] = [-1, "Disabled"]
+        if 'DomainStatus' in self.attribute:
+            if 'LogPublishingOptions' in self.attribute['DomainStatus']:
+                if 'ES_APPLICATION_LOGS' in self.attribute['DomainStatus']['LogPublishingOptions']:
+                    self.results["SearchSlowLogs"] = [1, "Enabled"]
+
+    def _checkAuditLogs(self):
+        self.results["AuditLogs"] = [-1, "Disabled"]
+        if 'DomainStatus' in self.attribute:
+            if 'LogPublishingOptions' in self.attribute['DomainStatus']:
+                if 'SEARCH_SLOW_LOGS' in self.attribute['DomainStatus']['LogPublishingOptions']:
+                    self.results["AUDIT_LOGS"] = [1, "Enabled"]
+
     def _checkAutoTune(self):
         self.results["AutoTune"] = [-1, "Disabled"]
         if 'DomainStatus' in self.attribute:
