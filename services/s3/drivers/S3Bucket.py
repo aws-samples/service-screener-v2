@@ -71,6 +71,8 @@ class S3Bucket(Evaluator):
 
     def _checkBucketReplication(self):
         try:
+            self.results['BucketReplication'] = [1, 'On']
+
             resp = self.s3Client.get_bucket_replication(
                 Bucket=self.bucket
             )
@@ -80,12 +82,9 @@ class S3Bucket(Evaluator):
             target_loc = resp.get('ReplicationConfiguration').get('Rules')[0].get('Destination').get('Bucket')
             if source_loc.get('LocationConstraint') != target_loc.split('.')[1]:
                 self.results['CrossRegionReplication'] = [1, 'On']
-            else:
-                self.results['SameRegionReplication'] = [1, 'On']
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == 'ReplicationConfigurationNotFoundError':
-                self.results['CrossRegionReplication'] = [-1, 'Off']
-                self.results['SameRegionReplication'] = [-1, 'Off']
+                self.results['BucketReplication'] = [-1, 'Off']
         
 
     def _checkLifecycle(self):
