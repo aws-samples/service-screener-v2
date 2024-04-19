@@ -134,7 +134,7 @@ class Iam(Service):
         objs = {}
         users = {}
         roles = {}
-        
+        '''
         users = self.getUsers()
         if self.getUserFlag == False:
             return objs
@@ -165,7 +165,7 @@ class Iam(Service):
             
             objs['Group::' + group['GroupName']] = obj.getInfo()
             del obj
-        
+        '''
         print('... (IAM:Account) inspecting')
         obj = IamAccount(None, self.awsClients, users, roles, self.ssBoto)
         obj.run(self.__class__)

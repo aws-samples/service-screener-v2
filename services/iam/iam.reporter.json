@@ -130,6 +130,19 @@
 			"[IAM Password Policy]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#configure-strong-password-policy>"
 		]
 	},
+	"passwordPolicyWeak": {
+		"category": "S",
+		"^description": "Your current password policy is not strong. Improving the strength of your password policy would improve the security of your account. Consider implementing best practices when setting the password policy. If you already configure as per your organization ",
+		"shortDesc": "Set a stronger password policy",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[IAM Password Policy]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#configure-strong-password-policy>"
+		]
+	},
 	"InlinePolicy": {
 		"category": "O",
 		"^description": "You have set an inline policy for {$COUNT} IAM users, groups or roles. An inline policy is a policy that's embedded in an IAM identity (a user, group, or role). In most cases, we recommend that you use managed policies instead of inline policies. This is because managed policies have several additional features such as reusability, central change management, versioning and rolling back, delegating permissions management and automatic updates. Inline policies are useful if you want to maintain a strict one-to-one relationship between a policy and the identity that it's applied to. For example, you want to be sure that the permissions in a policy are not inadvertently assigned to an identity other than the one they're intended for.",

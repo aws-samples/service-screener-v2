@@ -138,7 +138,7 @@ for acctId, cred in rolesCred.items():
     
     if acctLoop == 1:
         Config.set('REGIONS_SELECTED', regions)
-    
+        
     frameworks = []
     if len(_cli_options['frameworks']) > 0:
         frameworks = _cli_options['frameworks'].split(',')
@@ -213,7 +213,7 @@ for acctId, cred in rolesCred.items():
     
     hasGlobal = False
     for file in os.listdir(_C.FORK_DIR):
-        if file[0] == '.' or file == _C.SESSUID_FILENAME or file == 'tail.txt' or file == 'error.txt' or file == 'empty.txt' or file == 'all.csv':
+        if file[0] == '.' or file == _C.SESSUID_FILENAME or file == 'tail.txt' or file == 'error.txt' or file == 'empty.txt' or file == 'all.csv' or file[0:10] == 'CustomPage':
             continue
         f = file.split('.')
         if len(f) == 2:

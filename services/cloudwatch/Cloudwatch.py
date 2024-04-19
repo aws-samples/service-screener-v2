@@ -26,6 +26,7 @@ class Cloudwatch(Service):
         self.ctClient = ssBoto.client('cloudtrail', config=self.bConfig)
         
         self.ctLogs = []
+        self.logGroups = []
         
         return
     
@@ -51,20 +52,44 @@ class Cloudwatch(Service):
         if resp.get('NextToken'):
             self.loopTrail(resp.get('NextToken'))
     
+    def getAllLogs(self, nextToken=None):
+        args = {}
+        if nextToken:
+            args['nextToken'] = nextToken
+        
+        resp = self.cwLogClient.describe_log_groups(**args)
+        logGroups = resp.get('logGroups')
+        for lg in logGroups:
+            self.logGroups.append({
+                'logGroupName': lg['logGroupName'],
+                'storedBytes': lg['storedBytes'],
+                'retentionInDays': lg['retentionInDays'] if 'retentionInDays' in lg else -1,
+                'dataProtectionStatus': lg['dataProtectionStatus'] if 'dataProtectionStatus' in lg else ''
+            })
+        
+        if resp.get('nextToken'):
+            self.getAllLogs(resp.get('nextToken'))
+    
     def advise(self):
         objs = {}
         
         self.loopTrail()
         for log in self.ctLogs:
             print("... (Cloudwatch Logs) inspecting CloudTrail's related LogGroup [{}]".format(log[0]))
-            obj = CloudwatchTrails(log, self.cwLogClient)
+            obj = CloudwatchTrails(log, log[2], self.cwLogClient)
             obj.run(self.__class__)
             
-            objs[f"Log::{log[0]}"] = obj.getInfo()
-            
-            print(obj.getInfo())
+            objs[f"ctLog::{log[0]}"] = obj.getInfo()
             del obj
         
+        self.getAllLogs()
+        for log in self.logGroups:
+            print("... (Cloudwatch Logs inspecting LogGroup [{}]".format(log['logGroupName']))
+            obj = CloudwatchCommon(log, self.cwLogClient)
+            obj.run(self.__class__)
+            
+            objs[f"Log::{log['logGroupName']}"] = obj.getInfo()
+            del obj
         ###### TO DO #####
         ## call getResources method
         ## loop through the resources and run the checks in drivers

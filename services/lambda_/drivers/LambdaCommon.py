@@ -72,6 +72,12 @@ class LambdaCommon(Evaluator):
                 return result['SampleCount']
 
     
+    def _check_architectures_is_arm(self):
+        if 'arm64' in self.lambda_['Architectures']:
+            return
+        
+        self.results['UseArmArchitecture'] = [-1, ', '.join(self.lambda_['Architectures'])]
+    
     def _check_function_url_in_used(self):
         url_config = self.lambda_client.list_function_url_configs(
             FunctionName=self.function_name

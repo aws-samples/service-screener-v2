@@ -104,7 +104,7 @@ class CloudwatchTrails(Evaluator):
                 ["$.eventName", "=", "DeleteSecurityGroup"]
             ]
         },
-        {'trailWOMASecGroup11': [
+        {'trailWOMANACL11': [
                 ["$.eventName", "=", "CreateNetworkAcl"],
                 ["$.eventName", "=", "CreateNetworkAclEntry"],
                 ["$.eventName", "=", "DeleteNetworkAcl"],
@@ -152,12 +152,13 @@ class CloudwatchTrails(Evaluator):
     CISMetricsMapRegex = {}
     logMetricsFilterPattern = []
     
-    def __init__(self, log, logClient):
+    def __init__(self, log, logname, logClient):
         super().__init__()
         self.init()
         
         self.logClient = logClient
         self.log = log
+        self.logname = logname
         
         self.metricsInfo = []
         
@@ -219,7 +220,7 @@ class CloudwatchTrails(Evaluator):
     ## Check methods name must follow _check[Description]
     def _checkHasLogMetrics(self):
         if self.log[1] == None:
-            self.results['TrailWithoutCWLogs'] = [-1, None]
+            self.results['trailWithoutCWLogs'] = [-1, None]
             return
         
         args = {"logGroupNamePrefix": self.log[2]}
@@ -228,7 +229,7 @@ class CloudwatchTrails(Evaluator):
         logDetail = resp.get('logGroups')[0]
         
         if logDetail['metricFilterCount'] == 0:
-            self.results['TrailWithCWLogsWithoutMetrics'] = [-1, None]
+            self.results['trailWithCWLogsWithoutMetrics'] = [-1, None]
             return
         
         self.getAllMetrics()

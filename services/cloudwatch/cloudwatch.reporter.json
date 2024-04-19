@@ -129,7 +129,7 @@
 			"[CIS Cloudwatch Guide 10]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-10>"
 		]
 	},
-	"trailWOMASecGroup11": {
+	"trailWOMANACL11": {
 		"category": "O",
 		"^description": "CIS recommends that you create a metric filter and alarm for changes to NACLs. Monitoring these changes helps ensure that AWS resources and services aren't unintentionally exposed.",
 		"shortDesc": "Create alarm: NACL changes",
@@ -205,6 +205,32 @@
 		"needFullTest": 0,
 		"ref": [
 			"[CIS Cloudwatch Controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html>"
+		]
+	},
+	"SetRetentionDays":{
+		"category": "C",
+		"^description": "No retention day set in CloudWatch Log Groups. It incurs charges based on storage size",
+		"shortDesc": "Set retention days",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html>"
+		]
+	},
+	"CISRetentionAtLeast1Yr":{
+		"category": "O",
+		"^description": "CloudWatch Logs centralize logs from all of your systems, applications, and AWS services in a single, highly scalable service. You can use CloudWatch Logs to monitor, store, and access your log files from Amazon Elastic Compute Cloud (EC2) instances, AWS CloudTrail, Amazon Route 53, and other sources. Retaining your logs for at least 1 year can help you comply with log retention standards.",
+		"shortDesc": "To have at least 365 days retention",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CIS Cloudwatch Guide 16]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-16>"
 		]
 	}
 }

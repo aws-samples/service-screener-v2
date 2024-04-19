@@ -5,6 +5,7 @@ from frameworks.FTR.FTR import FTR
 from frameworks.SSB.SSB import SSB
 from frameworks.WAFS.WAFS import WAFS
 from frameworks.MSR.MSR import MSR
+from frameworks.CIS.CIS import CIS
 
 class FrameworkPageBuilder(PageBuilder):
     COMPLIANCE_STATUS = ["Not available", "Compliant", "Need Attention"]
@@ -27,6 +28,13 @@ class FrameworkPageBuilder(PageBuilder):
     ]
     
     HTML_TABLE_ID = 'screener-framework'
+    
+    colorCustomHex = ["#17a2b8", "#28a745", "#dc3545"]
+    colorCustomRGB = [
+        [23, 40, 220],
+        [162, 167, 53],
+        [184, 69, 69]
+    ]
     
     def __init__(self, service=None, reporter=None):
         framework = service

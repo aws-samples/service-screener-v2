@@ -94,7 +94,21 @@ class CloudtrailCommon(Evaluator):
         ## For safety purpose, though all trails must have bucket
         if 'S3BucketName' in self.trailInfo and len(self.trailInfo['S3BucketName']) > 0:
             s3Bucket = self.trailInfo['S3BucketName']
-            # print("Bucket Name {}".format(s3Bucket))
+            print(s3Bucket)
+            # help me retrieve s3 bucket public
+            try:
+                resp = self.s3Client.get_public_access_block(
+                    Bucket=s3Bucket
+                )
+                
+                for param, val in resp['PublicAccessBlockConfiguration'].items():
+                    if val == False:
+                        self.results['EnableS3PublicAccessBlock'] = [-1, None]
+                        break
+                    
+            except botocore.exceptions.ClientError as e:
+                print('-- Unable to capture Public Access Block settings:', e.response['Error']['Code'])
+            
             try:
                 r = self.s3Client.get_bucket_versioning(
                     Bucket=s3Bucket
@@ -109,7 +123,7 @@ class CloudtrailCommon(Evaluator):
                     self.results['EnableTrailS3BucketVersioning'] = [-1, '']
                     
             except botocore.exceptions.ClientError as e:
-                print('Unable to capture S3 MFA settings:', e.response['Error']['Code'])
+                print('-- Unable to capture S3 MFA settings:', e.response['Error']['Code'])
         
             try:
                 r = self.s3Client.get_bucket_logging(
@@ -119,7 +133,7 @@ class CloudtrailCommon(Evaluator):
                 if logEnable == None or not type(logEnable) is dict:
                     self.results['EnableTrailS3BucketLogging'] = [-1, '']
             except botocore.exceptions.ClientError as e:
-                print('Unable to capture S3 Logging settings:', e.response['Error']['Code'])
+                print('-- Unable to capture S3 Logging settings:', e.response['Error']['Code'])
                 
             try:
                 resp = self.s3Client.get_bucket_lifecycle(

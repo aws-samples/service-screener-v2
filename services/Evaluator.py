@@ -3,6 +3,7 @@ import botocore
 
 from utils.Config import Config
 from utils.Tools import _warn, _info
+from utils.CustomPage.CustomPage import CustomPage
 import constants as _C
 
 class Evaluator():
@@ -115,3 +116,8 @@ class Evaluator():
             
             scanned.append(';'.join([Config.get(classPrefix), driver, name, hasError]))
             Config.set(ConfigKey, scanned)
+            
+            
+        ## Handle custom page requirement
+        cp = CustomPage()
+        cp.trackInfo(driver, name, self.results)

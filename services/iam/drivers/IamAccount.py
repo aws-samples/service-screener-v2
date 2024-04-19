@@ -263,6 +263,9 @@ class IamAccount(IamCommon):
         badResults = []
         cnt = 0
         for region in regions:
+            if region == 'GLOBAL':
+                continue
+            
             conf = bConfig(region_name = region)
             cfg = ssBoto.client('config', config=conf)
             

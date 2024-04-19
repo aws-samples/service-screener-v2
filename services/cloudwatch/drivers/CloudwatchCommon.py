@@ -17,17 +17,19 @@ class CloudwatchCommon(Evaluator):
     ###### TO DO #####
     ## Replace resource variable to meaningful name
     ## Modify based on your need
-    def __init__(self, resource):
+    def __init__(self, log, logClient):
         super().__init__()
         self.init()
+        
+        self.log = log
+        self.logClient = logClient
         return
     
     ###### TO DO #####
     ## Change the method name to meaningful name
     ## Check methods name must follow _check[Description]
-    def _checkDescription(self):
-        ###### TO DO #####
-        ## Develop the checks logic here
-        ## If the resources failed the rules, flag the resource as example below
-        self.results['Rule Name'] = [-1, "Info for customer to identify the resource"]
-        return
+    def _checkRetention(self):
+        if self.log['retentionInDays'] == -1:
+            self.results['SetRetentionDays'] = [-1, "{} MB".format(self.log['storedBytes']/1024/1024)]
+        elif self.log['retentionInDays'] <= 365:
+            self.results['CISRetentionAtLeast1Yr'] = [-1, self.log['retentionInDays']]
