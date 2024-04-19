@@ -33,6 +33,9 @@ class CustomObject():
                         self.ResourcesStat[serv][driver][rule].append(name)
                         
     def printInfo(self, service):
+        if not service in self.ResourcesStat:
+            return None
+        
         s = json.dumps(self.ResourcesStat[service])
         _pr(s)
         

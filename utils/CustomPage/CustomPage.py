@@ -30,7 +30,7 @@ class CustomPage():
         serv = service.lower()
         prefix = 'CustomPage.'
         for filename in os.listdir(_C.FORK_DIR):
-            if filename.startswith(prefix):
+            if filename.startswith(prefix) and service.lower() in filename:
                 file_path = os.path.join(_C.FORK_DIR, filename)
                 if os.path.isfile(file_path):
                     os.remove(file_path)
@@ -41,6 +41,8 @@ class CustomPage():
         serv = service.lower()
         for cname, pObj in self.Pages.items():
             s = pObj.printInfo(serv)
+            if s == None:
+                return
             
             filename = _C.FORK_DIR + '/CustomPage.' + cname + '.' + service + '.json'
             with open(filename, "w") as f:
