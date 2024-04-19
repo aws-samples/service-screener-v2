@@ -92,6 +92,19 @@
             "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html#access-control-block-public-access-options>"   
         ]
     },
+    "EventNotification": {
+        "category": "OS",
+        "^description": "When you enable S3 Event Notifications, you receive alerts when specific events occur that impact your S3 buckets. For example, you can be notified of object creation, object removal, and object restoration. These notifications can alert relevant teams to accidental or intentional modifications that may lead to unauthorized data access.",
+        "shortDesc": "Enable Event Notification",
+        "criticality": "I",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html>"   
+        ]
+    },
     "BucketLifecycle": {
         "category": "CO",
         "^description": "You have not configured lifecycle policies for objects in {$COUNT} buckets. Lifecycle configuration is a set of rules that define actions that Amazon S3 applies to a group of objects. This will save you cost by moving infrequently accessed objects to lower cost storage tiers and expiring objects that are no longer needed.",
