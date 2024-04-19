@@ -9,18 +9,21 @@ import constants as _C
 
 class PageBuilder:
     serviceIcon = {
+        'cloudfront': 'wifi', 
+        'cloudtrail': 'user-secret',
+        'cloudwatch': 'clock',
+        'dynamodb': 'bars',
         'ec2': 'server',
-        'rds': 'database',
-        's3': 'hdd',
-        'iam': 'users',
-        'guardduty': 'shield-alt',
-        'opensearch': 'warehouse',
         'efs': 'network-wired', 
         'eks': 'box', 
-        'cloudfront': 'wifi', 
-        'elasticache': 'store', 
+        'elasticache': 'store',
+        'guardduty': 'shield-alt',
+        'iam': 'users',
+        'kms': 'key',
         'lambda': 'calculator', 
-        'cloudtrail': 'user-secret'
+        'opensearch': 'warehouse',
+        'rds': 'database',
+        's3': 'hdd'
     }
     
     frameworkIcon = 'tasks'
@@ -36,6 +39,9 @@ class PageBuilder:
     }
 
     isHome = False
+    
+    colorCustomHex = None
+    colorCustomRGB = None
 
     def __init__(self, service, reporter):
         self.service = service
@@ -316,9 +322,14 @@ class PageBuilder:
         return arr
         
     def _randomRGB(self, idx):
-        r1Arr = [226, 168, 109, 80 , 51 , 60 , 70 , 89 , 108]
-        r2Arr = [124, 100, 75 , 63 , 51 , 78 , 105, 158, 212]
-        r3Arr = [124, 100, 75 , 63 , 51 , 75 , 100, 148, 197]
+        if self.colorCustomRGB == None:
+            r1Arr = [226, 168, 109, 80 , 51 , 60 , 70 , 89 , 108]
+            r2Arr = [124, 100, 75 , 63 , 51 , 78 , 105, 158, 212]
+            r3Arr = [124, 100, 75 , 63 , 51 , 75 , 100, 148, 197]
+        else:
+            r1Arr = self.colorCustomRGB[0]
+            r2Arr = self.colorCustomRGB[1]
+            r3Arr = self.colorCustomRGB[2]
         
         if idx >= len(r1Arr):
             idx = idx%len(r1Arr)
@@ -330,7 +341,11 @@ class PageBuilder:
         return "rgba({}, {}, {}, 1)".format(r1, r2, r3)
         
     def _randomHexColorCode(self, idx):
-        color = ["#e27c7c", "#a86464", "#6d4b4b", "#503f3f", "#333333", "#3c4e4b", "#466964", "#599e94", "#6cd4c5"]
+        if self.colorCustomHex == None:
+            color = ["#e27c7c", "#a86464", "#6d4b4b", "#503f3f", "#333333", "#3c4e4b", "#466964", "#599e94", "#6cd4c5"]
+        else:
+            color = self.colorCustomHex
+        
         if idx >= len(color):
             idx = idx%len(color)
             # return '#' + str(hex(random.randint(0, 0xFFFFFF))).lstrip('0x').rjust(6, '0')
@@ -469,10 +484,10 @@ $('#changeAcctId').change(function(){
         sidebarPRE = sidebarPRE.replace('{$ISHOME}', ISHOME)
         output.append(sidebarPRE)
 
-        arr = self.buildNavCustomItems('Services', self.services)
-        output.append("\n".join(arr))
-        
         arr = self.buildNavCustomItems('Frameworks', self.frameworks)
+        output.append("\n".join(arr))
+
+        arr = self.buildNavCustomItems('Services', self.services)
         output.append("\n".join(arr))
 
         sidebarPOST = open(self._getTemplateByKey('sidebar.postcustom'), 'r').read()
@@ -486,17 +501,21 @@ $('#changeAcctId').change(function(){
         services = lists
         activeService = self.service
 
-        output = []
-        output.append("<li class='nav-header'>{}</li>".format(title))
-        
         if title == 'Frameworks':
+            title = 'Compliances / Frameworks'
             services = {}
             for l in lists:
                 services[l] = 0
         else:
             services = lists
+            
+        output = []
+        output.append("<li class='nav-header'>{}</li>".format(title))
+            
+        _services = sorted(services)
         
-        for name, count in services.items():
+        for name in _services:
+            count = services[name]
             if name == activeService:
                 class_ = 'active'
             else:

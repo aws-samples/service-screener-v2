@@ -46,7 +46,7 @@
         "downtime": 0,
         "slowness": 0,
         "additionalCost": 0,
-        "needFullTest": -1,
+        "needFullTest": 1,
         "ref": [
             "[Block S3 Public Access]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html#access-control-block-public-access-options>"   
         ]

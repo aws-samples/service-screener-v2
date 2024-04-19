@@ -123,6 +123,19 @@
       "[Resilience in CloudTrail]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/disaster-recovery-resiliency.html>"
     ]
   },
+  "EnableS3PublicAccessBlock": {
+    "category": "S",
+    "^description": "You have disabled public access block on {$COUNT} S3 buckets.This leaves your data to be accessible by anyone. Unless absolutely necessary, enable public access block. Block Public Access at the S3 bucket level provides controls to ensure that objects never have public access. Public access is granted to buckets and objects through access control lists (ACLs), bucket policies, or both.",
+    "shortDesc": "Block S3 Public Access",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "ref": [
+      "[Block S3 Public Access]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html#access-control-block-public-access-options>"   
+    ]
+  },
   "HasInsightSelectors": {
     "category": "O",
     "^description": "CloudTrail Insights analyzes your normal patterns of API call volume and API error rates, also called the baseline, and generates Insights events when the call volume or error rates are outside normal patterns. Insights events on API call volume are generated for write management APIs, and Insights events on API error rate are generated for both read and write management APIs.",

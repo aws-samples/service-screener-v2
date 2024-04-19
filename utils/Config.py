@@ -4,14 +4,15 @@ import boto3
 import constants as _C
 
 class Config:
+    
     AWS_SDK = {
         'signature_version': 'v4'
     }
 
     ADVISOR = {
         'TITLE': 'Service Screener',
-        'VERSION': '2.0.1',
-        'LAST_UPDATE': '26-Sep-2023'
+        'VERSION': '2.1.0',
+        'LAST_UPDATE': '17-Apr-2024'
     }
 
     ADMINLTE = {
@@ -42,6 +43,8 @@ class Config:
         'cloudfrontdist': ['ATTR', 'dist'],
         'cloudtrailaccount': ['TEXT', 'General'],
         'cloudtrailcommon': ['DICT', 'trail', 'TrailARN'],
+        'cloudwatchtrails': ['ATTR', 'logname'],
+        'cloudwatchcommon': ['DICT', 'log', 'logGroupName'],
         'dynamodbgeneric': ['TEXT', 'General'],
         'dynamodbcommon': ['ATTR', 'tablename'],
         'ec2autoscaling': ['DICT', 'asg', 'AutoScalingGroupName'],
@@ -67,6 +70,7 @@ class Config:
         'kmscommon': ['DICT', 'kms', 'Arn'],
         'lambdacommon': ['ATTR', 'function_name', ],
         'opensearchcommon': ['ATTR', 'domain'],
+        'rdsmariadb': ['DICT', 'db', ['DBInstanceIdentifier']],
         'rdsmysql': ['DICT', 'db', ['DBInstanceIdentifier']],
         'rdsmssql': ['DICT', 'db', ['DBInstanceIdentifier']],
         'rdspostgres': ['DICT', 'db', ['DBInstanceIdentifier']],

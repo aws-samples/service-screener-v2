@@ -1,11 +1,12 @@
 import botocore
 
 from utils.Config import Config
-from utils.Tools import _pr
+from utils.Tools import _pr, _warn
 from services.Service import Service
 ##import drivers here
 from services.rds.drivers.RdsCommon import RdsCommon
 from services.rds.drivers.RdsMysql import RdsMysql
+from services.rds.drivers.RdsMariadb import RdsMariadb
 from services.rds.drivers.RdsMysqlAurora import RdsMysqlAurora
 from services.rds.drivers.RdsPostgres import RdsPostgres
 from services.rds.drivers.RdsPostgresAurora import RdsPostgresAurora
@@ -28,6 +29,7 @@ class Rds(Service):
         self.secrets = []
 
     engineDriver = {
+        'mariadb': 'Mariadb',
         'mysql': 'Mysql',
         'aurora-mysql': 'MysqlAurora',
         'postgres': 'Postgres',
@@ -141,6 +143,7 @@ class Rds(Service):
                 engine = 'sqlserver'
             
             if engine not in self.engineDriver:
+                _warn("{}, unsupported RDS Engine: [{}]".format(instance[dbKey], engine))
                 continue
             
             driver_ = self.engineDriver[engine]

@@ -143,6 +143,19 @@
 			"[IAM Password Policy]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#configure-strong-password-policy>"
 		]
 	},
+	"passwordPolicyWeak": {
+		"category": "S",
+		"^description": "Your current password policy is not strong. Improving the strength of your password policy would improve the security of your account. Consider implementing best practices when setting the password policy. If you already configure as per your organization ",
+		"shortDesc": "Set a stronger password policy",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[IAM Password Policy]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#configure-strong-password-policy>"
+		]
+	},
 	"InlinePolicy": {
 		"category": "O",
 		"^description": "You have set an inline policy for {$COUNT} IAM users, groups or roles. An inline policy is a policy that's embedded in an IAM identity (a user, group, or role). In most cases, we recommend that you use managed policies instead of inline policies. This is because managed policies have several additional features such as reusability, central change management, versioning and rolling back, delegating permissions management and automatic updates. Inline policies are useful if you want to maintain a strict one-to-one relationship between a policy and the identity that it's applied to. For example, you want to be sure that the permissions in a policy are not inadvertently assigned to an identity other than the one they're intended for.",
@@ -460,6 +473,32 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Creating Cost and Usage Reports]<https://docs.aws.amazon.com/cur/latest/userguide/cur-create.html>"
+		]
+	},
+	"EnableConfigService":{
+		"category": "S",
+		"^description": "AWS Config is not enabled. The AWS Config service performs configuration management of supported AWS resources in your account and delivers log files to you. The recorded information includes the configuration item (AWS resource), relationships between configuration items, and any configuration changes between resources.",
+		"shortDesc": "Enable AWS Config",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Enable AWS Config]<https://docs.aws.amazon.com/config/latest/developerguide/gs-console.html>"
+		]
+	},
+	"PartialEnableConfigService":{
+		"category": "S",
+		"^description": "Not all regions has Config enabled. The AWS Config service performs configuration management of supported AWS resources in your account and delivers log files to you. The recorded information includes the configuration item (AWS resource), relationships between configuration items, and any configuration changes between resources.",
+		"shortDesc": "Enable AWS Config",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Enable AWS Config]<https://docs.aws.amazon.com/config/latest/developerguide/gs-console.html>"
 		]
 	}
 }
