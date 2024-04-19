@@ -12,6 +12,19 @@
             "[Protecting data with encryption]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingEncryption.html>"
         ]
     },
+    "AccessControlList": {
+        "category": "S",
+        "^description": "You are using {$COUNT} S3 buckets with ACLs. ACLs are legacy access control mechanisms that predate IAM. Instead of ACLs, we recommend using S3 bucket policies or AWS Identity and Access Management (IAM) policies to manage access to your S3 buckets.",
+        "shortDesc": "Enable SSE",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Protecting data with IAM]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/walkthrough1.html#walkthrough-grant-user1-permissions>"
+        ]
+    },
     "PublicAccessBlock": {
         "category": "S",
         "^description": "You have disabled public access block on {$COUNT} S3 buckets.This leaves your data to be accessible by anyone. Unless absolutely necessary, enable public access block. Block Public Access at the S3 bucket level provides controls to ensure that objects never have public access. Public access is granted to buckets and objects through access control lists (ACLs), bucket policies, or both.",

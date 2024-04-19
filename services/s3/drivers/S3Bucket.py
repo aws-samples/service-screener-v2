@@ -119,6 +119,16 @@ class S3Bucket(Evaluator):
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] ==  'NoSuchNotificationConfiguration':
                 self.results['EventNotification'] = [-1, 'Off']
+
+    def _checkACL(self):
+        try:
+            resp = self.s3Client.get_bucket_acl(
+                Bucket=self.bucket
+            )
+            self.results['AccessControlList'] = [-1, 'Enabled']
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] ==  'NoSuchAcl':
+                self.results['AccessControlList'] = [1, 'Disabled']
     
     def _checkIntelligentTiering(self): 
         try:
