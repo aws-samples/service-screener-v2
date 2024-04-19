@@ -9,6 +9,7 @@ from services.Cloudwatch import Cloudwatch
 from services.Reporter import Reporter
 from services.PageBuilder import PageBuilder
 from services.dashboard.DashboardPageBuilder import DashboardPageBuilder
+from utils.CustomPage.CustomPage import CustomPage
 from utils.Tools import _warn, _info
 
 from frameworks.FrameworkPageBuilder import FrameworkPageBuilder
@@ -44,7 +45,11 @@ class Screener:
         scannedKey = 'scanned_'+service[0]
         globalKey = 'GLOBALRESOURCES_'+service[0]
         Config.set(scannedKey, _zeroCount)
-
+        
+        ## CustomPage Enhancement
+        cp = CustomPage()
+        cp.resetOutput(service[0])
+        
         for region in _regions:
             reg = region
             if region == 'GLOBAL':
@@ -103,6 +108,9 @@ class Screener:
         
         with open(_C.FORK_DIR + '/' + service[0] + '.stat.json', 'w') as f:
             json.dump(scanned, f)
+            
+        cp.writeOutput(service[0].lower())
+
 
     @staticmethod
     def getServiceModuleDynamically(service):

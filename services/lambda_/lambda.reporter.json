@@ -180,5 +180,18 @@
         "ref": [
             "[Using resource-based policies for Lambda]<https://docs.aws.amazon.com/lambda/latest/dg/access-control-resource-based.html>"    
         ]
+    },
+    "UseArmArchitecture":{
+        "category": "P",
+        "^description": "{$COUNT} of your Lambda function(s) are not using arm64 architecture. Lambda functions that use arm64 architecture (AWS Graviton2 processor) can achieve significantly better price and performance than the equivalent function running on x86_64 architecture. Consider using arm64 for compute-intensive applications such as high-performance computing, video encoding, and simulation workloads.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "criticality": "M",
+        "shortDesc": "Use Arm64 Architecture",
+        "ref": [
+            "[Advantages of using arm64]<https://docs.aws.amazon.com/lambda/latest/dg/foundation-arch.html>"    
+        ]
     }
 }

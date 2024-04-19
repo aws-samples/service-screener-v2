@@ -13,25 +13,25 @@
             "2": ["cloudtrail.RequiresKmsKey"],
             "4": ["cloudtrail.LogFileValidationEnabled"],
             "5": ["cloudtrail.CloudWatchLogsLogGroupArn"],
-            "6": [],
+            "6": ["cloudtrail.EnableS3PublicAccessBlock"],
             "7": ["cloudtrail.EnableTrailS3BucketLogging"]
           },
         "CloudWatch.": {
-            "1": [],
-            "4": [],
-            "5": [],
-            "6": [],
-            "7": [],
-            "8": [],
-            "9": [],
-            "10": [],
-            "11": [],
-            "12": [],
-            "13": [],
-            "14": []
+            "1": ["cloudtrail.NeedToEnableCloudTrail", "cloudwatch.trailWithoutCWLogs", "cloudwatch.trailWithCWLogsWithoutMetrics", "cloudwatch.trailWOMAroot1"],
+            "4": ["cloudtrail.NeedToEnableCloudTrail", "cloudwatch.trailWithoutCWLogs", "cloudwatch.trailWithCWLogsWithoutMetrics", "cloudwatch.trailWOMAalarm4"],
+            "5": ["cloudtrail.NeedToEnableCloudTrail", "cloudwatch.trailWithoutCWLogs", "cloudwatch.trailWithCWLogsWithoutMetrics", "cloudwatch.trailWOMATrail5"],
+            "6": ["cloudtrail.NeedToEnableCloudTrail", "cloudwatch.trailWithoutCWLogs", "cloudwatch.trailWithCWLogsWithoutMetrics", "cloudwatch.trailWOMAAuthFail6"],
+            "7": ["cloudtrail.NeedToEnableCloudTrail", "cloudwatch.trailWithoutCWLogs", "cloudwatch.trailWithCWLogsWithoutMetrics", "cloudwatch.trailWOMACMK7"],
+            "8": ["cloudtrail.NeedToEnableCloudTrail", "cloudwatch.trailWithoutCWLogs", "cloudwatch.trailWithCWLogsWithoutMetrics", "cloudwatch.trailWOMAS3Policy8"],
+            "9": ["cloudtrail.NeedToEnableCloudTrail", "cloudwatch.trailWithoutCWLogs", "cloudwatch.trailWithCWLogsWithoutMetrics", "cloudwatch.trailWOMAConfig9"],
+            "10": ["cloudtrail.NeedToEnableCloudTrail", "cloudwatch.trailWithoutCWLogs", "cloudwatch.trailWithCWLogsWithoutMetrics", "cloudwatch.trailWOMASecGroup10"],
+            "11": ["cloudtrail.NeedToEnableCloudTrail", "cloudwatch.trailWithoutCWLogs", "cloudwatch.trailWithCWLogsWithoutMetrics", "cloudwatch.trailWOMANACL11"],
+            "12": ["cloudtrail.NeedToEnableCloudTrail", "cloudwatch.trailWithoutCWLogs", "cloudwatch.trailWithCWLogsWithoutMetrics", "cloudwatch.trailWOMAGateway12"],
+            "13": ["cloudtrail.NeedToEnableCloudTrail", "cloudwatch.trailWithoutCWLogs", "cloudwatch.trailWithCWLogsWithoutMetrics", "cloudwatch.trailWOMARouteTable13"],
+            "14": ["cloudtrail.NeedToEnableCloudTrail", "cloudwatch.trailWithoutCWLogs", "cloudwatch.trailWithCWLogsWithoutMetrics", "cloudwatch.trailWOMAVPC14"]
         },
         "Config.": {
-            "1": []
+            "1": ["iam.EnableConfigService", "iam.PartialEnableConfigService"]
         },
         "EC2.": {
             "2": ["ec2.SGDefaultDisallowTraffic"],
@@ -48,7 +48,7 @@
             "15": ["iam.passwordPolicyLength"],
             "16": ["iam.passwordPolicyReuse"],
             "18": [],
-            "22": ["iam.consoleLastAccess45,iam.consoleLastAccess90, iam.consoleLastAccess365"]
+            "22": ["iam.consoleLastAccess45", "iam.consoleLastAccess90", "iam.consoleLastAccess365"]
         },
         "KMS.": {
             "4": ["kms.KeyRotationEnabled"]

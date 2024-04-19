@@ -64,7 +64,8 @@ class RdsCommon(Evaluator):
         self.certInfo = myCert
         
     def showInfo(self):
-        print("Identifier: " + self.db['DBInstanceIdentifier'] + "\n")
+        identifier = self.db['DBInstanceIdentifier'] if self.isCluster == False else self.db['DBClusterIdentifier']
+        print("Identifier: " + identifier + "\n")
         _pr(self.results)
 
     def getInstInfo(self):
@@ -169,7 +170,8 @@ class RdsCommon(Evaluator):
             'aurora-mysql': 'admin',
             'postgres': 'postgres',
             'aurora-postgresql': 'postgres',
-            'sqlserver': 'admin'
+            'sqlserver': 'admin',
+            'mariadb': 'admin'
         }
         
         if not self.engine in defaultMasterUser:
@@ -178,6 +180,10 @@ class RdsCommon(Evaluator):
         
         if defaultMasterUser[self.engine] == self.db['MasterUsername']:
             self.results['DefaultMasterAdmin'] = [-1, self.engine + "::" + self.db["MasterUsername"]]
+    
+    def _checkHasStorageAutoscaling(self):
+        if not 'MaxAllocatedStorage' in self.db:
+            self.results['EnableStorageAutoscaling'] = [-1, None]
     
     def _checkHasMultiAZ(self):
         multiAZ = -1 if self.db['MultiAZ'] == False else 1
@@ -231,8 +237,12 @@ class RdsCommon(Evaluator):
         self.results['EnhancedMonitor'] = [flag, 'On' if flag == -1 else 'Off']
 
     def _checkDeleteProtection(self):
+        key = 'DeleteProtection'
+        if self.isCluster == True:
+            key = 'DeleteProtectionCluster'
+        
         flag = -1 if self.db['DeletionProtection'] == False else 1
-        self.results['DeleteProtection'] = [flag, 'Off' if flag == -1 else 'On']
+        self.results[key] = [flag, 'Off' if flag == -1 else 'On']
 
     def _checkIsPublicAccessible(self):
         if self.isCluster == True:
@@ -318,6 +328,32 @@ class RdsCommon(Evaluator):
         if compressedLists[dbInstFamily] > dbInstGeneration:
             self.results['LatestInstanceGeneration'] = [-1, self.db['DBInstanceClass']]
     
+    def _checkIsOpenSource(self):
+        if self.isCluster == True:
+            return
+        
+        validEngine = ['mariadb', 'postgres', 'mysql', 'aurora-mysql', 'aurora-postgresql']
+        if not self.engine in validEngine:
+            self.results['ConsiderOpenSource'] = [-1, self.engine]
+            
+    def _checkIfAurora(self):
+        if self.isCluster == True:
+            return
+        
+        validEngine = ['mariadb', 'postgres', 'mysql']
+        if self.engine in validEngine:
+            self.results['ConsiderAurora'] = [-1, self.engine]
+    
+    def _checkHasGravitonOption(self):
+        if self.isCluster == True:
+            return
+        
+        ## valid Graviton List
+        validEngine = ['mariadb', 'postgres', 'mysql', 'aurora-mysql', 'aurora-postgresql']
+        if self.engine in validEngine:
+            if not 'g' in self.instInfo['prefixDetail']['attributes']:
+                self.results['MoveToGraviton'] = [-1, self.instInfo['prefix']]
+            
     
     def _checkHasPatches(self):
         if self.isServerless == True:

@@ -131,7 +131,18 @@
   },
   "DeleteProtection":{
       "category": "O",
-      "^description": "Deletion Protection is not enabled for {$COUNT} instances and Aurora clusters. This can lead to accidental deletion of Production database. Enable deletion protection to ensure that production databases are not accidentally deleted.",
+      "^description": "Deletion Protection is not enabled for {$COUNT} instances. This can lead to accidental deletion of Production database. Enable deletion protection to ensure that production databases are not accidentally deleted.",
+      "downtime": 0,
+      "slowness": 0,
+      "additionalCost": 0,
+      "needFullTest": 0,
+      "criticality": "H",
+      "shortDesc": "Enable Delete Protection",
+      "ref": ["[Enable Delete Protection]<https://docs.fugue.co/FG_R00280.html>"]
+  },
+  "DeleteProtectionCluster":{
+      "category": "O",
+      "^description": "Deletion Protection is not enabled for {$COUNT} Aurora clusters. This can lead to accidental deletion of Production database. Enable deletion protection to ensure that production databases are not accidentally deleted.",
       "downtime": 0,
       "slowness": 0,
       "additionalCost": 0,
@@ -1008,6 +1019,58 @@
     "ref": [
       "[RDS - Delete Snapshot]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_DeleteSnapshot.html>",
       "[RDS Snapshot retention cost]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithAutomatedBackups.html#USER_WorkingWithAutomatedBackups.RetentionCosts>"
+    ]
+  },
+  "MoveToGraviton":{
+    "category": "CP",
+    "^description": "[Cost Optimisation] You have {$COUNT} RDS/Aurora is not running on graviton instance. Graviton2 provide up to 52% price/performance improvement for RDS open-source databases depending on database engine, version, and workload. Click on the references to learn more about Graviton2 benefits",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "M",
+    "shortDesc": "Move to graviton",
+    "ref": [
+      "[Key Consideration on RDS Graviton]<https://aws.amazon.com/blogs/database/key-considerations-in-moving-to-graviton2-for-amazon-rds-and-amazon-aurora-databases/>"
+    ]
+  },
+  "EnableStorageAutoscaling":{
+    "category": "R",
+    "^description": "[Reliablity] You have {$COUNT} RDS/Aurora does not have storage autoscaling enabled. With storage autoscaling enabled, when Amazon RDS detects that you are running out of free database space it automatically scales up your storage. Amazon RDS starts a storage modification for an autoscaling-enabled DB instance when these factors apply: (1) Free available space is less than or equal to 10 percent of the allocated storage. (2) The low-storage condition lasts at least five minutes. (3) At least six hours have passed since the last storage modification, or storage optimization has completed on the instance, whichever is longer.",
+    "downtime": -1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Enable storage autoscaling",
+    "ref": [
+      "[Understand RDS Storage auto scaling]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_PIOPS.StorageTypes.html>"
+    ]
+  },
+  "ConsiderOpenSource":{
+    "category": "T",
+    "^description": "[Modernization] Consider moving to open-sources. Modernizing commercial databases on AWS helps lowers costs by eliminating punitive licensing contracts and helps improve quality, efficiency, and performance.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "I",
+    "shortDesc": "Consider open-source DB",
+    "ref": [
+      "[DB Modernization Blog]<https://aws.amazon.com/blogs/modernizing-with-aws/datavail-modernizing-databases-on-aws/>"
+    ]
+  },
+  "ConsiderAurora":{
+    "category": "T",
+    "^description": "[Modernization] Consider moving to Aurora. Amazon Aurora (Aurora) is a fully managed relational database engine that's compatible with MySQL and PostgreSQL. You already know how MySQL and PostgreSQL combine the speed and reliability of high-end commercial databases with the simplicity and cost-effectiveness of open-source databases. The code, tools, and applications you use today with your existing MySQL and PostgreSQL databases can be used with Aurora. With some workloads, Aurora can deliver up to five times the throughput of MySQL and up to three times the throughput of PostgreSQL without requiring changes to most of your existing applications.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "I",
+    "shortDesc": "Consider Aurora",
+    "ref": [
+      "[DB Modernization Blog]<https://aws.amazon.com/blogs/modernizing-with-aws/datavail-modernizing-databases-on-aws/>"
     ]
   }
 }
