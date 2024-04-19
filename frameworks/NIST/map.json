@@ -209,7 +209,7 @@
             "8": ["iam.consoleLastAccess90", "iam.consoleLastAccess365"],
             "9": ["iam.rootMfaActive"],
             "19": ["iam.mfaActive"],
-            "21": ["iam.ManagedPolicyFullAccessOneServ"],
+            "21": ["iam.ManagedPolicyFullAccessOneServ"]
         },
         "Kinesis.": {
             "1": []
@@ -232,7 +232,7 @@
         },
         "MSK.": {
             "1": [],
-            "2": [],
+            "2": []
         },
         "MQ.": {
             "5": [],
@@ -333,7 +333,7 @@
             "15": ["s3.ObjectLock"],
             "17": ["ServerSideEncrypted", "s3.SSEWithKMS"],
             "19": [],
-            "20": ["s3.MFADelete"],
+            "20": ["s3.MFADelete"]
         },
         "Sagemaker.": {
             "1": [],
