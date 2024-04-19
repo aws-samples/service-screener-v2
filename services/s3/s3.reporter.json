@@ -3,7 +3,20 @@
         "category": "S",
         "^description": "You have not enabled server side encryption (SSE) on {$COUNT} buckets which automatically encrypts objects uploaded to the bucket. If this bucket contains non-publically-available data, and you are not implementing client-side encryption, please enable SSE.",
         "shortDesc": "Enable SSE",
-        "criticality": "L",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Protecting data with encryption]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingEncryption.html>"
+        ]
+    },
+    "SSEWithKMS": {
+        "category": "S",
+        "^description": "You have not enabled server side encryption (SSE) with KMS on {$COUNT} buckets which automatically encrypts objects uploaded to the bucket. If this bucket contains non-publically-available data, and you are not implementing client-side encryption, please enable SSE with KMS.",
+        "shortDesc": "Enable SSE with KMS",
+        "criticality": "M",
         "downtime": 0,
         "slowness": 0,
         "additionalCost": 0,

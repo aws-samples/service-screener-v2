@@ -23,6 +23,8 @@ class S3Bucket(Evaluator):
             resp = self.s3Client.get_bucket_encryption(
                 Bucket=self.bucket
             )
+            if "kms" not in resp.get('ServerSideEncryptionConfiguration').get('Rules')[0].get('ApplyServerSideEncryptionByDefault').get('SSEAlgorithm'):
+                self.results['SSEWithKMS'] = [1, 'On']
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == 'ServerSideEncryptionConfigurationNotFoundError':
                 self.results['ServerSideEncrypted'] = [-1, 'Off']
