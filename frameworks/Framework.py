@@ -100,6 +100,9 @@ class Framework():
         return '<h3>' + title + '</h3>'
         
     def getContent(self, _m):
+        if len(_m) == 0:
+            return
+        
         serv, check = _m.split(".")
         if check == '$length':
             cnt = self.getResourceCount(serv)
