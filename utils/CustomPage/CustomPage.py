@@ -52,11 +52,11 @@ class CustomPage():
         prefix = 'CustomPage.'
         for cname, pObj in self.Pages.items():
             toMatch = prefix + cname + '.'
-            print(toMatch)
+            # print(toMatch)
             for filename in os.listdir(_C.FORK_DIR):
                 if filename.startswith(toMatch):
                     file_path = os.path.join(_C.FORK_DIR, filename)
                     if os.path.isfile(file_path):
                         with open(file_path, 'r') as f:
                             s = f.read()
-                            print(s)
+                            # print(s)
