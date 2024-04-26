@@ -98,9 +98,6 @@ class Iam(Service):
                     currCount = 10 #skip the loop entirely
                 time.sleep(5)
         
-        print("ABCDEF")
-        _pr(results)    
-        
         if not 'results' in locals():
             print('IAM Users scan will be skip, unable to acquire IamCredentialReports')
             return []
