@@ -26,6 +26,12 @@ class IamUser(IamCommon):
         ##Created new Iam users, wait for this info to populate
         if self.user['password_last_used'] in self.ENUM_NO_INFO:
             return
+        
+        if self.user['password_enabled'] == 'false':
+            return
+        
+        if self.user == '<root_account>':
+            return
 
         daySinceLastAccess = self.getAgeInDay(self.user['password_last_used'])
 
@@ -71,18 +77,19 @@ class IamUser(IamCommon):
         if user['password_last_changed'] in self.ENUM_NO_INFO:
             return
         
-        daySinceLastChange = self.getAgeInDay(self.user['password_last_changed'])
-
-        if daySinceLastChange > 365:
-            key = "passwordLastChange365"
-        elif daySinceLastChange > 90:
-            key = "passwordLastChange90"
-        else:
-            key = False
+        if user['password_enabled'] == 'true':
+            daySinceLastChange = self.getAgeInDay(self.user['password_last_changed'])
+    
+            if daySinceLastChange > 365:
+                key = "passwordLastChange365"
+            elif daySinceLastChange > 90:
+                key = "passwordLastChange90"
+            else:
+                key = False
+                
+            if key != False:
+                self.results[key] = [-1, daySinceLastChange]
             
-        if key != False:
-            self.results[key] = [-1, daySinceLastChange]
-        
         daysAccesskey = 0
         if user['user'] == '<root_account>':
             if user['access_key_1_active'] == 'false' and user['access_key_2_active'] == 'false':
@@ -104,12 +111,12 @@ class IamUser(IamCommon):
                 
                 self.results[k] = [-1, str(daysAccesskey)]
         
-        daySinceLastLogin = 0
-        field = 'password_last_used'
-        if user['password_last_used'] in self.ENUM_NO_INFO:
-            field = 'user_creation_time'
-            
-        daySinceLastLogin = self.getAgeInDay(user[field])
+            daySinceLastLogin = 0
+            field = 'password_last_used'
+            if user['password_last_used'] in self.ENUM_NO_INFO:
+                field = 'user_creation_time'
                 
-        if daysAccesskey >= 90 and daySinceLastLogin >= 90:
-            self.results['userNoActivity90days'] = [-1, '']
+            daySinceLastLogin = self.getAgeInDay(user[field])
+                    
+            if daysAccesskey >= 90 and daySinceLastLogin >= 90:
+                self.results['userNoActivity90days'] = [-1, '']

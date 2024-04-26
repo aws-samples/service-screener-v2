@@ -651,7 +651,7 @@ $('#changeAcctId').change(function(){
         
         pid=self.getHtmlId('SummaryChart')
         html = self.generateBarChart(labels, dataSets)
-        card = self.generateCard(pid, html, cardClass='warning', title='Summary', titleBadge='', collapse=True, noPadding=False)
+        card = self.generateCard(pid, html, cardClass='warning', title='Summary', titleBadge='', collapse=9, noPadding=False)
         items = [[card, '']]
         output.append(self.generateRowWithCol(size=12, items=items, rowHtmlAttr="data-context='summaryChart'"))
         ## Chart completed

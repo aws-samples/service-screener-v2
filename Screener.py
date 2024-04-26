@@ -79,7 +79,14 @@ class Screener:
                 classPrefix = Config.getDriversClassPrefix(service[0])
                 Config.set(classPrefix, reg)
                 
-                contexts[service[0]][region] = serv.advise()
+                resp = serv.advise()
+                arr = {}
+                info = {}
+                for identifier, obj in resp.items():
+                    arr[identifier] = obj['results']
+                    info[identifier] = obj['info']
+                    
+                contexts[service[0]][region] = arr
                 Config.set(classPrefix, None)
                 
             except botocore.exceptions.ClientError as e:
@@ -220,6 +227,10 @@ class Screener:
                 # <TODO>
                 ## Upload to S3
                 ## Not implement yet, low priority
+                
+                ## Experimental
+                cp = CustomPage()
+                cp.buildPage()
             else:
                 with open(_C.API_JSON, 'w') as f:
                     json.dump(apiResultArray, f)

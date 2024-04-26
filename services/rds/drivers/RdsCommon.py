@@ -32,6 +32,7 @@ class RdsCommon(Evaluator):
         
     def setEngine(self, engine):
         self.engine = engine
+        self.addII('engine', engine)
         
         self.isAurora = False
         if engine[0:6]=='aurora':
@@ -70,13 +71,18 @@ class RdsCommon(Evaluator):
 
     def getInstInfo(self):
         self.isServerless = False
+        self.addII('isServerless', False)
+        self.addII('IsCluster', True)
         
         if self.isCluster == False:
             if 'serverless' in self.db['DBInstanceClass']:
                 self.isServerless = True
+                self.addII('isServerless', True)
                 return
             
             self.instInfo = aws_parseInstanceFamily(self.db['DBInstanceClass'])
+            self.addII('instInfo', self.instInfo)
+            self.addII('IsCluster', False)
         
         
         engine = self.db['Engine']
@@ -98,6 +104,7 @@ class RdsCommon(Evaluator):
             details = version[0]
             Config.set(key, details)
         
+        self.addII('EngineVersion', engineVersion)
         self.enginePatches = details
         
     def loadParameterInfo(self):
