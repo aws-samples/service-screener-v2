@@ -102,7 +102,13 @@ class Screener:
         
         GLOBALRESOURCES = Config.get(globalKey, [])
         if len(GLOBALRESOURCES) > 0:
-            contexts[service[0]]['GLOBAL'] = GLOBALRESOURCES
+            garr = {}
+            ginfo = {}
+            for identifier, obj in GLOBALRESOURCES.items():
+                garr[identifier] = obj['results']
+                ginfo[identifier] = obj['info']
+                
+            contexts[service[0]]['GLOBAL'] = arr
         
         time_end = time.time()
         scanned = Config.get(scannedKey)
