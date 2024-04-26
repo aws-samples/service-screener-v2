@@ -3,7 +3,7 @@
       "originator": "NIST",
       "shortname": "NIST AWS",
       "fullname": "National Institute of Standards and Technology (NIST) SP 800-53 Rev. 5",
-      "description": "The NIST Special Publication 800-53 Revision 5 provides a catalog of security and privacy controls for federal information systems and organizations to protect organizational operations and assets, individuals, other organizations, and the Nation from a diverse set of threats including hostile cyber attacks, natural disasters, structural failures, and human errors.",
+      "description": "[Work In Progress] The NIST Special Publication 800-53 Revision 5 provides a catalog of security and privacy controls for federal information systems and organizations to protect organizational operations and assets, individuals, other organizations, and the Nation from a diverse set of threats including hostile cyber attacks, natural disasters, structural failures, and human errors.",
       "_": "https://docs.aws.amazon.com/securityhub/latest/userguide/nist-standard.html",
       "emptyCheckDefaultMsg": "<small><i>Please refer to the NIST control section for further details. Kindly provide evidence or artifacts demonstrating compliance with the respective NIST control.</i></small>"
     },
