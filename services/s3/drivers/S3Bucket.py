@@ -23,6 +23,8 @@ class S3Bucket(Evaluator):
             resp = self.s3Client.get_bucket_encryption(
                 Bucket=self.bucket
             )
+            if "kms" not in resp.get('ServerSideEncryptionConfiguration').get('Rules')[0].get('ApplyServerSideEncryptionByDefault').get('SSEAlgorithm'):
+                self.results['SSEWithKMS'] = [1, 'On']
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == 'ServerSideEncryptionConfigurationNotFoundError':
                 self.results['ServerSideEncrypted'] = [-1, 'Off']
@@ -70,14 +72,22 @@ class S3Bucket(Evaluator):
                 self.results['ObjectLock'] = [-1, 'Off']
 
     def _checkBucketReplication(self):
-        self.results['BucketReplication'] = [1, 'On']
         try:
+            self.results['BucketReplication'] = [1, 'On']
+
             resp = self.s3Client.get_bucket_replication(
                 Bucket=self.bucket
             )
+            source_loc = self.s3Client.get_bucket_location(
+                Bucket=self.bucket
+            )
+            target_loc = resp.get('ReplicationConfiguration').get('Rules')[0].get('Destination').get('Bucket')
+            if source_loc.get('LocationConstraint') != target_loc.split('.')[1]:
+                self.results['CrossRegionReplication'] = [1, 'On']
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == 'ReplicationConfigurationNotFoundError':
                 self.results['BucketReplication'] = [-1, 'Off']
+        
 
     def _checkLifecycle(self):
         self.results['BucketLifecycle'] = [1, 'On']
@@ -100,6 +110,27 @@ class S3Bucket(Evaluator):
                 self.results['BucketLogging'] = [-1, 'Off']
         except botocore.exceptions.ClientError as e:
             print("[{}] Unable to get Logging Informaton, skip".format(self.bucket))
+    
+    def _checkEventNotif(self):
+        self.results['EventNotification'] = [1, 'On']
+        try:
+            resp = self.s3Client.get_bucket_notification_configuration(
+                Bucket=self.bucket
+            )
+            self.results['EventNotification'] = [-1, 'On']
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] ==  'NoSuchNotificationConfiguration':
+                self.results['EventNotification'] = [-1, 'Off']
+
+    def _checkACL(self):
+        try:
+            resp = self.s3Client.get_bucket_acl(
+                Bucket=self.bucket
+            )
+            self.results['AccessControlList'] = [-1, 'Enabled']
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] ==  'NoSuchAcl':
+                self.results['AccessControlList'] = [1, 'Disabled']
     
     def _checkIntelligentTiering(self): 
         try:

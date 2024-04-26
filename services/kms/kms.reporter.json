@@ -27,13 +27,13 @@
   },
   "KeyInPendingDeletion":{
     "category": "O",
-      "^description": "[Informational], no action needed. {$COUNT} KMS key is under Pending Deletion Stage.",
+      "^description": "[Warning] {$COUNT} KMS key is under Pending Deletion Stage. KMS keys cannot be recovered once deleted. Data encrypted under a KMS key is also permanently unrecoverable if the KMS key is deleted. If meaningful data has been encrypted under a KMS key scheduled for deletion, consider decrypting the data or re-encrypting the data under a new KMS key unless you are intentionally performing a cryptographic erasure.",
       "downtime": 0,
       "slowness": 0,
       "additionalCost": 0,
       "needFullTest": 0,
       "criticality": "I",
-      "shortDesc": "[Info] No Action Needed",
+      "shortDesc": "[Warning] Ensure intentional deletion",
       "ref": [
           "[KMS Key State Explanation]<https://docs.aws.amazon.com/kms/latest/developerguide/key-state.html>"
       ]

@@ -38,6 +38,19 @@
             "Dedicated master nodes in Amazon OpenSearch Service]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/managedomains-dedicatedmasternodes.html>"    
         ]
     },
+    "DataNodes": {
+        "category": "R",
+        "^description": "An OpenSearch domain requires at least three data nodes for high availability and fault-tolerance. Deploying an OpenSearch domain with at least three data nodes ensures cluster operations if a node fails.",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 1,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "We recommend that you add three data nodes to each production OpenSearch Service domain.",
+        "ref": [
+            "Data nodes in Amazon OpenSearch Service]<https://docs.aws.amazon.com/securityhub/latest/userguide/opensearch-controls.html#opensearch-6>"    
+        ]
+    },
     "AvailabilityZones": {
         "category": "R",
         "^description": "To prevent data loss and minimize cluster downtime in the event of a service disruption, you can distribute nodes across two or three Availability Zones in the same AWS Region. Availability Zones are isolated locations within each Region. With a two-AZ configuration, losing one Availability Zone means that you lose half of all domain capacity. Moving to three Availability Zones further reduces the impact of losing a single Availability Zone. Deploy mission-critical domains across three Availability Zones and two replica shards per index. This configuration lets OpenSearch Service distribute replica shards to different AZs than their corresponding primary shards. There are no cross-AZ data transfer charges for cluster communications between Availability Zones.",
@@ -181,6 +194,19 @@
             "[Enable node-to-node encryption]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"    
         ]
     },
+    "TLSEnforced": {
+        "category": "S",
+        "^description": "HTTPS (TLS) can be used to help prevent potential attackers from using person-in-the-middle or similar attacks to eavesdrop on or manipulate network traffic. Only encrypted connections over HTTPS (TLS) should be allowed. Encrypting data in transit can affect performance. You should test your application with this feature to understand the performance profile and the impact of TLS. TLS 1.2 provides several security enhancements over previous versions of TLS. ",
+        "downtime": -1,
+        "slowness": -1,
+        "additionalCost": 0,
+        "criticality": "I",
+        "needFullTest": 0,
+        "shortDesc": "If your domain stores sensitive data, make sure the domain endpoint is configured to use the latest TLS security policy.",
+        "ref": [
+            "[Enable node-to-node encryption]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"    
+        ]
+    },
     "SearchSlowLogs": {
         "category": "P",
         "^description": "OpenSearch Service exposes OpenSearch error logs, search slow logs, indexing slow logs, and audit logs in Amazon CloudWatch Logs. Search slow logs, indexing slow logs, and error logs are useful for troubleshooting performance and stability issues. Audit logs, which are only available if you enable fine-grained access control to track user activity. For more information, see Logs in the OpenSearch documentation. Search slow logs and indexing slow logs are an important tool for understanding and troubleshooting the performance of your search and indexing operations. Enable search and index slow log delivery for all production domains. You must also configure logging thresholds—otherwise, CloudWatch won't capture the logs.",
@@ -190,6 +216,32 @@
         "criticality": "M",
         "needFullTest": 0,
         "shortDesc": " Enable search and index slow log delivery for all production domains.",
+        "ref": [
+            "[Enable log publishing]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"    
+        ]
+    },
+    "ApplicationLogs": {
+        "category": "P",
+        "^description": "OpenSearch Service exposes OpenSearch error logs, search slow logs, indexing slow logs, and audit logs in Amazon CloudWatch Logs. Search slow logs, indexing slow logs, and error logs are useful for troubleshooting performance and stability issues. Audit logs, which are only available if you enable fine-grained access control to track user activity. For more information, see Logs in the OpenSearch documentation. Search slow logs and indexing slow logs are an important tool for understanding and troubleshooting the performance of your search and indexing operations. Enable search and index slow log delivery for all production domains. You must also configure logging thresholds—otherwise, CloudWatch won't capture the logs.",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 1,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": " Enable error log delivery for all production domains.",
+        "ref": [
+            "[Enable log publishing]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"    
+        ]
+    },
+    "AuditLogs": {
+        "category": "P",
+        "^description": "OpenSearch Service exposes OpenSearch error logs, search slow logs, indexing slow logs, and audit logs in Amazon CloudWatch Logs. Search slow logs, indexing slow logs, and error logs are useful for troubleshooting performance and stability issues. Audit logs, which are only available if you enable fine-grained access control to track user activity. For more information, see Logs in the OpenSearch documentation. Search slow logs and indexing slow logs are an important tool for understanding and troubleshooting the performance of your search and indexing operations. Enable search and index slow log delivery for all production domains. You must also configure logging thresholds—otherwise, CloudWatch won't capture the logs.",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 1,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": " Enable audit log delivery for all production domains.",
         "ref": [
             "[Enable log publishing]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"    
         ]

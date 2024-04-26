@@ -74,7 +74,24 @@ class OpensearchCommon(Evaluator):
                 self.results["DedicatedMasterNodes"] = [-1, "Wrong number of dedicated master nodes"]
                 return
             self.results["DedicatedMasterNodes"] = [1, "Sufficient dedicated master nodes"]
-    
+
+    def _checkDataNodes(self):
+        total_nodes = self.cluster_config['InstanceCount']
+        master_enabled = self.cluster_config["DedicatedMasterEnabled"]
+        master_nodes = 0
+        if master_enabled:
+            master_nodes = self.cluster_config['DedicatedMasterCount']
+        warm_enabled = self.cluster_config["WarmEnabled"]
+        warm_nodes = 0
+        if warm_enabled:
+            warm_nodes = self.cluster_config['WarmCount']
+        data_nodes = total_nodes - master_nodes - warm_nodes
+        
+        if data_nodes < 3:
+            self.results["DataNodes"] = [-1, "Insufficient data nodes"]
+            return
+        self.results["DataNodes"] = [1, "Sufficient data nodes"]
+
     def _checkAvailabilityZones(self):
         enabled = self.cluster_config["ZoneAwarenessEnabled"]
         self.results["AvailabilityZones"] = [-1, "Multi-AZ not enabled"]
@@ -147,12 +164,33 @@ class OpensearchCommon(Evaluator):
                 if 'Enabled' in self.attribute['DomainStatus']['NodeToNodeEncryptionOptions']:
                     self.results["NodeToNodeEncryption"] = [1, "Enabled"]
     
+    def _checkTLSEnforced(self):
+        self.results["TLSEnforced"] = [-1, "Disabled"]
+        if 'DomainStatus' in self.attribute:
+            if 'DomainEndpointOptions' in self.attribute['DomainStatus']:
+                if 'EnforceHTTPS' in self.attribute['DomainStatus']['DomainEndpointOptions']:
+                    self.results["TLSEnforced"] = [1, "Enabled"]
+    
     def _checkSearchSlowLogs(self):
         self.results["SearchSlowLogs"] = [-1, "Disabled"]
         if 'DomainStatus' in self.attribute:
             if 'LogPublishingOptions' in self.attribute['DomainStatus']:
                 if 'SEARCH_SLOW_LOGS' in self.attribute['DomainStatus']['LogPublishingOptions']:
                     self.results["SearchSlowLogs"] = [1, "Enabled"]
+
+    def _checkApplicationLogs(self):
+        self.results["ApplicationLogs"] = [-1, "Disabled"]
+        if 'DomainStatus' in self.attribute:
+            if 'LogPublishingOptions' in self.attribute['DomainStatus']:
+                if 'ES_APPLICATION_LOGS' in self.attribute['DomainStatus']['LogPublishingOptions']:
+                    self.results["SearchSlowLogs"] = [1, "Enabled"]
+
+    def _checkAuditLogs(self):
+        self.results["AuditLogs"] = [-1, "Disabled"]
+        if 'DomainStatus' in self.attribute:
+            if 'LogPublishingOptions' in self.attribute['DomainStatus']:
+                if 'SEARCH_SLOW_LOGS' in self.attribute['DomainStatus']['LogPublishingOptions']:
+                    self.results["AUDIT_LOGS"] = [1, "Enabled"]
 
     def _checkAutoTune(self):
         self.results["AutoTune"] = [-1, "Disabled"]
