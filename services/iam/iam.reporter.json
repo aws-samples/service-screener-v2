@@ -367,7 +367,7 @@
 		]
 	},
 	"enableGuardDuty": {
-		"category": "C",
+		"category": "S",
 		"^description": "Amazon GuardDuty is a threat-detection service that continuously monitors for malicious or unauthorized behavior to help protect your AWS accounts, workloads, and data. When it detects unexpected and potentially malicious activity, GuardDuty delivers detailed security findings for visibility and remediation. GuardDuty can detect threats such as cryptocurrency mining activity, access from Tor clients and relays, unexpected behavior, and compromised IAM credentials. Enable GuardDuty and respond to findings to stop potentially malicious or unauthorized behavior in your AWS environment.",
 		"shortDesc": "Enable GuardDuty",
 		"criticality": "H",
