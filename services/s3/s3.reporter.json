@@ -3,13 +3,39 @@
         "category": "S",
         "^description": "You have not enabled server side encryption (SSE) on {$COUNT} buckets which automatically encrypts objects uploaded to the bucket. If this bucket contains non-publically-available data, and you are not implementing client-side encryption, please enable SSE.",
         "shortDesc": "Enable SSE",
-        "criticality": "L",
+        "criticality": "M",
         "downtime": 0,
         "slowness": 0,
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
             "[Protecting data with encryption]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingEncryption.html>"
+        ]
+    },
+    "SSEWithKMS": {
+        "category": "S",
+        "^description": "You have not enabled server side encryption (SSE) with KMS on {$COUNT} buckets which automatically encrypts objects uploaded to the bucket. If this bucket contains non-publically-available data, and you are not implementing client-side encryption, please enable SSE with KMS.",
+        "shortDesc": "Enable SSE with KMS",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Protecting data with encryption]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingEncryption.html>"
+        ]
+    },
+    "AccessControlList": {
+        "category": "S",
+        "^description": "You are using {$COUNT} S3 buckets with ACLs. ACLs are legacy access control mechanisms that predate IAM. Instead of ACLs, we recommend using S3 bucket policies or AWS Identity and Access Management (IAM) policies to manage access to your S3 buckets.",
+        "shortDesc": "Enable SSE",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Protecting data with IAM]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/walkthrough1.html#walkthrough-grant-user1-permissions>"
         ]
     },
     "PublicAccessBlock": {
@@ -77,6 +103,32 @@
         "needFullTest": 0,
         "ref": [
             "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html#access-control-block-public-access-options>"   
+        ]
+    },
+    "CrossRegionReplication": {
+        "category": "RS",
+        "^description": "You have not enabled cross-region replication on {$COUNT} buckets. Replication enables automatic, asynchronous copying of objects across Amazon S3 buckets.",
+        "shortDesc": "Enable Bucket Replication",
+        "criticality": "I",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html#access-control-block-public-access-options>"   
+        ]
+    },
+    "EventNotification": {
+        "category": "OS",
+        "^description": "When you enable S3 Event Notifications, you receive alerts when specific events occur that impact your S3 buckets. For example, you can be notified of object creation, object removal, and object restoration. These notifications can alert relevant teams to accidental or intentional modifications that may lead to unauthorized data access.",
+        "shortDesc": "Enable Event Notification",
+        "criticality": "I",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Docs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/EventNotifications.html>"   
         ]
     },
     "BucketLifecycle": {
