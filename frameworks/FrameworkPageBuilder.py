@@ -6,6 +6,7 @@ from frameworks.SSB.SSB import SSB
 from frameworks.WAFS.WAFS import WAFS
 from frameworks.MSR.MSR import MSR
 from frameworks.CIS.CIS import CIS
+from frameworks.CIS.CIS import NIST
 
 class FrameworkPageBuilder(PageBuilder):
     COMPLIANCE_STATUS = ["Not available", "Compliant", "Need Attention"]
