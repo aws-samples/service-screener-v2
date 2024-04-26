@@ -7,12 +7,22 @@ from utils.CustomPage.CustomPage import CustomPage
 import constants as _C
 
 class Evaluator():
+    InventoryInfo = {}
     def __init__(self):
         self.results = {}
         self.init()
         
     def init(self):
         self.classname = type(self).__name__
+    
+    def addII(self, k, v):
+        self.InventoryInfo[k] = v
+        
+    def getII(self, k):
+        if k in self.InventoryInfo:
+            return self.InventoryInfo
+        else:
+            _warn("{} is not found in drivers/{}.InventoryInfo".format(k, self.classname))
         
     def run(self, serviceName):
         servClass = self.classname
@@ -68,7 +78,7 @@ class Evaluator():
         # __pr(self.getInfo())
         
     def getInfo(self):
-        return self.results
+        return {'results': self.results, 'info': self.InventoryInfo}
     
     ## Enhancement 20240117 - Capture all scanned resources    
     def __del__(self):

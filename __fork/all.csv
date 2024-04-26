@@ -1,0 +1,14 @@
+us-east-1;iamuser;<root_account>;1
+us-east-1;iamuser;my-macbook-cyberduck;1
+us-east-1;iamuser;s3limit;1
+us-east-1;iamrole;956288449190-PersonalizeS3-Immersion-Day;1
+us-east-1;iamrole;AccessAnalyzerTrustedService;1
+us-east-1;iamrole;AmazonPersonalizeImmersio-BucketNotificationsHandle-DZaETyhVpWrr;1
+us-east-1;iamrole;AmazonPersonalizeImmersio-CreateBatchInferenceJobSo-GEokVmZwYSti;1
+us-east-1;iamrole;AmazonPersonalizeImmersio-CreateBatchSegmentJobSolu-lWagxkUdjOZL;1
+us-east-1;iamrole;AmazonPersonalizeImmersio-CreateCampaignSolutionSte-WOR6VAb8srKn;1
+us-east-1;iamrole;AmazonPersonalizeImmersio-CreateDatasetGroupSolutio-qAhui6nJdoYR;1
+us-east-1;iamrole;AmazonPersonalizeImmersio-CreateDatasetImportJobSol-c1i04Tb5txoK;1
+us-east-1;iamrole;AmazonPersonalizeImmersio-CreateDatasetSolutionStep-SthKWaCSPIiT;1
+us-east-1;iamrole;AmazonPersonalizeImmersio-CreateEventTrackerSolutio-I0IUhSgY1oUU;1
+us-east-1;iamrole;AmazonPersonalizeImmersio-CreateFilterSolutionStepc-6AX5kOez1HZM;1

@@ -47,3 +47,16 @@ class CustomPage():
             filename = _C.FORK_DIR + '/CustomPage.' + cname + '.' + service + '.json'
             with open(filename, "w") as f:
                 f.write(s)
+                
+    def buildPage(self):
+        prefix = 'CustomPage.'
+        for cname, pObj in self.Pages.items():
+            toMatch = prefix + cname + '.'
+            print(toMatch)
+            for filename in os.listdir(_C.FORK_DIR):
+                if filename.startswith(toMatch):
+                    file_path = os.path.join(_C.FORK_DIR, filename)
+                    if os.path.isfile(file_path):
+                        with open(file_path, 'r') as f:
+                            s = f.read()
+                            print(s)
