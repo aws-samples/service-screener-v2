@@ -9,12 +9,12 @@ class EfsDriver(Evaluator):
         self.results = {}
         self.init()
 
-    def __check_encrypted(self):
+    def _checkEncrypted(self):
         self.results['EncryptedAtRest'] = [1, 'Enabled']
         if self.efs['Encrypted'] != 1:
             self.results['EncryptedAtRest'] = [-1, 'Disabled']
 
-    def __check_lifecycle_configuration(self):
+    def _checkLifecycle_configuration(self):
         self.results['Lifecycle'] = [1, 'Enabled']
         efs_id = self.efs['FileSystemId']
 
@@ -25,7 +25,7 @@ class EfsDriver(Evaluator):
         if len(life_cycle['LifecyclePolicies']) == 0:
             self.results['EnabledLifecycle'] = [-1, 'Disabled']
 
-    def __check_backup_policy(self):
+    def _checkBackupPolicy(self):
         self.results['AutomatedBackup'] = [1, 'Enabled']
         efs_id = self.efs['FileSystemId']
 

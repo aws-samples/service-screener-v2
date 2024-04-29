@@ -168,7 +168,7 @@
 			"[CIS Cloudwatch Guide 13]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-13>"
 		]
 	},
-	"trailWOMAGateway14": {
+	"trailWOMAVPC14": {
 		"category": "O",
 		"^description": "CIS recommends that you create a metric filter and alarm for changes to VPCs. Monitoring these changes helps ensure that authentication and authorization controls remain intact.",
 		"shortDesc": "Create alarm: VPC Changes",
