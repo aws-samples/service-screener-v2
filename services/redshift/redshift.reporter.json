@@ -1,0 +1,16 @@
+{
+	"<CHECK_NAME>": {
+		"category": '<ENUM>', 		//REQUIRED, valid value (combination): O,S,R,P,C
+		"^description": '<string>', //REQUIRED
+		"shortDesc": '<string>', 	//OPTIONAL
+		"criticality": '<ENUM>', 	//REQUIRED, valid value (single): I, L, M, H
+		"downtime": '<int>', 		//OPTIONAL
+		"slowness": '<int>', 		//OPTIONAL
+		"additionalCost": '<int>', 	//OPTIONAL
+		"needFullTest": '<int>', 	//OPTIONAL
+		"ref": [					//OPTIONAL
+			"[<text_to_display>]<url>",
+			"[<text_to_display>]<url>",
+		],
+	}
+}
