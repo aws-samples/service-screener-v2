@@ -9,8 +9,8 @@
     },
     "mapping": {
         "Account.": {
-            "1": [],
-            "2": []
+            "1": ["iam.hasAlternateContact"],
+            "2": ["iam.hasOrganization"]
         },
         "ACM.": {
             "1": []
