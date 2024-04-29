@@ -107,9 +107,9 @@ class Framework():
         if check == '$length':
             cnt = self.getResourceCount(serv)
             if cnt == 0:
-                return {"c": check, "d": "Has at least 1 "+serv, "r": {}, "l": ''}
+                return {"c": serv, "d": "Need at least 1 "+serv, "r": {}, "l": ''}
             else:
-                return {"c": check, "d": "Has #cnt "+serv}
+                return {"c": "Has {} actives {}".format(cnt, serv), "d": "Has #cnt "+serv}
         
         if serv in self.data and check in self.data[serv]['summary']:
             tmp = self.data[serv]['summary'][check]
