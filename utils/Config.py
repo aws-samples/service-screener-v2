@@ -79,6 +79,7 @@ class Config:
         'rdssecuritygroup': ['ATTR', 'sg'],
         'rdssecretsmanager': ['DICT', 'secret', 'Name'],
         'rdssecretsvsdb': ['SKIP'],
+        'redshiftcluster': ['DICT', 'cluster', 'ClusterIdentifier'],
         's3bucket': ['ATTR', 'bucket'],
         's3control': ['TEXT', 'S3AccountLevel'],
         's3macie': ['TEXT', 'Macie']

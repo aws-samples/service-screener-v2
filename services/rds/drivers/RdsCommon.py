@@ -80,7 +80,7 @@ class RdsCommon(Evaluator):
                 self.addII('isServerless', True)
                 return
             
-            self.instInfo = aws_parseInstanceFamily(self.db['DBInstanceClass'])
+            self.instInfo = aws_parseInstanceFamily(self.db['DBInstanceClass'], region=self.rdsClient.meta.region_name)
             self.addII('instInfo', self.instInfo)
             self.addII('IsCluster', False)
         

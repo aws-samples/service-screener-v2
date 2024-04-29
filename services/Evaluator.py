@@ -1,5 +1,6 @@
 import traceback
 import botocore
+import time
 
 from utils.Config import Config
 from utils.Tools import _warn, _info
@@ -37,10 +38,17 @@ class Evaluator():
         for method in methods:
             if not rules or str.lower(method[6:]) in rules:
                 try:
+                    
+                    startTime = time.time()
                     if debugFlag:
                         print('--- --- fn: ' + method)
                         
                     getattr(self, method)()
+                    if debugFlag:
+                        timeSpent = round(time.time() - startTime, 3)
+                        if timeSpent >= 0.2:
+                            _warn("Long running checks {}s".format(timeSpent))
+                        
                     cnt += 1
                 except botocore.exceptions.ClientError as e:
                     code = e.response['Error']['Code']
