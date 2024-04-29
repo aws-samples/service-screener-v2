@@ -1,6 +1,7 @@
 import boto3
 import botocore
 import datetime
+import time
 from utils.Config import Config
 
 from datetime import timedelta
@@ -95,8 +96,7 @@ class Ec2Instance(Evaluator):
                         self.results['SQLServerEOL'] = [-1, image['Name']]
     
     def _checkInstanceTypeGeneration(self):
-        
-        instanceArr = aws_parseInstanceFamily(self.ec2InstanceData['InstanceType'])
+        instanceArr = aws_parseInstanceFamily(self.ec2InstanceData['InstanceType'], region=self.ec2Client.meta.region_name)
         instancePrefixArr = instanceArr['prefixDetail']
         
         instancePrefixArr['version'] = int(instancePrefixArr['version'])+1
@@ -105,7 +105,8 @@ class Ec2Instance(Evaluator):
        
         try:
             results = self.ec2Client.describe_instance_types(
-                InstanceTypes=[newFamily + '.' + size]
+                InstanceTypes=[newFamily + '.' + size],
+                MaxResults=1
             )
         except Exception as e:
             self.results['EC2NewGen'] = [1, self.ec2InstanceData['InstanceType']]

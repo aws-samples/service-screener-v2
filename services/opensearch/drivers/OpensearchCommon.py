@@ -126,7 +126,7 @@ class OpensearchCommon(Evaluator):
         instance_type = self.cluster_config["InstanceType"]
         self.results["LatestInstanceVersion"] = [1, instance_type]
 
-        instance_info = aws_parseInstanceFamily(instance_type)
+        instance_info = aws_parseInstanceFamily(instance_type, region=self.osClient.meta.region_name)
 
         instance_prefix_arr = instance_info["prefixDetail"]
         instance_prefix_arr["version"] = int(instance_prefix_arr["version"]) + 1

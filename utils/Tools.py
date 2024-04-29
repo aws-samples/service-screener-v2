@@ -1,5 +1,6 @@
 import boto3
 import re
+import time
 
 from pprint import pprint
 from utils.Config import Config
@@ -26,8 +27,11 @@ def checkIsPrivateIp(ipaddr):
     ip = ipaddr.split('/')
     return IPAddress(ip[0]).is_private()
 
-def aws_parseInstanceFamily(instanceFamily: str) -> Dict[str, str]:
-    CURRENT_REGION = Config.CURRENT_REGION
+def aws_parseInstanceFamily(instanceFamily: str, region=None) -> Dict[str, str]:
+    if region:
+        CURRENT_REGION = region
+    else:
+        CURRENT_REGION = Config.CURRENT_REGION
 
     arr = instanceFamily.split('.')
     if len(arr) > 3 or len(arr) == 1:
@@ -52,9 +56,8 @@ def aws_parseInstanceFamily(instanceFamily: str) -> Dict[str, str]:
     ssBoto = Config.get('ssBoto', None)
     if not spec:
         ec2c = ssBoto.client('ec2', region_name=CURRENT_REGION)
-        
         resp = ec2c.describe_instance_types(InstanceTypes=[family])
-
+        
         iType = resp.get('InstanceTypes')
         if iType:
             info = iType[0]
