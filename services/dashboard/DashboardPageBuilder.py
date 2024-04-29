@@ -85,6 +85,8 @@ class DashboardPageBuilder(PageBuilder):
         donutR = {} 
         dataSetsL = {}
         dataSetsR = {}
+        filterDonutL = {}
+        filterDonutR = {}
         
         regions = self.regions
         services = self.services
@@ -111,13 +113,22 @@ class DashboardPageBuilder(PageBuilder):
                 donutL[region] += hri
                 donutR[serv] += hri
         
+        for region, cnt in donutL.items():
+            if cnt > 0:
+                filterDonutL[region] = cnt
+        
+        for serv, cnt in donutR.items():
+            if cnt > 0:
+                filterDonutR[serv] = cnt
+                
+        
         # card = self.generateCard(pid=pid, html=html, cardClass='danger', title='No. Criticality', titleBadge='', collapse=False, noPadding=False)
                 
-        html = self.generateDonutPieChart(donutL, 'hriByRegion', 'doughnut')
+        html = self.generateDonutPieChart(filterDonutL, 'hriByRegion', 'doughnut')
         card = self.generateCard(pid=self.getHtmlId('chartServRegion'), html=html, cardClass='warning', title='High Risk - Group by Region', titleBadge='', collapse=True, noPadding=False)
         items = [[card, '']]
         
-        html = self.generateDonutPieChart(donutR, 'hriByService', 'pie')
+        html = self.generateDonutPieChart(filterDonutR, 'hriByService', 'pie')
         card = self.generateCard(pid=self.getHtmlId('pieHriByService'), html=html, cardClass='warning', title='High Risk - Group by Service', titleBadge='', collapse=True, noPadding=False)
         items.append([card, ''])
         

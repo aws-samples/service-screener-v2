@@ -51,6 +51,9 @@ class cloudfrontDist(Evaluator):
             if not 'CustomOriginConfig' in y:
                 continue
             
+            if y['CustomOriginConfig']['OriginProtocolPolicy'] == 'http-only':
+                continue
+            
             if 'SSLv3' in y['CustomOriginConfig']['OriginSslProtocols']['Items']:
                 self.results['DeprecatedSSLProtocol'] = [-1, '']
                 break
