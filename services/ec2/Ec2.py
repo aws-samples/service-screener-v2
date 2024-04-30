@@ -39,6 +39,7 @@ class Ec2(Service):
         self.cwClient = ssBoto.client('cloudwatch', config=self.bConfig)
         
         self.getOutdateSQLVersion()
+        self.getWindowsVersion()
     
     def getOutdateSQLVersion(self):
         outdateVersion = Config.get('SQLEolVersion', None)
@@ -57,6 +58,37 @@ class Ec2(Service):
         
         Config.set('SQLEolVersion', outdateVersion)
         
+    
+    def getWindowsVersion(self):
+        outdateWindowsVersion = Config.get('WindowsEOLVersion', None)
+        if outdateWindowsVersion != None:
+            return outdateWindowsVersion
+            
+        mEOL = None
+        mCycle = None
+        arr = {}
+        arr['2012'] = {'isOutdate': True, 'isLatest': False}
+        arr['2023'] = {'isOutdate': False, 'isLatest': True}
+        
+        try:
+            resp = requests.get("https://endoflife.date/api/windows-server.json",  timeout=10)
+            for prod in resp.json():
+                if prod['lts'] == 'false':
+                    continue
+                eolDate = datetime.strptime(prod['eol'], '%Y-%m-%d').date()
+                isOutdate = True if date.today() > eolDate else False
+                arr[prod['cycle']] = {'isOutdate': isOutdate, 'isLatest': False}
+                
+                if mEOL == None or eolDate > mEOL:
+                    mCycle = prod['cycle']
+                    mEOL = eolDate
+                    
+            arr[mCycle]['isLatest'] = True
+            
+        except requests.exceptions.RequestException as e:
+            print("Unable to retrieve endoflife Windows Server information, using default value: 2012")
+        
+        Config.set('WindowsEolVersion', arr)
         
     
     # get EC2 Instance resources

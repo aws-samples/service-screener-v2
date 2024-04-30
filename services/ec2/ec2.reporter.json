@@ -675,6 +675,34 @@
         "shortDesc": "Remove unrestricted ingress access to sensitive port",
         "ref": [
             "[Amazon Elastic Compute Cloud controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-21>"
+          ]
+    },
+    "WindowsOSOutdated": {
+        "category": "S",
+        "^description": "You have {$COUNT} EC2 running on EOL Windows Server version. You will no longer receive patches from Microsoft. Please upgrade your Windows to non-EOL edition",  
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "Use non-EOL Windows",
+        "ref": [
+            "[Windows Upgrade Guide]<https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/serverupgrade.html/>",
+            "[endoflife]<https://endoflife.date/windows-server>"
+        ]
+    },
+    "WindowsOSNotLatest": {
+        "category": "S",
+        "^description": "You have {$COUNT} EC2 running on EOL Windows Server version. You will no longer receive patches from Microsoft. Please consider upgrade your Windows to non-EOL edition",  
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "Use non-EOL Windows",
+        "ref": [
+            "[Windows Upgrade Guide]<https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/serverupgrade.html/>",
+            "[endoflife]<https://endoflife.date/windows-server>"
         ]
     }
 }

@@ -1,5 +1,7 @@
 from services.Evaluator import Evaluator
 
+import botocore
+
 class EfsDriver(Evaluator):
     def __init__(self, efs, efs_client):
         self.efs = efs
@@ -29,9 +31,14 @@ class EfsDriver(Evaluator):
         self.results['AutomatedBackup'] = [1, 'Enabled']
         efs_id = self.efs['FileSystemId']
 
-        backup = self.efs_client.describe_backup_policy(
-            FileSystemId=efs_id
-        )
+        try:
+            backup = self.efs_client.describe_backup_policy(
+                FileSystemId=efs_id
+            )
+        except botocore.exceptions.PolicyNotFound as e:
+            print("(Not showstopper): Error encounter during efs describe_backup_policy {}".format(e.response['Error']['Code']))
+            return
+        
 
         if backup['BackupPolicy']['Status'] == 'DISABLED':
             self.results['AutomatedBackup'] = [-1, 'Disabled']
