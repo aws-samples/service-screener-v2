@@ -352,7 +352,7 @@ class RdsCommon(Evaluator):
             self.results['ConsiderAurora'] = [-1, self.engine]
     
     def _checkHasGravitonOption(self):
-        if self.isCluster == True:
+        if self.isCluster == True or self.isServerless == True:
             return
         
         ## valid Graviton List
