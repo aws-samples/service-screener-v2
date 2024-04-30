@@ -35,9 +35,9 @@
         },
         "EC2.": {
             "2": ["ec2.SGDefaultDisallowTraffic"],
-            "6": [],
+            "6": ["ec2.VPCFlowLogEnabled"],
             "7": ["ec2.EBSEncrypted"],
-            "21": []
+            "21": ["ec2.NACLSensitivePort"]
         },
         "IAM.": {
             "1": ["iam.FullAdminAccess"],
