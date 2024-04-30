@@ -5,7 +5,7 @@ import time
 from utils.Config import Config
 
 from datetime import timedelta
-from utils.Tools import aws_parseInstanceFamily
+from utils.Tools import aws_parseInstanceFamily, _warn
 from services.Evaluator import Evaluator
 
 class Ec2Instance(Evaluator):
@@ -16,6 +16,11 @@ class Ec2Instance(Evaluator):
         self.ec2InstanceData = ec2InstanceData
         self.setTimeDeltaInDays()
         self.init()
+        
+        self.getImageInfo()
+    
+        self.addII('platform', ec2InstanceData['Platform'] if 'Platform' in ec2InstanceData else 'linux')
+        self.addII('instanceType', ec2InstanceData['InstanceType'])
     
     # supporting functions
     
@@ -79,22 +84,51 @@ class Ec2Instance(Evaluator):
         launchDay = int(timeDelta / (60*60*24))
         
         self.launchTimeDeltaInDays = launchDay
+        
+    def getImageInfo(self):
+        imageId = self.ec2InstanceData['ImageId']
+        resp = self.ec2Client.describe_images(ImageIds=[imageId])
+        images = resp.get('Images')
+        for image in images:
+            self.ec2ImageInfo = image
     
     # checks
     def _checkSQLServerEdition(self):
         EolVersion = Config.get('SQLEolVersion', 2012)
         
-        imageId = self.ec2InstanceData['ImageId']
-        resp = self.ec2Client.describe_images(ImageIds=[imageId])
-        images = resp.get('Images')
-        for image in images:
-            if 'PlatformDetails' in image and image['PlatformDetails'].find('SQL Server') > 0:
-                pos = image['Name'].find('SQL')
-                if pos > 0:
-                    sqlVers = image['Name'][pos+4:pos+8]
-                    if EolVersion >= sqlVers:
-                        self.results['SQLServerEOL'] = [-1, image['Name']]
+        image = self.ec2ImageInfo
+        if 'PlatformDetails' in image and image['PlatformDetails'].find('SQL Server') > 0:
+            pos = image['Name'].find('SQL')
+            if pos > 0:
+                sqlVers = image['Name'][pos+4:pos+8]
+                if EolVersion >= sqlVers:
+                    self.results['SQLServerEOL'] = [-1, image['Name']]
     
+    def _checkWindowsServerEdition(self):
+        image = self.ec2ImageInfo
+        if 'Platform' in image and not image['Platform'] == 'windows':
+            return
+        
+        if 'Name' in image and 'Windows_Server' in image['Name']:
+            nameInfo = image['Name'].split('-')
+            if len(nameInfo) <= 2:
+                ## Unable to detect OS version from name, skip
+                return
+            
+            if len(nameInfo[1]) == 4:
+                EolVersion = Config.get('WindowsEolVersion', 2012)
+                
+                if not nameInfo[1] in EolVersion:
+                    _warn("Windows Edition not found in EOL Lookup: {}".format(nameInfo[1]))
+                else:
+                    eolInfo = EolVersion[nameInfo[1]]
+                    if eolInfo['isOutdate']:
+                        self.results['WindowsOSOutdated'] = [-1, nameInfo[1]]
+                    elif eolInfo['isLatest'] == False:
+                        self.results['WindowsOSNotLatest'] = [-1, nameInfo[1]]
+                    else:
+                        return
+        
     def _checkInstanceTypeGeneration(self):
         instanceArr = aws_parseInstanceFamily(self.ec2InstanceData['InstanceType'], region=self.ec2Client.meta.region_name)
         instancePrefixArr = instanceArr['prefixDetail']

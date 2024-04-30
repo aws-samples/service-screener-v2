@@ -637,5 +637,33 @@
             "[RDS SQL Server]<https://aws.amazon.com/rds/sqlserver/>",
             "[endoflife]<https://endoflife.date/mssqlserver>"
         ]
+    },
+    "WindowsOSOutdated": {
+        "category": "S",
+        "^description": "You have {$COUNT} EC2 running on EOL Windows Server version. You will no longer receive patches from Microsoft. Please upgrade your Windows to non-EOL edition",  
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "Use non-EOL Windows",
+        "ref": [
+            "[Windows Upgrade Guide]<https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/serverupgrade.html/>",
+            "[endoflife]<https://endoflife.date/windows-server>"
+        ]
+    },
+    "WindowsOSNotLatest": {
+        "category": "S",
+        "^description": "You have {$COUNT} EC2 running on EOL Windows Server version. You will no longer receive patches from Microsoft. Please consider upgrade your Windows to non-EOL edition",  
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "Use non-EOL Windows",
+        "ref": [
+            "[Windows Upgrade Guide]<https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/serverupgrade.html/>",
+            "[endoflife]<https://endoflife.date/windows-server>"
+        ]
     }
 }
