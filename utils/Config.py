@@ -58,6 +58,7 @@ class Config:
         'ec2instance': ['DICT', 'ec2InstanceData', 'InstanceId'],
         'ec2secgroup': ['DICT', 'secGroup', 'GroupId'],
         'ec2vpc': ['DICT', 'vpc', 'VpcId'],
+        'ec2nacl': ['DICT', 'nacl', 'NetworkAclId'],
         'efsdriver': ['DICT', 'efs', 'FileSystemId'],
         'ekscommon': ['ATTR', 'cluster'],
         'elasticachememcached': ['DICT', 'cluster', 'ARN'],

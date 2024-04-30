@@ -21,6 +21,7 @@ from services.ec2.drivers.Ec2ElbClassic import Ec2ElbClassic
 from services.ec2.drivers.Ec2AutoScaling import Ec2AutoScaling
 from services.ec2.drivers.Ec2EbsSnapshot import Ec2EbsSnapshot
 from services.ec2.drivers.Ec2Vpc import Ec2Vpc
+from services.ec2.drivers.Ec2NACL import Ec2NACL
 
 class Ec2(Service):
     def __init__(self, region):
@@ -322,6 +323,17 @@ class Ec2(Service):
             flowLogList = flowLogList + result.get('FlowLogs')
         
         return flowLogList
+        
+    def getNetworkACLs(self):
+        result = self.ec2Client.describe_network_acls()
+        
+        networkACLs = result.get('NetworkAcls')
+        while result.get('NextToken') is not None:
+            result = self.ec2Client.describe_network_acls(
+                NextToken = result.get('NextToken')
+            )
+            networkACLs = networkACLs + result.get('NetworkAcls')
+        return networkACLs
     
     def advise(self):
         objs = {}
@@ -457,5 +469,14 @@ class Ec2(Service):
             obj = Ec2Vpc(vpc, flowLogs, self.ec2Client)
             obj.run(self.__class__)
             objs[f"VPC::{vpc['VpcId']}"] = obj.getInfo()
+            
+        # NACL Checks
+        nacls = self.getNetworkACLs()
+        for nacl in nacls:
+            print(f"... (NACL::Network ACL) inspecting {nacl['NetworkAclId']}")
+            obj = Ec2NACL(nacl, self.ec2Client)
+            obj.run(self.__class__)
+            objs[f"NACL::{nacl['NetworkAclId']}"] = obj.getInfo()
+        
         
         return objs
