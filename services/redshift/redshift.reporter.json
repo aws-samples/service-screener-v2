@@ -1,16 +1,119 @@
 {
-	"<CHECK_NAME>": {
-		"category": '<ENUM>', 		//REQUIRED, valid value (combination): O,S,R,P,C
-		"^description": '<string>', //REQUIRED
-		"shortDesc": '<string>', 	//OPTIONAL
-		"criticality": '<ENUM>', 	//REQUIRED, valid value (single): I, L, M, H
-		"downtime": '<int>', 		//OPTIONAL
-		"slowness": '<int>', 		//OPTIONAL
-		"additionalCost": '<int>', 	//OPTIONAL
-		"needFullTest": '<int>', 	//OPTIONAL
-		"ref": [					//OPTIONAL
-			"[<text_to_display>]<url>",
-			"[<text_to_display>]<url>",
-		],
+	"PubliclyAcessible": {
+		"category": "S",
+		"^description": "Unless you intend for your cluster to be publicly accessible, the cluster should not be configured with PubliclyAccessible set to true",
+		"shortDesc": "Amazon Redshift clusters should prohibit public access",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": -1,
+		"needFullTest": 1,
+		"ref": [
+			"[Prohibit public access]<https://docs.aws.amazon.com/securityhub/latest/userguide/redshift-controls.html#redshift-2>"
+		]
+	},
+	"EncryptedInTransit": {
+		"category": "S",
+		"^description": "TLS can be used to help prevent potential attackers from using person-in-the-middle or similar attacks to eavesdrop on or manipulate network traffic. Only encrypted connections over TLS should be allowed. Encrypting data in transit can affect performance. You should test your application with this feature to understand the performance profile and the impact of TLS",
+		"shortDesc": "Connections to Amazon Redshift clusters should be encrypted in transit",
+		"criticality": "M",
+		"downtime": -1,
+		"slowness": -1,
+		"additionalCost": -1,
+		"needFullTest": 1,
+		"ref": [
+			"[Encypt in Transit]<https://docs.aws.amazon.com/securityhub/latest/userguide/redshift-controls.html#redshift-2>"
+		]
+	},
+	"AutomaticSnapshots": {
+		"category": "R",
+		"^description": "Backups help you to recover more quickly from a security incident. They strengthen the resilience of your systems. Amazon Redshift takes periodic snapshots by default. Automatic snapshots should be enabled and retained for at least seven days.",
+		"shortDesc": "Amazon Redshift clusters should have automatic snapshots enabled",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Enable automatic snapshots]<https://docs.aws.amazon.com/securityhub/latest/userguide/redshift-controls.html#redshift-3>"
+		]
+	},
+	"AuditLogging": {
+		"category": "S",
+		"^description": "Amazon Redshift audit logging provides additional information about connections and user activities in your cluster. This data can be stored and secured in Amazon S3 and can be helpful in security audits and investigations.",
+		"shortDesc": "Amazon Redshift clusters should have audit logging enabled",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Enable audit logging]<https://docs.aws.amazon.com/redshift/latest/mgmt/db-auditing-console.html>"
+		]
+	},
+	"AutomaticUpgrades": {
+		"category": "SO",
+		"^description": "Enabling automatic major version upgrades ensures that the latest major version updates to Amazon Redshift clusters are installed during the maintenance window. These updates might include security patches and bug fixes. Keeping up to date with patch installation is an important step in securing systems.",
+		"shortDesc": "Amazon Redshift should have automatic upgrades to major versions enabled",
+		"criticality": "M",
+		"downtime": -1,
+		"slowness": -1,
+		"additionalCost": 0,
+		"needFullTest": -1,
+		"ref": [
+			"[Enable automatic upgrades]<https://docs.aws.amazon.com/securityhub/latest/userguide/redshift-controls.html#redshift-6>"
+		]
+	},
+	"EnhancedVPCRouting": {
+		"category": "S",
+		"^description": "Enhanced VPC routing forces all COPY and UNLOAD traffic between the cluster and data repositories to go through your VPC. You can then use VPC features such as security groups and network access control lists to secure network traffic. You can also use VPC Flow Logs to monitor network traffic.",
+		"shortDesc": "Redshift clusters should use enhanced VPC routing",
+		"criticality": "M",
+		"downtime": -1,
+		"slowness": -1,
+		"additionalCost": 0,
+		"needFullTest": -1,
+		"ref": [
+			"[Enable enhanced VPC routing]<https://docs.aws.amazon.com/redshift/latest/mgmt/enhanced-vpc-enabling-cluster.html>"
+		]
+	},
+	"DefaultAdminUsername": {
+		"category": "S",
+		"^description": "When creating a Redshift cluster, you should change the default admin username to a unique value. Default usernames are public knowledge and should be changed upon configuration. Changing the default usernames reduces the risk of unintended access. You can't change the admin username for your Amazon Redshift cluster after it is created. To create a new cluster, follow the instructions in the link provided.",
+		"shortDesc": "Amazon Redshift clusters should not use the default Admin username",
+		"criticality": "M",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Create new cluster]<https://docs.aws.amazon.com/redshift/latest/gsg/rs-gsg-prereq.html>"
+		]
+	},
+	"DefaultDatabaseName": {
+		"category": "S",
+		"^description": "When creating a Redshift cluster, you should change the default database name to a unique value. Default names are public knowledge and should be changed upon configuration. As an example, a well-known name could lead to inadvertent access if it was used in IAM policy conditions. You can't change the database name for your Amazon Redshift cluster after it is created. For instructions on creating a new cluster, see Getting started with Amazon Redshift in the Amazon Redshift Getting Started Guide",
+		"shortDesc": "Redshift clusters should not use the default database name (dev)",
+		"criticality": "M",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Getting started with Amazon Redshift]<https://docs.aws.amazon.com/redshift/latest/gsg/getting-started.html>"
+		]
+	},
+	"EncryptedAtRest": {
+		"category": "S",
+		"^description": "In Amazon Redshift, you can turn on database encryption for your clusters to help protect data at rest. When you turn on encryption for a cluster, the data blocks and system metadata are encrypted for the cluster and its snapshots. Encryption of data at rest is a recommended best practice because it adds a layer of access management to your data. Encrypting Redshift clusters at rest reduces the risk that an unauthorized user can access the data stored on disk.",
+		"shortDesc": "Redshift clusters should be encrypted at rest",
+		"criticality": "M",
+		"downtime": -1,
+		"slowness": 1,
+		"additionalCost": -1,
+		"needFullTest": -1,
+		"ref": [
+			"[Changing cluster encryption]<https://docs.aws.amazon.com/redshift/latest/mgmt/changing-cluster-encryption.html>"
+		]
 	}
 }

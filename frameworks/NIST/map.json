@@ -304,15 +304,15 @@
             "35": ["rds.AutoMinorVersionUpgrade"]
         },
         "Redshift.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": [],
-            "6": [],
-            "7": [],
-            "8": [],
-            "9": [],
-            "10": []
+            "1": ["redshift.PubliclyAcessible"],
+            "2": ["redshift.EncryptedInTransit"],
+            "3": ["redshift.AutomaticSnapshots"],
+            "4": ["redshift.AuditLogging"],
+            "6": ["redshift.AutomaticUpgrades"],
+            "7": ["redshift.EnhancedVPCRouting"],
+            "8": ["redshift.DefaultAdminUsername"],
+            "9": ["redshift.DefaultDatabaseName"],
+            "10": ["redshift.EncryptedAtRest"]
         },
         "Route53.": {
             "2": []
