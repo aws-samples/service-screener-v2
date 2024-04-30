@@ -637,5 +637,18 @@
             "[RDS SQL Server]<https://aws.amazon.com/rds/sqlserver/>",
             "[endoflife]<https://endoflife.date/mssqlserver>"
         ]
+    },
+    "VPCFlowLogEnabled": {
+        "category": "S",
+        "^description": "You have {$COUNT} VPC has not enable VPC Flow Log. VPC Flow Log provide visibility into network traffic that traverses the VPC.",  
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Enable VPC Flow Log",
+        "ref": [
+            "[Amazon Elastic Compute Cloud controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-6>"
+        ]
     }
 }

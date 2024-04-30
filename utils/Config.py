@@ -57,6 +57,7 @@ class Config:
         'ec2elbcommon': ['DICT', 'elb', 'LoadBalancerArn'],
         'ec2instance': ['DICT', 'ec2InstanceData', 'InstanceId'],
         'ec2secgroup': ['DICT', 'secGroup', 'GroupId'],
+        'ec2vpc': ['DICT', 'vpc', 'VpcId'],
         'efsdriver': ['DICT', 'efs', 'FileSystemId'],
         'ekscommon': ['ATTR', 'cluster'],
         'elasticachememcached': ['DICT', 'cluster', 'ARN'],
