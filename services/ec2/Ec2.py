@@ -20,6 +20,8 @@ from services.ec2.drivers.Ec2ElbCommon import Ec2ElbCommon
 from services.ec2.drivers.Ec2ElbClassic import Ec2ElbClassic
 from services.ec2.drivers.Ec2AutoScaling import Ec2AutoScaling
 from services.ec2.drivers.Ec2EbsSnapshot import Ec2EbsSnapshot
+from services.ec2.drivers.Ec2Vpc import Ec2Vpc
+from services.ec2.drivers.Ec2NACL import Ec2NACL
 
 class Ec2(Service):
     def __init__(self, region):
@@ -37,6 +39,7 @@ class Ec2(Service):
         self.cwClient = ssBoto.client('cloudwatch', config=self.bConfig)
         
         self.getOutdateSQLVersion()
+        self.getWindowsVersion()
     
     def getOutdateSQLVersion(self):
         outdateVersion = Config.get('SQLEolVersion', None)
@@ -55,6 +58,37 @@ class Ec2(Service):
         
         Config.set('SQLEolVersion', outdateVersion)
         
+    
+    def getWindowsVersion(self):
+        outdateWindowsVersion = Config.get('WindowsEOLVersion', None)
+        if outdateWindowsVersion != None:
+            return outdateWindowsVersion
+            
+        mEOL = None
+        mCycle = None
+        arr = {}
+        arr['2012'] = {'isOutdate': True, 'isLatest': False}
+        arr['2023'] = {'isOutdate': False, 'isLatest': True}
+        
+        try:
+            resp = requests.get("https://endoflife.date/api/windows-server.json",  timeout=10)
+            for prod in resp.json():
+                if prod['lts'] == 'false':
+                    continue
+                eolDate = datetime.strptime(prod['eol'], '%Y-%m-%d').date()
+                isOutdate = True if date.today() > eolDate else False
+                arr[prod['cycle']] = {'isOutdate': isOutdate, 'isLatest': False}
+                
+                if mEOL == None or eolDate > mEOL:
+                    mCycle = prod['cycle']
+                    mEOL = eolDate
+                    
+            arr[mCycle]['isLatest'] = True
+            
+        except requests.exceptions.RequestException as e:
+            print("Unable to retrieve endoflife Windows Server information, using default value: 2012")
+        
+        Config.set('WindowsEolVersion', arr)
         
     
     # get EC2 Instance resources
@@ -289,6 +323,49 @@ class Ec2(Service):
                 finalArr.append(defaultSGs[i])
         
         return finalArr
+        
+    def getVpcs(self):
+        filters = []
+        if self.tags is not None:
+            filters = self.tags
+            
+        result = self.ec2Client.describe_vpcs(
+            Filters = filters
+        )
+        
+        vpcList = result.get('Vpcs')
+        while result.get('NextToken') is not None:
+            result = self.ec2Client.describe_vpcs(
+                Filters = filters,
+                NextToken = result.get('NextToken')
+            )
+            vpcList = vpcList + result.get('Vpcs')
+        
+        return vpcList
+        
+    def getFlowLogs(self):
+        ## No filter check in flow logs because the filter should be applied on VPC level
+        result = self.ec2Client.describe_flow_logs()
+        
+        flowLogList = result.get('FlowLogs')
+        while result.get('NextToken') is not None:
+            result = self.ec2Client.describe_flow_logs(
+                NextToken = result.get('NextToken')
+            )
+            flowLogList = flowLogList + result.get('FlowLogs')
+        
+        return flowLogList
+        
+    def getNetworkACLs(self):
+        result = self.ec2Client.describe_network_acls()
+        
+        networkACLs = result.get('NetworkAcls')
+        while result.get('NextToken') is not None:
+            result = self.ec2Client.describe_network_acls(
+                NextToken = result.get('NextToken')
+            )
+            networkACLs = networkACLs + result.get('NetworkAcls')
+        return networkACLs
     
     def advise(self):
         objs = {}
@@ -415,5 +492,23 @@ class Ec2(Service):
             obj = Ec2EIP(eip)
             obj.run(self.__class__)
             objs[f"ElasticIP::{eip['AllocationId']}"] = obj.getInfo()
+            
+        # VPC Checks
+        vpcs = self.getVpcs()
+        flowLogs = self.getFlowLogs()
+        for vpc in vpcs:
+            print(f"... (VPC::Virtual Private Cloud) inspecting {vpc['VpcId']}")
+            obj = Ec2Vpc(vpc, flowLogs, self.ec2Client)
+            obj.run(self.__class__)
+            objs[f"VPC::{vpc['VpcId']}"] = obj.getInfo()
+            
+        # NACL Checks
+        nacls = self.getNetworkACLs()
+        for nacl in nacls:
+            print(f"... (NACL::Network ACL) inspecting {nacl['NetworkAclId']}")
+            obj = Ec2NACL(nacl, self.ec2Client)
+            obj.run(self.__class__)
+            objs[f"NACL::{nacl['NetworkAclId']}"] = obj.getInfo()
+        
         
         return objs

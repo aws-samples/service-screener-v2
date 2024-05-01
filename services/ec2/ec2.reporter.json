@@ -637,5 +637,72 @@
             "[RDS SQL Server]<https://aws.amazon.com/rds/sqlserver/>",
             "[endoflife]<https://endoflife.date/mssqlserver>"
         ]
+    },
+    "VPCFlowLogEnabled": {
+        "category": "S",
+        "^description": "You have {$COUNT} VPC has not enable VPC Flow Log. VPC Flow Log provide visibility into network traffic that traverses the VPC.",  
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Enable VPC Flow Log",
+        "ref": [
+            "[Amazon Elastic Compute Cloud controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-6>"
+        ]
+    },
+    "NACLAssociated": {
+        "category": "O",
+        "^description": "You have {$COUNT} Network ACL has no subnet association. Remove unused Network ACL to improve operation efficiency.",  
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Remove unused Network ACL",
+        "ref": [
+            "[Control traffic to subnets using network ACLs]<https://docs.aws.amazon.com/vpc/latest/userguide/vpc-network-acls.html>"
+        ]
+    },
+    "NACLSensitivePort": {
+        "category": "S",
+        "^description": "You have {$COUNT} Network ACL has unrestricted ingress access to SSH/RDP port. Remove ingress access for the sensitive port",  
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Remove unrestricted ingress access to sensitive port",
+        "ref": [
+            "[Amazon Elastic Compute Cloud controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-21>"
+          ]
+    },
+    "WindowsOSOutdated": {
+        "category": "S",
+        "^description": "You have {$COUNT} EC2 running on EOL Windows Server version. You will no longer receive patches from Microsoft. Please upgrade your Windows to non-EOL edition",  
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "Use non-EOL Windows",
+        "ref": [
+            "[Windows Upgrade Guide]<https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/serverupgrade.html/>",
+            "[endoflife]<https://endoflife.date/windows-server>"
+        ]
+    },
+    "WindowsOSNotLatest": {
+        "category": "S",
+        "^description": "You have {$COUNT} EC2 running on EOL Windows Server version. You will no longer receive patches from Microsoft. Please consider upgrade your Windows to non-EOL edition",  
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "Use non-EOL Windows",
+        "ref": [
+            "[Windows Upgrade Guide]<https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/serverupgrade.html/>",
+            "[endoflife]<https://endoflife.date/windows-server>"
+        ]
     }
 }
