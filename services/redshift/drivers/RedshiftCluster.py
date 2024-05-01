@@ -85,7 +85,7 @@ class RedshiftCluster(Evaluator):
         # chech if encryption is enabled
         try:
             if not self.cluster['Encrypted']:
-                self.results['Encryption'] = [-1, "Encryption is not enabled"]
+                self.results['EncryptedAtRest'] = [-1, "Encryption is not enabled"]
         
         except Exception as e:
             print(f"Error: {e}")
