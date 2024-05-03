@@ -3,7 +3,7 @@ test.py
 test.md
 crossAccounts.json
 output.zip
-__fork/*.json
+__fork
 adminlte/aws/**/
 adminlte/aws/**/*.html
 adminlte/aws/**/*.xlsx
@@ -33,6 +33,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+AWSCLIV2.pkg
 
 # Unit test / coverage reports
 htmlcov/

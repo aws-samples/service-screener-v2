@@ -39,16 +39,18 @@
             "1": []
         },
         "CloudFront.": {
-            "1": [],
-            "3": [],
-            "4": [],
-            "5": [],
-            "6": [],
+            "1": ["cloudfront.defaultRootObject"],
+            "3": ["cloudfront.viewerPolicyHttps"],
+            "4": ["cloudfront.originFailover"],
+            "5": ["cloudfront.accessLogging"],
+            "6": ["cloudfront.WAFAssociation"],
             "7": [],
             "8": [],
             "9": [],
-            "10": [],
-            "12": []
+            "10": ["cloudfront.DeprecatedSSLProtocol"],
+            "12": [],
+            "13": [],
+            "14": []
         },
         "CloudTrail.": {
             "1": ["cloudtrail.HasOneMultiRegionTrail"],
@@ -85,11 +87,12 @@
             "5": []
         },
         "DynamoDB.": {
-            "1": [],
-            "2": [],
+            "1": ["dynamodb.autoScalingStatus"],
+            "2": ["dynamodb.disabledPointInTimeRecovery"],
             "3": [],
             "4": [],
-            "6": []
+            "5": ["dynamodb.resourcesWithoutTags"],
+            "6": ["dynamodb.deleteTableProtection"]
         },
         "EC2.": {
             "1": ["ec2.EBSSnapshotIsPublic"],
@@ -304,15 +307,15 @@
             "35": ["rds.AutoMinorVersionUpgrade"]
         },
         "Redshift.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": [],
-            "6": [],
-            "7": [],
-            "8": [],
-            "9": [],
-            "10": []
+            "1": ["redshift.PubliclyAcessible"],
+            "2": ["redshift.EncryptedInTransit"],
+            "3": ["redshift.AutomaticSnapshots"],
+            "4": ["redshift.AuditLogging"],
+            "6": ["redshift.AutomaticUpgrades"],
+            "7": ["redshift.EnhancedVPCRouting"],
+            "8": ["redshift.DefaultAdminUsername"],
+            "9": ["redshift.DefaultDatabaseName"],
+            "10": ["redshift.EncryptedAtRest"]
         },
         "Route53.": {
             "2": []
