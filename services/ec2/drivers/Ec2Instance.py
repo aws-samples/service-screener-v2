@@ -86,7 +86,7 @@ class Ec2Instance(Evaluator):
         self.launchTimeDeltaInDays = launchDay
         
     def getImageInfo(self):
-        self.ecImageInfo = None
+        self.ec2ImageInfo = None
         imageId = self.ec2InstanceData['ImageId']
         resp = self.ec2Client.describe_images(ImageIds=[imageId])
         images = resp.get('Images')
