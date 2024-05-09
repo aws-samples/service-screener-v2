@@ -86,6 +86,7 @@ class Ec2Instance(Evaluator):
         self.launchTimeDeltaInDays = launchDay
         
     def getImageInfo(self):
+        self.ecImageInfo = None
         imageId = self.ec2InstanceData['ImageId']
         resp = self.ec2Client.describe_images(ImageIds=[imageId])
         images = resp.get('Images')
@@ -95,8 +96,11 @@ class Ec2Instance(Evaluator):
     # checks
     def _checkSQLServerEdition(self):
         EolVersion = Config.get('SQLEolVersion', 2012)
-        
+
         image = self.ec2ImageInfo
+        if image == None:
+            return
+        
         if 'PlatformDetails' in image and image['PlatformDetails'].find('SQL Server') > 0:
             pos = image['Name'].find('SQL')
             if pos > 0:
@@ -106,6 +110,9 @@ class Ec2Instance(Evaluator):
     
     def _checkWindowsServerEdition(self):
         image = self.ec2ImageInfo
+        if image == None:
+            return
+        
         if 'Platform' in image and not image['Platform'] == 'windows':
             return
         
