@@ -97,9 +97,10 @@ class Ec2Instance(Evaluator):
     def _checkSQLServerEdition(self):
         EolVersion = Config.get('SQLEolVersion', 2012)
 
+        if self.ec2ImageInfo == None:
+            return 
+            
         image = self.ec2ImageInfo
-        if image == None:
-            return
         
         if 'PlatformDetails' in image and image['PlatformDetails'].find('SQL Server') > 0:
             pos = image['Name'].find('SQL')
@@ -109,9 +110,10 @@ class Ec2Instance(Evaluator):
                     self.results['SQLServerEOL'] = [-1, image['Name']]
     
     def _checkWindowsServerEdition(self):
-        image = self.ec2ImageInfo
-        if image == None:
+        if self.ec2ImageInfo == None:
             return
+        
+        image = self.ec2ImageInfo
         
         if 'Platform' in image and not image['Platform'] == 'windows':
             return
