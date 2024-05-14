@@ -36,5 +36,5 @@ class ApiGatewayCommon(Evaluator):
         items = resp['Items']
         for route in items:
             if route['AuthorizationType'] == 'NONE':
-                self.results['Authorization'] = [-1, "Route key: " + route['RouteKey']]
+                self.results['AuthorizationType'] = [-1, "Route key: " + route['RouteKey']]
         return
