@@ -106,12 +106,15 @@
     },
     "IdleAPIGateway": {
         "category": "O",
-        "shortDesc": "Info only: {$COUNT} APIGateway(s) is not deployed",
+        "^description": "",
+        "shortDesc": "Info only: ${COUNT} APIGateway(s) is not deployed",
         "criticality": "I",
         "downtime": 0,
         "slowness": 0,
         "additionalCost": 0,
         "needFullTest": 0,
-        "ref": []
+        "ref":[
+            "[Setting up a stage using the API Gateway console]<https://docs.aws.amazon.com/apigateway/latest/developerguide/stages.html>"
+        ]
     }
 }
