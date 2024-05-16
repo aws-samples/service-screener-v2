@@ -53,7 +53,7 @@ class Apigateway(Service):
             objs = {}
             self.getApis()
             for api in self.apisv2:
-                objName = 'APIGateway::' + api['ProtocolType'] + '::' + api['Name']
+                objName = api['ProtocolType'] + '::' + api['Name']
                 print('... (APIGateway) inspecting ' + objName)
                 obj = ApiGatewayCommon(api, self.apiv2Client)
                 obj.run(self.__class__)
@@ -62,7 +62,7 @@ class Apigateway(Service):
 
             self.getRestApis()
             for api in self.apis:
-                objName = 'APIGateway::' + 'REST' + '::' + api['name']
+                objName = 'REST' + '::' + api['name']
                 print('... (APIGateway) inspecting ' + objName)
                 obj = ApiGatewayRest(api, self.apiClient)
                 obj.run(self.__class__)

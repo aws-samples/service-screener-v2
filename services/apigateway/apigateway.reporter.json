@@ -2,7 +2,7 @@
 	"ExecutionLogging": {
         "category": "S",
         "^description": "API Gateway REST or WebSocket API stages should have relevant logs enabled. API Gateway REST and WebSocket API execution logging provides detailed records of requests made to API Gateway REST and WebSocket API stages. The stages include API integration backend responses, Lambda authorizer responses, and the requestId for AWS integration endpoints.",
-        "shortDesc": "API Gateway REST and WebSocket API execution logging should be enabled",
+        "shortDesc": "Enable execution logging",
         "criticality": "M",
         "downtime": 0,
         "slowness": 0,
@@ -15,7 +15,7 @@
 	"EncryptionInTransit": {
         "category": "S",
         "^description": "API Gateway REST API stages should be configured with SSL certificates to allow backend systems to authenticate that requests originate from API Gateway.",
-        "shortDesc": "API Gateway REST API stages should be configured to use SSL certificates for backend authentication",
+        "shortDesc": "Enable SSL certificates",
         "criticality": "M",
         "downtime": 0,
         "slowness": -1,
@@ -28,7 +28,7 @@
 	"XRayTracing": {
         "category": "S",
         "^description": "X-Ray active tracing enables a more rapid response to performance changes in the underlying infrastructure. Changes in performance could result in a lack of availability of the API. X-Ray active tracing provides real-time metrics of user requests that flow through your API Gateway REST API operations and connected services.",
-        "shortDesc": "API Gateway REST API stages should have AWS X-Ray tracing enabled",
+        "shortDesc": "Enable AWS X-Ray tracing",
         "criticality": "M",
         "downtime": 0,
         "slowness": 0,
@@ -41,7 +41,7 @@
 	"WAFWACL": {
         "category": "S",
         "^description": "AWS WAF is a web application firewall that helps protect web applications and APIs from attacks. It enables you to configure an ACL, which is a set of rules that allow, block, or count web requests based on customizable web security rules and conditions that you define. Ensure that your API Gateway stage is associated with an AWS WAF web ACL to help protect it from malicious attacks.",
-        "shortDesc": "API Gateway should be associated with a WAF Web ACL",
+        "shortDesc": "Associale a WAF Web ACL",
         "criticality": "M",
         "downtime": 0,
         "slowness": 0,
@@ -54,7 +54,7 @@
     "EncryptionAtRest": {
         "category": "S",
         "^description": "Encrypting data at rest reduces the risk of data stored on disk being accessed by a user not authenticated to AWS. It adds another set of access controls to limit unauthorized users ability access the data. For example, API permissions are required to decrypt the data before it can be read. API Gateway REST API caches should be encrypted at rest for an added layer of security.",
-        "shortDesc": "API Gateway REST API cache data should be encrypted at rest",
+        "shortDesc": "Encrypt cache data",
         "criticality": "M",
         "downtime": 0,
         "slowness": 0,
@@ -67,7 +67,7 @@
     "AuthorizationType": {
         "category": "S",
         "^description": "API Gateway V2 WebSocket and HTTP routes should specify an authorization type. Specifying an authorization type ensures that access to the API is controlled and restricted to authorized users or processes.",
-        "shortDesc": "API Gateway V2 WebSocket and HTTP routes should specify an authorization type",
+        "shortDesc": "Specify an authorization type",
         "criticality": "M",
         "downtime": 0,
         "slowness": 0,
@@ -81,7 +81,7 @@
 	"AccessLogging": {
         "category": "S",
         "^description": "API Gateway access logs provide detailed information about who has accessed your API and how the caller accessed the API. These logs are useful for applications such as security and access audits and forensics investigation. Enable these access logs to analyze traffic patterns and to troubleshoot issues.",
-        "shortDesc": "API Gateway V2 stages should have access logging enabled",
+        "shortDesc": "Enable access logging",
         "criticality": "M",
         "downtime": 0,
         "slowness": 0,
