@@ -106,8 +106,8 @@
     },
     "IdleAPIGateway": {
         "category": "O",
-        "^description": "",
-        "shortDesc": "Info only: {$COUNT} APIGateway(s) is not deployed",
+        "^description": "Info only: {$COUNT} APIGateway(s) is not deployed",
+        "shortDesc": "Idel APIGateway",
         "criticality": "I",
         "downtime": 0,
         "slowness": 0,
