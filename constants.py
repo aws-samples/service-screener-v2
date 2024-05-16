@@ -1,4 +1,5 @@
 import pathlib
+import sys
 
 ROOT_DIR = str(pathlib.Path.cwd())
 
@@ -6,7 +7,7 @@ SERVICE_DIR = ROOT_DIR + '/services'
 TEMPLATE_DIR = ROOT_DIR + '/templates'
 # VENDOR_DIR = ROOT_DIR + '/vendor'
 FRAMEWORK_DIR = ROOT_DIR + '/frameworks'
-BOTOCORE_DIR = ROOT_DIR + '/../lib64/python3.7/site-packages/botocore'
+BOTOCORE_DIR = ROOT_DIR + '/../lib64/python'+ str(sys.version_info.major) + '.' + str(sys.version_info.minor) +'/site-packages/botocore'
 
 HTML_FOLDER =  '/adminlte/aws/res'
 ADMINLTE_ROOT_DIR = ROOT_DIR + '/adminlte'
