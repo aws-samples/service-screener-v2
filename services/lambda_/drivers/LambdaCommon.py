@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 from datetime import datetime, timedelta
 
 import botocore
@@ -25,8 +26,6 @@ class LambdaCommon(Evaluator):
         'provided'
     ]
 
-    ## <TODO>
-    # RUNTIME_PATH = os.path.join(os.environ.get("VENDOR_DIR"), 'aws/aws-sdk-php/src/data/lambda/2015-03-31/api-2.json.php')
     RUNTIME_PATH = _C.BOTOCORE_DIR + '/data/lambda/2015-03-31/service-2.json'
     CW_HISTORY_DAYS = [30, 7]
 
