@@ -107,7 +107,7 @@
     "IdleAPIGateway": {
         "category": "O",
         "^description": "Info only: {$COUNT} APIGateway(s) is not deployed",
-        "shortDesc": "Idel APIGateway",
+        "shortDesc": "Deploy/delete APIGateway",
         "criticality": "I",
         "downtime": 0,
         "slowness": 0,
