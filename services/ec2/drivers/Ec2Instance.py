@@ -90,6 +90,8 @@ class Ec2Instance(Evaluator):
         imageId = self.ec2InstanceData['ImageId']
         resp = self.ec2Client.describe_images(ImageIds=[imageId])
         images = resp.get('Images')
+        
+        self.ec2ImageInfo = None
         for image in images:
             self.ec2ImageInfo = image
     
