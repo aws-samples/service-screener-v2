@@ -35,7 +35,7 @@ class EfsDriver(Evaluator):
             backup = self.efs_client.describe_backup_policy(
                 FileSystemId=efs_id
             )
-        except botocore.exceptions.PolicyNotFound as e:
+        except self.efs_client.exceptions.PolicyNotFound as e:
             print("(Not showstopper): Error encounter during efs describe_backup_policy {}".format(e.response['Error']['Code']))
             return
         
