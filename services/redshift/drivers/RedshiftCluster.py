@@ -4,19 +4,8 @@ import constants as _C
 
 from services.Evaluator import Evaluator
 
-###### TO DO #####
-## Import modules that needed for this driver
-## Example
-## from services.ec2.drivers.Ec2SecGroup import Ec2SecGroup
-
-###### TO DO #####
-## Replace ServiceDriver with
-
 class RedshiftCluster(Evaluator):
     
-    ###### TO DO #####
-    ## Replace resource variable to meaningful name
-    ## Modify based on your need
     def __init__(self, cluster, rsClient):
         super().__init__()
         self.init()
@@ -26,20 +15,15 @@ class RedshiftCluster(Evaluator):
         # print(self.cluster)
         return
     
-    ###### TO DO #####
-    ## Change the method name to meaningful name
-    ## Check methods name must follow _check[Description]
     def _checkPubliclyAcessible(self):
-        # resp = self.rsClient.describe_clusters(
-        #         ClusterIdentifier=self.cluster['ClusterIdentifier']
-        #     )
+
+        # check if publicly accessible
         if self.cluster['PubliclyAccessible']:
             self.results['PubliclyAccessible'] = [-1, "Redshift cluster is publicly accessible"]
         
         # check if automated snapshot is enabled
         try:
             if self.cluster['AutomatedSnapshotRetentionPeriod'] < 7:
-                print(self.cluster['AutomatedSnapshotRetentionPeriod'])
                 self.results['AutomaticSnapshots'] = [-1, "Automatic snapshot retention is < 7 days"]
         
         except Exception as e:

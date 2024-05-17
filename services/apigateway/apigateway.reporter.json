@@ -1,0 +1,120 @@
+{
+	"ExecutionLogging": {
+        "category": "S",
+        "^description": "API Gateway REST or WebSocket API stages should have relevant logs enabled. API Gateway REST and WebSocket API execution logging provides detailed records of requests made to API Gateway REST and WebSocket API stages. The stages include API integration backend responses, Lambda authorizer responses, and the requestId for AWS integration endpoints.",
+        "shortDesc": "Enable execution logging",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Set up CloudWatch API logging using the API Gateway console]<https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-logging.html#set-up-access-logging-using-console>"
+        ]
+    },
+	"EncryptionInTransit": {
+        "category": "S",
+        "^description": "API Gateway REST API stages should be configured with SSL certificates to allow backend systems to authenticate that requests originate from API Gateway.",
+        "shortDesc": "Enable SSL certificates",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": -1,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Generate and configure an SSL certificate for backend authentication]<https://docs.aws.amazon.com/apigateway/latest/developerguide/getting-started-client-side-ssl-authentication.html>"
+        ]
+    },
+	"XRayTracing": {
+        "category": "S",
+        "^description": "X-Ray active tracing enables a more rapid response to performance changes in the underlying infrastructure. Changes in performance could result in a lack of availability of the API. X-Ray active tracing provides real-time metrics of user requests that flow through your API Gateway REST API operations and connected services.",
+        "shortDesc": "Enable AWS X-Ray tracing",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Amazon API Gateway active tracing support for AWS X-Ray]<https://docs.aws.amazon.com/xray/latest/devguide/xray-services-apigateway.html>"
+        ]
+    },
+	"WAFWACL": {
+        "category": "S",
+        "^description": "AWS WAF is a web application firewall that helps protect web applications and APIs from attacks. It enables you to configure an ACL, which is a set of rules that allow, block, or count web requests based on customizable web security rules and conditions that you define. Ensure that your API Gateway stage is associated with an AWS WAF web ACL to help protect it from malicious attacks.",
+        "shortDesc": "Associale a WAF Web ACL",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[API Gateway should be associated with a WAF Web ACL]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-aws-waf.html>"
+        ]
+    },
+    "EncryptionAtRest": {
+        "category": "S",
+        "^description": "Encrypting data at rest reduces the risk of data stored on disk being accessed by a user not authenticated to AWS. It adds another set of access controls to limit unauthorized users ability access the data. For example, API permissions are required to decrypt the data before it can be read. API Gateway REST API caches should be encrypted at rest for an added layer of security.",
+        "shortDesc": "Encrypt cache data",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Configuring encryption at rest for API Gateway cache data]<https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-caching.html#api-gateway-caching-encryption>"
+        ]
+    },
+    "AuthorizationType": {
+        "category": "S",
+        "^description": "API Gateway V2 WebSocket and HTTP routes should specify an authorization type. Specifying an authorization type ensures that access to the API is controlled and restricted to authorized users or processes.",
+        "shortDesc": "Specify an authorization type",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+		"ref": [
+            "[Configuring authorization for API Gateway V2 WebSocket APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-websocket-api-authorization.html>",
+            "[Configuring authorization for API Gateway V2 HTTP APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-auth-providers.html>"
+        ]
+    },
+	"AccessLogging": {
+        "category": "S",
+        "^description": "API Gateway access logs provide detailed information about who has accessed your API and how the caller accessed the API. These logs are useful for applications such as security and access audits and forensics investigation. Enable these access logs to analyze traffic patterns and to troubleshoot issues.",
+        "shortDesc": "Enable access logging",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Configuring access logging for API Gateway V2]<https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-logging.html>"
+        ]
+    },
+    "MinTLSVersion": {
+        "category": "S",
+        "^description": "API Gateway REST API domains should use a security policy that specifies a minimum TLS protocol version of TLSv1.2. Using a minimum TLS version of 1.2 helps ensure that secure communication is established between the client and the API Gateway.",
+        "shortDesc": "API Gateway REST API domains should use a security policy with a minimum TLS version of TLSv1.2",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Configuring a minimum TLS version for API Gateway REST API domains]<https://docs.aws.amazon.com/apigateway/latest/developerguide/security-policy.html>"
+        ]
+    },
+    "IdleAPIGateway": {
+        "category": "O",
+        "^description": "Info only: {$COUNT} APIGateway(s) is not deployed",
+        "shortDesc": "Deploy/delete APIGateway",
+        "criticality": "I",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref":[
+            "[Setting up a stage using the API Gateway console]<https://docs.aws.amazon.com/apigateway/latest/developerguide/stages.html>"
+        ]
+    }
+}

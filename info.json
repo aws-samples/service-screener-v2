@@ -1,1 +1,1 @@
-{"cloudfront": 8, "cloudtrail": 18, "cloudwatch": 18, "dynamodb": 24, "ec2": 49, "efs": 3, "eks": 7, "elasticache": 10, "guardduty": 4, "iam": 37, "kms": 4, "lambda": 15, "opensearch": 18, "rds": 82, "s3": 12}
+{"apigateway": 9, "cloudfront": 8, "cloudtrail": 18, "cloudwatch": 18, "dynamodb": 24, "ec2": 54, "efs": 3, "eks": 7, "elasticache": 10, "guardduty": 4, "iam": 37, "kms": 4, "lambda": 15, "opensearch": 22, "rds": 82, "redshift": 9, "s3": 16}
