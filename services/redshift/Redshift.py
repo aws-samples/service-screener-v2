@@ -6,26 +6,12 @@ from utils.Config import Config
 from services.Service import Service
 from services.redshift.drivers.RedshiftCluster import RedshiftCluster
 
-###### TO DO #####
-## Import required service module below
-## Example
-## from services.ec2.drivers.Ec2Instance import Ec2Instance
-
-
-###### TO DO #####
-## Replace ServiceName with
-## getResources and advise method is default method that must have
-## Feel free to develop method to support your checks
 class Redshift(Service):
     def __init__(self, region):
         super().__init__(region)
         ssBoto = self.ssBoto
         self.rsClient = ssBoto.client('redshift', config=self.bConfig)
         
-        ###### TO DO #####
-        ## Initiate clients required for the check
-        ## Example
-        ## self.rdsClient = ssBoto.client('rds', config=self.bConfig)
         self.redshifts = []
         return
     
@@ -60,10 +46,6 @@ class Redshift(Service):
     def advise(self):
         objs = {}
         
-        ###### TO DO #####
-        ## call getResources method
-        ## loop through the resources and run the checks in drivers
-        ## Example
         self.getClusterResources()
         for cluster in self.redshifts:
             print('... (Redshift) inspecting ' + cluster['ClusterIdentifier'])
