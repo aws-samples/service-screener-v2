@@ -40,6 +40,8 @@ class Config:
     # ATTR = self.0
     # SKIP = literally skip, not showing
     SERVICES_IDENTIFIER_MAPPING = {
+        'apigatewaycommon': ['DICT', 'api', 'Name'],
+        'apigatewayrest': ['DICT', 'api', 'name'],
         'cloudfrontdist': ['ATTR', 'dist'],
         'cloudtrailaccount': ['TEXT', 'General'],
         'cloudtrailcommon': ['DICT', 'trail', 'TrailARN'],
