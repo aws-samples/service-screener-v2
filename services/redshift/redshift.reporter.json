@@ -1,5 +1,5 @@
 {
-	"PubliclyAcessible": {
+	"PubliclyAccessible": {
 		"category": "S",
 		"^description": "Unless you intend for your cluster to be publicly accessible, the cluster should not be configured with PubliclyAccessible set to true",
 		"shortDesc": "Disable public access",
