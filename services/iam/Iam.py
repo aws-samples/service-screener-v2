@@ -23,7 +23,7 @@ class Iam(Service):
             'orgClient': ssBoto.client('organizations'),
             'accClient': ssBoto.client('account', config=self.bConfig),
             'sppClient': ssBoto.client('support', config=self.bConfig),
-            'gdClient': ssBoto.client('guardduty', config=self.bConfig),
+            # 'gdClient': ssBoto.client('guardduty', config=self.bConfig),
             'budgetClient': ssBoto.client('budgets', config=self.bConfig),
             'curClient': ssBoto.client('cur', config=self.bConfig),
             'ctClient': ssBoto.client('cloudtrail', config=self.bConfig)
