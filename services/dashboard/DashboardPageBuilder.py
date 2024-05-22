@@ -145,7 +145,7 @@ class DashboardPageBuilder(PageBuilder):
         
         output.append(self.generateRowWithCol(size=6, items=items, rowHtmlAttr="data-context='chartCount'"))
         
-        output.append("<h6>Report generated at <u>{}</u>, timezone setting: {}</h6>".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().tzname()))
+        output.append("<h6>Report generated at <u>{}</u>, timezone setting: {}</h6>".format(datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), 'UTC'))
         return output
         
     def getDashboardCategoryTiles(self, key, cnt):
