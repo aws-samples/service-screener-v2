@@ -21,3 +21,32 @@ GENERAL_CONF_PATH = SERVICE_DIR + '/general.reporter.json'
 CLI_TRUE_KEYWORD_ARRAY = ['yes', 'y', 'true', '1', 1]
 
 SESSUID_FILENAME = 'sess-uuid'
+
+EC2_TAGS_KEYWORDS = [
+    "elk",
+    "elasticsearch",
+    "kibana",
+    "mysql",
+    "postgres",
+    "mariadb",
+    "database",
+    "sql",
+    "db",
+    "oracle",
+    "rabbit",
+    "rabbitmq",
+    "activemq",
+    "kafka",
+    "spark",
+    "hadoop",
+    "mongo",
+    "mongodb",
+    "memcached",
+    "redis",
+    "kubernetes",
+    "k8s",
+    "docker",
+    "cassandra"
+]
+
+EC2_TAG_VALUE_FALSE_KEYWORDS = ['false', '0', '-1', 'no', 'none', 'negative']

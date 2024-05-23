@@ -87,7 +87,6 @@ class Screener:
                     info[identifier] = obj['info']
                     
                 contexts[service[0]][region] = arr
-                Config.set(classPrefix, None)
                 
             except botocore.exceptions.ClientError as e:
                 contexts[service[0]][region] = {}
@@ -99,6 +98,9 @@ class Screener:
                 
             tempCount += len(contexts[service[0]][region])
             del serv
+            
+            Config.set(classPrefix, None)
+
         
         GLOBALRESOURCES = Config.get(globalKey, [])
         if len(GLOBALRESOURCES) > 0:
