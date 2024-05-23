@@ -182,7 +182,7 @@ class IamAccount(IamCommon):
             conf = bConfig(region_name = region)
             gdClient = ssBoto.client('guardduty', config=conf)
         
-            resp = self.gdClient.list_detectors()
+            resp = gdClient.list_detectors()
             if 'DetectorIds' in resp:
                 ids = resp.get('DetectorIds')
                 if len(ids) > 0:
