@@ -1,4 +1,4 @@
-import boto3
+import boto3, botocore
 import datetime
 from dateutil.tz import tzlocal
 
@@ -16,9 +16,9 @@ class IamUser(IamCommon):
 
     def _checkHasMFA(self):
         xkey = "rootMfaActive" if self.user['user'] == "<root_account>" else "mfaActive"
-        if self.user['mfa_active'] == 'false':
+        if self.user['mfa_active'] == 'false' and (self.user['user'] == "<root_account>" or self.user['password_enabled'] == 'true'):
             self.results[xkey] = [-1, 'Inactive']
-
+            
     def _checkConsoleLastAccess(self):
         key = ''
         
@@ -52,25 +52,31 @@ class IamUser(IamCommon):
         if user == '<root_account>':
             return
         
-        resp = self.iamClient.list_groups_for_user(UserName = user)
-        groups = resp.get('Groups')
-        if not groups:
-            self.results['userNotUsingGroup'] = [-1, '-']
-            
+        try:
+            resp = self.iamClient.list_groups_for_user(UserName = user)
+            groups = resp.get('Groups')
+            if not groups:
+                self.results['userNotUsingGroup'] = [-1, '-']
+        except botocore.exceptions.ClientError as e:
+            print(e.response['Error']['Code'], e.response['Error']['Message'])
+                
     def _checkUserPolicy(self):
         user = self.user['user']
         if user == '<root_account>':
             return
             
         ## Managed Policy   
-        resp = self.iamClient.list_attached_user_policies(UserName = user)
-        policies = resp.get('AttachedPolicies')
-        self.evaluateManagePolicy(policies) ## code in iam_common.class.php
-        
-        ## Inline Policy
-        resp = self.iamClient.list_user_policies(UserName = user)
-        inlinePolicies = resp.get('PolicyNames')
-        self.evaluateInlinePolicy(inlinePolicies, user, 'user')
+        try:
+            resp = self.iamClient.list_attached_user_policies(UserName = user)
+            policies = resp.get('AttachedPolicies')
+            self.evaluateManagePolicy(policies) ## code in iam_common.class.php
+            
+            ## Inline Policy
+            resp = self.iamClient.list_user_policies(UserName = user)
+            inlinePolicies = resp.get('PolicyNames')
+            self.evaluateInlinePolicy(inlinePolicies, user, 'user')
+        except botocore.exceptions.ClientError as e:
+            print(e.response['Error']['Code'], e.response['Error']['Message'])
         
     def _checkAccessKeyRotate(self):
         user = self.user

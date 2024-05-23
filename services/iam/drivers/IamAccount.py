@@ -20,7 +20,7 @@ class IamAccount(IamCommon):
         self.iamClient = awsClients['iamClient']
         self.accClient = awsClients['accClient']
         self.sppClient = awsClients['sppClient']
-        self.gdClient = awsClients['gdClient']
+        # self.gdClient = awsClients['gdClient']
         self.budgetClient = awsClients['budgetClient']
         self.orgClient = awsClients['orgClient']
         
@@ -169,11 +169,24 @@ class IamAccount(IamCommon):
             self.results['hasExternalIdentityProvider'] = [-1, '']
     
     def _checkHasGuardDuty(self):
-        resp = self.gdClient.list_detectors()
-        if 'DetectorIds' in resp:
-            ids = resp.get('DetectorIds')
-            if len(ids) > 0:
-                return
+        ssBoto = self.ssBoto
+        regions = Config.get("REGIONS_SELECTED")
+        
+        results = {}
+        badResults = []
+        cnt = 0
+        for region in regions:
+            if region == 'GLOBAL':
+                continue
+            
+            conf = bConfig(region_name = region)
+            gdClient = ssBoto.client('guardduty', config=conf)
+        
+            resp = gdClient.list_detectors()
+            if 'DetectorIds' in resp:
+                ids = resp.get('DetectorIds')
+                if len(ids) > 0:
+                    return
             
         self.results["enableGuardDuty"] = [-1, ""]
         

@@ -408,18 +408,18 @@ class Ec2(Service):
         
         # EC2 instance checks
         instances = self.getResources()
-        for instance in instances:
-            instanceData = instance['Instances'][0]
-            print('... (EC2) inspecting ' + instanceData['InstanceId'])
-            obj = Ec2Instance(instanceData,self.ec2Client, self.cwClient)
-            obj.run(self.__class__)
-            
-            objs[f"EC2::{instanceData['InstanceId']}"] = obj.getInfo()
-            
-            ## Gather SecGroups in dict first to prevent check same sec groups multiple time
-            instanceSG = self.getEC2SecurityGroups(instanceData)
-            for group in instanceSG:
-                secGroups[group['GroupId']] = group
+        for instanceArr in instances:
+            for instanceData in instanceArr['Instances']:
+                print('... (EC2) inspecting ' + instanceData['InstanceId'])
+                obj = Ec2Instance(instanceData,self.ec2Client, self.cwClient)
+                obj.run(self.__class__)
+                
+                objs[f"EC2::{instanceData['InstanceId']}"] = obj.getInfo()
+                
+                ## Gather SecGroups in dict first to prevent check same sec groups multiple time
+                instanceSG = self.getEC2SecurityGroups(instanceData)
+                for group in instanceSG:
+                    secGroups[group['GroupId']] = group
             
         #EBS checks
         volumes = self.getEBSResources()
