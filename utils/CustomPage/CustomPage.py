@@ -1,7 +1,9 @@
-import os, importlib
+import os, importlib, json
 import constants as _C
 from utils.Config import Config
 from utils.Tools import _pr
+
+from services.PageBuilder import PageBuilder
 
 class CustomPage():
     Pages = {}
@@ -9,22 +11,30 @@ class CustomPage():
         self.importCustomObject()
         
     def importCustomObject(self):
-        folderPath = 'utils/CustomPage/Pages'
-        files = os.listdir(folderPath)
-        
         if len(self.Pages) > 0:
             return
         
+        folderPath = 'utils/CustomPage/Pages'
+        files = os.listdir(folderPath)
+
         for file in files:
-            if file[-2:] == 'py':
-                cname, ext = file.split('.')
-                module = 'utils.CustomPage.Pages.' + cname
-                sclass = getattr(importlib.import_module(module), cname)
-                self.Pages[cname] = sclass()
+            if file[0:2] == "__":
+                continue
+            
+            cname = file
+            module = 'utils.CustomPage.Pages.' + cname + '.' + cname
+            sclass = getattr(importlib.import_module(module), cname)
+            
+            pname = cname + 'PageBuilder'
+            pmodule = 'utils.CustomPage.Pages.' + cname + '.' + pname
+            pclass = getattr(importlib.import_module(pmodule), pname)
     
-    def trackInfo(self, driver, name, results):
-        for cname, pObj in self.Pages.items():
-            pObj.recordItem(driver, name, results)
+            self.Pages[cname] = [sclass(), pclass('CP' + cname, [])]
+    
+    def trackInfo(self, driver, name, results, inventoryInfo):
+        for cname, classObj in self.Pages.items():
+            pObj, pbObj = classObj
+            pObj.recordItem(driver, name, results, inventoryInfo)
     
     def resetOutput(self, service):
         serv = service.lower()
@@ -39,7 +49,8 @@ class CustomPage():
     def writeOutput(self, service):
         ## TODO: save that particular service only
         serv = service.lower()
-        for cname, pObj in self.Pages.items():
+        for cname, classObj in self.Pages.items():
+            pObj, pbObj = classObj
             s = pObj.printInfo(serv)
             if s == None:
                 return
@@ -49,14 +60,23 @@ class CustomPage():
                 f.write(s)
                 
     def buildPage(self):
+        arr = {}
         prefix = 'CustomPage.'
-        for cname, pObj in self.Pages.items():
+        for cname, classObj in self.Pages.items():
+            pObj, pbObj = classObj
+            arr[cname] = {}
             toMatch = prefix + cname + '.'
-            # print(toMatch)
             for filename in os.listdir(_C.FORK_DIR):
                 if filename.startswith(toMatch):
                     file_path = os.path.join(_C.FORK_DIR, filename)
                     if os.path.isfile(file_path):
                         with open(file_path, 'r') as f:
-                            s = f.read()
-                            # print(s)
+                            serv = file_path.split('.')[2]
+                            info = f.read()
+                            arr[cname][serv] = json.loads(info)
+                            
+            pObj.setData(arr[cname])
+            pObj.build()
+            
+            pbObj.loadData(pObj)
+            pbObj.buildPage()

@@ -82,7 +82,7 @@ class PageBuilder:
 
         if not os.path.exists(self.htmlFolder):
             os.makedirs(self.htmlFolder)
-
+        
         with open(self.htmlFolder + '/' + self.service + '.html', 'w') as f:
             f.write(finalHTML)
     

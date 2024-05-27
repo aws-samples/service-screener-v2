@@ -8,12 +8,12 @@ from utils.CustomPage.CustomPage import CustomPage
 import constants as _C
 
 class Evaluator():
-    InventoryInfo = {}
     def __init__(self):
         self.results = {}
         self.init()
         
     def init(self):
+        self.InventoryInfo = {}
         self.classname = type(self).__name__
     
     def addII(self, k, v):
@@ -138,4 +138,4 @@ class Evaluator():
             
         ## Handle custom page requirement
         cp = CustomPage()
-        cp.trackInfo(driver, name, self.results)
+        cp.trackInfo(driver, name, self.results, self.InventoryInfo)
