@@ -56,7 +56,9 @@ class Modernize(CustomObject):
                 "Lambda": {
                     "_Modernized": None
                 },
-                "EKS_ECS": {}
+                "EKS_ECS": {
+                    "_Modernized": None
+                }
             },
         },
         {

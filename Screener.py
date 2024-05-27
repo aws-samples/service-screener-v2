@@ -171,6 +171,10 @@ class Screener:
             with open(_C.API_JSON, 'w') as f:
                 json.dump(contexts, f)
         else:
+            cp = CustomPage()
+            pages = cp.getRegistrar()
+            Config.set('CustomPage::Pages', pages)
+            
             apiResultArray = {}
             if hasGlobal:
                 regions.append('GLOBAL')
@@ -232,12 +236,6 @@ class Screener:
                         else:
                             print(framework + " GATECHECK==FALSE")
                 
-                # <TODO>
-                ## Upload to S3
-                ## Not implement yet, low priority
-                
-                ## Experimental
-                cp = CustomPage()
                 cp.buildPage()
             else:
                 with open(_C.API_JSON, 'w') as f:

@@ -5,8 +5,9 @@ from utils.Tools import _pr
 
 from services.PageBuilder import PageBuilder
 
-class CustomPage():
+class CustomPage(): 
     Pages = {}
+    registrar = []
     def __init__(self):
         self.importCustomObject()
         
@@ -30,6 +31,10 @@ class CustomPage():
             pclass = getattr(importlib.import_module(pmodule), pname)
     
             self.Pages[cname] = [sclass(), pclass('CP' + cname, [])]
+            self.registrar.append(cname)
+    
+    def getRegistrar(self):
+        return self.registrar
     
     def trackInfo(self, driver, name, results, inventoryInfo):
         for cname, classObj in self.Pages.items():

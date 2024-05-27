@@ -25,7 +25,14 @@ class ModernizePageBuilder(CustomPageBuilder):
     
     def buildContentSummary_customPage(self):
         output = []
-        output.append("")
+        
+        html = "[Beta] This sankey diagram shows ... Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Consequat ac felis donec et odio pellentesque diam. Iaculis urna id volutpat lacus laoreet non curabitur. Ultrices in iaculis nunc sed augue lacus viverra vitae congue. Auctor eu augue ut lectus arcu bibendum at varius vel. Nisi quis eleifend quam adipiscing vitae proin sagittis nisl rhoncus. Fermentum posuere urna nec tincidunt praesent semper feugiat. Feugiat nisl pretium fusce id velit. Ultricies tristique nulla aliquet enim tortor at auctor. Sit amet consectetur adipiscing elit ut. Vehicula ipsum a arcu cursus vitae congue mauris. Vitae tortor condimentum lacinia quis vel. At tellus at urna condimentum mattis pellentesque."
+        card = self.generateCard(pid=self.getHtmlId('Description'), html=html, cardClass='warning', title='Read Me', titleBadge='', collapse=True, noPadding=False)
+        items = [[card, '']]
+        
+        output.append(self.generateRowWithCol(size=12, items=items, rowHtmlAttr="data-context='description'"))
+        
+        
         output.append("<svg id='compute' xmlns='http://www.w3.org/2000/svg' ></svg>")
         output.append("<svg id='database' xmlns='http://www.w3.org/2000/svg' ></svg>")
         output.append 

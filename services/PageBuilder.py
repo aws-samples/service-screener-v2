@@ -483,11 +483,17 @@ $('#changeAcctId').change(function(){
         sidebarPRE = sidebarPRE.replace('{$ADVISOR_TITLE}', Config.ADVISOR['TITLE'])
         sidebarPRE = sidebarPRE.replace('{$ISHOME}', ISHOME)
         output.append(sidebarPRE)
-
+        
+        #Page
+        pages = Config.get('CustomPage::Pages')
+        if pages:
+            arr = self.buildNavCustomItems('Pages', pages)
+            output.append("\n".join(arr))
+        
         arr = self.buildNavCustomItems('Frameworks', self.frameworks)
         output.append("\n".join(arr))
 
-        arr = self.buildNavCustomItems('Services', self.services)
+        arr = self.buildNavCustomItems('References', self.services)
         output.append("\n".join(arr))
 
         sidebarPOST = open(self._getTemplateByKey('sidebar.postcustom'), 'r').read()
@@ -500,6 +506,10 @@ $('#changeAcctId').change(function(){
     def buildNavCustomItems(self, title, lists):
         services = lists
         activeService = self.service
+        
+        skipCount = False
+        if title == 'Pages':
+            skipCount = True
 
         if title == 'Frameworks':
             title = 'Compliances / Frameworks'
@@ -515,7 +525,10 @@ $('#changeAcctId').change(function(){
         _services = sorted(services)
         
         for name in _services:
-            count = services[name]
+            count = 0
+            if skipCount == False:
+                count = services[name]
+                
             if name == activeService:
                 class_ = 'active'
             else:
@@ -531,12 +544,16 @@ $('#changeAcctId').change(function(){
             if name == 'guardduty' or isFramework == True:
                 _count = ''
 
+            link = name
+            if skipCount == True:
+                link = 'CP' + name
+                
             output.append("<li class='nav-item'>\n"
                           "<a href='{}.html' class='nav-link {}'>\n"
                           "<i class='nav-icon fas fa-{}'></i>\n"
                           "<p>{} <span class='badge badge-info right' data-count='{}'></span></p>\n"
                           "</a>\n"
-                          "</li>".format(name, class_, icon, name.upper(), _count))
+                          "</li>".format(link, class_, icon, name.upper(), _count))
 
         return output
         
