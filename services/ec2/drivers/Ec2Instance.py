@@ -241,39 +241,39 @@ class Ec2Instance(Evaluator):
         self.results['EC2DiskMonitor'] = [-1, 'Disabled']
         return
         
-    def _checkEC2Active(self):
-        verifyDay = 7
+    # def _checkEC2Active(self):
+    #     verifyDay = 7
     
-        cwClient = self.cwClient
-        instance = self.ec2InstanceData
-        launchDay = self.launchTimeDeltaInDays
+    #     cwClient = self.cwClient
+    #     instance = self.ec2InstanceData
+    #     launchDay = self.launchTimeDeltaInDays
         
-        if launchDay < verifyDay:
-            return
+    #     if launchDay < verifyDay:
+    #         return
     
-        dimensions = [
-            {
-                'Name': 'InstanceId',
-                'Value': instance['InstanceId']
-            }
-        ]
+    #     dimensions = [
+    #         {
+    #             'Name': 'InstanceId',
+    #             'Value': instance['InstanceId']
+    #         }
+    #     ]
     
-        results = cwClient.get_metric_statistics(
-            Dimensions=dimensions,
-            Namespace='AWS/EC2',
-            MetricName='CPUUtilization',
-            StartTime=datetime.datetime.utcnow() - datetime.timedelta(days=verifyDay),
-            EndTime=datetime.datetime.utcnow(),
-            Period=verifyDay * 24 * 60 * 60,
-            Statistics=['Average']
-        )
+    #     results = cwClient.get_metric_statistics(
+    #         Dimensions=dimensions,
+    #         Namespace='AWS/EC2',
+    #         MetricName='CPUUtilization',
+    #         StartTime=datetime.datetime.utcnow() - datetime.timedelta(days=verifyDay),
+    #         EndTime=datetime.datetime.utcnow(),
+    #         Period=verifyDay * 24 * 60 * 60,
+    #         Statistics=['Average']
+    #     )
     
-        if not results['Datapoints']:
-            results['Datapoints'] = [{'Average': 0.0}]
-        if results['Datapoints'][0]['Average'] < 5.0:
-            self.results['EC2Active'] = [-1, 'Inactive']
+    #     if not results['Datapoints']:
+    #         results['Datapoints'] = [{'Average': 0.0}]
+    #     if results['Datapoints'][0]['Average'] < 5.0:
+    #         self.results['EC2Active'] = [-1, 'Inactive']
         
-        return
+    #     return
         
     def _checkSecurityGroupsAttached(self):
         instance = self.ec2InstanceData
@@ -396,10 +396,12 @@ class Ec2Instance(Evaluator):
         instanceArr = aws_parseInstanceFamily(self.ec2InstanceData['InstanceType'], region=self.ec2Client.meta.region_name)
         prefixDetail = instanceArr['prefixDetail']
 
-        if prefixDetail['attributes'] != 'a':
+        if 'a' not in prefixDetail['attributes']:
             amdInstanceType = prefixDetail['family'] + prefixDetail['version'] + 'a.' + instanceArr['suffix']
+            nextVersion = str(int(prefixDetail['version']) + 1)
+            nextVerInstanceType = prefixDetail['family'] + nextVersion + 'a.' + instanceArr['suffix']
             
-            if self.checkInstanceTypeAvailable(amdInstanceType):
+            if self.checkInstanceTypeAvailable(amdInstanceType) or self.checkInstanceTypeAvailable(nextVerInstanceType):
                 self.results['EC2AMD'] = [-1, self.ec2InstanceData['InstanceType']]
                 
         return
@@ -412,10 +414,12 @@ class Ec2Instance(Evaluator):
         instanceArr = aws_parseInstanceFamily(self.ec2InstanceData['InstanceType'], region=self.ec2Client.meta.region_name)
         prefixDetail = instanceArr['prefixDetail']
 
-        if prefixDetail['attributes'] != 'g':
+        if 'g' not in prefixDetail['attributes']:
             gInstanceType = prefixDetail['family'] + prefixDetail['version'] + 'g.' + instanceArr['suffix']
+            nextVersion = str(int(prefixDetail['version']) + 1)
+            nextVerInstanceType = prefixDetail['family'] + nextVersion + 'g.' + instanceArr['suffix']
             
-            if self.checkInstanceTypeAvailable(gInstanceType):
+            if self.checkInstanceTypeAvailable(gInstanceType) or self.checkInstanceTypeAvailable(nextVerInstanceType):
                 self.results['EC2Graviton'] = [-1, self.ec2InstanceData['InstanceType']]
                 
         return
