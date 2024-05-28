@@ -89,11 +89,13 @@ class Modernize(CustomObject):
         self.RelMapValue = {}
         # print( json.dumps(self.ModernizePath, indent=2))
     
-    def getRelValue(self, source, target):
+    def getRelValue(self, source, target, isPath=False):
         prefix = source + "==>" + target
         
         res = 0
-        if target[0:1] == '_': 
+        if prefix in self.RelMapValue and (target[0:1] == '_' and isPath==True): 
+            res = self.RelMapValue[prefix]
+        elif target[0:1] == '_': 
             kstr = "==>" + target
             for k, v in self.RelMapValue.items():
                 if kstr in k:
@@ -107,8 +109,6 @@ class Modernize(CustomObject):
                         res = res + v 
                         break
                     
-        elif prefix in self.RelMapValue: 
-            res = self.RelMapValue[prefix]
         else: 
             res = 0
             
@@ -133,11 +133,14 @@ class Modernize(CustomObject):
                     
                     val = " ({})".format(str(val))
                 
+                # print('===', val, k)
                 self.d3nodes.append("{}{}".format(k, val))
                 self.IndexMap.append(k)
             
             if p:
-                val = self.getRelValue(p, k)
+                val = self.getRelValue(p, k, isPath=True)
+                
+                print(val, p, k)
                 pIdx = self.IndexMap.index(p)
                 kIdx = self.IndexMap.index(k)
                 

@@ -17,7 +17,11 @@ class ModernizePageBuilder(CustomPageBuilder):
         for p, data in self.data.ds.items():
             nodes = []
             for node in data['nodes']:
-                nodes.append({'name': node})
+                n = node
+                if node == 'TagsKeyWords':
+                    n = '**' + node
+                
+                nodes.append({'name': n})
         
             self.nodes[c] = nodes
             self.links[c] = data['links']
@@ -26,7 +30,7 @@ class ModernizePageBuilder(CustomPageBuilder):
     def buildContentSummary_customPage(self):
         output = []
         
-        html = "[Beta] This sankey diagram shows ... Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Consequat ac felis donec et odio pellentesque diam. Iaculis urna id volutpat lacus laoreet non curabitur. Ultrices in iaculis nunc sed augue lacus viverra vitae congue. Auctor eu augue ut lectus arcu bibendum at varius vel. Nisi quis eleifend quam adipiscing vitae proin sagittis nisl rhoncus. Fermentum posuere urna nec tincidunt praesent semper feugiat. Feugiat nisl pretium fusce id velit. Ultricies tristique nulla aliquet enim tortor at auctor. Sit amet consectetur adipiscing elit ut. Vehicula ipsum a arcu cursus vitae congue mauris. Vitae tortor condimentum lacinia quis vel. At tellus at urna condimentum mattis pellentesque."
+        html = "[Beta] (For Sankey diagram to generate, internet connectivty is required. The page loads D3 Javascript directly from d3 CDN) Modernizing your applications helps you reduce costs, gain efficiencies, and make the most of your existing investments. It involves a multi-dimensional approach to adopt and use new technology, to deliver portfolio, application, and infrastructure value faster, and to position your organization to scale at an optimal price. After you optimize your applications, you must operate in that new, modernized model without disruption to simplify your business operations, architecture, and overall engineering practices.<br><br>Migrating applications to AWS by using the rehosting (lift and shift) approach doesn’t automatically give you the benefits of the elasticity, resiliency, ease of deployment and management, and flexibility that AWS offers. Nor does it automatically modernize your culture and processes to enable high-performing software development. Modernization means taking your application environment in the form that it’s in today (most likely, legacy and monolithic) and transforming it into something that is more agile, elastic, and highly available. In doing so, you can transform your business into a modern enterprise.<br><br>To optimize your cloud adoption and migration, you must first assess and evaluate your enterprise for readiness. After you assess the readiness of your organization, you can:<br><ol><li>Select one or two applications.</li><li>Modernize those applications so that you can maintain, extend, deploy, and manage them in a way that meets the current and future needs of your business.</li><li>Establish a foundation for modernization at scale through the hands-on experience you gained in the previous two steps. In this phase, you can create a complete modernization solution by determining the supporting infrastructure, application middleware, middleware services (such as databases, queuing software, integration software, and other technologies), and other components.</li></ol><br>The iterative approach to application modernization discussed in this article can be divided into three high-level phases: assess, modernize, and manage.<br><br>The modernisation sankey belows provide recommendation of your environment the next possible service or feature to leverage to achieve optimized architecture on AWS. Read more <a target=_blank rel='noopener noreferrer' href='https://docs.aws.amazon.com/prescriptive-guidance/latest/strategy-modernizing-applications/welcome.html'>here</a>"
         card = self.generateCard(pid=self.getHtmlId('Description'), html=html, cardClass='warning', title='Read Me', titleBadge='', collapse=True, noPadding=False)
         items = [[card, '']]
         
