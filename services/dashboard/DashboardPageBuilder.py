@@ -1,6 +1,7 @@
 import datetime
 from services.PageBuilder import PageBuilder
-from utils.Config import Config, dashboard
+from utils.Config import Config
+import utils.Config as cfg
 
 class DashboardPageBuilder(PageBuilder):
     def init(self):
@@ -24,6 +25,8 @@ class DashboardPageBuilder(PageBuilder):
             'L': 0,
             'I': 0
         }
+        
+        dashboard = cfg.dashboard.copy()
         
         total = 0
         if not 'CRITICALITY' in dashboard:
@@ -100,6 +103,8 @@ class DashboardPageBuilder(PageBuilder):
             regionLabels.append(region)
             dataSetsL[region] = []
             donutL[region] = 0
+            
+        dashboard = cfg.dashboard.copy()
             
         for serv, attrs in dashboard['SERV'].items():
             for region in regions:

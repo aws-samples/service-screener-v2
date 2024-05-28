@@ -16,8 +16,8 @@ def _pr(s, forcePrint = False):
 def _info(s, alwaysPrint = False):
     _printStatus("info", s, alwaysPrint)
 
-def _warn(s):
-    _printStatus("\033[1;41m__!! WARNING !!__\033[0m", s, forcePrint=True)
+def _warn(s, forcePrint=True):
+    _printStatus("\033[1;41m__!! WARNING !!__\033[0m", s, forcePrint)
     
 def _printStatus(status, s, forcePrint = False):
     p = "["+status+"] "+ s

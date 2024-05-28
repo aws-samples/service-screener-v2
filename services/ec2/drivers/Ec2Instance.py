@@ -390,7 +390,7 @@ class Ec2Instance(Evaluator):
     
     def _checkEC2AMD(self):
         osType = self.getII('platform')
-        if osType['platform'] == 'linux':
+        if osType == 'linux':
             return
         
         instanceArr = aws_parseInstanceFamily(self.ec2InstanceData['InstanceType'], region=self.ec2Client.meta.region_name)
@@ -408,7 +408,7 @@ class Ec2Instance(Evaluator):
     
     def _checkEC2Graviton(self):
         osType = self.getII('platform')
-        if osType['platform'] != 'linux':
+        if osType != 'linux':
             return
         
         instanceArr = aws_parseInstanceFamily(self.ec2InstanceData['InstanceType'], region=self.ec2Client.meta.region_name)
