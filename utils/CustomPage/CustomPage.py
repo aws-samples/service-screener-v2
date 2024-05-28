@@ -10,6 +10,9 @@ class CustomPage():
     registrar = []
     def __init__(self):
         self.importCustomObject()
+    
+    def resetPages(self):
+        self.Pages = {}
         
     def importCustomObject(self):
         if len(self.Pages) > 0:
