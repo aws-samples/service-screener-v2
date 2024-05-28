@@ -145,7 +145,7 @@ class DashboardPageBuilder(PageBuilder):
         
         output.append(self.generateRowWithCol(size=6, items=items, rowHtmlAttr="data-context='chartCount'"))
         
-        output.append("<h6>Report generated at <u>{}</u>, timezone setting: {}</h6>".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().tzname()))
+        output.append("<h6>Report generated at <u>{}</u>, timezone setting: {}</h6>".format(datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"), 'UTC'))
         return output
         
     def getDashboardCategoryTiles(self, key, cnt):
@@ -168,7 +168,7 @@ class DashboardPageBuilder(PageBuilder):
         infoCnt = cnt['I']
         
         output = f"""
-<div class="small-box bg-{colorClass}">
+<div class="small-box bg-{colorClass}" style="cursor:pointer;" onClick="window.open('CPFindings.html#{title}', '_blank')">
   <div class="inner">
     <h3>{total}</h3>
     <p>{title}</p>
@@ -203,7 +203,7 @@ class DashboardPageBuilder(PageBuilder):
         percentile = round(cnt * 100 / total)
         
         output = f"""
-<dt class="col-sm-4"><i class="fas fa-{icon}"></i> {title}</dt>
+<dt class="col-sm-4"><a style='cursor: pointer; color: black;' target=_blank rel='noopener noreferrer' href='CPFindings.html#{title}'><i class="fas fa-{icon}"></i> {title}</dt></a>
 <dd class="col-sm-8" style='text-align: right'>{cnt}</dd>
 <dt class="col-sm-12">
 <div class="progress mb-3">
@@ -224,7 +224,7 @@ class DashboardPageBuilder(PageBuilder):
         infoCnt = cnt['I']
         
         output = f"""
-<div class="col-sm-4">
+<div class="col-sm-4" style="cursor:pointer;" onClick="window.open('CPFindings.html#Security', '_blank')">
 	<div class="small-box bg-danger" style='height: 357px'>
 	  <div class="inner">
 		<h3>{total}</h3>

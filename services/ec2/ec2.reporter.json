@@ -181,6 +181,32 @@
             "[Tag your EC2 resources]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html>"
         ]
     },
+    "EC2AMD": {
+        "category": "CP",
+        "^description": "EC2 instance family with AMD chips: {$COUNT} of your instances can change to intance type powered by AMD chips",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "I",
+        "needFullTest": 0,
+        "shortDesc": "EC2 with AMD chips",
+        "ref": [
+            ""
+        ]
+    },
+    "EC2Graviton": {
+        "category": "CP",
+        "^description": "EC2 instance family with Graviton chips: {$COUNT} of your instances can change to instance type powered by Graviton chips.",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "I",
+        "needFullTest": 0,
+        "shortDesc": "EC2 with AMD chips",
+        "ref": [
+            ""
+        ]
+    },
     "EBSEncrypted": {
         "category": "S",
         "^description": "Storage Encyrption: {$COUNT} of EBS storage volumes are not encrypted. Enable encryption for EBS volumes to meet security and compliance requirements.",

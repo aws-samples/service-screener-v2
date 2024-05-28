@@ -8,6 +8,8 @@ from datetime import timedelta
 from utils.Tools import aws_parseInstanceFamily, _warn
 from services.Evaluator import Evaluator
 
+import constants as _C
+
 class Ec2Instance(Evaluator):
     def __init__(self, ec2InstanceData,ec2Client, cwClient):
         super().__init__()
@@ -108,6 +110,7 @@ class Ec2Instance(Evaluator):
             pos = image['Name'].find('SQL')
             if pos > 0:
                 sqlVers = image['Name'][pos+4:pos+8]
+                self.addII('SQLServer', sqlVers)
                 if EolVersion >= sqlVers:
                     self.results['SQLServerEOL'] = [-1, image['Name']]
     
@@ -238,39 +241,39 @@ class Ec2Instance(Evaluator):
         self.results['EC2DiskMonitor'] = [-1, 'Disabled']
         return
         
-    def _checkEC2Active(self):
-        verifyDay = 7
+    # def _checkEC2Active(self):
+    #     verifyDay = 7
     
-        cwClient = self.cwClient
-        instance = self.ec2InstanceData
-        launchDay = self.launchTimeDeltaInDays
+    #     cwClient = self.cwClient
+    #     instance = self.ec2InstanceData
+    #     launchDay = self.launchTimeDeltaInDays
         
-        if launchDay < verifyDay:
-            return
+    #     if launchDay < verifyDay:
+    #         return
     
-        dimensions = [
-            {
-                'Name': 'InstanceId',
-                'Value': instance['InstanceId']
-            }
-        ]
+    #     dimensions = [
+    #         {
+    #             'Name': 'InstanceId',
+    #             'Value': instance['InstanceId']
+    #         }
+    #     ]
     
-        results = cwClient.get_metric_statistics(
-            Dimensions=dimensions,
-            Namespace='AWS/EC2',
-            MetricName='CPUUtilization',
-            StartTime=datetime.datetime.utcnow() - datetime.timedelta(days=verifyDay),
-            EndTime=datetime.datetime.utcnow(),
-            Period=verifyDay * 24 * 60 * 60,
-            Statistics=['Average']
-        )
+    #     results = cwClient.get_metric_statistics(
+    #         Dimensions=dimensions,
+    #         Namespace='AWS/EC2',
+    #         MetricName='CPUUtilization',
+    #         StartTime=datetime.datetime.utcnow() - datetime.timedelta(days=verifyDay),
+    #         EndTime=datetime.datetime.utcnow(),
+    #         Period=verifyDay * 24 * 60 * 60,
+    #         Statistics=['Average']
+    #     )
     
-        if not results['Datapoints']:
-            results['Datapoints'] = [{'Average': 0.0}]
-        if results['Datapoints'][0]['Average'] < 5.0:
-            self.results['EC2Active'] = [-1, 'Inactive']
+    #     if not results['Datapoints']:
+    #         results['Datapoints'] = [{'Average': 0.0}]
+    #     if results['Datapoints'][0]['Average'] < 5.0:
+    #         self.results['EC2Active'] = [-1, 'Inactive']
         
-        return
+    #     return
         
     def _checkSecurityGroupsAttached(self):
         instance = self.ec2InstanceData
@@ -363,3 +366,80 @@ class Ec2Instance(Evaluator):
         if self.ec2InstanceData.get('Tags') is None:
             self.results['EC2HasTag'] = [-1, '']
         return
+    
+    def checkInstanceTypeAvailable(self, instanceType):
+        resp = self.ec2Client.describe_instance_type_offerings(
+            LocationType='region',
+            Filters=[
+                {
+                    'Name': 'instance-type',
+                    'Values': [
+                        instanceType,
+                    ]
+                },
+                {
+                    'Name': 'location',
+                    'Values': [
+                        self.ec2Client.meta.region_name,
+                    ]
+                }
+            ]
+        )
+        if len(resp['InstanceTypeOfferings']) > 0:
+            return True
+    
+    def _checkEC2AMD(self):
+        osType = self.getII('platform')
+        if osType['platform'] == 'linux':
+            return
+        
+        instanceArr = aws_parseInstanceFamily(self.ec2InstanceData['InstanceType'], region=self.ec2Client.meta.region_name)
+        prefixDetail = instanceArr['prefixDetail']
+
+        if 'a' not in prefixDetail['attributes']:
+            amdInstanceType = prefixDetail['family'] + prefixDetail['version'] + 'a.' + instanceArr['suffix']
+            nextVersion = str(int(prefixDetail['version']) + 1)
+            nextVerInstanceType = prefixDetail['family'] + nextVersion + 'a.' + instanceArr['suffix']
+            
+            if self.checkInstanceTypeAvailable(amdInstanceType) or self.checkInstanceTypeAvailable(nextVerInstanceType):
+                self.results['EC2AMD'] = [-1, self.ec2InstanceData['InstanceType']]
+                
+        return
+    
+    def _checkEC2Graviton(self):
+        osType = self.getII('platform')
+        if osType['platform'] != 'linux':
+            return
+        
+        instanceArr = aws_parseInstanceFamily(self.ec2InstanceData['InstanceType'], region=self.ec2Client.meta.region_name)
+        prefixDetail = instanceArr['prefixDetail']
+
+        if 'g' not in prefixDetail['attributes']:
+            gInstanceType = prefixDetail['family'] + prefixDetail['version'] + 'g.' + instanceArr['suffix']
+            nextVersion = str(int(prefixDetail['version']) + 1)
+            nextVerInstanceType = prefixDetail['family'] + nextVersion + 'g.' + instanceArr['suffix']
+            
+            if self.checkInstanceTypeAvailable(gInstanceType) or self.checkInstanceTypeAvailable(nextVerInstanceType):
+                self.results['EC2Graviton'] = [-1, self.ec2InstanceData['InstanceType']]
+                
+        return
+    
+    
+    def _checkTags(self):
+        tags = self.ec2InstanceData['Tags']
+        
+        keyTags = []
+        for tag in tags:
+            if tag['Key'].lower() in _C.EC2_TAGS_KEYWORDS and tag['Value'].lower() not in _C.EC2_TAG_VALUE_FALSE_KEYWORDS:
+                keyTags.append(tag['Key'].lower())
+                continue
+                
+            if tag['Value'].lower() in _C.EC2_TAGS_KEYWORDS:
+                keyTags.append(tag['Value'].lower())
+                continue
+
+        if len(keyTags) > 0:
+            self.addII('keyTags', keyTags)
+            
+        return
+    

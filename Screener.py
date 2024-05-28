@@ -2,6 +2,7 @@ import importlib.util
 import json
 import os
 import botocore
+import traceback
 
 import time
 from utils.Config import Config
@@ -171,6 +172,10 @@ class Screener:
             with open(_C.API_JSON, 'w') as f:
                 json.dump(contexts, f)
         else:
+            cp = CustomPage()
+            pages = cp.getRegistrar()
+            Config.set('CustomPage::Pages', pages)
+            
             apiResultArray = {}
             if hasGlobal:
                 regions.append('GLOBAL')
@@ -232,13 +237,20 @@ class Screener:
                         else:
                             print(framework + " GATECHECK==FALSE")
                 
-                # <TODO>
-                ## Upload to S3
-                ## Not implement yet, low priority
+                emsg = []
+                try:
+                    cp.buildPage()
+                except Exception:
+                    print(traceback.format_exc())
+                    emsg.append(traceback.format_exc())
                 
-                ## Experimental
-                cp = CustomPage()
-                cp.buildPage()
+                if emsg:
+                    with open(_C.FORK_DIR + '/error.txt', 'a+') as f:
+                        f.write('\n\n'.join(emsg))
+                        f.close()
+                
+                del(cp)
+                # cp.resetPages()
             else:
                 with open(_C.API_JSON, 'w') as f:
                     json.dump(apiResultArray, f)
