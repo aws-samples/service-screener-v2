@@ -138,4 +138,4 @@ class Evaluator():
             
         ## Handle custom page requirement
         cp = CustomPage()
-        cp.trackInfo(driver, name, self.results)
+        cp.trackInfo(driver, name, self.results, self.InventoryInfo)
