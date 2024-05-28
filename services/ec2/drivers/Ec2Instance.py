@@ -411,7 +411,7 @@ class Ec2Instance(Evaluator):
         
         instanceArr = aws_parseInstanceFamily(self.ec2InstanceData['InstanceType'], region=self.ec2Client.meta.region_name)
         prefixDetail = instanceArr['prefixDetail']
-
+        
         if prefixDetail['attributes'] != 'g':
             gInstanceType = prefixDetail['family'] + prefixDetail['version'] + 'g.' + instanceArr['suffix']
             

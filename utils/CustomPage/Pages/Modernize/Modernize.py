@@ -41,13 +41,13 @@ class Modernize(CustomObject):
                             "_UpgradeLatestOS": None
                         },
                         "_MoveToAMD": None,
-                        "_MoveToContainer": None
+                        "_WinMoveToContainer": None
                     },
                     "NoneGravitonLinux": {
                         "_MoveToGraviton": None
                     },
                     "Linux":{
-                        "_MoveToContainer": None
+                        "_LinuxMoveToContainer": None
                     },
                     "TagsKeyWords": {
                         "_MoveToManagedServices": None
@@ -74,9 +74,7 @@ class Modernize(CustomObject):
                         "_Modernized": None
                     }
                 },
-                "DynamoDB": {
-                    "_Modernized": None
-                }
+                "DynamoDB": None
             }
         }
     ]
@@ -89,13 +87,11 @@ class Modernize(CustomObject):
         self.RelMapValue = {}
         # print( json.dumps(self.ModernizePath, indent=2))
     
-    def getRelValue(self, source, target, isPath=False):
+    def getRelValue(self, source, target):
         prefix = source + "==>" + target
         
         res = 0
-        if prefix in self.RelMapValue and (target[0:1] == '_' and isPath==True): 
-            res = self.RelMapValue[prefix]
-        elif target[0:1] == '_': 
+        if target[0:1] == '_':
             kstr = "==>" + target
             for k, v in self.RelMapValue.items():
                 if kstr in k:
@@ -108,7 +104,8 @@ class Modernize(CustomObject):
                     if kstr in k:
                         res = res + v 
                         break
-                    
+        elif prefix in self.RelMapValue: 
+            res = self.RelMapValue[prefix]            
         else: 
             res = 0
             
@@ -138,9 +135,9 @@ class Modernize(CustomObject):
                 self.IndexMap.append(k)
             
             if p:
-                val = self.getRelValue(p, k, isPath=True)
+                val = self.getRelValue(p, k)
                 
-                print(val, p, k)
+                # print(val, p, k)
                 pIdx = self.IndexMap.index(p)
                 kIdx = self.IndexMap.index(k)
                 
@@ -296,12 +293,12 @@ class Modernize(CustomObject):
         self.RelMapValue['Windows==>MSSQL'] = winMSSQL
         self.RelMapValue['Windows==>OutdatedOS'] = winOutdateOS
         self.RelMapValue['Windows==>NotLatestOS'] = winNotLatestOS
-        self.RelMapValue['Windows==>_MoveToContainer'] = winToContainer
+        self.RelMapValue['Windows==>_WinMoveToContainer'] = winToContainer
         self.RelMapValue['Windows==>_MoveToAMD'] = winToAMD
         self.RelMapValue['EC2==>TagsKeyWords'] = compHasTag
         
         self.RelMapValue['EC2==>NoneGravitonLinux'] = compLinuxNonGTotal
-        self.RelMapValue['Linux==>_MoveToContainer'] = self.RelMapValue['EC2==>Linux'] = compLinuxTotal - compLinuxNonGTotal
+        self.RelMapValue['Linux==>_LinuxMoveToContainer'] = self.RelMapValue['EC2==>Linux'] = compLinuxTotal - compLinuxNonGTotal
         self.RelMapValue['Computes==>Lambda'] = 0 if not 'lambda' in compute else compute['lambda']['total']
         self.RelMapValue['Computes==>EKS_EC2'] = 0 if not 'container' in compute else compute['container']['total']
         

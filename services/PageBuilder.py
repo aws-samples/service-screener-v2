@@ -23,7 +23,9 @@ class PageBuilder:
         'lambda': 'calculator', 
         'opensearch': 'warehouse',
         'rds': 'database',
-        's3': 'hdd'
+        's3': 'hdd',
+        'Modernize': 'chart-line',
+        'Finding': 'bug'
     }
     
     frameworkIcon = 'tasks'
@@ -66,6 +68,7 @@ class PageBuilder:
 
     def buildPage(self):
         self.init()
+        self.htmlFolder = Config.get('HTML_ACCOUNT_FOLDER_FULLPATH')
 
         output = []
         output.append(self.buildHeader())
@@ -83,6 +86,7 @@ class PageBuilder:
         if not os.path.exists(self.htmlFolder):
             os.makedirs(self.htmlFolder)
         
+        # print(self.htmlFolder + '/' + self.service + '.html')
         with open(self.htmlFolder + '/' + self.service + '.html', 'w') as f:
             f.write(finalHTML)
     

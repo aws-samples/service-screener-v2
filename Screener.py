@@ -249,6 +249,8 @@ class Screener:
                         f.write('\n\n'.join(emsg))
                         f.close()
                 
+                del(cp)
+                # cp.resetPages()
             else:
                 with open(_C.API_JSON, 'w') as f:
                     json.dump(apiResultArray, f)
