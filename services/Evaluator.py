@@ -138,4 +138,16 @@ class Evaluator():
             
         ## Handle custom page requirement
         cp = CustomPage()
-        cp.trackInfo(driver, name, self.results, self.InventoryInfo)
+        
+        emsg = []
+        try:
+            cp.trackInfo(driver, name, self.results, self.InventoryInfo)
+        except Exception:
+            print(traceback.format_exc())
+            emsg.append(traceback.format_exc())
+        
+        if emsg:
+            with open(_C.FORK_DIR + '/error.txt', 'a+') as f:
+                f.write('\n\n'.join(emsg))
+                f.close()
+        

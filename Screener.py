@@ -2,6 +2,7 @@ import importlib.util
 import json
 import os
 import botocore
+import traceback
 
 import time
 from utils.Config import Config
@@ -236,7 +237,18 @@ class Screener:
                         else:
                             print(framework + " GATECHECK==FALSE")
                 
-                cp.buildPage()
+                emsg = []
+                try:
+                    cp.buildPage()
+                except Exception:
+                    print(traceback.format_exc())
+                    emsg.append(traceback.format_exc())
+                
+                if emsg:
+                    with open(_C.FORK_DIR + '/error.txt', 'a+') as f:
+                        f.write('\n\n'.join(emsg))
+                        f.close()
+                
             else:
                 with open(_C.API_JSON, 'w') as f:
                     json.dump(apiResultArray, f)
