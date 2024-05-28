@@ -215,7 +215,7 @@ class Modernize(CustomObject):
         if 'ec2' in ds:
             compute['ec2'] = ds['ec2']['ec2instance']
             for ec2info in compute['ec2']['items']:
-                if ec2info['platform'] == 'windows':
+                if 'platform' in ec2info and ec2info['platform'] == 'windows':
                     compWindowsTotal = compWindowsTotal + 1
                     if 'SQLServer' in ec2info:
                         winMSSQL = winMSSQL + 1
@@ -276,7 +276,7 @@ class Modernize(CustomObject):
             
             if detail['items']:
                 for dbInfo in detail['items']:
-                    if dbInfo['IsCluster'] == True:
+                    if 'IsCluster' in dbInfo and dbInfo['IsCluster'] == True:
                         rdsTotal = rdsTotal - 1
         
         if 'dynamodb' in ds:

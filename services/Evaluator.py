@@ -9,10 +9,10 @@ import constants as _C
 
 class Evaluator():
     def __init__(self):
-        self.results = {}
         self.init()
         
     def init(self):
+        self.results = {}
         self.InventoryInfo = {}
         self.classname = type(self).__name__
     
@@ -21,9 +21,10 @@ class Evaluator():
         
     def getII(self, k):
         if k in self.InventoryInfo:
-            return self.InventoryInfo
+            return self.InventoryInfo[k]
         else:
-            _warn("{} is not found in drivers/{}.InventoryInfo".format(k, self.classname))
+            _warn("{} is not found in drivers/{}.InventoryInfo".format(k, self.classname), forcePrint=False)
+            return None
         
     def run(self, serviceName):
         servClass = self.classname

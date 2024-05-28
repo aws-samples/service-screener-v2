@@ -8,6 +8,11 @@ class CustomPageBuilder(PageBuilder):
     def init(self):
         self.isHome = False
         self.template = 'customPage'
+        
+        self.js = []
+        self.jsLib = []
+        self.cssLib = []
+        
         self.customPageInit()
     
     def loadData(self, obj):

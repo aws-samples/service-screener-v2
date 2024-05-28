@@ -2,7 +2,8 @@ import os
 import json
 import re
 
-from utils.Config import Config, dashboard
+from utils.Config import Config
+import utils.Config as cfg
 from utils.Tools import _warn
 import constants as _C
 
@@ -55,6 +56,7 @@ class Reporter:
             
 
     def process(self, serviceObjs):
+        dashboard = cfg.dashboard
         for region, objs in serviceObjs.items():
             for identifier, results in objs.items():
                 self._process(region, identifier, results)
@@ -126,6 +128,7 @@ class Reporter:
     def getSummary(self):
         # Enhance for MAP summary
         # _ : refers to HIGH category
+        dashboard = cfg.dashboard
         if 'MAP' not in dashboard:
             dashboard['MAP'] = {}
             
@@ -302,9 +305,8 @@ class Reporter:
         
         return config[key]
         
-    # backward-compatible for PHP global $DASHBOARD concept
-    def getDashboard(self):
-        return dashboard
+    def resetDashboard(self):
+        cfg.dashboard = {}
         
 if __name__ == "__main__":
     from services.PageBuilder import PageBuilder

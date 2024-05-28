@@ -69,7 +69,7 @@ class FindingsPageBuilder(CustomPageBuilder):
         for sheetName in wb.sheetnames:
             if sheetName not in self.SHEETS_TO_SKIP:
                 ws = wb[sheetName]
-                for i in range(2, ws.max_row):
+                for i in range(2, ws.max_row + 1):
                     tableHTMLList.append("<tr><td>" + sheetName + "</td>")
                     for j in range (1, ws.max_column + 1):
                         tableHTMLList.append("<td>" + ws.cell(row=i, column=j).value + "</td>")
