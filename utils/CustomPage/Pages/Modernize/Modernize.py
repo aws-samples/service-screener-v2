@@ -300,7 +300,7 @@ class Modernize(CustomObject):
         self.RelMapValue['EC2==>NoneGravitonLinux'] = compLinuxNonGTotal
         self.RelMapValue['Linux==>_LinuxMoveToContainer'] = self.RelMapValue['EC2==>Linux'] = compLinuxTotal - compLinuxNonGTotal
         self.RelMapValue['Computes==>Lambda'] = 0 if not 'lambda' in compute else compute['lambda']['total']
-        self.RelMapValue['Computes==>EKS_EC2'] = 0 if not 'container' in compute else compute['container']['total']
+        self.RelMapValue['Computes==>EKS_ECS'] = 0 if not 'container' in compute else compute['container']['total']
         
         self.RelMapValue['Resources==>Databases'] = dbTotal
         self.RelMapValue['Databases==>RDS'] = rdsTotal
