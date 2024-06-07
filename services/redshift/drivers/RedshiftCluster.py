@@ -15,7 +15,7 @@ class RedshiftCluster(Evaluator):
         # print(self.cluster)
         return
     
-    def _checkPubliclyAcessible(self):
+    def _checkCluster(self):
 
         # check if publicly accessible
         if self.cluster['PubliclyAccessible']:
