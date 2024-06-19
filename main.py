@@ -294,7 +294,17 @@ for acctId, cred in rolesCred.items():
     
 
 adminlteDir = _C.ADMINLTE_ROOT_DIR
-shutil.make_archive('output', 'zip', adminlteDir)
+
+if runmode == 'report':
+    shutil.make_archive('output', 'zip', adminlteDir)
+else:
+    apiFolder = _C.ROOT_DIR + '/aws-api'
+    if os.path.exists(apiFolder):
+        shutil.rmtree(apiFolder)
+        
+    shutil.copytree(adminlteDir, apiFolder, ignore=shutil.ignore_patterns('res*'))
+    shutil.make_archive('output', 'zip', apiFolder)
+    shutil.rmtree(apiFolder)
 
 print("Pages generated, download \033[1;42moutput.zip\033[0m to view")
 print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m ~/service-screener-v2/output.zip \033[1;42m <===== \033[0m")
