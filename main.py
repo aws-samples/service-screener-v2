@@ -3,7 +3,12 @@ import os
 import shutil
 import json
 import locale
-from multiprocessing import Pool
+from sys import platform
+
+if platform == 'darwin':
+    from multiprocess import Pool
+else:
+    from multiprocessing import Pool
 
 import boto3
 
@@ -45,10 +50,6 @@ runmode = runmode if runmode in ['api-raw', 'api-full', 'report'] else 'report'
 # uploadToS3 = Uploader.getConfirmationToUploadToS3(bucket)
 
 # <TODO> analyse the impact profile switching
-profile = _cli_options['profile']
-if not profile == False:
-    boto3.setup_default_session(profile_name=profile)
-
 _AWS_OPTIONS = {
     'signature_version': Config.AWS_SDK['signature_version']
 }
@@ -65,7 +66,14 @@ Config.set("_SS_PARAMS", _cli_options)
 Config.set("_AWS_OPTIONS", _AWS_OPTIONS)
 
 defaultSessionRegion = 'us-east-1'
-defaultBoto3 = boto3.Session(region_name=defaultSessionRegion)
+
+boto3args = {'region_name': defaultSessionRegion}
+profile = _cli_options['profile']
+if not profile == False:
+    boto3args['profile_name'] = profile
+    # boto3.setup_default_session(profile_name=profile)
+
+defaultBoto3 = boto3.Session(**boto3args)
 
 rolesCred = {}
 if crossAccounts == True:
@@ -93,6 +101,7 @@ for file in os.listdir(_C.ADMINLTE_DIR):
 
 acctLoop = 0
 CfnTrailObj = CfnTrail()
+
 for acctId, cred in rolesCred.items():
     acctLoop = acctLoop + 1
     flagSkipPromptForRegionConfirmation = True
@@ -153,6 +162,7 @@ for acctId, cred in rolesCred.items():
     print("Processing the following account id: " + acctInfo['Account'])
     print("=================================================")
     print("")
+    
     ## Build List of Accounts for dropdown...
     if acctLoop == 1:
         listOfAccts = []
@@ -196,7 +206,8 @@ for acctId, cred in rolesCred.items():
     
     pool = Pool(processes=int(workerCounts))
     pool.starmap(Screener.scanByService, input_ranges)
-    
+    pool.close()
+
     if testmode == False:
         CfnTrailObj.deleteStack()
     
