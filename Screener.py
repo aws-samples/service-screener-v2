@@ -167,9 +167,13 @@ class Screener:
     
     @staticmethod    
     def generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS3, bucket):
+        htmlFolder = Config.get('HTML_ACCOUNT_FOLDER_FULLPATH')
+        if not os.path.exists(htmlFolder):
+            os.makedirs(htmlFolder)
+        
         stsInfo = Config.get('stsInfo')
         if runmode == 'api-raw':
-            with open(_C.API_JSON, 'w') as f:
+            with open(htmlFolder + '/api.json', 'w') as f:
                 json.dump(contexts, f)
         else:
             cp = CustomPage()
@@ -253,5 +257,5 @@ class Screener:
                 cp.resetPages()
                 del cp
             else:
-                with open(_C.API_JSON, 'w') as f:
+                with open(htmlFolder + '/api.json', 'w') as f:
                     json.dump(apiResultArray, f)
