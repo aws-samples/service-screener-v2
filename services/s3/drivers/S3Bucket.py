@@ -20,6 +20,7 @@ class S3Bucket(Evaluator):
     def policyAllowsPublicRead (self, policy_document):
         # Check if the policy allows public read access
         # Check if the policy allows public read access
+        response = None
         if policy_document:
             iam = boto3.client('iam')
             response = iam.simulate_principal_policy(
@@ -32,13 +33,14 @@ class S3Bucket(Evaluator):
                 ResourceHandlingOption='SINGLE_SERVICE_MULTI_RESOURCE'
             )
 
-        if response['EvaluationResults'][0]['EvalDecision'] == 'allowed':
+        if response and response['EvaluationResults'][0]['EvalDecision'] == 'allowed':
             policy_allows_public_read = True
         return policy_allows_public_read
     
     def policyAllowsPublicWrite (self, policy_document):
         # Check if the policy allows public read access
         # Check if the policy allows public read access
+        response = None
         if policy_document:
             iam = boto3.client('iam')
             response = iam.simulate_principal_policy(
@@ -51,7 +53,7 @@ class S3Bucket(Evaluator):
                 ResourceHandlingOption='SINGLE_SERVICE_MULTI_RESOURCE'
             )
 
-        if response['EvaluationResults'][0]['EvalDecision'] == 'allowed':
+        if response and response['EvaluationResults'][0]['EvalDecision'] == 'allowed':
             policy_allows_public_read = True
         return policy_allows_public_read
 
