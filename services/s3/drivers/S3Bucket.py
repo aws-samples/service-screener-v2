@@ -17,6 +17,70 @@ class S3Bucket(Evaluator):
         
         self.init()
 
+    def policyAllowsPublicRead (self, policy_document):
+        # Check if the policy allows public read access
+        # Check if the policy allows public read access
+        if policy_document:
+            iam = boto3.client('iam')
+            response = iam.simulate_principal_policy(
+                PolicySourceArn=f"arn:aws:s3:::{self.bucket}",
+                PolicyInputList=[policy_document],
+                ActionNames=['s3:GetObject', 's3:ListBucket'],
+                ResourceArns=[f"arn:aws:s3:::{self.bucket}", f"arn:aws:s3:::{self.bucket}/*"],
+                PermissionsBoundarySet=[],
+                ContextEntries=[],
+                ResourceHandlingOption='SINGLE_SERVICE_MULTI_RESOURCE'
+            )
+
+        if response['EvaluationResults'][0]['EvalDecision'] == 'allowed':
+            policy_allows_public_read = True
+        return policy_allows_public_read
+    
+    def policyAllowsPublicWrite (self, policy_document):
+        # Check if the policy allows public read access
+        # Check if the policy allows public read access
+        if policy_document:
+            iam = boto3.client('iam')
+            response = iam.simulate_principal_policy(
+                PolicySourceArn=f"arn:aws:s3:::{self.bucket}",
+                PolicyInputList=[policy_document],
+                ActionNames=['s3:PutObject'],
+                ResourceArns=[f"arn:aws:s3:::{self.bucket}", f"arn:aws:s3:::{self.bucket}/*"],
+                PermissionsBoundarySet=[],
+                ContextEntries=[],
+                ResourceHandlingOption='SINGLE_SERVICE_MULTI_RESOURCE'
+            )
+
+        if response['EvaluationResults'][0]['EvalDecision'] == 'allowed':
+            policy_allows_public_read = True
+        return policy_allows_public_read
+
+    def getBucketPolicy(self):
+        try:
+            policy = self.s3Client.get_bucket_policy(
+                Bucket=self.bucket
+            )
+            return policy['Policy']
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchBucketPolicy':
+                return None
+    
+    def aclAllowsPublicRead(self, bucket_acl):
+        acl_allows_public_read = False
+        for grant in bucket_acl['Grants']:
+            if grant['Grantee']['Type'] == 'Group' and grant['Grantee']['URI'] == 'http://acs.amazonaws.com/groups/global/AllUsers' and grant['Permission'] == 'READ':
+                acl_allows_public_read = True
+                break
+        return acl_allows_public_read
+    
+    def aclAllowsPublicWrite(self, bucket_acl):
+        acl_allows_public_write = False
+        for grant in bucket_acl['Grants']:
+            if grant['Grantee']['Type'] == 'Group' and grant['Grantee']['URI'] == 'http://acs.amazonaws.com/groups/global/AllUsers' and grant['Permission'] == 'WRITE':
+                acl_allows_public_write = True
+                break
+        return acl_allows_public_write 
+
     def _checkEncrypted(self):
         self.results['ServerSideEncrypted'] = [1, 'On']
         try:
@@ -29,21 +93,58 @@ class S3Bucket(Evaluator):
             if e.response['Error']['Code'] == 'ServerSideEncryptionConfigurationNotFoundError':
                 self.results['ServerSideEncrypted'] = [-1, 'Off']
 
-    def _checkPublicAcessBlock(self):
-        self.results['PublicAccessBlock'] = [-1, 'Off']
+    def _checkAccess(self):
+        self.results['PublicAccessBlock'] = [1, 'On']
+        
         try:
             resp = self.s3Client.get_public_access_block(
                 Bucket=self.bucket
             )
-            
+            public_policy_restricted = resp['PublicAccessBlockConfiguration']['RestrictPublicBuckets']
             for param, val in resp['PublicAccessBlockConfiguration'].items():
                 if val == False:
-                   return
+                   self.results['PublicAccessBlock'] = [-1, 'Off']
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == 'NoSuchPublicAccessBlockConfiguration':
                 return
+
+        # check ACL  
+        public_acl_restricted = False
+        try:
+            resp = self.s3Client.get_bucket_acl(
+                Bucket=self.bucket
+            )
+            self.results['AccessControlList'] = [-1, 'Enabled']
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] ==  'NoSuchAcl':
+                public_acl_restricted = True
+                self.results['AccessControlList'] = [1, 'Disabled']
+
+        try:
+            bucket_acl = self.s3Client.get_bucket_acl(
+                Bucket=self.bucket
+            )
         
-        self.results['PublicAccessBlock'] = [1, 'On']
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchAcl':
+                return None
+        
+
+        # check if S3 bucket has prohibited public reads 
+        policy = self.getBucketPolicy()    
+
+
+        if (public_policy_restricted or not self.policyAllowsPublicRead(policy)) and (public_acl_restricted or not self.aclAllowsPublicRead(bucket_acl)):
+            self.results['PublicReadAccessBlock'] = [1, 'Prohibited'] 
+        else:
+            self.results['PublicReadAccessBlock'] = [-1, 'NotProhibited'] 
+        
+        # check if S3 bucket has prohibited public writes 
+        if (public_policy_restricted or not self.policyAllowsPublicWrite(policy)) and (public_acl_restricted or not self.aclAllowsPublicWrite(bucket_acl)):
+            self.results['PublicWriteAccessBlock'] = [1, 'Prohibited'] 
+        else:
+            self.results['PublicWriteAccessBlock'] = [-1, 'NotProhibited'] 
+
     
     def _checkMfaDeleteAndVersioning(self):
         self.results['MFADelete'] = [-1, 'Off']
@@ -125,16 +226,6 @@ class S3Bucket(Evaluator):
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] ==  'NoSuchNotificationConfiguration':
                 self.results['EventNotification'] = [-1, 'Off']
-
-    def _checkACL(self):
-        try:
-            resp = self.s3Client.get_bucket_acl(
-                Bucket=self.bucket
-            )
-            self.results['AccessControlList'] = [-1, 'Enabled']
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] ==  'NoSuchAcl':
-                self.results['AccessControlList'] = [1, 'Disabled']
     
     def _checkIntelligentTiering(self): 
         try:
