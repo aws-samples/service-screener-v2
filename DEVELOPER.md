@@ -23,6 +23,13 @@ aws configure --profile ss
 
 ## When executing SS locally
 screener --regions ap-southeast-1 --profile ss
+
+## TROUBLESHOOTING
+# 1/ For some odd cases, where modules install but venv shows 'module not found', has to force refresh python module by
+#    executing help("modules") command
+% python
+>>> help("modules")
+>>> import boto3
 ```
 
 ## Pre-requisite
