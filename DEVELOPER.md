@@ -21,6 +21,13 @@ sudo installer -pkg AWSCLIV2.pkg -target /
 # Setup AWS Profile
 aws configure --profile ss
 
+# Setup before running screener command
+python3 -m venv .
+source bin/activate
+python3 -m pip install --upgrade pip
+pip install -r requirements.txt
+alias screener="python3 $(pwd)/main.py"
+
 ## When executing SS locally
 screener --regions ap-southeast-1 --profile ss
 
@@ -33,9 +40,9 @@ screener --regions ap-southeast-1 --profile ss
 ```
 
 ## Pre-requisite
-1. git account
-1. fork the master repository from aws-samples
-1. clone the forked repo to local machine
+1. Login to your Git account
+1. Fork the master repository from aws-samples
+1. git clone <your forked repository url>
 1. setup aws-cli follows aws official documentation: https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html 
 1. Setup necessary IAM Users with readOnly permission. 
 1. Generate Accesskey & Secret combination to be used by local machine
