@@ -5,4 +5,5 @@ netaddr~=0.9.0
 requests~=2.31.0
 openpyxl~=3.1.2
 multiprocess~=0.70
+simple-term-menu~=1.6.4
 -e .
