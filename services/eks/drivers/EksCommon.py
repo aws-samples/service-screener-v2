@@ -343,12 +343,23 @@ class EksCommon(Evaluator):
                     nodegroups_not_using_bottlerocket.append(each_nodegroup)
 
         return len(nodegroups_not_using_bottlerocket) == 0
+        
+    def _checkAuthenticationMode(self):
+        authenticationMode = self.clusterInfo.get('accessConfig').get('authenticationMode')
+        if authenticationMode != 'API' and authenticationMode != 'API_AND_CONFIG_MAP':
+            self.results['eksAuthenticationMode'] = [-1, 'Disabled']
+        return
 
-    def _checkCostAllocationTags(self):
-        """
-        EKS-24
-
-        :return:
-        """
-
-        print(self.k8sClient.CoreV1Client.list_namespace())
+    def _checkPermissionToAccessCluster(self):
+        try :
+            self.k8sClient.list_namespace()
+        except:
+            self.results['eksPermissionToAccessCluster'] = [-1, 'No permission']
+        return
+    
+    # def _checkImplementedPodDisruptionBudget(self):
+    #     # try :
+    #     self.k8sClient.()
+    #     # except:
+    #     #     print('No permission to access <cluster name>, skipping Implemented Pod Disruption Budget check')
+    #     return

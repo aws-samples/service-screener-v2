@@ -91,5 +91,33 @@
 		"ref": [
 			"[IAM Grant Least Privilege]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
 		]
+    },
+    "eksAuthenticationMode":{
+        "category": "S",
+		"^description": "EKS authentication mode: {$COUNT} of clusters' have 'EKS API' authentication mode disabled. Use 'EKS API' for authentication mode in access configuration of your cluster.",
+		"shortDesc": "'EKS API' authentication mode is disabled",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[EKS Authentication Mode]<https://aws.amazon.com/blogs/containers/a-deep-dive-into-simplified-amazon-eks-access-management-controls/",
+            "[EKS Best Practices Guides]<https://aws.github.io/aws-eks-best-practices/security/docs/iam/#cluster-access-manager>"
+		]
+    },
+    "eksPermissionToAccessCluster":{
+        "category": "S",
+		"^description": "EKS permission error: Service screen don't have access to your {$COUNT} EKS clusters, somecheck will be skipped on these clusters, please make sure your user have enough permission.'",
+		"shortDesc": "'User don't have permission to access EKS clusters",
+		"criticality": "I",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Grant access to Kubernetes APIs]<https://docs.aws.amazon.com/eks/latest/userguide/grant-k8s-access.html>"
+		]
     }
+
 }
