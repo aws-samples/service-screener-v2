@@ -1,16 +1,15 @@
 {
-	"<CHECK_NAME>": {
-		"category": '<ENUM>', 		//REQUIRED, valid value (combination): O,S,R,P,C
-		"^description": '<string>', //REQUIRED
-		"shortDesc": '<string>', 	//OPTIONAL
-		"criticality": '<ENUM>', 	//REQUIRED, valid value (single): I, L, M, H
-		"downtime": '<int>', 		//OPTIONAL
-		"slowness": '<int>', 		//OPTIONAL
-		"additionalCost": '<int>', 	//OPTIONAL
-		"needFullTest": '<int>', 	//OPTIONAL
-		"ref": [					//OPTIONAL
-			"[<text_to_display>]<url>",
-			"[<text_to_display>]<url>",
-		],
-	}
+    "TaskExecutionRole": {
+        "category": "S",
+        "^description": "ECS task execution role is overpermissive with AdministratorAccess or ECSFullAccess IAM permissions.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "Task Execution IAM role should be least privilege",
+        "ref": [
+            "[ECS Task Execution Role Least Privilege]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_execution_IAM_role.html>"    
+        ]
+    }
 }
