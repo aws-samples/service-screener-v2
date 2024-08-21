@@ -2,6 +2,7 @@
 
 import boto3
 import botocore
+import re
 
 from utils.Config import Config
 from utils.Policy import Policy
@@ -13,13 +14,15 @@ class EksCommon(Evaluator):
         'udp': [53]
     }
     
-    def __init__(self, eksCluster, clusterInfo, eksClient, ec2Client, iamClient):
+    def __init__(self, eksCluster, clusterInfo, eksClient, ec2Client, iamClient, k8sClient):
         super().__init__()
         self.cluster = eksCluster
         self.clusterInfo = clusterInfo
         self.eksClient = eksClient
         self.ec2Client = ec2Client
         self.iamClient = iamClient
+        self.k8sClient = k8sClient(cluster_info=self.clusterInfo)
+        self.nodegroups_list = self.__get_node_groups()
         
         self.init()
         
@@ -238,19 +241,9 @@ class EksCommon(Evaluator):
         
         return
 
-    def _checkSpotUsage(self):
-        """EKS-25 Leverage spot instances for  deeper discount for fault-tolerant workload.
-
-        https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
-
-        :return: bool
-        """
-
-        print("Spot Instance Usage Check Started")
+    def __get_node_groups(self):
         _cluster_name = self.clusterInfo.get("name")
-
-        nodegroups_list = []
-
+        nodegroups_list = list()
         nextToken = True
         while nextToken:
             nodegroups = self.eksClient.list_nodegroups(  # Self-managed node groups are not listed
@@ -261,10 +254,23 @@ class EksCommon(Evaluator):
             if not nodegroups.get("nextToken"):
                 nextToken = False
 
+        return nodegroups_list
+
+    def _checkSpotUsage(self) -> bool:
+        """EKS-25 Leverage spot instances for  deeper discount for fault-tolerant workload.
+
+        https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+
+        :return: bool
+        """
+
+        print("EKS-25 Leverage spot instances for  deeper discount for fault-tolerant workload")
+        _cluster_name = self.clusterInfo.get("name")
+
         mng_wo_spot = []  # Empty list for Managed Node Groups with Capacity Type != SPOT
 
-        if len(nodegroups_list) != 0:
-            for each_nodegroup in nodegroups_list:
+        if len(self.nodegroups_list) != 0:
+            for each_nodegroup in self.nodegroups_list:
                 each_nodegroup_detail = self.eksClient.describe_nodegroup(
                     clusterName=_cluster_name,
                     nodegroupName=each_nodegroup
@@ -281,21 +287,25 @@ class EksCommon(Evaluator):
 
         return len(mng_wo_spot) == 0
 
-    def _checkCostVisibility(self):
+    def _checkCostVisibility(self) -> bool:
         """
         EKS-10 Implement a tool for cost  visibility
 
         https://docs.aws.amazon.com/eks/latest/userguide/cost-monitoring.html
         :return: bool
         """
+        print("EKS-10 Implement a tool for cost  visibility")
+
         return self.__kube_cost()
 
-    def __kube_cost(self):
+    def __kube_cost(self) -> bool:
         """
         Check if Kube Cost plugin is installed.
 
         :return: bool
         """
+        print("Checking if Kube Cost Plugin is installed")
+
         kube_cost_addon_name = "kubecost_kubecost"  # TODO Move to constants.py
 
         _cluster_name = self.clusterInfo.get("name")
@@ -309,3 +319,36 @@ class EksCommon(Evaluator):
             return False
 
         return True
+
+    def _checkAMIs(self) -> bool:
+        """
+        EKS-13 Use EKS-optimized AMI or Bottlerocket for host OS
+
+        :return:
+        """
+        _cluster_name = self.clusterInfo.get("name")
+
+        regex_pattern = r"^Bottlerocket"
+
+        nodegroups_not_using_bottlerocket = list()
+
+        if len(self.nodegroups_list) != 0:
+            for each_nodegroup in self.nodegroups_list:
+                each_nodegroup_amitype = self.eksClient.describe_nodegroup(
+                    clusterName=_cluster_name,
+                    nodegroupName=each_nodegroup
+                )["nodegroup"]["amiType"]
+
+                if not re.match(regex_pattern, each_nodegroup_amitype):
+                    nodegroups_not_using_bottlerocket.append(each_nodegroup)
+
+        return len(nodegroups_not_using_bottlerocket) == 0
+
+    def _checkCostAllocationTags(self):
+        """
+        EKS-24
+
+        :return:
+        """
+
+        print(self.k8sClient.CoreV1Client.list_namespace())
