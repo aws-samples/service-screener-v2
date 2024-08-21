@@ -17,11 +17,11 @@ class EcsCommon(Evaluator):
     ###### TO DO #####
     ## Replace resource variable to meaningful name
     ## Modify based on your need
-    def __init__(self, clusterName, clusterInfo, taskDefinitionsArn,ecsClient):
+    def __init__(self, clusterName, clusterInfo,ecsClient):
         super().__init__()
         self.clusterName = clusterName
         self.clusterInfo = clusterInfo
-        self.taskDefinitionsArn = taskDefinitionsArn
+        #self.taskDefinitionsArn = taskDefinitionsArn
         self.ecsClient = ecsClient
         self.init()
     
