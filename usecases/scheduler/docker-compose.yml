@@ -1,0 +1,17 @@
+version: "3"
+services:
+  app:
+    image: ss-container
+    platform: linux/x86_64
+    build: .
+    environment:
+      DYNAMODB_TABLE_NAME: service-screener-ddb
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_DEFAULT_REGION: ap-southeast-1
+    depends_on:
+      - dynamodb
+  dynamodb:
+    image: amazon/dynamodb-local
+    ports:
+      - "8000:8000"

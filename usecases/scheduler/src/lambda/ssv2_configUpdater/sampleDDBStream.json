@@ -1,0 +1,51 @@
+{
+    "Records": [
+      {
+        "eventID": "f07f8ca4b0b26cb9c4e5e77e42f274ee",
+        "eventName": "INSERT",
+        "eventVersion": "1.1",
+        "eventSource": "aws:dynamodb",
+        "awsRegion": "ap-southeast-1",
+        "dynamodb": {
+          "ApproximateCreationDateTime": 1480642020,
+          "Keys": {
+            "name": {
+              "S": "default"
+            }
+          },
+          "NewImage": {
+            "Enabled": {
+              "BOOL": true
+            },
+            "frequency": {
+              "S": "cron(0, 0, 1,* ,?, *)"
+            },
+            "regions": {
+              "SS": [
+                "ap-southeast-1",
+                "ap-southeast-2"
+              ]
+            },
+            "services": {
+              "SS": [
+                "ec2",
+                "s3",
+                "rds"
+              ]
+            },
+            "emails": {
+                "SS": [
+                    "yingting+ssv2@amazon.com",
+                    "keatkw+ssv2@amazon.com",
+                    "yongkue+ssv2@amazon.com"
+                ]
+            }
+          },
+          "SequenceNumber": "1405400000000002063282832",
+          "SizeBytes": 54,
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "eventSourceARN": "arn:aws:dynamodb:us-east-1:123456789012:table/Example-Table/stream/2016-12-01T00:00:00.000"
+      }
+    ]
+}
