@@ -1,9 +1,1 @@
-boto3~=1.26.114
-packaging~=23.1
-XlsxWriter~=3.1.0
-netaddr~=0.9.0
-requests~=2.31.0
-openpyxl~=3.1.2
-multiprocess~=0.70
-simple-term-menu~=1.6.4
--e .
+wheel @ file:///opt/homebrew/Cellar/python%403.12/3.12.5/libexec/wheel-0.44.0-py3-none-any.whl#sha256=8d8a590e50bda8422000110e90bc730ebfcd8363d2de80793ac819b7f252e97d
