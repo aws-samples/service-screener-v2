@@ -237,9 +237,75 @@ class EksCommon(Evaluator):
             return
         
         return
-        
-        
-        
-        
-        
-        
+
+    def _checkSpotUsage(self):
+        """EKS-25 Leverage spot instances for  deeper discount for fault-tolerant workload.
+
+        https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+
+        :return: bool
+        """
+
+        print("Spot Instance Usage Check Started")
+        _cluster_name = self.clusterInfo.get("name")
+
+        nodegroups_list = []
+
+        nextToken = True
+        while nextToken:
+            nodegroups = self.eksClient.list_nodegroups(  # Self-managed node groups are not listed
+                clusterName=_cluster_name,
+            )
+            nodegroups_list.extend(nodegroups.get("nodegroups"))
+
+            if not nodegroups.get("nextToken"):
+                nextToken = False
+
+        mng_wo_spot = []  # Empty list for Managed Node Groups with Capacity Type != SPOT
+
+        if len(nodegroups_list) != 0:
+            for each_nodegroup in nodegroups_list:
+                each_nodegroup_detail = self.eksClient.describe_nodegroup(
+                    clusterName=_cluster_name,
+                    nodegroupName=each_nodegroup
+                )
+
+                if each_nodegroup_detail.get("nodegroup").get("capacityType") != "SPOT":
+                    mng_wo_spot.append(each_nodegroup)
+
+        if len(mng_wo_spot) != 0:
+            print("Node Groups without Spot Instance")
+            print(mng_wo_spot)  # TODO To print out to the result thingy
+
+        print("Spot Instance Usage Check Completed")
+
+        return len(mng_wo_spot) == 0
+
+    def _checkCostVisibility(self):
+        """
+        EKS-10 Implement a tool for cost  visibility
+
+        https://docs.aws.amazon.com/eks/latest/userguide/cost-monitoring.html
+        :return: bool
+        """
+        return self.__kube_cost()
+
+    def __kube_cost(self):
+        """
+        Check if Kube Cost plugin is installed.
+
+        :return: bool
+        """
+        kube_cost_addon_name = "kubecost_kubecost"  # TODO Move to constants.py
+
+        _cluster_name = self.clusterInfo.get("name")
+
+        addons = self.eksClient.list_addons(
+            clusterName=_cluster_name
+        ).get("addons")
+
+        if kube_cost_addon_name not in addons:
+            print(f"{_cluster_name} - Kube Cost Plugin is not installed")
+            return False
+
+        return True
