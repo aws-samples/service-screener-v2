@@ -23,4 +23,4 @@ jobs:
             docker build ./usecases/scheduler -t yingtingaws/screener-scheduler:latest
         - name: push the docker image
           id: push-docker-image
-          run: docker push ${{secrets.DOCKERHUB_USERNAME}}/screener-scheduler
+          run: docker push ${{secrets.DOCKER_USERNAME}}/screener-scheduler:latest
