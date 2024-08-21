@@ -9,6 +9,8 @@ COPY docker-entrypoint.sh /tmp/docker-entrypoint.sh
 # Make the script executable
 RUN chmod +x /tmp/docker-entrypoint.sh
 
+RUN echo "hello"
+
 # Set the CMD to run the script
 RUN cat /tmp/docker-entrypoint.sh
 ENTRYPOINT ["/tmp/docker-entrypoint.sh"]
