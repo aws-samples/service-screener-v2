@@ -3,10 +3,13 @@
 import boto3
 import botocore
 import re
+import json
 
 from utils.Config import Config
 from utils.Policy import Policy
 from services.Evaluator import Evaluator
+
+from kubernetes import client as k8sClient
 
 class EksCommon(Evaluator):
     OUTBOUNDSGMINIMALRULES = {
@@ -352,14 +355,28 @@ class EksCommon(Evaluator):
 
     def _checkPermissionToAccessCluster(self):
         try :
-            self.k8sClient.list_namespace()
-        except:
+            self.k8sClient.CoreV1Client.list_namespace()
+        except k8sClient.exceptions.ApiException:
             self.results['eksPermissionToAccessCluster'] = [-1, 'No permission']
+        except:
+            print("Unknown error")
         return
     
-    # def _checkImplementedPodDisruptionBudget(self):
-    #     # try :
-    #     self.k8sClient.()
-    #     # except:
-    #     #     print('No permission to access <cluster name>, skipping Implemented Pod Disruption Budget check')
-    #     return
+    def _checkImplementedPodDisruptionBudget(self):
+        try:
+            haveCustomPDB = False #Check if cluster include any clustom Pod Disruption Budget outside kube-system namespace
+
+            for pdb in self.k8sClient.PolicyV1Client.list_pod_disruption_budget_for_all_namespaces().items:
+                if pdb.metadata.namespace != 'kube-system':
+                    haveCustomPDB = True
+                    break
+
+            if not haveCustomPDB:
+                self.results['eksImplementedPodDisruptionBudget'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster, skipping Implemented Pod Disruption Budget check')
+        except:
+            print("Unknown error")
+        
+        return

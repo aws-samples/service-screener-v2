@@ -109,7 +109,7 @@
     "eksPermissionToAccessCluster":{
         "category": "S",
 		"^description": "EKS permission error: Service screen don't have access to your {$COUNT} EKS clusters, somecheck will be skipped on these clusters, please make sure your user have enough permission.'",
-		"shortDesc": "'User don't have permission to access EKS clusters",
+		"shortDesc": "User don't have permission to access EKS clusters",
 		"criticality": "I",
 		"downtime": 0,
 		"slowness": 0,
@@ -118,6 +118,18 @@
 		"ref": [
 			"[Grant access to Kubernetes APIs]<https://docs.aws.amazon.com/eks/latest/userguide/grant-k8s-access.html>"
 		]
+    },
+    "eksImplementedPodDisruptionBudget":{
+        "category": "R",
+		"^description": "EKS Pod Disruption Budget: {$COUNT} of clusters' don't have Pod Disruption Budget. Prevent disruption and increase  availability of workloads by limitting the number of concurrent disruptions  to Pods.'",
+		"shortDesc": "Implement Pod Disruption Budget",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Pod Disruption Budget]<https://kubernetes.io/docs/tasks/run-application/configure-pdb/#specifying-a-poddisruptionbudget>"
+		]
     }
-
 }
