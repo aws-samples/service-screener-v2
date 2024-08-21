@@ -25,12 +25,11 @@ class EcsCommon(Evaluator):
         self.ecsClient = ecsClient
         self.init()
     
-    ###### TO DO #####
-    ## Change the method name to meaningful name
-    ## Check methods name must follow _check[Description]
+
     def _checkTaskExecutionRole(self):
-        ###### TO DO #####
-        ## Develop the checks logic here
-        ## If the resources failed the rules, flag the resource as example below
-        # self.results['Rule Name'] = [-1, "Info for customer to identify the resource"]
+        # check the list of task definitions within in ECS account, whether it contains task execution role of AdministratorAccess and ECSFullAccess
+        
+        print("test")
+
+        self.results['ecsTaskExecutionRole'] = [-1, "roleArn"]
         return

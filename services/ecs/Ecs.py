@@ -56,13 +56,12 @@ class Ecs(Service):
         objs = {}
 
         clusterInfoList = self.getResources()
-        print("test",clusterInfoList)
 
-        taskDefinitionsList = self.getTaskDefinitions()
+        #taskDefinitionsList = self.getTaskDefinitions()
 
         for clusterInfo in clusterInfoList:
             clusterName = clusterInfo.get('clusterName')
-            obj = EcsCommon(clusterName, clusterInfo, taskDefinitionsList, self.ecsClient)
+            obj = EcsCommon(clusterName, clusterInfo, self.ecsClient)
             obj.run(self.__class__)
             objs['ECSCluster::' + clusterName] = obj.getInfo()
 
