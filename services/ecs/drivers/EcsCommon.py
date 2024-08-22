@@ -9,9 +9,6 @@ from services.Evaluator import Evaluator
 ## Example
 ## from services.ec2.drivers.Ec2SecGroup import Ec2SecGroup
 
-###### TO DO #####
-## Replace ServiceDriver with
-
 class EcsCommon(Evaluator):
     
     ###### TO DO #####
@@ -21,15 +18,47 @@ class EcsCommon(Evaluator):
         super().__init__()
         self.clusterName = clusterName
         self.clusterInfo = clusterInfo
-        #self.taskDefinitionsArn = taskDefinitionsArn
         self.ecsClient = ecsClient
         self.init()
+
+    def _checkECSGraviton(self):
+        """
+        Notes:
+        If list_container_instances is called and returns a result - typically means that they are using EC2 or external ECS Anywhere service
+
+        """
+        # containerInstances = []
+        # response = self.ecsClient.list_container_instances(
+        #     cluster = self.clusterName,
+        # )
+        # containerInstances += response.get('containerInstanceArns')
+        # while response.get('nextToken') is not None:
+        #     containerInstances += response.get('containerInstanceArns')
+        #     response = self.ecsClient.list_container_instances(
+        #         cluster = self.clusterName,
+        #         nextToken = response.get('nextToken')
+        #     )
+        # print("Hi",containerInstances)
+        #response = self.ecsClient.
+
+        #print(self.clusterInfo.get('capacityProviders'))
+        clusterCapacityProviderList = self.clusterInfo.get('capacityProviders')
+        ec2CapacityProviders = []
+
+        if len(clusterCapacityProviderList) > 0:
+            for capacityProviderName in clusterCapacityProviderList:
+                if capacityProviderName != 'FARGATE_SPOT' and capacityProviderName != 'FARGATE':
+                    ec2CapacityProviders.append(capacityProviderName)
+                    # TODO: Probably can refactor and get the capacityProviderName's associated Auto Scaling Group ARN
+        # check capacity provider of the cluster
+
+        #print(ec2CapacityProviders)
+        for ec2CapacityProvider in ec2CapacityProviders:
+            response = self.ecsClient.describe_capacity_providers(
+                capacityProviders=[ec2CapacityProvider]
+            ).get('capacityProviders')[0]
+            #print(response['autoScalingGroupProvider']['autoScalingGroupArn'])
     
 
-    def _checkTaskExecutionRole(self):
-        # check the list of task definitions within in ECS account, whether it contains task execution role of AdministratorAccess and ECSFullAccess
-        
-        print("test")
-
-        self.results['ecsTaskExecutionRole'] = [-1, "roleArn"]
+        # self.results['ecsGraviton'] = [-1, "TODO: InstanceType here"]
         return

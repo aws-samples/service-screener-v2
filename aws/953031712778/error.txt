@@ -1,0 +1,708 @@
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 29, in _checkECSGraviton
+    servicesList = self.ecsClient(
+                   ^^^^^^^^^^^^^^^
+TypeError: 'ECS' object is not callable
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 29, in _checkECSGraviton
+    servicesList = self.ecsClient(
+                   ^^^^^^^^^^^^^^^
+TypeError: 'ECS' object is not callable
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 29, in _checkECSGraviton
+    servicesList = self.ecsClient(
+                   ^^^^^^^^^^^^^^^
+TypeError: 'ECS' object is not callable
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 38, in _checkECSGraviton
+    containerInstances = self.ecsClient.list_container_instances(
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.InvalidParameterException: An error occurred (InvalidParameterException) when calling the ListContainerInstances operation: filter 'ec2InstanceId' is invalid.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 43, in _checkECSGraviton
+    print("Container instances ID", containerInstances)
+                                    ^^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'containerInstances' where it is not associated with a value
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 43, in _checkECSGraviton
+    print("Container instances ID", containerInstances)
+                                    ^^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'containerInstances' where it is not associated with a value
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 38, in _checkECSGraviton
+    containerInstances += self.ecsClient.list_container_instances(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.InvalidParameterException: An error occurred (InvalidParameterException) when calling the ListContainerInstances operation: filter 'ec2InstanceId' is invalid.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 38, in _checkECSGraviton
+    containerInstances += self.ecsClient.list_container_instances(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.InvalidParameterException: An error occurred (InvalidParameterException) when calling the ListContainerInstances operation: filter 'ec2InstanceId' is invalid.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 55, in _checkECSGraviton
+    print(capacityProviderName)
+          ^^^^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'capacityProviderName' where it is not associated with a value
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 56, in _checkECSGraviton
+    print(ec2CapacityProvider)
+          ^^^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'ec2CapacityProvider' where it is not associated with a value
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 56, in _checkECSGraviton
+    print(ec2CapacityProvider)
+          ^^^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'ec2CapacityProvider' where it is not associated with a value
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 56, in _checkECSGraviton
+    print(ec2CapacityProvider)
+          ^^^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'ec2CapacityProvider' where it is not associated with a value
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 60, in _checkECSGraviton
+    ).get('capacityProviders').get('autoScalingGroupProvider')
+                               ^^^
+AttributeError: 'list' object has no attribute 'get'
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 60, in _checkECSGraviton
+    ).get('capacityProviders').get('autoScalingGroupProvider')
+                               ^^^
+AttributeError: 'list' object has no attribute 'get'
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 58, in _checkECSGraviton
+    response = self.ecsClient.describe_capacity_providers(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: list indices must be integers or slices, not str
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 58, in _checkECSGraviton
+    response = self.ecsClient.describe_capacity_providers(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: list indices must be integers or slices, not str
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 61, in _checkECSGraviton
+    print(response.get['autoScalingGroupProvider'])
+          ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'builtin_function_or_method' object is not subscriptable
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 61, in _checkECSGraviton
+    print(response.get['autoScalingGroupProvider'])
+          ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'builtin_function_or_method' object is not subscriptable
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 26, in _checkReadOnlyRootFileSystem
+    taskDefFamily = self.ecsClient.list_task_definitions_family(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 875, in __getattr__
+    raise AttributeError(
+AttributeError: 'ECS' object has no attribute 'list_task_definitions_family'. Did you mean: 'list_task_definition_families'?
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 26, in _checkReadOnlyRootFileSystem
+    taskDefFamily = self.ecsClient.list_task_definitions_family(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 875, in __getattr__
+    raise AttributeError(
+AttributeError: 'ECS' object has no attribute 'list_task_definitions_family'. Did you mean: 'list_task_definition_families'?
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsCommon.py", line 26, in _checkReadOnlyRootFileSystem
+    taskDefFamily = self.ecsClient.list_task_definitions_family(
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 875, in __getattr__
+    raise AttributeError(
+AttributeError: 'ECS' object has no attribute 'list_task_definitions_family'. Did you mean: 'list_task_definition_families'?
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 19, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.
+Traceback (most recent call last):
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/Evaluator.py", line 47, in run
+    getattr(self, method)()
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/services/ecs/drivers/EcsTaskDefinition.py", line 17, in _checkReadOnlyRootFileSystem
+    response = self.ecsClient.describe_task_definition(
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 530, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/jqchoong/Documents/Projects/service-screener-v2/lib/python3.12/site-packages/botocore/client.py", line 964, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.errorfactory.ClientException: An error occurred (ClientException) when calling the DescribeTaskDefinition operation: Unable to describe task definition.

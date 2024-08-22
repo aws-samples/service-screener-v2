@@ -5,6 +5,8 @@ import requests
 from utils.Config import Config
 from services.Service import Service
 from services.ecs.drivers.EcsCommon import EcsCommon
+from services.ecs.drivers.EcsTaskDefinition import EcsTaskDefinition
+
 
 class Ecs(Service):
     def __init__(self, region):
@@ -12,19 +14,20 @@ class Ecs(Service):
         ssBoto = self.ssBoto
         self.ecsClient = ssBoto.client('ecs', config=self.bConfig)
     
-    def getTaskDefinitions(self):
-        arr = []
-        nextToken = None
-        while True:
-            if nextToken:
-                arr += self.ecsClient.list_task_definitions(nextToken=nextToken)
+    def getTaskDefinitionsFamily(self):
+        taskDefFamilyList = []
 
-            else:
-                arr = self.ecsClient.list_task_definitions()
-            nextToken = arr.get('nextToken')
-            if not nextToken:
-                break 
-        return arr
+        results = self.ecsClient.list_task_definition_families(status='ACTIVE')
+        taskDefFamilyList += results.get('families')
+
+        while results.get('nextToken') is not None:
+            results = self.ecsClient.list_task_definition_families(
+                status='ACTIVE', 
+                nextToken=results.get('nextToken'))
+            taskDefFamilyList += results.get('families')
+
+        return taskDefFamilyList
+
 
     def getResources(self):
         clustersArns = []                       # stores list of Clusters ARNs
@@ -57,12 +60,19 @@ class Ecs(Service):
 
         clusterInfoList = self.getResources()
 
-        #taskDefinitionsList = self.getTaskDefinitions()
-
         for clusterInfo in clusterInfoList:
             clusterName = clusterInfo.get('clusterName')
             obj = EcsCommon(clusterName, clusterInfo, self.ecsClient)
             obj.run(self.__class__)
             objs['ECSCluster::' + clusterName] = obj.getInfo()
+
+        taskDefFamilyList = self.getTaskDefinitionsFamily()
+
+        for taskDef in taskDefFamilyList:
+            taskDefName = taskDef
+            obj = EcsTaskDefinition(taskDefName, self.ecsClient)
+            
+            obj.run(self.__class__)
+            objs['ECSTaskDefinition::' + taskDefName ] = obj.getInfo()
 
         return objs

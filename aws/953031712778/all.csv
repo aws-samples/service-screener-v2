@@ -1,0 +1,9 @@
+ap-southeast-1;ecscommon;container-demo;1
+ap-southeast-1;ecscommon;testCluster;1
+ap-southeast-1;ecscommon;DistributedLoadTestingContainers;1
+ap-southeast-1;ecstaskdefinition;DistributedLoadTestingContainers-DLTEcsDLTTaskDefinition6BFC2400-pgQaeVOv19LC;-1
+ap-southeast-1;ecstaskdefinition;demo-app;-1
+ap-southeast-1;ecstaskdefinition;ecsworkshopcapacityprovidersec2EC2CapacityProviderServiceTaskDef68AF634B;-1
+ap-southeast-1;ecstaskdefinition;my-task-definition;-1
+ap-southeast-1;ecstaskdefinition;test;-1
+ap-southeast-1;ecstaskdefinition;testcluster-taskdefinition;-1

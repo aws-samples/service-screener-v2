@@ -1,15 +1,15 @@
 {
-    "TaskExecutionRole": {
+    "ecsTaskDefinitionReadOnlyRootFilesystem": {
         "category": "S",
-        "^description": "ECS task execution role is overpermissive with AdministratorAccess or ECSFullAccess IAM permissions.",
-        "downtime": 0,
+        "^description": "You have not enabled 'Read-only root file  system' for every container in a Task definition. Give containers read-only access to root file system, modifications not allowed to the root file system.",
+        "downtime": 1,
         "slowness": 0,
         "additionalCost": 0,
         "criticality": "H",
         "needFullTest": 1,
-        "shortDesc": "Task Execution IAM role should be least privilege",
+        "shortDesc": "Enable read-only root file system",
         "ref": [
-            "[ECS Task Execution Role Least Privilege]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_execution_IAM_role.html>"    
+            "[Container Definition Storage and Logging]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definitions>"    
         ]
     }
 }
