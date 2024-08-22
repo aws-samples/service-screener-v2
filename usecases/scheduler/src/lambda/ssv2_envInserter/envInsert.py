@@ -6,14 +6,14 @@ from botocore.exceptions import ClientError
 
 ## Environment Variables
 ## Test values only, should comment out in actual production
-
 os.environ['SSV2_REGION'] = 'ap-southeast-1'
 os.environ['DDB_NAME'] = 'ss-parameters'
 os.environ['FREQUENCY'] = 'cron(0, 0, 1,* ,?, *)'
-os.environ['REGIONS'] = 'ap-southeast-1,ap-southeast-2'
+os.environ['REGIONS'] = 'ap-southeast-1,us-east-1'
 os.environ['EMAILS'] = 'yingting@amazon.com,keatkw@amazon.com'
 os.environ['SERVICES'] = 'ec2,rds'
-os.environ['config_name'] = 'team_A'
+os.environ['config_name'] = 'team_B'
+os.environ['crossAccounts'] = '0123193244,8384923874'
 
 ## Initialize
 deploy_region = os.environ['SSV2_REGION']
@@ -23,6 +23,7 @@ regions = os.environ['REGIONS']
 emails = os.environ['EMAILS']
 services = os.environ['SERVICES']
 item_name = os.environ['config_name']
+cross_accounts = os.environ['crossAccounts']
 
 ddb = boto3.client('dynamodb', region_name=deploy_region)
 
@@ -37,7 +38,8 @@ def lambda_handler(event, context):
         "emails": {"SS": email_list},
         "services": {"SS": service_list},
         "regions": {"SS": region_list},
-        "frequency": {"S": frequency}
+        "frequency": {"S": frequency},
+        "crossAccounts": {"SS": [cross_accounts]}
     }
 
     # Insert the item into the table
@@ -63,3 +65,4 @@ def split_string(input_string):
     result = [item.strip() for item in input_string.split(',')]
     return result
 
+print(lambda_handler("",""))

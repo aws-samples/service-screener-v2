@@ -29,4 +29,4 @@ for folder in adminlte/aws/*; do
 done
 
 # Upload the output.zip file to S3 with file name as current date
-aws s3 cp "$CURRENT_DATE" s3://$S3_OUTPUT_BUCKET/$CONFIG_ID/$CURRENT_DATE --recursive
+aws s3 cp "$CURRENT_DATE" s3://$S3_OUTPUT_BUCKET/$CONFIG_NAME/$CURRENT_DATE --recursive

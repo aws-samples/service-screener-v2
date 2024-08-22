@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - ugym-automation
+      - main
 jobs:
     build:
       name: push docker image to docker hub
@@ -20,7 +21,7 @@ jobs:
           id: build-docker-image
           run: |
             ls -la 
-            docker build ./usecases/scheduler -t yingtingaws/screener-scheduler:latest
+            docker build ./usecases/scheduler/docker -t yingtingaws/screener-scheduler:latest
         - name: push the docker image
           id: push-docker-image
           run: docker push ${{secrets.DOCKER_USERNAME}}/screener-scheduler:latest
