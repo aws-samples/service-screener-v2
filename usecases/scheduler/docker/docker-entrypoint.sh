@@ -15,29 +15,15 @@ CONFIG_ID='config1'
 CROSSACCOUNTS=''
 
 if [ -n "$CROSSACCOUNTS" ]; then
-    echo "CROSSACCOUNTS is not empty"
     echo $CROSSACCOUNTS > crossAccounts.json
     crossAccountsParam=' --crossAccounts 1 '
 fi
 
-# Run the main.py script
-# check if $PARAMS contains '--regions ALL'
-# case "--regions ALL" in
-#     *"$PARAMS"*) 
-#         echo "The string contains '--region ALL'"
-#         python3 main.py $PARAMS $crossAccountsParam y 
-#         ;;
-#     *) 
-#         python3 main.py $PARAMS $crossAccountsParam 
-#         ;;
-# esac
-
+# Check if need to run for ALL regions
 if echo "$PARAMS" | grep -q "ALL"; then
-    echo "The string contains '--region ALL'"
     echo "n" | python3 main.py $PARAMS $crossAccountsParam 
     
 else
-    echo "The string does not contain '--region ALL'"
     python3 main.py $PARAMS $crossAccountsParam 
 fi
 
