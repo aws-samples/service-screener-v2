@@ -10,7 +10,10 @@ from datetime import datetime
 # os.environ['SSV2_S3_BUCKET'] = 'myBucket'
 # os.environ['SSV2_SNSARN_PREFIX'] = 'ssv2'
 # os.environ['SSV2_REGION'] = 'ap-southeast-1'
-# os.environ['SSV2_EVENTBRIDGE_ROLES_ARN'] = 'arn:aws:iam::956288449190:role/AWSEventBridgeRoles'
+# os.environ['SSV2_EVENTBRIDGE_ROLES_ARN'] = 'arn:aws:iam::1111111111:role/AWSEventBridgeRoles'
+# os.environ['SSV2_JOB_DEF'] = 'TEEHEE'
+# os.environ['SSV2_JOB_QUEUE'] = 'TEEHEE'
+# os.environ['SSV2_SCHEDULER_NAME'] = 'screener-scheduler-group'
 
 ## Sample Event Data 
 
@@ -41,6 +44,7 @@ def lambda_handler(event, context):
         emails = item['emails']
         ssparams = item['ssparams']
         cronPattern = item['frequency']
+        crossAccounts = item['crossAccounts']
 
         print('Patching the following Config: {}'.format(configId))
         result = updateSnsRecipient(configId, emails)
@@ -49,7 +53,7 @@ def lambda_handler(event, context):
             resp = {'statusCode': 500, 'body': msg}
             return resp
 
-        result = updateEventBridge(configId, ssparams, cronPattern)
+        result = updateEventBridge(configId, ssparams, cronPattern, crossAccounts)
         if result == False:
             msg = 'Fail to update eventBridge Configuration for: {}'.format(configId)
             resp = {'statusCode': 500, 'body': msg}
@@ -58,7 +62,7 @@ def lambda_handler(event, context):
     return successResp
 
 ## update EventBridge
-def updateEventBridge(ssv2configId, ssparams, cronPattern):
+def updateEventBridge(ssv2configId, ssparams, cronPattern, crossAccounts):
     ## check if schedule exists
     inputJson = { 
         "JobDefinition": jobDef, 
@@ -68,8 +72,9 @@ def updateEventBridge(ssv2configId, ssparams, cronPattern):
             { "Environment": 
                 [ 
                     { "Name": "PARAMS", "Value": ssparams }, 
-                    { "Name": "S3_OUTPUT_BUCKET", "Value": s3Bucket } ,
-                    { "Name": "CONFIG_ID", "Value": ssv2configId }
+                    { "Name": "S3_OUTPUT_BUCKET", "Value": s3Bucket },
+                    { "Name": "CONFIG_ID", "Value": ssv2configId },
+                    { "Name": "CROSSACCOUNTS", "Value": crossAccounts}
                 ] 
             } 
     }
@@ -172,7 +177,8 @@ def sanitizeEvent(event):
             'configId': configId,
             'ssparams': params,
             'frequency': _sanitized['frequency'],
-            'emails': list(_sanitized['emails'])
+            'emails': list(_sanitized['emails']),
+            'crossAccounts': _sanitized['crossAccounts']
         })
 
     return items
@@ -183,7 +189,7 @@ def sanitizeEvent(event):
 
 # read a json file
 # with open('sampleDDBStream.json', 'r') as f:
-#     event = json.load(f)
+#    event = json.load(f)
 
 # output = lambda_handler(event, '')
 # print(output)

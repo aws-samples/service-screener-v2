@@ -18,7 +18,7 @@
               "BOOL": true
             },
             "frequency": {
-              "S": "cron(0, 0, 1,* ,?, *)"
+              "S": "cron(0, 0, 1, * ,?, *)"
             },
             "regions": {
               "SS": [
@@ -39,6 +39,9 @@
                     "bbb+ssv2@bbb.com",
                     "ccc+ssv2@ccc.com"
                 ]
+            },
+            "crossAccounts":{
+                "S": "{general:1}"
             }
           },
           "SequenceNumber": "1405400000000002063282832",
