@@ -67,7 +67,8 @@ def updateEventBridge(ssv2configId, ssparams, cronPattern):
             { "Environment": 
                 [ 
                     { "Name": "PARAMS", "Value": ssparams }, 
-                    { "Name": "S3_OUTPUT_BUCKET", "Value": s3Bucket } 
+                    { "Name": "S3_OUTPUT_BUCKET", "Value": s3Bucket } ,
+                    { "Name": "CONFIG_ID", "Value": ssv2configId }
                 ] 
             } 
     }
@@ -183,7 +184,7 @@ with open('sampleDDBStream.json', 'r') as f:
     event = json.load(f)
 
 output = lambda_handler(event, '')
-print(output)
+# print(output)
 # print(event['Records'])
 
 # items = sanitizeEvent(event)
