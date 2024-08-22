@@ -211,6 +211,19 @@
 			"[Configure security context]<https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>"
 		]
     },
+    "eksPodIdentityIRSA":{
+        "category": "S",
+		"^description": "EKS Pod Identity IRSA: {$COUNT} of clusters' don't use Pod Identities or IRSA. Applications in a Pod's containers can use an AWS SDK or the AWS CLI to make API requests to AWS services using AWS IAM permissions. EKS Pod Identities and IRSA provide the  ability to manage credentials for your applications, similar to the way that  Amazon EC2 instance profiles provide credentials to Amazon EC2 instances. Instead of creating and distributing your AWS credentials to the containers  or using the Amazon EC2 instance's role, you associate an IAM role with a Kubernetes service account and configure your Pods to use the service account.",
+		"shortDesc": "Use EKS Pod Identities or IRSA",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Configure security context]<https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>"
+		]
+    },
     "eksKarpenterConfiguredExpireAfter":{
         "category": "S",
 		"^description": "EKS Karpenter configure 'disruption.expireAfter': {$COUNT} of clusters' are using default 'disruption.expireAfter' for all NodePool. This feature rehydrates nodes to  ensure that they are upgraded with the latest AMI and dependencies periodically.",

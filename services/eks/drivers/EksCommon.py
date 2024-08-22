@@ -457,7 +457,7 @@ class EksCommon(Evaluator):
                 self.results['eksPodSpead'] = [-1, 'Disabled']
 
         except k8sClient.exceptions.ApiException:
-            print('No permission to access cluster, skipping Defined LimitRange check')
+            print('No permission to access cluster, skipping Pod Spread check')
         except:
             print("Unknown error")
         
@@ -480,10 +480,35 @@ class EksCommon(Evaluator):
                 self.results['eksLivenessReadiness'] = [-1, 'Disabled']
 
         except k8sClient.exceptions.ApiException:
-            print('No permission to access cluster, skipping Defined LimitRange check')
+            print('No permission to access cluster, skipping Liveness Readiness check')
         except:
             print("Unknown error")
         
+        return
+    
+    def _checkPodIdentityIRSA(self):
+        try:
+            useIRSA = False
+            usePodIdentity = False
+            
+            if self.clusterInfo.get("identity").get("oidc").get("issuer"):
+                useIRSA = True
+
+            for pod in self.k8sClient.CoreV1Client.list_pod_for_all_namespaces().items:
+                if 'eks-pod-identity-agent' in pod.metadata.name:
+                    useIRSA = True
+
+            print(useIRSA)
+            print(usePodIdentity)
+
+            if not useIRSA and not usePodIdentity:
+                self.results['eksPodIdentityIRSA'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster, skipping Pod Identity IRSA check')
+        except:
+            print("Unknown error")
+
         return
     
     def checkPodSecurityContext(self, context): # Check if security context is not empty
@@ -540,8 +565,8 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster, skipping Defined LimitRange check')
-        # except:
-        #     print("Unknown error")
+        except:
+            print("Unknown error")
         
         return
     
