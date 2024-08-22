@@ -6,14 +6,14 @@ from botocore.exceptions import ClientError
 
 ## Environment Variables
 ## Test values only, should comment out in actual production
-os.environ['SSV2_REGION'] = 'ap-southeast-1'
-os.environ['DDB_NAME'] = 'ss-parameters'
-os.environ['FREQUENCY'] = 'cron(0, 0, 1,* ,?, *)'
-os.environ['REGIONS'] = 'ap-southeast-1,us-east-1'
-os.environ['EMAILS'] = 'yingting@amazon.com,keatkw@amazon.com'
-os.environ['SERVICES'] = 'ec2,rds'
-os.environ['config_name'] = 'team_B'
-os.environ['crossAccounts'] = '1'
+# os.environ['SSV2_REGION'] = 'ap-southeast-1'
+# os.environ['DDB_NAME'] = 'ss-parameters'
+# os.environ['FREQUENCY'] = '0, 0, 1,* ,?, *'
+# os.environ['REGIONS'] = 'ap-southeast-1,us-east-1'
+# os.environ['EMAILS'] = 'yingting@amazon.com,keatkw@amazon.com'
+# os.environ['SERVICES'] = 'ec2,rds'
+# os.environ['CONFIG_ID'] = 'team_B'
+# os.environ['CROSSACCOUNTS'] = '1'
 
 ## Initialize
 deploy_region = os.environ['SSV2_REGION']
@@ -22,8 +22,8 @@ frequency = os.environ['FREQUENCY']
 regions = os.environ['REGIONS']
 emails = os.environ['EMAILS']
 services = os.environ['SERVICES']
-item_name = os.environ['config_name']
-cross_accounts = os.environ['crossAccounts']
+item_name = os.environ['CONFIG_ID']
+cross_accounts = os.environ['CROSSACCOUNTS']
 
 ddb = boto3.client('dynamodb', region_name=deploy_region)
 
