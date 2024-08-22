@@ -383,7 +383,7 @@ class EksCommon(Evaluator):
     
     def _checkDefaultDenyIngressNetworkPolicy(self):
         try:
-            haveDefaultDenyIngressNP = False #Check if cluster include any clustom Pod Disruption Budget outside kube-system namespace
+            haveDefaultDenyIngressNP = False 
 
             for networkPolicy in self.k8sClient.NetworkingV1Client.list_network_policy_for_all_namespaces().items:
                 npSelectAllPod = not networkPolicy.spec.pod_selector.match_expressions and not networkPolicy.spec.pod_selector.match_labels
@@ -396,6 +396,28 @@ class EksCommon(Evaluator):
 
             if not haveDefaultDenyIngressNP:
                 self.results['eksDefaultDenyIngressNetworkPolicy'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster, skipping Implemented Default Deny Ingress Network Policy check')
+        except:
+            print("Unknown error")
+        
+        return
+    
+    def _checkDefinedResourceRequestAndLimit(self):
+        try:
+            haveViolatedContainer = False # Violated container is the container without resource request and limit defined
+
+            for pod in self.k8sClient.CoreV1Client.list_pod_for_all_namespaces().items:
+                if pod.metadata.namespace != 'kube-system':
+                    for container in pod.spec.containers:
+                        if not container.resources.limits and not container.resources.requests:
+                            haveViolatedContainer = True
+                if haveViolatedContainer:
+                    break
+
+            if haveViolatedContainer:
+                self.results['eksDefinedResourceRequestAndLimit'] = [-1, 'Disabled']
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster, skipping Implemented Default Deny Ingress Network Policy check')

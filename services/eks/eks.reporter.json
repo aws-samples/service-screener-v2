@@ -144,5 +144,19 @@
 		"ref": [
 			"[Default deny all ingress traffic]<https://kubernetes.io/docs/concepts/services-networking/network-policies/#default-deny-all-ingress-traffic>"
 		]
+    },
+    "eksDefinedResourceRequestAndLimit":{
+        "category": "R",
+		"^description": "EKS defined resource request and limit: {$COUNT} of clusters' have containers without resource request and limit defined. This Helps kube-scheduler to allocate pods to the right node. Helps Karpenter and Fargate to scale out right-sized nodes.",
+		"shortDesc": "Defined resource request and limit for container",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[EKS best practice]<https://aws.github.io/aws-eks-best-practices/reliability/docs/dataplane/#configure-and-size-resource-requestslimits-for-all-workloads>",
+            "[Resource Management for Pods and Containers]<https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/>"
+		]
     }
 }
