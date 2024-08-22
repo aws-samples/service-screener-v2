@@ -21,7 +21,7 @@ fi
 
 # Check if need to run for ALL regions
 if echo "$PARAMS" | grep -q "ALL"; then
-    echo "n" | python3 main.py $PARAMS $crossAccountsParam 
+    echo "y" | python3 main.py $PARAMS $crossAccountsParam 
     
 else
     python3 main.py $PARAMS $crossAccountsParam 
