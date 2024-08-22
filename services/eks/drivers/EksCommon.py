@@ -488,13 +488,39 @@ class EksCommon(Evaluator):
             for nodePool in self.k8sClient.CustomObjectsClient.list_cluster_custom_object('karpenter.sh', 'v1beta1', 'nodepools').get("items"):
                 dontHaveConsolidationPolicy = not nodePool.get('spec').get('disruption').get('consolidationPolicy')
                 dontHaveConsolidateAfter = not nodePool.get('spec').get('disruption').get('consolidateAfter') or nodePool.get('spec').get('disruption').get('consolidateAfter') == 'Never'
-                
+
                 if dontHaveConsolidationPolicy and dontHaveConsolidateAfter:
                     haveViolatedNodePool = True
                     break
 
             if haveViolatedNodePool:
                 self.results['eksKarpenterConfigureConsolidation'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster, skipping Karpenter Configure Consolidation check')
+        except:
+            print("Unknown error")
+        
+        return
+    
+    def _checkKarpenterRestrictedInstanceType(self):
+        try:
+            haveViolatedNodePool = False # Violated NodePool is the NodePool only allow one instance type.
+
+            for nodePool in self.k8sClient.CustomObjectsClient.list_cluster_custom_object('karpenter.sh', 'v1beta1', 'nodepools').get("items"):
+                if haveViolatedNodePool:
+                    break
+
+                for requirement in nodePool.get('spec').get('template').get('spec').get('requirements'):
+                    isInstanceTypeRestriction = requirement.get('key') == 'node.kubernetes.io/instance-type'
+                    isOperatorIn = requirement.get('operator') == 'In'
+                    containOnlyOneValue = len(requirement.get('values')) < 2
+                    if (isInstanceTypeRestriction and isOperatorIn and containOnlyOneValue):
+                        haveViolatedNodePool = True
+                        break
+
+            if haveViolatedNodePool:
+                self.results['eksKarpenterRestrictedInstanceType'] = [-1, 'Disabled']
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster, skipping Karpenter Configure Consolidation check')

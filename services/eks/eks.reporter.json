@@ -200,15 +200,28 @@
     },
     "eksKarpenterConfigureConsolidation":{
         "category": "C",
-		"^description": "EKS Karpenter limits: {$COUNT} of clusters' includes NodePool without limits. Set limits for node pools to keep cost in check.",
-		"shortDesc": "Set limits for node pools",
+		"^description": "EKS Karpenter consolidation: {$COUNT} of clusters' don't have cosolidation policy. Enable this make Karpenter consolidate / terminate under-utilised nodes.",
+		"shortDesc": "Configure 'disruption.consolidationPolicy' and 'consolidateAfter'",
 		"criticality": "M",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Setup limit for NodePool]<https://karpenter.sh/docs/concepts/nodepools/#speclimits>"
+			"[Configure Consolidation]<https://karpenter.sh/docs/concepts/disruption/#automated-methods>"
+		]
+    },
+    "eksKarpenterRestrictedInstanceType":{
+        "category": "P",
+		"^description": "EKS Karpenter limits: {$COUNT} of clusters' includes NodePool with instance type restricted. Ensure that Karpenter nodepools  are not restricted by instance type.",
+		"shortDesc": "Remove instance type restriction",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Remove instance type restriction]<https://karpenter.sh/docs/concepts/nodepools/#spectemplatespecrequirements>"
 		]
     }
 }
