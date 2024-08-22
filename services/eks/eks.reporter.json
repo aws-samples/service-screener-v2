@@ -172,6 +172,19 @@
 			"[Define LimitRange]<https://kubernetes.io/docs/concepts/policy/limit-range/>"
 		]
     },
+    "eksPodSpead":{
+        "category": "R",
+		"^description": "EKS Pod spread constrant: {$COUNT} of clusters' don't have any Pod Topology Spread Constraints defined. Helps to spread pods across Availability Zones and Hosts. Optional for workload (e.g. data processing) which require Pods to be placed in the same availability zone.",
+		"shortDesc": "Define Pod Topology Spread Constraints",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Example Spread Constraints]<https://raw.githubusercontent.com/kubernetes/website/main/content/en/examples/pods/topology-spread-constraints/two-constraints.yaml/>"
+		]
+    },
     "eksKarpenterConfiguredExpireAfter":{
         "category": "S",
 		"^description": "EKS Karpenter configure 'disruption.expireAfter': {$COUNT} of clusters' are using default 'disruption.expireAfter' for all NodePool. This feature rehydrates nodes to  ensure that they are upgraded with the latest AMI and dependencies periodically.",

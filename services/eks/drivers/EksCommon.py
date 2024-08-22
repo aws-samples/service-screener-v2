@@ -443,6 +443,26 @@ class EksCommon(Evaluator):
         
         return
     
+    def _checkPodSpread(self):
+        try:
+            havePodSpread = False
+
+            for pod in self.k8sClient.CoreV1Client.list_pod_for_all_namespaces().items:
+                if pod.metadata.namespace != 'kube-system':
+                    if pod.spec.topology_spread_constraints:
+                        havePodSpread = True
+                        break
+
+            if not havePodSpread:
+                self.results['eksPodSpead'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster, skipping Defined LimitRange check')
+        except:
+            print("Unknown error")
+        
+        return
+    
     def _checkKarpenterConfiguredExpireAfter(self):
         try:
             configuredExpireAfter = False
