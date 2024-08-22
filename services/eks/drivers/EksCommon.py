@@ -490,16 +490,13 @@ class EksCommon(Evaluator):
         try:
             useIRSA = False
             usePodIdentity = False
-            
+
             if self.clusterInfo.get("identity").get("oidc").get("issuer"):
                 useIRSA = True
 
             for pod in self.k8sClient.CoreV1Client.list_pod_for_all_namespaces().items:
                 if 'eks-pod-identity-agent' in pod.metadata.name:
-                    useIRSA = True
-
-            print(useIRSA)
-            print(usePodIdentity)
+                    usePodIdentity = True
 
             if not useIRSA and not usePodIdentity:
                 self.results['eksPodIdentityIRSA'] = [-1, 'Disabled']
