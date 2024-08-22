@@ -18,6 +18,7 @@ class K8sClient:
         self.stsClientFactory = STSClientFactory(self.workSession)
         self.CoreV1Client = k8sClient.CoreV1Api(api_client=self.client())
         self.PolicyV1Client = k8sClient.PolicyV1Api(api_client=self.client())
+        self.NetworkingV1Client = k8sClient.NetworkingV1Api(api_client=self.client())
 
     def writeCaFile(self, data: str) -> tempfile.NamedTemporaryFile:
         """
