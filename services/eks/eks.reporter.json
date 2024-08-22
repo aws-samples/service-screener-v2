@@ -198,6 +198,19 @@
 			"[Configure Liveness, Readiness and Startup Probes]<https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/>"
 		]
     },
+    "eksSecurityContext":{
+        "category": "S",
+		"^description": "EKS security context: {$COUNT} of clusters' contain container without security context. A security context defines privilege and access control setting for a Pod or Container. It prevents attacker from getting too many priviledges if Pod is compromised.",
+		"shortDesc": "Configure Pods and Containers  Security Context",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Configure security context]<https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>"
+		]
+    },
     "eksKarpenterConfiguredExpireAfter":{
         "category": "S",
 		"^description": "EKS Karpenter configure 'disruption.expireAfter': {$COUNT} of clusters' are using default 'disruption.expireAfter' for all NodePool. This feature rehydrates nodes to  ensure that they are upgraded with the latest AMI and dependencies periodically.",

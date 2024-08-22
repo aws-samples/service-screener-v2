@@ -486,6 +486,65 @@ class EksCommon(Evaluator):
         
         return
     
+    def checkPodSecurityContext(self, context): # Check if security context is not empty
+        print(context)
+        if not context:
+            return False
+        if (context.app_armor_profile or context.fs_group or context.fs_group_change_policy or context.run_as_group
+            or context.run_as_non_root or context.run_as_user or context.se_linux_options or context.seccomp_profile 
+            or context.supplemental_groups or context.sysctls or context.windows_options):
+            return True
+        else:
+            return False
+    
+    def checkContainerSecurityContext(self, context): # Check if security context is not empty
+        print(context)
+        if not context:
+            return False
+        if (context.allow_privilege_escalation or context.app_armor_profile or context.capabilities or context.privileged or context.proc_mount
+            or context.read_only_root_filesystem or context.run_as_group or context.run_as_non_root or context.run_as_user 
+            or context.se_linux_options or context.sysctls or context.seccomp_profile or windows_options):
+            return True
+        else:
+            return False
+    
+    def _checkSecurityContext(self):
+        try:
+            havePodWithoutSecurityContext = False # Cluster have at least one Pod without Security Context
+
+            for pod in self.k8sClient.CoreV1Client.list_pod_for_all_namespaces().items:
+                if havePodWithoutSecurityContext:
+                    break
+
+                if pod.metadata.namespace != 'kube-system':
+                    thisPodHaveSecurityContext = False
+                    print(pod.metadata.name)
+
+                    if self.checkPodSecurityContext(pod.spec.security_context):
+                        thisPodHaveSecurityContext = True
+
+                    if not thisPodHaveSecurityContext:
+                        for container in pod.spec.containers:
+                            if self.checkContainerSecurityContext(container.security_context):
+                                thisPodHaveSecurityContext = True
+                                break
+                    
+                    if not thisPodHaveSecurityContext:
+                        havePodWithoutSecurityContext = True
+                        break
+                    print(thisPodHaveSecurityContext)
+
+            print(havePodWithoutSecurityContext)
+            if havePodWithoutSecurityContext:
+                self.results['eksSecurityContext'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster, skipping Defined LimitRange check')
+        # except:
+        #     print("Unknown error")
+        
+        return
+    
     def _checkKarpenterConfiguredExpireAfter(self):
         try:
             configuredExpireAfter = False
