@@ -171,5 +171,18 @@
 		"ref": [
 			"[Define LimitRange]<https://kubernetes.io/docs/concepts/policy/limit-range/>"
 		]
+    },
+    "eksKarpenterConfiguredExpireAfter":{
+        "category": "S",
+		"^description": "EKS Karpenter configure 'disruption.expireAfter': {$COUNT} of clusters' are using default 'disruption.expireAfter' for all NodePool. This feature rehydrates nodes to  ensure that they are upgraded with the latest AMI and dependencies periodically.",
+		"shortDesc": "Configure 'disruption.expireAfter' for node pools",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Define LimitRange]<https://kubernetes.io/docs/concepts/policy/limit-range/>"
+		]
     }
 }

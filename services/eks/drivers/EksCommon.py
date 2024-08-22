@@ -442,3 +442,22 @@ class EksCommon(Evaluator):
             print("Unknown error")
         
         return
+    
+    def _checkKarpenterConfiguredExpireAfter(self):
+        try:
+            configuredExpireAfter = False
+
+            for nodePool in self.k8sClient.CustomObjectsClient.list_cluster_custom_object('karpenter.sh', 'v1beta1', 'nodepools').get("items"):
+                if nodePool.get('spec').get('disruption').get('expireAfter') != '720h':
+                    configuredExpireAfter = True
+                    break
+
+            if not configuredExpireAfter:
+                self.results['eksKarpenterConfiguredExpireAfter'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster, skipping Karpenter Configured ExpireAfter check')
+        except:
+            print("Unknown error")
+        
+        return
