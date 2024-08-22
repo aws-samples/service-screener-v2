@@ -420,7 +420,24 @@ class EksCommon(Evaluator):
                 self.results['eksDefinedResourceRequestAndLimit'] = [-1, 'Disabled']
 
         except k8sClient.exceptions.ApiException:
-            print('No permission to access cluster, skipping Implemented Default Deny Ingress Network Policy check')
+            print('No permission to access cluster, skipping Defined Resource Request And Limit For Container check')
+        except:
+            print("Unknown error")
+        
+        return
+    
+    def _checkDefinedLimitRange(self):
+        try:
+            limitRangeExist = False
+
+            if self.k8sClient.CoreV1Client.list_limit_range_for_all_namespaces().items:
+                limitRangeExist = True
+
+            if not limitRangeExist:
+                self.results['eksConfigureLimitRange'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster, skipping Defined LimitRange check')
         except:
             print("Unknown error")
         

@@ -147,7 +147,7 @@
     },
     "eksDefinedResourceRequestAndLimit":{
         "category": "R",
-		"^description": "EKS defined resource request and limit: {$COUNT} of clusters' have containers without resource request and limit defined. This Helps kube-scheduler to allocate pods to the right node. Helps Karpenter and Fargate to scale out right-sized nodes.",
+		"^description": "EKS defined resource request and limit: {$COUNT} of clusters' have containers without resource request and limit defined. This helps kube-scheduler to allocate pods to the right node. Helps Karpenter and Fargate to scale out right-sized nodes.",
 		"shortDesc": "Defined resource request and limit for container",
 		"criticality": "M",
 		"downtime": 0,
@@ -157,6 +157,19 @@
 		"ref": [
 			"[EKS best practice]<https://aws.github.io/aws-eks-best-practices/reliability/docs/dataplane/#configure-and-size-resource-requestslimits-for-all-workloads>",
             "[Resource Management for Pods and Containers]<https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/>"
+		]
+    },
+    "eksConfigureLimitRange":{
+        "category": "R",
+		"^description": "EKS configure LimitRange: {$COUNT} of clusters' don't have LimitRange defined. This helps to ensure that a single object cannot monopolize all available resources within a namespace. Also enforce default Resource Request and Limit for containers.",
+		"shortDesc": "Defined LimitRange for clusters",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Define LimitRange]<https://kubernetes.io/docs/concepts/policy/limit-range/>"
 		]
     }
 }
