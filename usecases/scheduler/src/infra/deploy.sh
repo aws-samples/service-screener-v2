@@ -1,0 +1,4 @@
+
+
+cdk bootstrap
+cdk deploy
