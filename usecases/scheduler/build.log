@@ -1,0 +1,72 @@
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 713B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/yingtingaws/screener-scheduler-base:latest
+#2 DONE 0.9s
+
+#3 [internal] load .dockerignore
+#3 transferring context: 2B done
+#3 DONE 0.0s
+
+#4 [1/5] FROM docker.io/yingtingaws/screener-scheduler-base:latest@sha256:692ab20d409e174a330daa90fcae39d693dec98fe6358f5cf6ee9e692972240e
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 1.07kB done
+#5 DONE 0.0s
+
+#6 [2/5] RUN cd service-screener-v2
+#6 CACHED
+
+#7 [3/5] COPY docker-entrypoint.sh /tmp/docker-entrypoint.sh
+#7 DONE 0.0s
+
+#8 [4/5] RUN chmod +x /tmp/docker-entrypoint.sh
+#8 DONE 0.1s
+
+#9 [5/5] RUN cat /tmp/docker-entrypoint.sh
+#9 0.123 #!/bin/sh
+#9 0.123 
+#9 0.123 # Source .bashrc to ensure environment variables are available
+#9 0.123 source ~/.bashrc
+#9 0.123 
+#9 0.123 # Change to the service-screener-v2 directory
+#9 0.123 cd service-screener-v2
+#9 0.123 
+#9 0.123 # Run the main.py script
+#9 0.123 python3 main.py $PARAMS
+#9 0.123 
+#9 0.123 # Get the current date
+#9 0.123 CURRENT_DATE=$(date +"%Y%m%d")
+#9 0.123 
+#9 0.123 # create folder and add all the files in
+#9 0.123 mkdir -p "$CURRENT_DATE"
+#9 0.123 cp output.zip "$CURRENT_DATE"
+#9 0.123 
+#9 0.123 # loop through the folders in adminlte/aws/, copy the folder names if its not "res" and the file workItem.xlsx inside each to a new folder
+#9 0.123 for folder in adminlte/aws/*; do
+#9 0.123     folder_name=$(basename $folder)
+#9 0.123     if [ "$folder_name" != "res" ]; then
+#9 0.123             mkdir "$CURRENT_DATE"/$folder_name
+#9 0.123             cp $folder/workItem.xlsx "$CURRENT_DATE"/$folder_name/
+#9 0.123             echo "Added $folder_name"
+#9 0.123         else
+#9 0.123             echo "Skipping 'res' folder"
+#9 0.123     fi
+#9 0.123 done
+#9 0.123 
+#9 0.123 # Upload the output.zip file to S3 with file name as current date
+#9 0.123 aws s3 cp "$CURRENT_DATE" s3://$S3_OUTPUT_BUCKET/$CONFIG_ID/$CURRENT_DATE --recursive
+#9 DONE 0.1s
+
+#10 exporting to image
+#10 exporting layers 0.0s done
+#10 writing image sha256:cfc218eb2b7c6609124617bfc9c2f13902f3bbc32e8a58f250fc6c45e331f184 done
+#10 naming to docker.io/yingtingaws/screener-scheduler done
+#10 DONE 0.0s
+
+ [33m1 warning found (use --debug to expand):
+[0m - InvalidBaseImagePlatform: Base image yingtingaws/screener-scheduler-base:latest was pulled with platform "linux/amd64", expected "linux/arm64" for current build (line 2)

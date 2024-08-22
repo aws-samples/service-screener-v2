@@ -3,7 +3,6 @@ from aws_cdk import (
     Stack,
     Duration,
     Size,
-    aws_iam as iam,
     RemovalPolicy,
     aws_ec2 as ec2,
     aws_batch as batch,
@@ -15,10 +14,10 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_lambda as lambda_,
     aws_lambda_event_sources as eventsources,
-    aws_sns as sns
+    aws_scheduler as scheduler
     # aws_sqs as sqs,
 )
-from aws_solutions_constructs.aws_eventbridge_lambda import EventbridgeToLambda, EventbridgeToLambdaProps
+from aws_solutions_constructs.aws_eventbridge_lambda import EventbridgeToLambda
 from os import path
 from constructs import Construct
 
@@ -28,8 +27,10 @@ class ServiceScreenerAutomationStack(Stack):
         dirname = path.dirname(__file__)
         super().__init__(scope, construct_id, **kwargs)
         bucket_name = "BucketNameHere1"
+        prefix="Screener"
 
         vpc = ec2.Vpc(self, "VPC")
+        #add check for existing bucket
         #S3 Bucket
         bucket = s3.Bucket(self, bucket_name,
             block_public_access=s3.BlockPublicAccess.BLOCK_ALL,
@@ -43,18 +44,6 @@ class ServiceScreenerAutomationStack(Stack):
             vpc=vpc,
             spot=True
         )
-        job_role = iam.Role(
-            self, "ScreenerBatchRole",
-            assumed_by=iam.CompositePrincipal(
-                iam.ServicePrincipal("batch.amazonaws.com"),
-                iam.ServicePrincipal("ecs.amazonaws.com")
-            ),
-            description="An example IAM role for Lambda"
-        )
-        job_role.add_to_policy(iam.PolicyStatement(
-            resources=[bucket.bucket_arn],
-            actions=["s3:PutObject", "s3:GetObject","s3:DeleteObject"]
-        ))
         # Tags.of(batch_compute_env).add("Application", "Screener")
         job_queue = batch.JobQueue(self, "ScreenerQueue",
             priority=1,
@@ -72,31 +61,35 @@ class ServiceScreenerAutomationStack(Stack):
                 cpu=1,
                 ephemeral_storage_size=Size.gibibytes(30),
                 fargate_cpu_architecture=ecs.CpuArchitecture.X86_64,
-                fargate_operating_system_family=ecs.OperatingSystemFamily.LINUX
-                execution_role=job_role
+                fargate_operating_system_family=ecs.OperatingSystemFamily.LINUX,
             )
         )
-
-        #EventBridge Definitions
-        ss_rule = events.Rule(self, "ScreenerRule",
-            schedule=events.Schedule.cron(minute="0", hour="0", day="3", month="*"),
-        )
-        ss_rule.add_target(targets.BatchJob(job_queue.job_queue_arn, job_queue, job_defn.job_definition_arn, job_defn,
-            # dead_letter_queue=queue,
-            event=events.RuleTargetInput.from_object({"SomeParam": "SomeValue"}),
-            retry_attempts=2,
-            max_event_age=Duration.hours(2)
+        job_defn.container.execution_role.add_to_policy(iam.PolicyStatement(
+            resources=[bucket.bucket_arn],
+            actions=["s3:PutObject", "s3:GetObject","s3:DeleteObject"]
         ))
 
-        #SNS
-        topic = sns.Topic(self, "ScreenerAlertTopic",
-            display_name="Email List Topic (Service Screener)"
+        eb_role = iam.Role(self, "ScreenerEbRole",
+            assumed_by=iam.ServicePrincipal("scheduler.amazonaws.com"),
+            description="Screener Eventbridge Scheduler Role"
+        )
+        eb_role.add_to_policy(iam.PolicyStatement(
+            resources=[job_defn.container.execution_role.role_arn],
+            actions=["iam:PassRole"]
+        ))
+        eb_role.add_to_policy(iam.PolicyStatement(
+            resources=["arn:aws:batch:"+self.region+":"+self.account+":*"],
+            actions=["batch:SubmitJob"]
+        ))
+        #EventBridge Definitions
+        cfn_schedule_group = scheduler.CfnScheduleGroup(self, "ScreenerScheduleGroup",
+            name="ScreenerScheduleGroup"
         )
 
         #DynamoDB Table
-        table = dynamodb.TableV2(self, "ScreenerTable",
+        table = dynamodb.TableV2(self, "screener-scheduler",
             partition_key=dynamodb.Attribute(
-                name="id",
+                name="name",
                 type=dynamodb.AttributeType.STRING
             ),
             dynamo_stream=dynamodb.StreamViewType.NEW_IMAGE
@@ -104,43 +97,58 @@ class ServiceScreenerAutomationStack(Stack):
         #Lambda Update Function
         update_fn = lambda_.Function(self, "ScreenerUpdate",
             runtime=lambda_.Runtime.PYTHON_3_12,
-            handler="index.lambda_handler",
-            code=lambda_.Code.from_asset(path.join(dirname, "update_function"))
+            handler="configUpdate.lambda_handler",
+            code=lambda_.Code.from_asset(path.join(dirname, "../../lambda/ssv2_configUpdater")),
+            environment={
+                "SSV2_S3_BUCKET": bucket.bucket_name,
+                "SSV2_SNSARN_PREFIX": prefix,
+                "SSV2_REGION": self.region,
+                "SSV2_EVENTBRIDGE_ROLES_ARN": eb_role.role_arn,
+                "SSV2_JOB_QUEUE": job_queue.job_queue_name,
+                "SSV2_JOB_DEF": job_defn.job_definition_name,
+                "SSV2_SCHEDULER_NAME": cfn_schedule_group.name
+            }
         )
         update_fn.add_event_source(eventsources.DynamoEventSource(table,
             starting_position=lambda_.StartingPosition.LATEST,
-            filters=[lambda_.FilterCriteria.filter({"event_name": lambda_.FilterRule.is_equal("INSERT")})],
+            batch_size=1,
+            # filters=[lambda_.FilterCriteria.filter({"event_name": lambda_.FilterRule.or_("INSERT", "UPDATE")})],
         ))
         #Update function's role
         update_role = update_fn.role
         table.grant_read_data(update_role)
         update_role.add_to_policy(iam.PolicyStatement(
-            resources=[ss_rule.rule_arn],
-            actions=["events:PutRule"]
+            resources=["arn:aws:scheduler:"+self.region+":"+self.account+":*"],
+            actions=["scheduler:*"]
         ))
         update_role.add_to_policy(iam.PolicyStatement(
-            resources=[topic.topic_arn],
-            actions=["sns:GetTopicAttributes", "sns:SetTopicAttributes"]
+            resources=["arn:aws:sns:"+self.region+":"+self.account+":"+prefix+"*"],
+            actions=["sns:*"]
+        ))
+        update_role.add_to_policy(iam.PolicyStatement(
+            resources=[eb_role.role_arn],
+            actions=["iam:PassRole"]
         ))
         #Findings Function
         event_lambda = EventbridgeToLambda(self, 'eventbridge-lambda',
-                lambda_function_props=lambda_.FunctionProps(\
+                lambda_function_props=lambda_.FunctionProps(
                 function_name="ScreenerFindingsAlert",
                 runtime=lambda_.Runtime.PYTHON_3_12,
                 handler="index.lambda_handler",
-                code=lambda_.Code.from_asset(path.join(dirname, "findings_function"))
+                code=lambda_.Code.from_asset(path.join(dirname, "findings_function")),
+
             ),
             event_rule_props=events.RuleProps(
                 event_pattern=events.EventPattern(
                     source=["aws.s3"]
                 ),
                 
-            ),
+            )
 
         )
         findings_role = event_lambda.lambda_function.role
         findings_role.add_to_policy(iam.PolicyStatement(
-            resources=[topic.topic_arn],
+            resources=["arn:aws:sns:"+self.region+":"+self.account+":"+prefix+"*"],
             actions=["sns:Publish"]
         ))
 
