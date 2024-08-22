@@ -480,3 +480,25 @@ class EksCommon(Evaluator):
             print("Unknown error")
         
         return
+    
+    def _checkKarpenterConfigureConsolidation(self):
+        try:
+            haveViolatedNodePool = False # Violated NodePool is the NodePool without Consolidation Policy set.
+
+            for nodePool in self.k8sClient.CustomObjectsClient.list_cluster_custom_object('karpenter.sh', 'v1beta1', 'nodepools').get("items"):
+                dontHaveConsolidationPolicy = not nodePool.get('spec').get('disruption').get('consolidationPolicy')
+                dontHaveConsolidateAfter = not nodePool.get('spec').get('disruption').get('consolidateAfter') or nodePool.get('spec').get('disruption').get('consolidateAfter') == 'Never'
+                
+                if dontHaveConsolidationPolicy and dontHaveConsolidateAfter:
+                    haveViolatedNodePool = True
+                    break
+
+            if haveViolatedNodePool:
+                self.results['eksKarpenterConfigureConsolidation'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster, skipping Karpenter Configure Consolidation check')
+        except:
+            print("Unknown error")
+        
+        return
