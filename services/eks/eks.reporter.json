@@ -185,6 +185,19 @@
 			"[Example Spread Constraints]<https://raw.githubusercontent.com/kubernetes/website/main/content/en/examples/pods/topology-spread-constraints/two-constraints.yaml/>"
 		]
     },
+    "eksLivenessReadiness":{
+        "category": "R",
+		"^description": "EKS Liveness, Readiness, Startup Probes: {$COUNT} of clusters' contain container without Readiness, Liveness, and Startup Probes defined. By default, traffic are sent to  containers immediately. Setting these probes allow Kubernetes to know when  your applications are ready to receive traffic or if they have became  unresponsive.",
+		"shortDesc": "Implement Readiness, Liveness, and Startup Probes",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Configure Liveness, Readiness and Startup Probes]<https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/>"
+		]
+    },
     "eksKarpenterConfiguredExpireAfter":{
         "category": "S",
 		"^description": "EKS Karpenter configure 'disruption.expireAfter': {$COUNT} of clusters' are using default 'disruption.expireAfter' for all NodePool. This feature rehydrates nodes to  ensure that they are upgraded with the latest AMI and dependencies periodically.",

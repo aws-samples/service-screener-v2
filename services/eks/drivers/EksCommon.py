@@ -463,6 +463,29 @@ class EksCommon(Evaluator):
         
         return
     
+    def _checkLivenessReadiness(self):
+        try:
+            havePodWithoutLivenessReadiness = False # Cluster at least one Pod contain at least ine container without Liveness, Readiness, and Startup Probes defined
+
+            for pod in self.k8sClient.CoreV1Client.list_pod_for_all_namespaces().items:
+                if havePodWithoutLivenessReadiness:
+                    break
+                if pod.metadata.namespace != 'kube-system':
+                    for container in pod.spec.containers:
+                        if not container.liveness_probe and not container.readiness_probe and not container.startup_probe:
+                            havePodWithoutLivenessReadiness = True
+                            break
+
+            if havePodWithoutLivenessReadiness:
+                self.results['eksLivenessReadiness'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster, skipping Defined LimitRange check')
+        except:
+            print("Unknown error")
+        
+        return
+    
     def _checkKarpenterConfiguredExpireAfter(self):
         try:
             configuredExpireAfter = False
