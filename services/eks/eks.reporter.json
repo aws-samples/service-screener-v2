@@ -184,5 +184,18 @@
 		"ref": [
 			"[Define LimitRange]<https://kubernetes.io/docs/concepts/policy/limit-range/>"
 		]
+    },
+    "eksKarpenterResourceLimit":{
+        "category": "C",
+		"^description": "EKS Karpenter limits: {$COUNT} of clusters' includes NodePool without limits. Set limits for node pools to keep cost in check.",
+		"shortDesc": "Set limits for node pools",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Setup limit for NodePool]<https://karpenter.sh/docs/concepts/nodepools/#speclimits>"
+		]
     }
 }

@@ -461,3 +461,22 @@ class EksCommon(Evaluator):
             print("Unknown error")
         
         return
+    
+    def _checkKarpenterResourceLimit(self):
+        try:
+            haveViolatedNodePool = False # Violated NodePool is the NodePool without Limits set.
+
+            for nodePool in self.k8sClient.CustomObjectsClient.list_cluster_custom_object('karpenter.sh', 'v1beta1', 'nodepools').get("items"):
+                if not nodePool.get('spec').get('limits'):
+                    haveViolatedNodePool = True
+                    break
+
+            if haveViolatedNodePool:
+                self.results['eksKarpenterResourceLimit'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster, skipping Karpenter Resource Limit check')
+        except:
+            print("Unknown error")
+        
+        return
