@@ -1,6 +1,6 @@
 This Docker image is currently hosted on yingtingaws/screener-scheduler repository. If you would like to update/ modify it, you can deploy it locally.
 
-## Pre-requisites
+## Prerequisites
 Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) to set up Docker in your environment.
 
 ## Deployment Guide 

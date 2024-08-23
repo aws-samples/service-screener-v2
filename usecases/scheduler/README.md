@@ -1,32 +1,36 @@
 # Screener Scheduler Guide
-Today, you can setup scheduler to run screener automatically at fix schedule. Follow the setup guide below to deloy. 
+This use case is meant to help you run Screener automatically at your desired frequency, so that you can have a good view of what has changed since the last run without the need to constantly re-deploy. Below is the setup guide for you to deploy in your AWS environment. 
 
 ## Architecture Components
 ### Components
 
 From left to right
-1. DynamoDB: 
-1. Lambda - ConfigUpdater: This lambda is only triggered through DynamoDB stream. It updates the EventBridge scheduler setting, parameters, and email recipients
-1. EventBridge (behind-the-scene): It is the main component to perform scheduling event. Based on the scheduler setting, EventBridge triggers AWS Batch to run Screener
-1. AWS Batch: It provides compute environments to runs Screener and shutdown as soon as results are generated. It first look at Spot instance availability ...
-1. ...
+1. DynamoDB: This stores your various configurations for different schedulers. Each configuration consists of environment variables used to run Screener, and the email recipient for the summary email
+2. Lambda - ConfigUpdater: This lambda will be triggered using DynamoDB Streams. It updates the EventBridge Scheduler setting, parameters, and SNS topic recipients
+3. EventBridge - Scheduler: This is the main component for performing the scheduled event. Based on the Scheduler setting, EventBridge triggers AWS Batch to run Screener
+4. AWS Batch: It consists of job definition, job queue and jobs that will create use ECS Fargate to run Screener, and will be shut down after each complete run. For container compute allocation, it will first utilise Spot instances. If not available, then it will fall back on On Demand instances.
+5. ECS Fargate: This will be created by AWS Batch to run Screener commands and upload the results to S3.
+6. S3 bucket: Stores the output.zip summary and excel findings for each account
+7. EventBridge - Email: Based on S3 event of uploaded *.zip, it will trigger Lambda to process the findings.
+8. Lambda - resultProcessor: Identifies high findings and compare with the previous run to identify changes, new findings or what has been resolved.
+9. SNS: Sends the summary of findings to the email recipients. 
 ![architecture diagram](./screener-architecture.png)
 ### Costs
+<TODO>
 
-## Deployment Guide (Recommend to run in Cloudshell)
+## Deployment Guide (Recommended to run in Cloudshell)
 ### Prerequisite - Permission 
-1. AWS User ID to log into AWS Console
-1. [TODO] Permission required
-1. 
+1. AWS User Console access
+2. [TODO] Permissions required - AWSReadOnlyAccess, IAM??
 
-### Prereqsuite - running at your own environment 
-Note: All the following already preinstall for you in Cloudshell environment
+### Prereqsuite - running in your own environment 
+Note: All the following is already preinstalled for you in  your Cloudshell environment
 1. Python3.12 & pip3
 1. awscli & awscdk
 1. Docker
 
 ### Cloudshell
-The deployment requires 1/ CDK, 2/ git, 3/ docker and 4/ aws-cli. Using AWS Cloudshell is the cleanest way to deploy.
+The deployment requires 1/ CDK, 2/ git, 3/ docker and 4/ aws-cli. Using AWS Cloudshell is the cleanest and easiest way to deploy.
 1. Login to AWS Console
 1. Access Cloudshell
 1. Run the following commands
@@ -40,12 +44,31 @@ git clone https://github.com/aws-samples/service-screener-v2.git
 cd service-screener-v2
 pip install -r requirements.txt
 ```
+```
+## Set up your environment variables to deploy the infrastructure
+export NAME="<insert config name>" 
+export EMAIL_LIST="<insert email>"
+export SERVICES="<insert services>" 
+export REGIONS="<insert regions>" 
+export FREQUENCY="<insert cron expression>" 
+export CROSSACCOUNTS="<1 or empty>"
+export BUCKET_NAME="<insert name>" 
 
+### Example
+export NAME="scheduler-deploy" 
+export EMAIL_LIST="keatkw@amazon.com"
+export SERVICES="ec2,rds" 
+export REGIONS="ap-southeast-5" 
+export FREQUENCY="cron(*, *, 1, *, ?, *)" 
+export CROSSACCOUNTS="1"
+export BUCKET_NAME="screener-scheduler" 
+```
 ```
 ## Deploy the architecture
 export AWS_DEFAULT_REGION=<YOUR_REGION>
 cd usecases/scheduler/src/infra
 pip install -r requirements.txt
+cdk synth 
 cdk bootstrap
 cdk deploy
 ```
