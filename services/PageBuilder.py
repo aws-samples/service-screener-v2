@@ -677,6 +677,24 @@ $('#changeAcctId').change(function(){
         output.append(self.generateRowWithCol(size=12, items=items, rowHtmlAttr="data-context='summaryChart'"))
         ## Chart completed
 
+        ##### Cost Optimization Chart #####
+        chartItems = []
+        chartPid = self.getHtmlId('CostChart')
+        chartsObj = self.reporter.charts
+        chartsConfigObj = self.reporter.chartsConfig
+
+        for title in chartsObj:
+            chartDataSets = chartsObj[title]
+            chartConfig = chartsConfigObj[title]
+
+            html = self.generateBarChart(chartConfig['legends'], chartDataSets)
+            card = self.generateCard(chartPid, html, cardClass='info', title=title, titleBadge='', collapse=9, noPadding=False)
+            chartItems.append([card, ''])
+        
+        output.append(self.generateRowWithCol(size=6, items=chartItems, rowHtmlAttr="data-context='costChart'"))
+
+        ##### Cost Optimization Chart Completed #####
+
         ## Filter
         filterTitle = "<i class='icon fas fa-search'></i> Filter"
         filterByCheck = self.generateFilterByCheck(labels)

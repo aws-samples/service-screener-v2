@@ -7,8 +7,10 @@ import constants as _C
 
 class Service:
     _AWS_OPTIONS = {}
+    charts = {}
     RULESPREFIX = None
     tags = []
+    chartsConfig = {}
 
     TAGS_SEPARATOR = '%'
     KEYVALUE_SEPARATOR = '='
@@ -32,7 +34,42 @@ class Service:
             print('BOTO3 SESSION IS MISSING')
         
         print('PREPARING -- ' + classname.upper()+ '::'+region)
+
+    def setChart(self, title, chartType, chartData):
+        legends = list(chartData.keys())
+        data = list(chartData.values())
+
+        self.setChartConfig(title, chartType, legends)
+        self.setChartData(title, data)
+
+    def setChartConfig(self, title, chartType, legends):
+        if title not in self.chartsConfig:
+            self.chartsConfig[title] = {}
+            self.chartsConfig[title] = {
+                'chartType' : chartType,
+                'legends': legends
+            }
+
+    def setChartData(self, title, chartData):
+        if title not in self.charts:
+            self.charts[title] = {}
         
+        self.charts[title] = chartData
+
+
+    def getChartsConfig(self):
+        return self.chartsConfig
+
+    def getChartData(self):
+        return self.charts
+    
+    def getChart(self):
+        return {
+            'config': self.chartsConfig,
+            'data': self.charts
+        }
+
+    
     def setRules(self, rules):
         ## Class method is case insensitive, lower to improve accessibilities
         rules = rules.lower().split('^')
