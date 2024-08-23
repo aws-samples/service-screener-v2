@@ -224,6 +224,19 @@
 			"[Configure security context]<https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>"
 		]
     },
+    "eksUpdateInsights":{
+        "category": "O",
+		"^description": "EKS Update Insights: {$COUNT} of clusters' have ERROR and/or WARNING update insights. To fix these findings, you need  to update your Kubernetes manifests to stop using deprecated APIs. This helps  to avoid compatibility issues after upgrading your EKS clusters.",
+		"shortDesc": "Fix ERROR and WARNING update insights",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Test and verify update with update insights]<https://aws.amazon.com/blogs/containers/accelerate-the-testing-and-verification-of-amazon-eks-upgrades-with-upgrade-insights/>"
+		]
+    },
     "eksKarpenterConfiguredExpireAfter":{
         "category": "S",
 		"^description": "EKS Karpenter configure 'disruption.expireAfter': {$COUNT} of clusters' are using default 'disruption.expireAfter' for all NodePool. This feature rehydrates nodes to  ensure that they are upgraded with the latest AMI and dependencies periodically.",

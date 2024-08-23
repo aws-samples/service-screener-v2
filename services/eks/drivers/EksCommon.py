@@ -17,10 +17,11 @@ class EksCommon(Evaluator):
         'udp': [53]
     }
     
-    def __init__(self, eksCluster, clusterInfo, eksClient, ec2Client, iamClient, k8sClient):
+    def __init__(self, eksCluster, clusterInfo, updateInsights, eksClient, ec2Client, iamClient, k8sClient):
         super().__init__()
         self.cluster = eksCluster
         self.clusterInfo = clusterInfo
+        self.updateInsights = updateInsights
         self.eksClient = eksClient
         self.ec2Client = ec2Client
         self.iamClient = iamClient
@@ -486,28 +487,6 @@ class EksCommon(Evaluator):
         
         return
     
-    def _checkPodIdentityIRSA(self):
-        try:
-            useIRSA = False
-            usePodIdentity = False
-
-            if self.clusterInfo.get("identity").get("oidc").get("issuer"):
-                useIRSA = True
-
-            for pod in self.k8sClient.CoreV1Client.list_pod_for_all_namespaces().items:
-                if 'eks-pod-identity-agent' in pod.metadata.name:
-                    usePodIdentity = True
-
-            if not useIRSA and not usePodIdentity:
-                self.results['eksPodIdentityIRSA'] = [-1, 'Disabled']
-
-        except k8sClient.exceptions.ApiException:
-            print('No permission to access cluster, skipping Pod Identity IRSA check')
-        except:
-            print("Unknown error")
-
-        return
-    
     def checkPodSecurityContext(self, context): # Check if security context is not empty
         print(context)
         if not context:
@@ -525,7 +504,7 @@ class EksCommon(Evaluator):
             return False
         if (context.allow_privilege_escalation or context.app_armor_profile or context.capabilities or context.privileged or context.proc_mount
             or context.read_only_root_filesystem or context.run_as_group or context.run_as_non_root or context.run_as_user 
-            or context.se_linux_options or context.sysctls or context.seccomp_profile or windows_options):
+            or context.se_linux_options or context.sysctls or context.seccomp_profile or context.windows_options):
             return True
         else:
             return False
@@ -561,7 +540,48 @@ class EksCommon(Evaluator):
                 self.results['eksSecurityContext'] = [-1, 'Disabled']
 
         except k8sClient.exceptions.ApiException:
-            print('No permission to access cluster, skipping Defined LimitRange check')
+            print('No permission to access cluster, skipping Defined Security Context check')
+        except:
+            print("Unknown error")
+        
+        return
+    
+    def _checkPodIdentityIRSA(self):
+        try:
+            useIRSA = False
+            usePodIdentity = False
+
+            if self.clusterInfo.get("identity").get("oidc").get("issuer"):
+                useIRSA = True
+
+            for pod in self.k8sClient.CoreV1Client.list_pod_for_all_namespaces().items:
+                if 'eks-pod-identity-agent' in pod.metadata.name:
+                    usePodIdentity = True
+
+            if not useIRSA and not usePodIdentity:
+                self.results['eksPodIdentityIRSA'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster, skipping Pod Identity IRSA check')
+        except:
+            print("Unknown error")
+
+        return
+    
+    def _checkUpdateInsights(self):
+        try:
+            haveWarningOrError = False
+
+            for insight in self.updateInsights:
+                if insight.get('insightStatus').get('status') in ['WARNING', 'ERROR']:
+                    haveWarningOrError = True
+                    break
+
+            if haveWarningOrError:
+                self.results['eksUpdateInsights'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster, skipping Update Insights check')
         except:
             print("Unknown error")
         
