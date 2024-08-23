@@ -624,8 +624,9 @@ class EksCommon(Evaluator):
             self.k8sClient.CoreV1Client.list_namespace()
         except k8sClient.exceptions.ApiException:
             self.results['eksPermissionToAccessCluster'] = [-1, 'No permission']
-        except:
-            print("Unknown error")
+        except Exception as e:
+            print(f"Error checking permission to access cluster: {e}")
+
         return
 
     def _checkImplementedPodDisruptionBudget(self):
@@ -638,12 +639,12 @@ class EksCommon(Evaluator):
                     break
 
             if not haveCustomPDB:
-                self.results['eksImplementedPodDisruptionBudget'] = [-1, 'Not found']
+                self.results['eksImplementedPodDisruptionBudget'] = [-1, 'Not Configured']
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Implemented Pod Disruption Budget check')
-        except:
-            print("Unknown error")
+        except Exception as e:
+            print(f"Error checking implemented pod disruption budget: {e}")
 
         return
 
@@ -661,12 +662,12 @@ class EksCommon(Evaluator):
                     break
 
             if not haveDefaultDenyIngressNP:
-                self.results['eksDefaultDenyIngressNetworkPolicy'] = [-1, 'Not found']
+                self.results['eksDefaultDenyIngressNetworkPolicy'] = [-1, None]
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Implemented Default Deny Ingress Network Policy check')
-        except:
-            print("Unknown error")
+        except Exception as e:
+            print(f"Error checking default deny ingress network policy: {e}")
 
         return
 
@@ -683,12 +684,12 @@ class EksCommon(Evaluator):
                     break
 
             if haveViolatedContainer:
-                self.results['eksDefinedResourceRequestAndLimit'] = [-1, 'Not found']
+                self.results['eksDefinedResourceRequestAndLimit'] = [-1, None]
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Defined Resource Request And Limit For Container check')
-        except:
-            print("Unknown error")
+        except Exception as e:
+            print(f"Error checking defined resource request and limit: {e}")
 
         return
 
@@ -700,12 +701,12 @@ class EksCommon(Evaluator):
                 limitRangeExist = True
 
             if not limitRangeExist:
-                self.results['eksConfigureLimitRange'] = [-1, 'Not found']
+                self.results['eksConfigureLimitRange'] = [-1, None]
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Defined LimitRange check')
-        except:
-            print("Unknown error")
+        except Exception as e:
+            print(f"Error checking defined limit range: {e}")
 
         return
 
@@ -720,12 +721,12 @@ class EksCommon(Evaluator):
                         break
 
             if not havePodSpread:
-                self.results['eksPodSpead'] = [-1, 'Not found']
+                self.results['eksPodSpead'] = [-1, None]
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Pod Spread check')
-        except:
-            print("Unknown error")
+        except Exception as e:
+            print(f"Error checking pod spead: {e}")
 
         return
 
@@ -743,12 +744,12 @@ class EksCommon(Evaluator):
                             break
 
             if havePodWithoutLivenessReadiness:
-                self.results['eksLivenessReadiness'] = [-1, 'Not found']
+                self.results['eksLivenessReadiness'] = [-1, None]
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Liveness Readiness check')
-        except:
-            print("Unknown error")
+        except Exception as e:
+            print(f"Error checking liveness readiness: {e}")
 
         return
 
@@ -797,12 +798,12 @@ class EksCommon(Evaluator):
                         break
 
             if havePodWithoutSecurityContext:
-                self.results['eksSecurityContext'] = [-1, 'Not found']
+                self.results['eksSecurityContext'] = [-1, None]
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Defined Security Context check')
-        except:
-            print("Unknown error")
+        except Exception as e:
+            print(f"Error checking security context: {e}")
 
         return
 
@@ -823,27 +824,38 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Pod Identity IRSA check')
-        except:
-            print("Unknown error")
+        except Exception as e:
+            print(f"Error checking pod indentity IRSA: {e}")
 
         return
 
     def _checkUpdateInsights(self):
         try:
-            haveWarningOrError = False
+            haveWarning = False
+            haveError = False
 
             for insight in self.updateInsights:
-                if insight.get('insightStatus').get('status') in ['WARNING', 'ERROR']:
-                    haveWarningOrError = True
-                    break
+                if insight.get('insightStatus').get('status')  == 'WARNING':
+                    haveWarning = True
+                if insight.get('insightStatus').get('status')  == 'ERROR':
+                    haveError = True
 
-            if haveWarningOrError:
-                self.results['eksUpdateInsights'] = [-1, 'WARNING/ERROR']
+            if haveWarning or haveError:
+                output = ""
+                if haveError and not haveWarning:
+                    output = "ERROR"
+                else:
+                    if not haveError and haveWarning:
+                        output = "WARNING"
+                    else:
+                        output ="WARNING & ERROR"
+
+                self.results['eksUpdateInsights'] = [-1, output]
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Update Insights check')
-        except:
-            print("Unknown error")
+        except Exception as e:
+            print(f"Error checking update insights: {e}")
 
         return
 
@@ -861,8 +873,8 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Configured ExpireAfter check')
-        except:
-            print("Unknown error")
+        except Exception as e:
+            print(f"Error checking Karpenter configured expireAfter: {e}")
 
         return
 
@@ -880,8 +892,8 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Resource Limit check')
-        except:
-            print("Unknown error")
+        except Exception as e:
+            print(f"Error checking Karpenter Resource Limit: {e}")
 
         return
 
@@ -902,8 +914,8 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Configure Consolidation check')
-        except:
-            print("Unknown error")
+        except Exception as e:
+            print(f"Error checking Karpenter Configure Consolidation: {e}")
 
         return
 
@@ -930,7 +942,7 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Configure Consolidation check')
-        except:
-            print("Unknown error")
+        except Exception as e:
+            print(f"Error checking Karpenter Restricted Instance Type: {e}")
 
         return
