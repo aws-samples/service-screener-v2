@@ -92,7 +92,98 @@
 			"[IAM Grant Least Privilege]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
 		]
     },
-    "eksAuthenticationMode":{
+	"eksNodeGroupSpotInstanceUsage":{
+		"category": "C",
+		"^description": "{$COUNT} Managed Nodegroup(s) are not using Spot Instance.",
+		"shortDesc": "Leverage spot instances for  deeper discount for fault-tolerant workload.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+		]
+	},
+	"eksCostVisibilityPlugins":{
+		"category": "C",
+		"^description": "{$COUNT} Managed Nodegroup(s) do not have cost visibility plugins installed.",
+		"shortDesc": "Leverage spot instances for  deeper discount for fault-tolerant workload.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+		]
+	},
+	"eksNodegroupsWithoutBottleRocketAMI":{
+		"category": "S",
+		"^description": "{$COUNT} Managed Nodegroup(s) are not using Bottlerocket AMI",
+		"shortDesc": "Use EKS-optimized AMI or  Bottlerocket for host OS. These AMIs reduce the surface of  attack, are light-weight and improve resource utilization of the container  host.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+		]
+	},
+	"eksCheckAutoScaling":{
+		"category": "C",
+		"^description": "{$COUNT} Managed Nodegroup(s) are not using Bottlerocket AMI",
+		"shortDesc": "Use EKS-optimized AMI or  Bottlerocket for host OS. These AMIs reduce the surface of  attack, are light-weight and improve resource utilization of the container  host.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+		]
+	},
+	"eksAutoMountServiceAccountToken":{
+		"category": "C",
+		"^description": "{$COUNT} Managed Nodegroup(s) are not using Bottlerocket AMI",
+		"shortDesc": "Use EKS-optimized AMI or  Bottlerocket for host OS. These AMIs reduce the surface of  attack, are light-weight and improve resource utilization of the container  host.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+		]
+	},
+	"eksPodSecurityStandards":{
+		"category": "C",
+		"^description": "{$COUNT} Managed Nodegroup(s) are not using Bottlerocket AMI",
+		"shortDesc": "Use EKS-optimized AMI or  Bottlerocket for host OS. These AMIs reduce the surface of  attack, are light-weight and improve resource utilization of the container  host.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+		]
+	},
+	"eksNamespaceResourceQuotas":{
+		"category": "C",
+		"^description": "{$COUNT} Managed Nodegroup(s) are not using Bottlerocket AMI",
+		"shortDesc": "Use EKS-optimized AMI or  Bottlerocket for host OS. These AMIs reduce the surface of  attack, are light-weight and improve resource utilization of the container  host.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+		]
+	},
+  "eksAuthenticationMode":{
         "category": "S",
 		"^description": "EKS authentication mode: {$COUNT} of clusters' have 'EKS API' authentication mode disabled. Use 'EKS API' for authentication mode in access configuration of your cluster.",
 		"shortDesc": "'EKS API' authentication mode is disabled",

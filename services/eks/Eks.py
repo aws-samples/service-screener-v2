@@ -20,6 +20,8 @@ class K8sClient:
         self.PolicyV1Client = k8sClient.PolicyV1Api(api_client=self.client())
         self.NetworkingV1Client = k8sClient.NetworkingV1Api(api_client=self.client())
         self.CustomObjectsClient = k8sClient.CustomObjectsApi(api_client=self.client())
+        self.AutoscalingV2Api = k8sClient.AutoscalingV2Api(api_client=self.client())
+        self.AppsV1Api = k8sClient.AppsV1Api(api_client=self.client())
 
     def writeCaFile(self, data: str) -> tempfile.NamedTemporaryFile:
         """
