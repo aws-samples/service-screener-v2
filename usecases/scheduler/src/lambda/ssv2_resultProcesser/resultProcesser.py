@@ -43,7 +43,7 @@ def lambda_handler(event, context):
             _obj = xlsx.get('Key').split('/')
             accounts[_obj[2]] = {'currentRun': currentDate}
 
-    # find latest available files
+    # find latest available filesx
     currentDateObj = datetime.strptime(currentDate, '%Y%m%d').date()
     for x in range(3):
         prefixSearch = (currentDateObj - relativedelta(months=x)).strftime("%Y%m")

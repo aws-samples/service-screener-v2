@@ -13,14 +13,15 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_lambda as lambda_,
     aws_lambda_event_sources as eventsources,
-    aws_scheduler as scheduler
+    aws_scheduler as scheduler,
+    custom_resources
     # aws_sqs as sqs,
 )
 from aws_solutions_constructs.aws_eventbridge_lambda import EventbridgeToLambda
 from aws_cdk.aws_lambda_python_alpha import (
     PythonFunction,
 )
-from os import path
+from os import path, environ
 from constructs import Construct
 
 class ServiceScreenerAutomationStack(Stack):
@@ -28,7 +29,7 @@ class ServiceScreenerAutomationStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         dirname = path.dirname(__file__)
         super().__init__(scope, construct_id, **kwargs)
-        bucket_name = "BucketNameHere1"
+        bucket_name = environ["BUCKET_NAME"]
         prefix="Screener"
 
         vpc = ec2.Vpc(self, "VPC")
@@ -192,8 +193,34 @@ class ServiceScreenerAutomationStack(Stack):
             resources=[bucket.bucket_arn, bucket.bucket_arn+"/*"],
             actions=["s3:PutObject", "s3:GetObject","s3:DeleteObject", "s3:ListBucket"]
         ))
+        initial_insert = custom_resources.AwsCustomResource(
+            scope=self,
+            id='InitialConfigInsert',
+            policy=custom_resources.AwsCustomResourcePolicy.from_sdk_calls(resources=[table.table_arn]),
+            on_create=self.insert(table),
+            resource_type='Custom::MyCustomResource'
+        )
 
+    def insert(self, table):
+            insert_params = {
 
+                "TableName": table.table_name,
+                "Item": {
+                    "name": {"S": environ["NAME"]},
+                    "emails": {"SS": environ["EMAIL_LIST"].split(",")},
+                    "services": {"SS": environ["SERVICES"].split(",")},
+                    "regions": {"SS": environ["REGIONS"].split(",")},
+                    "frequency": {"S": environ["FREQUENCY"]},
+                    "crossAccounts": {"S": environ["CROSSACCOUNTS"]}
+                }
+
+            }
+            return custom_resources.AwsSdkCall(
+                action='putItem',
+                service='dynamodb',
+                parameters=insert_params,
+                physical_resource_id=custom_resources.PhysicalResourceId.of(table.table_name+'_insert')
+            )
 
 
 

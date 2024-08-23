@@ -10,7 +10,7 @@ From left to right
 1. EventBridge (behind-the-scene): It is the main component to perform scheduling event. Based on the scheduler setting, EventBridge triggers AWS Batch to run Screener
 1. AWS Batch: It provides compute environments to runs Screener and shutdown as soon as results are generated. It first look at Spot instance availability ...
 1. ...
-
+![architecture diagram](./screener-architecture.png)
 ### Costs
 
 ## Deployment Guide (Recommend to run in Cloudshell)
