@@ -2,13 +2,15 @@ import boto3
 import json
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-
+import os
 import openpyxl
+import logging
 
 ## Initialization
 SnsEmailSubject = "[AWS] Service Screener Scheduler Report"
 SnsEmailBodyPrefix = "Here is your Service Screener report.\n\n"
-snsPrefix = 'ssv2'
+snsPrefix = os.environ['SSV2_SNSARN_PREFIX']
+
 
 successResp = {
     'statusCode': 200,
@@ -22,10 +24,10 @@ accounts = {}
 SHEETS_TO_SKIP = ['Info', 'Appendix']
 
 def lambda_handler(event, context):
-    record = event['Records'][0]
-    region = record['awsRegion']
-    targetBucket = record['s3']['bucket']['name']
-    targetObject = record['s3']['object']['key']
+    record = event['detail']
+    region = event['region']
+    targetBucket = record['bucket']['name']
+    targetObject = record['object']['key']
     
     s3 = boto3.client('s3', region_name=region)
     sns = boto3.client('sns', region_name=region)
@@ -78,16 +80,16 @@ def lambda_handler(event, context):
 
 def processXlsx(s3, targetBucket, configId, acct, info):
     latestObjname = "{}/{}/{}/workItem.xlsx".format(configId, info['currentRun'], acct)
-    s3.download_file(targetBucket, latestObjname, 'current.xlsx')
-    loadXlsx('current.xlsx')
+    s3.download_file(targetBucket, latestObjname, '/tmp/current.xlsx')
+    loadXlsx('/tmp/current.xlsx')
 
     previousObjname = None
     hasPreviousObj = False
     if 'previousRun' in info:
         hasPreviousObj = True
         previousObjname = "{}/{}/{}/workItem.xlsx".format(configId, info['previousRun'], acct)
-        s3.download_file(targetBucket, previousObjname, 'previous.xlsx')
-        loadXlsx('previous.xlsx')
+        s3.download_file(targetBucket, previousObjname, '/tmp/previous.xlsx')
+        loadXlsx('/tmp/previous.xlsx')
 
     compared = compareXlsx(hasPreviousObj)
     html = formatCompared(compared, hasPreviousObj)
@@ -154,6 +156,7 @@ def compareXlsx(hasPreviousObj):
             len(newFindings),
             len(resolvedItems)
         ])
+        logging.info(data)
 
     return data
 
@@ -228,6 +231,7 @@ def checkIfPreviousScanFound():
 
 def sendSnsEmail(sns, configId, html):
     topic = snsPrefix + '-' + configId
+    print(topic)
     rrr = sns.list_topics()
     topicArn = [tp['TopicArn'] for tp in sns.list_topics()['Topics'] if topic in tp['TopicArn']]
 
