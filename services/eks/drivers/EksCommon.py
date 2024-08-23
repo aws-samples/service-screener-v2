@@ -3,10 +3,13 @@
 import boto3
 import botocore
 import re
+import json
 
 from utils.Config import Config
 from utils.Policy import Policy
 from services.Evaluator import Evaluator
+
+from kubernetes import client as k8sClient
 
 class EksCommon(Evaluator):
     OUTBOUNDSGMINIMALRULES = {
@@ -14,7 +17,7 @@ class EksCommon(Evaluator):
         'udp': [53]
     }
     
-    def __init__(self, eksCluster, clusterInfo, eksClient, ec2Client, iamClient, k8sClient):
+    def __init__(self, eksCluster, clusterInfo, updateInsights, eksClient, ec2Client, iamClient, k8sClient):
         super().__init__()
         self.cluster = eksCluster
         self.clusterInfo = clusterInfo
@@ -23,6 +26,7 @@ class EksCommon(Evaluator):
         self.iamClient = iamClient
         self.k8sClient = k8sClient(cluster_info=self.clusterInfo)
         self.nodegroups_list = self.__get_nodegroups()
+        self.updateInsights = updateInsights
         
         self.init()
         
@@ -608,3 +612,325 @@ class EksCommon(Evaluator):
     def is_graviton_instance(instance_type):
         # Graviton instance types
         return re.search(r'g[^.]*\.', instance_type)
+      
+    def _checkAuthenticationMode(self):
+        authenticationMode = self.clusterInfo.get('accessConfig').get('authenticationMode')
+        if authenticationMode != 'API' and authenticationMode != 'API_AND_CONFIG_MAP':
+            self.results['eksAuthenticationMode'] = [-1, 'Disabled']
+        return
+
+    def _checkPermissionToAccessCluster(self):
+        try :
+            self.k8sClient.CoreV1Client.list_namespace()
+        except k8sClient.exceptions.ApiException:
+            self.results['eksPermissionToAccessCluster'] = [-1, 'No permission']
+        except:
+            print("Unknown error")
+        return
+
+    def _checkImplementedPodDisruptionBudget(self):
+        try:
+            haveCustomPDB = False #Check if cluster include any clustom Pod Disruption Budget outside kube-system namespace
+
+            for pdb in self.k8sClient.PolicyV1Client.list_pod_disruption_budget_for_all_namespaces().items:
+                if pdb.metadata.namespace != 'kube-system':
+                    haveCustomPDB = True
+                    break
+
+            if not haveCustomPDB:
+                self.results['eksImplementedPodDisruptionBudget'] = [-1, 'Not found']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Implemented Pod Disruption Budget check')
+        except:
+            print("Unknown error")
+
+        return
+
+    def _checkDefaultDenyIngressNetworkPolicy(self):
+        try:
+            haveDefaultDenyIngressNP = False 
+
+            for networkPolicy in self.k8sClient.NetworkingV1Client.list_network_policy_for_all_namespaces().items:
+                npSelectAllPod = not networkPolicy.spec.pod_selector.match_expressions and not networkPolicy.spec.pod_selector.match_labels
+                npIsIngressRule = 'Ingress' in networkPolicy.spec.policy_types
+                npIsDenyAll = not networkPolicy.spec.ingress
+
+                if npSelectAllPod and npIsIngressRule and npIsDenyAll:
+                    haveDefaultDenyIngressNP = True
+                    break
+
+            if not haveDefaultDenyIngressNP:
+                self.results['eksDefaultDenyIngressNetworkPolicy'] = [-1, 'Not found']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Implemented Default Deny Ingress Network Policy check')
+        except:
+            print("Unknown error")
+
+        return
+
+    def _checkDefinedResourceRequestAndLimit(self):
+        try:
+            haveViolatedContainer = False # Violated container is the container without resource request and limit defined
+
+            for pod in self.k8sClient.CoreV1Client.list_pod_for_all_namespaces().items:
+                if pod.metadata.namespace != 'kube-system':
+                    for container in pod.spec.containers:
+                        if not container.resources.limits and not container.resources.requests:
+                            haveViolatedContainer = True
+                if haveViolatedContainer:
+                    break
+
+            if haveViolatedContainer:
+                self.results['eksDefinedResourceRequestAndLimit'] = [-1, 'Not found']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Defined Resource Request And Limit For Container check')
+        except:
+            print("Unknown error")
+
+        return
+
+    def _checkDefinedLimitRange(self):
+        try:
+            limitRangeExist = False
+
+            if self.k8sClient.CoreV1Client.list_limit_range_for_all_namespaces().items:
+                limitRangeExist = True
+
+            if not limitRangeExist:
+                self.results['eksConfigureLimitRange'] = [-1, 'Not found']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Defined LimitRange check')
+        except:
+            print("Unknown error")
+
+        return
+
+    def _checkPodSpread(self):
+        try:
+            havePodSpread = False
+
+            for pod in self.k8sClient.CoreV1Client.list_pod_for_all_namespaces().items:
+                if pod.metadata.namespace != 'kube-system':
+                    if pod.spec.topology_spread_constraints:
+                        havePodSpread = True
+                        break
+
+            if not havePodSpread:
+                self.results['eksPodSpead'] = [-1, 'Not found']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Pod Spread check')
+        except:
+            print("Unknown error")
+
+        return
+
+    def _checkLivenessReadiness(self):
+        try:
+            havePodWithoutLivenessReadiness = False # Cluster at least one Pod contain at least ine container without Liveness, Readiness, and Startup Probes defined
+
+            for pod in self.k8sClient.CoreV1Client.list_pod_for_all_namespaces().items:
+                if havePodWithoutLivenessReadiness:
+                    break
+                if pod.metadata.namespace != 'kube-system':
+                    for container in pod.spec.containers:
+                        if not container.liveness_probe and not container.readiness_probe and not container.startup_probe:
+                            havePodWithoutLivenessReadiness = True
+                            break
+
+            if havePodWithoutLivenessReadiness:
+                self.results['eksLivenessReadiness'] = [-1, 'Not found']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Liveness Readiness check')
+        except:
+            print("Unknown error")
+
+        return
+
+    def checkPodSecurityContext(self, context): # Check if security context is not empty
+        if not context:
+            return False
+        if (context.app_armor_profile or context.fs_group or context.fs_group_change_policy or context.run_as_group
+            or context.run_as_non_root or context.run_as_user or context.se_linux_options or context.seccomp_profile 
+            or context.supplemental_groups or context.sysctls or context.windows_options):
+            return True
+        else:
+            return False
+
+    def checkContainerSecurityContext(self, context): # Check if security context is not empty
+        if not context:
+            return False
+        if (context.allow_privilege_escalation or context.app_armor_profile or context.capabilities or context.privileged or context.proc_mount
+            or context.read_only_root_filesystem or context.run_as_group or context.run_as_non_root or context.run_as_user 
+            or context.se_linux_options or context.sysctls or context.seccomp_profile or context.windows_options):
+            return True
+        else:
+            return False
+
+    def _checkSecurityContext(self):
+        try:
+            havePodWithoutSecurityContext = False # Cluster have at least one Pod without Security Context
+
+            for pod in self.k8sClient.CoreV1Client.list_pod_for_all_namespaces().items:
+                if havePodWithoutSecurityContext:
+                    break
+
+                if pod.metadata.namespace != 'kube-system':
+                    thisPodHaveSecurityContext = False
+
+                    if self.checkPodSecurityContext(pod.spec.security_context):
+                        thisPodHaveSecurityContext = True
+
+                    if not thisPodHaveSecurityContext:
+                        for container in pod.spec.containers:
+                            if self.checkContainerSecurityContext(container.security_context):
+                                thisPodHaveSecurityContext = True
+                                break
+
+                    if not thisPodHaveSecurityContext:
+                        havePodWithoutSecurityContext = True
+                        break
+
+            if havePodWithoutSecurityContext:
+                self.results['eksSecurityContext'] = [-1, 'Not found']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Defined Security Context check')
+        except:
+            print("Unknown error")
+
+        return
+
+    def _checkPodIdentityIRSA(self):
+        try:
+            useIRSA = False
+            usePodIdentity = False
+
+            if self.clusterInfo.get("identity").get("oidc").get("issuer"):
+                useIRSA = True
+
+            for pod in self.k8sClient.CoreV1Client.list_pod_for_all_namespaces().items:
+                if 'eks-pod-identity-agent' in pod.metadata.name:
+                    usePodIdentity = True
+
+            if not useIRSA and not usePodIdentity:
+                self.results['eksPodIdentityIRSA'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Pod Identity IRSA check')
+        except:
+            print("Unknown error")
+
+        return
+
+    def _checkUpdateInsights(self):
+        try:
+            haveWarningOrError = False
+
+            for insight in self.updateInsights:
+                if insight.get('insightStatus').get('status') in ['WARNING', 'ERROR']:
+                    haveWarningOrError = True
+                    break
+
+            if haveWarningOrError:
+                self.results['eksUpdateInsights'] = [-1, 'WARNING/ERROR']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Update Insights check')
+        except:
+            print("Unknown error")
+
+        return
+
+    def _checkKarpenterConfiguredExpireAfter(self):
+        try:
+            configuredExpireAfter = False
+
+            for nodePool in self.k8sClient.CustomObjectsClient.list_cluster_custom_object('karpenter.sh', 'v1beta1', 'nodepools').get("items"):
+                if nodePool.get('spec').get('disruption').get('expireAfter') != '720h':
+                    configuredExpireAfter = True
+                    break
+
+            if not configuredExpireAfter:
+                self.results['eksKarpenterConfiguredExpireAfter'] = [-1, 'Default: 720h']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Configured ExpireAfter check')
+        except:
+            print("Unknown error")
+
+        return
+
+    def _checkKarpenterResourceLimit(self):
+        try:
+            haveViolatedNodePool = False # Violated NodePool is the NodePool without Limits set.
+
+            for nodePool in self.k8sClient.CustomObjectsClient.list_cluster_custom_object('karpenter.sh', 'v1beta1', 'nodepools').get("items"):
+                if not nodePool.get('spec').get('limits'):
+                    haveViolatedNodePool = True
+                    break
+
+            if haveViolatedNodePool:
+                self.results['eksKarpenterResourceLimit'] = [-1, 'Unlimited']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Resource Limit check')
+        except:
+            print("Unknown error")
+
+        return
+
+    def _checkKarpenterConfigureConsolidation(self):
+        try:
+            haveViolatedNodePool = False # Violated NodePool is the NodePool without Consolidation Policy set.
+
+            for nodePool in self.k8sClient.CustomObjectsClient.list_cluster_custom_object('karpenter.sh', 'v1beta1', 'nodepools').get("items"):
+                dontHaveConsolidationPolicy = not nodePool.get('spec').get('disruption').get('consolidationPolicy')
+                dontHaveConsolidateAfter = not nodePool.get('spec').get('disruption').get('consolidateAfter') or nodePool.get('spec').get('disruption').get('consolidateAfter') == 'Never'
+
+                if dontHaveConsolidationPolicy and dontHaveConsolidateAfter:
+                    haveViolatedNodePool = True
+                    break
+
+            if haveViolatedNodePool:
+                self.results['eksKarpenterConfigureConsolidation'] = [-1, 'Disabled']
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Configure Consolidation check')
+        except:
+            print("Unknown error")
+
+        return
+
+    def _checkKarpenterRestrictedInstanceType(self):
+        try:
+            haveViolatedNodePool = False # Violated NodePool is the NodePool only allow one instance type.
+            allowedInstanceTypes = []
+
+            for nodePool in self.k8sClient.CustomObjectsClient.list_cluster_custom_object('karpenter.sh', 'v1beta1', 'nodepools').get("items"):
+                if haveViolatedNodePool:
+                    break
+
+                for requirement in nodePool.get('spec').get('template').get('spec').get('requirements'):
+                    isInstanceTypeRestriction = requirement.get('key') == 'node.kubernetes.io/instance-type'
+                    isOperatorIn = requirement.get('operator') == 'In'
+                    containOnlyOneValue = len(requirement.get('values')) < 2
+                    if (isInstanceTypeRestriction and isOperatorIn and containOnlyOneValue):
+                        haveViolatedNodePool = True
+                        allowedInstanceTypes = requirement.get('values')
+                        break
+
+            if haveViolatedNodePool:
+                self.results['eksKarpenterRestrictedInstanceType'] = [-1, allowedInstanceTypes]
+
+        except k8sClient.exceptions.ApiException:
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Configure Consolidation check')
+        except:
+            print("Unknown error")
+
+        return

@@ -182,5 +182,202 @@
 		"ref": [
 			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
 		]
-	}
+	},
+  "eksAuthenticationMode":{
+        "category": "S",
+		"^description": "EKS authentication mode: {$COUNT} of clusters' have 'EKS API' authentication mode disabled. Use 'EKS API' for authentication mode in access configuration of your cluster.",
+		"shortDesc": "'EKS API' authentication mode is disabled",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[EKS Authentication Mode]<https://aws.amazon.com/blogs/containers/a-deep-dive-into-simplified-amazon-eks-access-management-controls/>",
+            "[EKS Best Practices Guides]<https://aws.github.io/aws-eks-best-practices/security/docs/iam/#cluster-access-manager>"
+		]
+    },
+    "eksPermissionToAccessCluster":{
+        "category": "S",
+		"^description": "EKS permission error: Service screen don't have access to your {$COUNT} EKS clusters, somecheck will be skipped on these clusters, please make sure your user have enough permission.'",
+		"shortDesc": "User don't have permission to access EKS clusters",
+		"criticality": "I",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Grant access to Kubernetes APIs]<https://docs.aws.amazon.com/eks/latest/userguide/grant-k8s-access.html>"
+		]
+    },
+    "eksImplementedPodDisruptionBudget":{
+        "category": "R",
+		"^description": "EKS Pod Disruption Budget: {$COUNT} of clusters' don't have Pod Disruption Budget. Prevent disruption and increase  availability of workloads by limitting the number of concurrent disruptions  to Pods.'",
+		"shortDesc": "Implement Pod Disruption Budget",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Pod Disruption Budget]<https://kubernetes.io/docs/tasks/run-application/configure-pdb/#specifying-a-poddisruptionbudget>"
+		]
+    },
+    "eksDefaultDenyIngressNetworkPolicy":{
+        "category": "S",
+		"^description": "EKS Default Deny Ingress: {$COUNT} of clusters' don't have a defaut deny ingress network policy. This policy prevent Pods from communicating with each other unless allowed explicitly.",
+		"shortDesc": "Create default deny ingress network policy",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Default deny all ingress traffic]<https://kubernetes.io/docs/concepts/services-networking/network-policies/#default-deny-all-ingress-traffic>"
+		]
+    },
+    "eksDefinedResourceRequestAndLimit":{
+        "category": "R",
+		"^description": "EKS defined resource request and limit: {$COUNT} of clusters' have containers without resource request and limit defined. This helps kube-scheduler to allocate pods to the right node. Helps Karpenter and Fargate to scale out right-sized nodes.",
+		"shortDesc": "Defined resource request and limit for container",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[EKS best practice]<https://aws.github.io/aws-eks-best-practices/reliability/docs/dataplane/#configure-and-size-resource-requestslimits-for-all-workloads>",
+            "[Resource Management for Pods and Containers]<https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/>"
+		]
+    },
+    "eksConfigureLimitRange":{
+        "category": "R",
+		"^description": "EKS configure LimitRange: {$COUNT} of clusters' don't have LimitRange defined. This helps to ensure that a single object cannot monopolize all available resources within a namespace. Also enforce default Resource Request and Limit for containers.",
+		"shortDesc": "Defined LimitRange for clusters",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Define LimitRange]<https://kubernetes.io/docs/concepts/policy/limit-range/>"
+		]
+    },
+    "eksPodSpead":{
+        "category": "R",
+		"^description": "EKS Pod spread constrant: {$COUNT} of clusters' don't have any Pod Topology Spread Constraints defined. Helps to spread pods across Availability Zones and Hosts. Optional for workload (e.g. data processing) which require Pods to be placed in the same availability zone.",
+		"shortDesc": "Define Pod Topology Spread Constraints",
+		"criticality": "L",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Example Spread Constraints]<https://raw.githubusercontent.com/kubernetes/website/main/content/en/examples/pods/topology-spread-constraints/two-constraints.yaml>"
+		]
+    },
+    "eksLivenessReadiness":{
+        "category": "R",
+		"^description": "EKS Liveness, Readiness, Startup Probes: {$COUNT} of clusters' contain container without Readiness, Liveness, and Startup Probes defined. By default, traffic are sent to containers immediately. Setting these probes allow Kubernetes to know when  your applications are ready to receive traffic or if they have became  unresponsive.",
+		"shortDesc": "Implement Readiness, Liveness, and Startup Probes",
+		"criticality": "M",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Configure Liveness, Readiness and Startup Probes]<https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/>"
+		]
+    },
+    "eksSecurityContext":{
+        "category": "S",
+		"^description": "EKS security context: {$COUNT} of clusters' contain container without security context. A security context defines privilege and access control setting for a Pod or Container. It prevents attacker from getting too many priviledges if Pod is compromised.",
+		"shortDesc": "Configure Pods and Containers  Security Context",
+		"criticality": "M",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Configure security context]<https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>"
+		]
+    },
+    "eksPodIdentityIRSA":{
+        "category": "S",
+		"^description": "EKS Pod Identity IRSA: {$COUNT} of clusters' don't use Pod Identities or IRSA. Applications in a Pod's containers can use an AWS SDK or the AWS CLI to make API requests to AWS services using AWS IAM permissions. EKS Pod Identities and IRSA provide the  ability to manage credentials for your applications, similar to the way that  Amazon EC2 instance profiles provide credentials to Amazon EC2 instances. Instead of creating and distributing your AWS credentials to the containers  or using the Amazon EC2 instance's role, you associate an IAM role with a Kubernetes service account and configure your Pods to use the service account.",
+		"shortDesc": "Use EKS Pod Identities or IRSA",
+		"criticality": "M",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Configure security context]<https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>"
+		]
+    },
+    "eksUpdateInsights":{
+        "category": "O",
+		"^description": "EKS Update Insights: {$COUNT} of clusters' have ERROR and/or WARNING update insights. To fix these findings, you need  to update your Kubernetes manifests to stop using deprecated APIs. This helps  to avoid compatibility issues after upgrading your EKS clusters.",
+		"shortDesc": "Fix ERROR and WARNING update insights",
+		"criticality": "M",
+		"downtime": 1,
+		"slowness": 1,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Test and verify update with update insights]<https://aws.amazon.com/blogs/containers/accelerate-the-testing-and-verification-of-amazon-eks-upgrades-with-upgrade-insights/>"
+		]
+    },
+    "eksKarpenterConfiguredExpireAfter":{
+        "category": "S",
+		"^description": "EKS Karpenter configure 'disruption.expireAfter': {$COUNT} of clusters' are using default 'disruption.expireAfter' for all NodePool. This feature rehydrates nodes to  ensure that they are upgraded with the latest AMI and dependencies periodically.",
+		"shortDesc": "Configure 'disruption.expireAfter' for node pools",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Define expireAfter]<https://karpenter.sh/docs/concepts/disruption/#automated-methods>"
+		]
+    },
+    "eksKarpenterResourceLimit":{
+        "category": "C",
+		"^description": "EKS Karpenter limits: {$COUNT} of clusters' includes NodePool without limits. Set limits for node pools to keep cost in check.",
+		"shortDesc": "Set limits for node pools",
+		"criticality": "M",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Setup limit for NodePool]<https://karpenter.sh/docs/concepts/nodepools/#speclimits>"
+		]
+    },
+    "eksKarpenterConfigureConsolidation":{
+        "category": "C",
+		"^description": "EKS Karpenter consolidation: {$COUNT} of clusters' don't have cosolidation policy. Enable this make Karpenter consolidate / terminate under-utilised nodes.",
+		"shortDesc": "Configure 'disruption.consolidationPolicy' and 'consolidateAfter'",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Configure Consolidation]<https://karpenter.sh/docs/concepts/disruption/#automated-methods>"
+		]
+    },
+    "eksKarpenterRestrictedInstanceType":{
+        "category": "P",
+		"^description": "EKS Karpenter limits: {$COUNT} of clusters' includes NodePool with instance type restricted. Ensure that Karpenter nodepools  are not restricted by instance type.",
+		"shortDesc": "Remove instance type restriction",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Remove instance type restriction]<https://karpenter.sh/docs/concepts/nodepools/#spectemplatespecrequirements>"
+		]
+    }
 }

@@ -18,6 +18,8 @@ class K8sClient:
         self.stsClientFactory = STSClientFactory(self.workSession)
         self.CoreV1Client = k8sClient.CoreV1Api(api_client=self.client())
         self.PolicyV1Client = k8sClient.PolicyV1Api(api_client=self.client())
+        self.NetworkingV1Client = k8sClient.NetworkingV1Api(api_client=self.client())
+        self.CustomObjectsClient = k8sClient.CustomObjectsApi(api_client=self.client())
         self.AutoscalingV2Api = k8sClient.AutoscalingV2Api(api_client=self.client())
         self.AppsV1Api = k8sClient.AppsV1Api(api_client=self.client())
 
@@ -92,6 +94,12 @@ class Eks(Service):
             name = clusterName
         )
         return response.get('cluster')
+    
+    def listInsights(self, clusterName):
+        response = self.eksClient.list_insights(
+            clusterName = clusterName
+        )
+        return response.get('insights')
 
     def advise(self):
         objs = {}
@@ -99,6 +107,7 @@ class Eks(Service):
         for cluster in clusters:
             print('...(EKS:Cluster) inspecting ' + cluster)
             clusterInfo = self.describeCluster(cluster)
+            updateInsights = self.listInsights(cluster)
             # K8sClient = self.generateK8sClient(cluster, clusterInfo)
             #if clusterInfo.get('status') == 'CREATING':
             #    print(cluster + " cluster is creating. Skipped")
@@ -108,7 +117,7 @@ class Eks(Service):
                 nTags = self.convertKeyPairTagToTagFormat(resp.get('tags'))
                 if self.resourceHasTags(nTags) == False:
                     continue
-            obj = EksCommon(cluster, clusterInfo, self.eksClient, self.ec2Client, self.iamClient, K8sClient)
+            obj = EksCommon(cluster, clusterInfo, updateInsights, self.eksClient, self.ec2Client, self.iamClient, K8sClient)
             obj.run(self.__class__)
             objs['Cluster::' + cluster] = obj.getInfo()
         return objs
