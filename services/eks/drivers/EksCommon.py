@@ -22,7 +22,7 @@ class EksCommon(Evaluator):
         self.ec2Client = ec2Client
         self.iamClient = iamClient
         self.k8sClient = k8sClient(cluster_info=self.clusterInfo)
-        self.nodegroups_list = self.__get_node_groups()
+        self.nodegroups_list = self.__get_nodegroups()
         
         self.init()
         
@@ -241,114 +241,370 @@ class EksCommon(Evaluator):
         
         return
 
-    def __get_node_groups(self):
+    def __get_nodegroups(self) -> list:
+        """
+        Retrieve a list of all managed node groups in the EKS cluster.
+
+        This method uses the EKS client to list all managed node groups associated with the cluster.
+        It handles pagination by continuing to make API calls until all node groups have been retrieved.
+
+        Returns:
+            list: A list of node group names (strings) in the cluster.
+
+        Note:
+            - This method only retrieves managed node groups. Self-managed node groups are not included.
+            - The method handles pagination internally, making multiple API calls if necessary.
+
+        Example:
+            self.__get_node_groups()
+            ['nodegroup-1', 'nodegroup-2', 'nodegroup-3']
+        """
+
         _cluster_name = self.clusterInfo.get("name")
         nodegroups_list = list()
-        nextToken = True
-        while nextToken:
+        next_token = True
+        while next_token:
             nodegroups = self.eksClient.list_nodegroups(  # Self-managed node groups are not listed
                 clusterName=_cluster_name,
             )
             nodegroups_list.extend(nodegroups.get("nodegroups"))
 
             if not nodegroups.get("nextToken"):
-                nextToken = False
+                next_token = False
 
         return nodegroups_list
 
-    def _checkSpotUsage(self) -> bool:
-        """EKS-25 Leverage spot instances for  deeper discount for fault-tolerant workload.
-
-        https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
-
-        :return: bool
+    def _checkSpotUsage(self):
         """
+        Check if the EKS cluster leverages Spot instances for deeper discounts on fault-tolerant workloads (EKS-25).
 
-        print("EKS-25 Leverage spot instances for  deeper discount for fault-tolerant workload")
-        _cluster_name = self.clusterInfo.get("name")
+        This function examines all managed node groups in the cluster to determine if they are using
+        Spot instances. It identifies and reports any node groups that are not using Spot capacity.
 
-        mng_wo_spot = []  # Empty list for Managed Node Groups with Capacity Type != SPOT
+        Spot instances can offer significant cost savings for fault-tolerant workloads, as they use
+        spare EC2 capacity at discounted rates. However, they can be interrupted with short notice,
+        so they are best suited for flexible, stateless applications.
 
-        if len(self.nodegroups_list) != 0:
-            for each_nodegroup in self.nodegroups_list:
-                each_nodegroup_detail = self.eksClient.describe_nodegroup(
-                    clusterName=_cluster_name,
-                    nodegroupName=each_nodegroup
-                )
-
-                if each_nodegroup_detail.get("nodegroup").get("capacityType") != "SPOT":
-                    mng_wo_spot.append(each_nodegroup)
-
-        if len(mng_wo_spot) != 0:
-            print("Node Groups without Spot Instance")
-            print(mng_wo_spot)  # TODO To print out to the result thingy
-
-        print("Spot Instance Usage Check Completed")
-
-        return len(mng_wo_spot) == 0
-
-    def _checkCostVisibility(self) -> bool:
+        Reference:
+            https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
         """
-        EKS-10 Implement a tool for cost  visibility
+        try:
+            _cluster_name = self.clusterInfo.get("name")
 
-        https://docs.aws.amazon.com/eks/latest/userguide/cost-monitoring.html
-        :return: bool
+            mng_wo_spot = []  # Empty list for Managed Node Groups with Capacity Type != SPOT
+
+            if len(self.nodegroups_list) != 0:
+                for each_nodegroup in self.nodegroups_list:
+                    each_nodegroup_detail = self.get_nodegroup_details(each_nodegroup)
+                    if self.check_capacity_type(each_nodegroup_detail, "SPOT"):
+                        mng_wo_spot.append(each_nodegroup)
+
+            if mng_wo_spot:
+                self.results['eksNodeGroupSpotInstanceUsage'] = [-1, str(mng_wo_spot)]
+
+        except Exception as e:
+            print(f"Error Checking Spot Instance Usage {e}")
+
+    def _checkCostVisibility(self):
         """
-        print("EKS-10 Implement a tool for cost  visibility")
+        Check if a cost visibility tool is implemented for the EKS cluster (EKS-10).
 
-        return self.__kube_cost()
+        This function verifies the implementation of a cost monitoring solution for Amazon EKS.
+        It specifically checks for the installation of Kubecost, which is one of the recommended
+        tools for cost visibility in EKS clusters.
 
-    def __kube_cost(self) -> bool:
+        The function delegates the actual check to the __kube_cost method, which verifies
+        if the Kubecost addon is installed in the cluster so that we can implement more the checks
+        in the future if needed.
+
+        Note:
+            - This check only verifies Kubecost installation and does not check for other
+              cost visibility solutions like AWS Billing split cost allocation data.
+
+        Reference:
+            https://docs.aws.amazon.com/eks/latest/userguide/cost-monitoring.html
         """
-        Check if Kube Cost plugin is installed.
+        plugins = {"kube-cost": self.__kube_cost()}
 
-        :return: bool
+        self.results['eksCostVisibilityPlugins'] = [-1, str(plugins)]
+
+    def __kube_cost(self):
         """
-        print("Checking if Kube Cost Plugin is installed")
+        Check if the Kubecost plugin is installed in the EKS cluster.
 
-        kube_cost_addon_name = "kubecost_kubecost"  # TODO Move to constants.py
+        This function queries the list of addons installed in the EKS cluster
+        and checks for the presence of the Kubecost addon.
 
-        _cluster_name = self.clusterInfo.get("name")
+        Returns:
+            bool: True if the Kubecost plugin is installed, False otherwise.
 
-        addons = self.eksClient.list_addons(
-            clusterName=_cluster_name
-        ).get("addons")
+        Raises:
+            Exception: If there's an error while checking for the Kubecost plugin installation.
+            This exception is caught and printed, and the function implicitly returns None in this case.
 
-        if kube_cost_addon_name not in addons:
-            print(f"{_cluster_name} - Kube Cost Plugin is not installed")
-            return False
+        Note:
+            - The function uses a hardcoded addon name 'kubecost_kubecost'.
+            - TODO to move this constant to a separate constants.py file.
+            - The function relies on self.clusterInfo and self.eksClient being properly initialized.
+            - If the addon is not found, a message is printed to stdout before returning False.
+        """
+        try:
+            kube_cost_addon_name = "kubecost_kubecost"  # TODO Move to constants.py
 
-        return True
+            _cluster_name = self.clusterInfo.get("name")
+
+            addons = self.eksClient.list_addons(
+                clusterName=_cluster_name
+            ).get("addons")
+
+            return kube_cost_addon_name in addons
+
+        except Exception as e:
+            print(f"Error checking Kube Cost Plugin installation: {e}")
 
     def _checkAMIs(self) -> bool:
         """
-        EKS-13 Use EKS-optimized AMI or Bottlerocket for host OS
+        Check if all nodegroups in the EKS cluster are using EKS-optimized AMI or Bottlerocket for host OS (EKS-13).
+
+        This function iterates through all nodegroups in the cluster and checks their AMI type.
+        It specifically looks for nodegroups that are not using Bottlerocket OS, which is
+        identified by an AMI type starting with "Bottlerocket".
+
+        Returns:
+            bool: True if all nodegroups are using Bottlerocket OS, False otherwise.
+
+        Note:
+            - The function assumes that AMI types starting with "Bottlerocket" are compliant.
+            - EKS-optimized AMIs are not explicitly checked.
+        """
+        try:
+            _cluster_name = self.clusterInfo.get("name")
+            regex_pattern = r"^Bottlerocket"
+            nodegroups_not_using_bottlerocket = []
+
+            if len(self.nodegroups_list) != 0:
+                for each_nodegroup in self.nodegroups_list:
+                    each_nodegroup_ami_type = self.get_nodegroup_details(each_nodegroup)["nodegroup"]["amiType"]
+                    # each_nodegroup_ami_type = self.eksClient.describe_nodegroup(
+                    #     clusterName=_cluster_name,
+                    #     nodegroupName=each_nodegroup
+                    # )["nodegroup"]["amiType"]
+
+                    if not re.match(regex_pattern, each_nodegroup_ami_type):
+                        nodegroups_not_using_bottlerocket.append(each_nodegroup)
+
+            if nodegroups_not_using_bottlerocket:
+                self.results["eksNodegroupsWithoutBottleRocketAMI"] = [-1, str(nodegroups_not_using_bottlerocket)]
+        except Exception as e:
+            print(f"Error checking node group AMIs: {e}")
+
+    def _checkAutoScaling(self):
+        """
+        Check if a Pod Autoscaler (Cluster Autoscaler or Karpenter) is installed in the cluster (EKS-31).
+
+        This function searches for pods in the 'kube-system' namespace whose names contain
+        either 'cluster-autoscaler' or 'karpenter', indicating the presence of an autoscaler.
+
+        Returns:
+            bool: False if an autoscaler is found, implying the check passes.
+                  The function doesn't explicitly return True, which may be a bug.
+
+        Raises:
+            Exception: If there's an error while checking for the pod autoscaler.
+        """
+        karpenter_installed = False
+        cluster_autoscaler_installed = False
+        try:
+            regex_cluster_autoscaler = r'\bcluster-autoscaler\b'
+
+            # Check for Karpenter
+            # Assumping if the karpenter is in separate namespace
+            pods = self.k8sClient.CoreV1Client.list_namespaced_pod("karpenter").items
+            if not len(pods) == 0:
+                karpenter_installed = True
+
+            # Check for Cluster Autoscaler
+            pods = self.k8sClient.CoreV1Client.list_namespaced_pod("kube-system").items
+            for each_pod in pods:
+                pod_name = each_pod.metadata.name
+                installed = re.search(regex_cluster_autoscaler, pod_name)
+                if installed:
+                    cluster_autoscaler_installed = True
+
+            if not (karpenter_installed or cluster_autoscaler_installed):
+                self.results["eksCheckAutoScaling"] = [-1, ""]
+
+        except Exception as e:
+            print(f"Error checking pod autoscaler: {e}")
+            pass
+
+    def _checkAutoMountServiceAccountToken(self):
+        """
+        Check if pods have opted out of automounting service account tokens (EKS-16).
+
+        This function iterates through all pods in all namespaces and checks whether they have
+        opted out of automounting API credentials. A pod is considered to have opted out if:
+        - The pod spec explicitly sets automountServiceAccountToken: false, or
+        - The pod spec doesn't set automountServiceAccountToken, but the associated ServiceAccount sets it to false.
+
+        The function prints the status for each pod, indicating whether it has opted out or not.
+
+        Reference:
+        https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#opt-out-of-api-credential-automounting
+
+        Raises:
+            Exception: If there's an error while checking the automount status of service account tokens.
+
+        Returns:
+            None
+        """
+        try:
+            # List all pods in all namespaces
+            pods = self.k8sClient.CoreV1Client.list_pod_for_all_namespaces(watch=False)
+
+            results = []
+
+            for pod in pods.items:
+                pod_name = pod.metadata.name
+                namespace = pod.metadata.namespace
+
+                # Check pod spec for automountServiceAccountToken
+                pod_automount = pod.spec.automount_service_account_token
+
+                # Check service account for automountServiceAccountToken
+                sa_name = pod.spec.service_account_name or "default"
+                sa = self.k8sClient.CoreV1Client.read_namespaced_service_account(sa_name, namespace)
+                sa_automount = sa.automount_service_account_token
+
+                if pod_automount is False or (pod_automount is None and sa_automount is False):
+                    pass
+                else:
+                    results.append(pod_name)
+
+            if results:
+                self.results["eksAutoMountServiceAccountToken"] = [-1, str(results)]
+
+        except Exception as e:
+            print(f"Error checking Automount Service Account Token: {e}")
+
+    def _checkPodSecurityStandards(self):
+        """
+        Check Pod Security Standards enforcement for all namespaces in the Kubernetes cluster.
+
+        This method iterates through all namespaces and checks if the 'pod-security.kubernetes.io/enforce'
+        label is set. If the label is present, it prints the enforcement level. If not, it prints a message
+        indicating that Pod Security Standards are not enforced for that namespace.
+
+        Note:
+            - TODO: Implement check if Open Policy Agent Gatekeeper exists
+
+        """
+        try:
+            namespace_list = self.k8sClient.CoreV1Client.list_namespace()
+            namespaces_wo_pod_security = []
+            for namespace in namespace_list.items:
+                labels = namespace.metadata.labels
+                print(labels)
+                if not labels and "pod-security.kubernetes.io/enforce" in labels:
+                    namespaces_wo_pod_security.append(namespace.metadata.name)
+            # if namespaces_wo_pod_security:
+            self.results["eksPodSecurityStandards"] = [-1, str(namespaces_wo_pod_security)]
+
+        except Exception as e:
+            print(f"Error checking Pod Security Standards: {e}")
+
+    def _checkNamespaceResourceQuotas(self):
+        """
+        Check if resource quotas are configured for all namespaces in the EKS cluster.
+
+        This function implements the EKS-26 control, which requires configuring resource quotas
+        for namespaces. It retrieves all namespaces in the cluster and checks if each namespace
+        has at least one ResourceQuota object defined.
+
+        The function uses the Kubernetes API to list all namespaces and their associated
+        ResourceQuota objects. It then identifies namespaces without any resource quotas and
+        stores them in the results.
+
+        Returns:
+            None
+
+        Reference:
+            https://kubernetes.io/docs/concepts/policy/resource-quotas/
+        """
+
+        # Get all namespaces
+        namespaces = self.k8sClient.CoreV1Client.list_namespace()
+        namespaces_wo_resource_quota = list()
+
+        for each_namespace in namespaces.items:
+            namespace = each_namespace.metadata.name
+
+            # Get resource quotas for the namespace
+            quotas = self.k8sClient.CoreV1Client.list_namespaced_resource_quota(namespace)
+
+            if not quotas.items:
+                namespaces_wo_resource_quota.append(namespace)
+
+        if namespaces_wo_resource_quota:
+            self.results["eksNamespaceResourceQuotas"] = [-1, str(namespaces_wo_resource_quota)]
+
+    def _checkAddonsNodeGroups(self):
+        # Define the add-ons to check
+        addons = ["coredns", "cluster-autoscaler", "karpenter"]  # TODO Move this into constants.py
+        cluster_addons = self.eksClient.list_addons(clusterName=self.clusterInfo.get("name")).get("addons")
+
+        print(f"Cluster Addons - {cluster_addons}")
+
+        nodes = self.k8sClient.CoreV1Client.list_node().items
+
+        # for node in nodes:
+            # print(f"Node - {node.metadata}")
+            # labels = node.metadata.labels.get("eks.amazonaws.com/nodegroup")
+
+        self.__check_karpenter()
+    def __check_core_dns(self):
+        pass
+
+    def __check_cluster_autoscaler(self):
+        pass
+    def __check_karpenter(self):
+        """
+        Assumpting the karpenter is in seperate namespace.
 
         :return:
         """
-        _cluster_name = self.clusterInfo.get("name")
 
-        regex_pattern = r"^Bottlerocket"
+        nodegroups = list()
 
-        nodegroups_not_using_bottlerocket = list()
+        try:
+            pods = self.k8sClient.CoreV1Client.list_namespaced_pod("karpenter").items
+            if not len(pods) == 0:
+                for each_pod in pods:
+                    nodegroup_name = (self.k8sClient.CoreV1Client.read_node(each_pod.spec.node_name).metadata.labels.get
+                              ("eks.amazonaws.com/nodegroup"))
 
-        if len(self.nodegroups_list) != 0:
-            for each_nodegroup in self.nodegroups_list:
-                each_nodegroup_amitype = self.eksClient.describe_nodegroup(
-                    clusterName=_cluster_name,
-                    nodegroupName=each_nodegroup
-                )["nodegroup"]["amiType"]
+                    if nodegroup_name:
+                        nodegroups.append(nodegroup_name)
+        except Exception as e:
+            print(f"Error Checking Karpenter Details {e}")
 
-                if not re.match(regex_pattern, each_nodegroup_amitype):
-                    nodegroups_not_using_bottlerocket.append(each_nodegroup)
+        if not len(nodegroups) == 0:
+            for each_nodegroup in nodegroups:
+                details = self.get_nodegroup_details(each_nodegroup)
+                self.check_instance_type(details)
+                self.check_capacity_type(details, "ON-DEMAND")
 
-        return len(nodegroups_not_using_bottlerocket) == 0
+    def get_nodegroup_details(self, nodegroup) -> dict:
+        return self.eksClient.describe_nodegroup(clusterName=self.clusterInfo.get("name"), nodegroupName=nodegroup)
 
-    def _checkCostAllocationTags(self):
-        """
-        EKS-24
+    def check_instance_type(self,details) -> bool:
+        return all(self.is_graviton_instance(instance_type=it) for it in details['nodegroup']['instanceTypes'])
 
-        :return:
-        """
+    @staticmethod
+    def check_capacity_type(details, capacity_type) -> bool:
+        return details["nodegroup"]["capacityType"] == capacity_type
 
-        print(self.k8sClient.CoreV1Client.list_namespace())
+    @staticmethod
+    def is_graviton_instance(instance_type):
+        # Graviton instance types
+        return re.search(r'g[^.]*\.', instance_type)
