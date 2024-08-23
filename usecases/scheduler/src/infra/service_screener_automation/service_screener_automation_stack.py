@@ -61,7 +61,7 @@ class ServiceScreenerAutomationStack(Stack):
             description="Screener ECS JOB Scheduler Role"
         )
         job_role_.add_to_policy(iam.PolicyStatement(
-            resources=[bucket.bucket_arn],
+            resources=[bucket.bucket_arn+"/*"],
             actions=["s3:PutObject", "s3:GetObject","s3:DeleteObject"]
         ))
         job_role_.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("ReadOnlyAccess"))
