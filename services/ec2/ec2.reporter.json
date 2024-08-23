@@ -129,6 +129,19 @@
             "[Rightsizing Whitepaper]<https://d1.awsstatic.com/whitepapers/cost-optimization-right-sizing.pdf>"
         ]
     },
+    "EC2SpikyUtilization": {
+        "category": "C",
+        "^description": "EC2 Spiky Utilization: {$COUNT} of your instances have spiky utilization. Switch to burstable instance to save cost.",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "EC2 Spiky Utilization",
+        "ref": [
+            "[Rightsizing Whitepaper]<https://d1.awsstatic.com/whitepapers/cost-optimization-right-sizing.pdf>"
+        ]
+    },
     "EC2InstancePublicIP": {
         "category": "S",
         "^description": "EC2 with Public IP: {$COUNT} of your instances associated public IP. Disable unused public IP from instances.",

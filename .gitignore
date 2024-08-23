@@ -8,6 +8,8 @@ adminlte/aws/**/*.html
 adminlte/aws/**/*.xlsx
 adminlte/aws/**/error.txt
 .~c9_invoke*
+pyvenv.cfg
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -65,6 +67,7 @@ __pypackages__/
 .venv
 env/
 venv/
+bin/
 ENV/
 env.bak/
 venv.bak/
