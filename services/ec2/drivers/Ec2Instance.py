@@ -23,10 +23,14 @@ class Ec2Instance(Evaluator):
     
         self.addII('platform', ec2InstanceData['Platform'] if 'Platform' in ec2InstanceData else 'linux')
         self.addII('instanceType', ec2InstanceData['InstanceType'])
+
+        self.ec2Util = 'Right Sized'
     
     # supporting functions
+    def getCPUUtil(self):
+        return self.ec2Util
     
-    def getEC2UtilizationMetrics(self, metricName, verifyDay):
+    def getEC2UtilizationMetrics(self, metricName, verifyDay, statistics=['Average']):
         cwClient = self.cwClient
         instance = self.ec2InstanceData
         
@@ -44,7 +48,7 @@ class Ec2Instance(Evaluator):
             StartTime=datetime.datetime.utcnow() - timedelta(days=verifyDay),
             EndTime=datetime.datetime.utcnow(),
             Period=24 * 60 * 60,
-            Statistics=['Average'],
+            Statistics=statistics,
         )
         
         return results
@@ -72,6 +76,22 @@ class Ec2Instance(Evaluator):
         cnt = 0
         for datapoint in result['Datapoints']:
             if datapoint['Average'] > thresholdValue:
+                cnt += 1
+        
+        if cnt < thresholdDay:
+            return False
+        else:
+            return True
+
+    def checkMetricsSpikyUsage(self, metricName, verifyDay, thresholdDay, maxThresholdValue, avgThresholdValue, statistics):
+        result = self.getEC2UtilizationMetrics(metricName, verifyDay, statistics)
+        
+        if len(result['Datapoints']) < verifyDay:
+            return False
+        
+        cnt = 0
+        for datapoint in result['Datapoints']:
+            if (datapoint['Average'] < avgThresholdValue) and (datapoint['Maximum'] > maxThresholdValue):
                 cnt += 1
         
         if cnt < thresholdDay:
@@ -309,7 +329,9 @@ class Ec2Instance(Evaluator):
             return
         
         self.results['EC2LowUtilization'] = [-1, '']
+        self.ec2Util = 'Over Provisioned'
         return
+
 
     def _checkEC2HighUtilization(self):
         instance = self.ec2InstanceData
@@ -327,6 +349,27 @@ class Ec2Instance(Evaluator):
             return
     
         self.results['EC2HighUtilization'] = [-1, '']
+        self.ec2Util = 'Under Provisioned'
+        return
+    
+    def _checkEC2SpikyUtilization(self):
+        instance = self.ec2InstanceData
+        launchDay = self.launchTimeDeltaInDays
+
+        verifyDay = 14
+        thresholdDay = 4
+
+        if launchDay < verifyDay:
+            return
+
+        cpuMaxThresholdPercent = 90
+        cpuAvgThresholdPercent = 30
+        cpuSpikyUsage = self.checkMetricsSpikyUsage('CPUUtilization', verifyDay, thresholdDay, cpuMaxThresholdPercent, cpuAvgThresholdPercent,  statistics=['Average', 'Maximum'])
+        if not cpuSpikyUsage:
+            return
+
+        self.results['EC2SpikyUtilization'] = [-1, '']
+        self.ec2Util = 'Spiky'
         return
     
     def _checkEC2PublicIP(self):

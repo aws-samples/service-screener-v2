@@ -3,8 +3,9 @@
 import boto3
 import botocore
 import requests
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, UTC
 
+import re
 import json
 import time
 
@@ -40,6 +41,9 @@ class Ec2(Service):
         
         self.getOutdateSQLVersion()
         self.getWindowsVersion()
+
+        self.chartGen = None
+        self.chartCPUUtil = None
     
     def getOutdateSQLVersion(self):
         outdateVersion = Config.get('SQLEolVersion', None)
@@ -366,7 +370,118 @@ class Ec2(Service):
             )
             networkACLs = networkACLs + result.get('NetworkAcls')
         return networkACLs
-    
+
+
+    def getChartGenCost(self):
+        '''
+        Generate Pie Chart by EC2 Instance Type & Region
+        Provide customer insight on percentage of older generation EC2 Instance Type
+        '''
+        def get_next_gen(instance_family):
+            # Extract the numeric part from the instance family
+            numeric_part = re.search(r'\d+', instance_family)
+            if numeric_part:
+                numeric_value = int(numeric_part.group())
+                new_numeric_value = numeric_value + 1
+                new_instance_family = re.sub(r'\d+', str(new_numeric_value), instance_family)
+            else:
+                # If no numeric part is found, assume it's the first generation
+                new_instance_family = instance_family + '1'
+
+            return new_instance_family
+
+        # Define the time period for the this month
+        end_date = datetime.now(UTC)
+        start_date = end_date - timedelta(days=30)
+        time_period = {
+            'Start': start_date.strftime('%Y-%m-%d'),
+            'End': end_date.strftime('%Y-%m-%d')
+        }
+
+        # Get the cost data for EC2 instances, grouped by instance type and region
+        ec2_response = self.ceClient.get_cost_and_usage(
+            TimePeriod=time_period,
+            Granularity='MONTHLY',
+            Metrics=['UnblendedCost'],
+            GroupBy=[
+                {
+                    'Type': 'DIMENSION',
+                    'Key': 'INSTANCE_TYPE'
+                },
+                {
+                    'Type': 'DIMENSION',
+                    'Key': 'REGION'
+                }
+            ],
+            Filter={
+                'Dimensions': {
+                    'Key': 'SERVICE',
+                    'Values': ['Amazon Elastic Compute Cloud - Compute']
+                }
+            }
+        )
+        
+        region_instance_dict = dict()
+
+        # Print the cost for each instance family and region
+        for result in ec2_response['ResultsByTime']:
+            for group in result['Groups']:
+                instance_type = group['Keys'][0]
+                region = group['Keys'][1]
+                cost = float(group['Metrics']['UnblendedCost']['Amount'])
+
+                if instance_type == 'NoInstanceType':
+                    continue
+
+                instance_family = instance_type.split('.')[0]
+
+                if region not in region_instance_dict:
+                    region_instance_dict[region] = dict()
+                
+                if instance_family not in region_instance_dict[region]:
+                    region_instance_dict[region][instance_family] = {'latest_gen' : True, 'cost': 0}
+
+                region_instance_dict[region][instance_family]['cost'] += cost
+
+        if self.region not in region_instance_dict.keys():
+            return
+        else:
+            instance_dict = region_instance_dict.get(self.region, None)
+
+        # Get all available instance types
+        all_instance_types = []
+        response = self.ec2Client.describe_instance_types()
+        all_instance_types.extend(response['InstanceTypes'])
+
+        while 'NextToken' in response:
+            response = self.ec2Client.describe_instance_types(NextToken=response['NextToken'])
+            all_instance_types.extend(response['InstanceTypes'])
+
+        for instance, metadata in instance_dict.items():
+            latest_gen = instance
+            has_next_gen = True
+            while has_next_gen:
+                instance_type_to_check = get_next_gen(latest_gen)
+                if instance_type_to_check in [instance_type['InstanceType'].split('.')[0] for instance_type in all_instance_types]:
+                    latest_gen = instance_type_to_check
+                else:
+                    has_next_gen = False
+        
+            if latest_gen != instance:
+                metadata['latest_gen'] = False
+        
+        formatted_instance_dict = dict()
+        for instance_family, metadata in instance_dict.items():
+            if metadata['latest_gen']:
+                formatted_instance_dict[instance_family] = metadata['cost']
+            else:
+                formatted_instance_dict[f'[PREV GEN] {instance_family}'] = metadata['cost']
+        self.chartGen = formatted_instance_dict
+        
+        print(self.chartGen)
+
+        return self.chartGen
+
     def advise(self):
         objs = {}
         secGroups = {}
@@ -408,11 +523,20 @@ class Ec2(Service):
         
         # EC2 instance checks
         instances = self.getResources()
+        if instances:
+            self.chartCPUUtil = {
+                'Under Provisioned': 0,
+                'Over Provisioned': 0,
+                'Spiky': 0,
+                'Right Sized': 0
+            }
         for instanceArr in instances:
             for instanceData in instanceArr['Instances']:
                 print('... (EC2) inspecting ' + instanceData['InstanceId'])
                 obj = Ec2Instance(instanceData,self.ec2Client, self.cwClient)
                 obj.run(self.__class__)
+                
+                self.chartCPUUtil[obj.getCPUUtil()] += 1
                 
                 objs[f"EC2::{instanceData['InstanceId']}"] = obj.getInfo()
                 
@@ -420,6 +544,9 @@ class Ec2(Service):
                 instanceSG = self.getEC2SecurityGroups(instanceData)
                 for group in instanceSG:
                     secGroups[group['GroupId']] = group
+        
+        if self.chartCPUUtil:
+            print(self.chartCPUUtil)
             
         #EBS checks
         volumes = self.getEBSResources()
@@ -511,4 +638,6 @@ class Ec2(Service):
             objs[f"NACL::{nacl['NetworkAclId']}"] = obj.getInfo()
         
         
+        self.getChartGenCost()
+
         return objs
