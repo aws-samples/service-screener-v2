@@ -30,220 +30,220 @@ class EksCommon(Evaluator):
         
         self.init()
         
-    # def getNewerVersionCnt(self, versionList, clusterVersion):
-    #     newerVersionCnt = 0
-    #     for version in versionList:
-    #         if clusterVersion < version:
-    #             newerVersionCnt += 1
+    def getNewerVersionCnt(self, versionList, clusterVersion):
+        newerVersionCnt = 0
+        for version in versionList:
+            if clusterVersion < version:
+                newerVersionCnt += 1
         
-    #     return newerVersionCnt
+        return newerVersionCnt
         
-    # def getVersions(self):
-    #     versionList = Config.get('EKSVersionList', False)
+    def getVersions(self):
+        versionList = Config.get('EKSVersionList', False)
         
-    #     if versionList is False:
-    #         versionList = []
-    #         addonList = []
-    #         results = self.eksClient.describe_addon_versions()
-    #         addonList = results.get('addons')
+        if versionList is False:
+            versionList = []
+            addonList = []
+            results = self.eksClient.describe_addon_versions()
+            addonList = results.get('addons')
             
-    #         while results.get('nextToken') is not None:
-    #             results = self.eksClient.describe_addon_versions(
-    #                 nextToken = results.get('nextToken')
-    #             )
-    #             addonList = addonList + results.get('addons')
+            while results.get('nextToken') is not None:
+                results = self.eksClient.describe_addon_versions(
+                    nextToken = results.get('nextToken')
+                )
+                addonList = addonList + results.get('addons')
                 
-    #         for addon in addonList:
-    #             for addonVersion in addon.get('addonVersions'):
-    #                 for compatibility in addonVersion.get('compatibilities'):
-    #                     versionList = versionList + [compatibility.get('clusterVersion')]
+            for addon in addonList:
+                for addonVersion in addon.get('addonVersions'):
+                    for compatibility in addonVersion.get('compatibilities'):
+                        versionList = versionList + [compatibility.get('clusterVersion')]
                         
             
-    #         versionSet = set(versionList)
-    #         uniqVersionList = list(versionSet)
-    #         uniqVersionList.sort(reverse=True)
+            versionSet = set(versionList)
+            uniqVersionList = list(versionSet)
+            uniqVersionList.sort(reverse=True)
             
-    #         Config.set('EKSVersionList', uniqVersionList)
+            Config.set('EKSVersionList', uniqVersionList)
             
-    #         return uniqVersionList
-    #     else:
-    #         return versionList
+            return uniqVersionList
+        else:
+            return versionList
             
-    # def getLatestVersion(self, versionList):
-    #     return versionList[0]
+    def getLatestVersion(self, versionList):
+        return versionList[0]
         
         
-    # def _checkClusterVersion(self):
-    #     clusterVersion = self.clusterInfo.get('version')
+    def _checkClusterVersion(self):
+        clusterVersion = self.clusterInfo.get('version')
         
-    #     versionList = self.getVersions()
-    #     newVersionCnt = self.getNewerVersionCnt(versionList, clusterVersion)
-    #     latestVersion = self.getLatestVersion(versionList)
+        versionList = self.getVersions()
+        newVersionCnt = self.getNewerVersionCnt(versionList, clusterVersion)
+        latestVersion = self.getLatestVersion(versionList)
         
-    #     if newVersionCnt >= 3:
-    #         self.results['eksClusterVersionEol'] = [-1, "Current: " + clusterVersion + ", Latest: " + latestVersion]
-    #     elif newVersionCnt > 0 and newVersionCnt < 3:
-    #         self.results['eksClusterVersionUpdate'] = [-1, "Current: " + clusterVersion + ", Latest: " + latestVersion]
+        if newVersionCnt >= 3:
+            self.results['eksClusterVersionEol'] = [-1, "Current: " + clusterVersion + ", Latest: " + latestVersion]
+        elif newVersionCnt > 0 and newVersionCnt < 3:
+            self.results['eksClusterVersionUpdate'] = [-1, "Current: " + clusterVersion + ", Latest: " + latestVersion]
                 
-    #     return
+        return
     
-    # def clusterSGInboundRuleCheck(self, rule, sgID, accountId):
-    #     if len(rule.get('UserIdGroupPairs')) == 0:
-    #         ## No SG Group found means the source is not from self SG, Flagged
-    #         return False
-    #     else:
-    #         ## Check is the only self SG assigned into the rules
-    #         for group in rule.get('UserIdGroupPairs'):
-    #             if group.get('GroupId') != sgID or group.get('UserId') != accountId:
-    #                 return False
+    def clusterSGInboundRuleCheck(self, rule, sgID, accountId):
+        if len(rule.get('UserIdGroupPairs')) == 0:
+            ## No SG Group found means the source is not from self SG, Flagged
+            return False
+        else:
+            ## Check is the only self SG assigned into the rules
+            for group in rule.get('UserIdGroupPairs'):
+                if group.get('GroupId') != sgID or group.get('UserId') != accountId:
+                    return False
                     
-    #     return True
+        return True
         
-    # def clusterSGOutboundRuleCheck(self, rule, sgID, accountId):
-    #     minimalPort = self.OUTBOUNDSGMINIMALRULES
+    def clusterSGOutboundRuleCheck(self, rule, sgID, accountId):
+        minimalPort = self.OUTBOUNDSGMINIMALRULES
         
-    #     if len(rule.get('UserIdGroupPairs')) == 0:
-    #         return False
-    #     else:
-    #         ## EKS Cluster SG Outbound minimal requirement is listed in the minimal port
-    #         if rule.get('IpProtocol') in list(minimalPort.keys()) and rule.get('FromPort') in minimalPort.get(rule.get('IpProtocol')):
-    #             ## Check is the only self SG assigned into the rules
-    #             for group in rule.get('UserIdGroupPairs'):
-    #                 if group.get('GroupId') != sgID or group.get('UserId') != accountId:
-    #                     return False
-    #         else:
-    #             return False
+        if len(rule.get('UserIdGroupPairs')) == 0:
+            return False
+        else:
+            ## EKS Cluster SG Outbound minimal requirement is listed in the minimal port
+            if rule.get('IpProtocol') in list(minimalPort.keys()) and rule.get('FromPort') in minimalPort.get(rule.get('IpProtocol')):
+                ## Check is the only self SG assigned into the rules
+                for group in rule.get('UserIdGroupPairs'):
+                    if group.get('GroupId') != sgID or group.get('UserId') != accountId:
+                        return False
+            else:
+                return False
         
-    #     return True
+        return True
     
-    # def _checkClusterSecurityGroup(self):
-    #     stsInfo = Config.get('stsInfo', False)
-    #     if stsInfo is False:
-    #         print("Unable to get Account ID, skipped Cluster Security Group check")
-    #         return
+    def _checkClusterSecurityGroup(self):
+        stsInfo = Config.get('stsInfo', False)
+        if stsInfo is False:
+            print("Unable to get Account ID, skipped Cluster Security Group check")
+            return
         
-    #     sgID =  self.clusterInfo.get('resourcesVpcConfig').get('clusterSecurityGroupId')
-    #     if sgID is None:
-    #         print("Cluster security group not found for cluster " + self.cluster + ". skipped Cluster Security Group check")
-    #         return
+        sgID =  self.clusterInfo.get('resourcesVpcConfig').get('clusterSecurityGroupId')
+        if sgID is None:
+            print("Cluster security group not found for cluster " + self.cluster + ". skipped Cluster Security Group check")
+            return
         
-    #     accountId = Config.get('stsInfo', False).get('Account')
+        accountId = Config.get('stsInfo', False).get('Account')
         
-    #     response = self.ec2Client.describe_security_groups(
-    #         GroupIds = [sgID]
-    #     )
-    #     sgInfos = response.get('SecurityGroups')
+        response = self.ec2Client.describe_security_groups(
+            GroupIds = [sgID]
+        )
+        sgInfos = response.get('SecurityGroups')
         
-    #     for info in sgInfos:
-    #         ## Inbound Rule Checking
-    #         inboundRules = info.get('IpPermissions')
-    #         ## EKS Cluster SG Inbound Rules should point to only itself
-    #         for rule in inboundRules:
-    #             result = self.clusterSGInboundRuleCheck(rule, sgID, accountId)
-    #             if not result:
-    #                 self.results['eksClusterSGRestriction'] = [-1, sgID]
-    #                 return
+        for info in sgInfos:
+            ## Inbound Rule Checking
+            inboundRules = info.get('IpPermissions')
+            ## EKS Cluster SG Inbound Rules should point to only itself
+            for rule in inboundRules:
+                result = self.clusterSGInboundRuleCheck(rule, sgID, accountId)
+                if not result:
+                    self.results['eksClusterSGRestriction'] = [-1, sgID]
+                    return
             
-    #         ## Outbound Rule Checking
-    #         outboundRules = info.get('IpPermissionsEgress')
+            ## Outbound Rule Checking
+            outboundRules = info.get('IpPermissionsEgress')
             
-    #         for rule in outboundRules:
-    #             result = self.clusterSGOutboundRuleCheck(rule, sgID, accountId)
-    #             if not result:
-    #                 self.results['eksClusterSGRestriction'] = [-1, sgID]
-    #                 return
+            for rule in outboundRules:
+                result = self.clusterSGOutboundRuleCheck(rule, sgID, accountId)
+                if not result:
+                    self.results['eksClusterSGRestriction'] = [-1, sgID]
+                    return
                         
-    #     return
+        return
     
-    # def _checkPublicClusterEndpoint(self):
-    #     if self.clusterInfo.get('resourcesVpcConfig').get('endpointPublicAccess'):
-    #         self.results['eksEndpointPublicAccess'] = [-1, 'Enabled']
+    def _checkPublicClusterEndpoint(self):
+        if self.clusterInfo.get('resourcesVpcConfig').get('endpointPublicAccess'):
+            self.results['eksEndpointPublicAccess'] = [-1, 'Enabled']
         
-    #     return
+        return
     
-    # def _checkEnvelopeEncryption(self):
-    #     if self.clusterInfo.get('encryptionConfig') is None:
-    #         self.results['eksSecretsEncryption'] = [-1, 'Disabled']
+    def _checkEnvelopeEncryption(self):
+        if self.clusterInfo.get('encryptionConfig') is None:
+            self.results['eksSecretsEncryption'] = [-1, 'Disabled']
         
-    #     return
+        return
     
-    # def _checkClusterLogging(self):
-    #     for logConfig in self.clusterInfo.get('logging').get('clusterLogging'):
-    #         if logConfig.get('enabled') is False:
-    #             self.results['eksClusterLogging'] = [-1, 'Disabled']
-    #             return
+    def _checkClusterLogging(self):
+        for logConfig in self.clusterInfo.get('logging').get('clusterLogging'):
+            if logConfig.get('enabled') is False:
+                self.results['eksClusterLogging'] = [-1, 'Disabled']
+                return
         
-    #     return
+        return
     
-    # def inlinePolicyLeastPrivilege(self, roleName):
-    #     response = self.iamClient.list_role_policies(
-    #         RoleName = roleName    
-    #     )
+    def inlinePolicyLeastPrivilege(self, roleName):
+        response = self.iamClient.list_role_policies(
+            RoleName = roleName    
+        )
         
-    #     for policyName in response.get('PolicyNames'):
-    #         policyResp = self.iamClient.get_role_policy(
-    #             RoleName=roleName,
-    #             PolicyName=policyName
-    #         )
-    #         document = policyResp.get('PolicyDocument')
+        for policyName in response.get('PolicyNames'):
+            policyResp = self.iamClient.get_role_policy(
+                RoleName=roleName,
+                PolicyName=policyName
+            )
+            document = policyResp.get('PolicyDocument')
             
-    #         pObj = Policy(document)
-    #         pObj.inspectAccess()
-    #         if pObj.hasFullAccessToOneResource() or pObj.hasFullAccessAdmin():
-    #             return False
+            pObj = Policy(document)
+            pObj.inspectAccess()
+            if pObj.hasFullAccessToOneResource() or pObj.hasFullAccessAdmin():
+                return False
         
-    #     return True
+        return True
         
-    # def attachedPolicyLeastPrivilege(self, roleName):
-    #     response = self.iamClient.list_attached_role_policies(
-    #         RoleName = roleName    
-    #     )
+    def attachedPolicyLeastPrivilege(self, roleName):
+        response = self.iamClient.list_attached_role_policies(
+            RoleName = roleName    
+        )
         
-    #     for policy in response.get('AttachedPolicies'):
-    #         policyInfoResp = self.iamClient.get_policy(
-    #             PolicyArn=policy.get('PolicyArn')
-    #         )
+        for policy in response.get('AttachedPolicies'):
+            policyInfoResp = self.iamClient.get_policy(
+                PolicyArn=policy.get('PolicyArn')
+            )
             
-    #         policyInfo = policyInfoResp.get('Policy')
-    #         if len(policyInfo) == 0:
-    #             print("Skipped. Unable to retrieve policy information for " + policy.get('PolicyArn'))
-    #             continue
+            policyInfo = policyInfoResp.get('Policy')
+            if len(policyInfo) == 0:
+                print("Skipped. Unable to retrieve policy information for " + policy.get('PolicyArn'))
+                continue
             
-    #         policyArn = policyInfo.get('Arn')
-    #         policyVersion = policyInfo.get('DefaultVersionId')
+            policyArn = policyInfo.get('Arn')
+            policyVersion = policyInfo.get('DefaultVersionId')
             
-    #         policyResp = self.iamClient.get_policy_version(
-    #             PolicyArn=policyArn,
-    #             VersionId=policyVersion
-    #         )
+            policyResp = self.iamClient.get_policy_version(
+                PolicyArn=policyArn,
+                VersionId=policyVersion
+            )
             
-    #         if len(policyResp.get('PolicyVersion')) == 0:
-    #             print("Skipped. Unable to retrieve policy permission for " + policy.get('PolicyArn') + " version " + policyVersion)
-    #             continue
+            if len(policyResp.get('PolicyVersion')) == 0:
+                print("Skipped. Unable to retrieve policy permission for " + policy.get('PolicyArn') + " version " + policyVersion)
+                continue
                 
-    #         document = policyResp.get('PolicyVersion').get('Document')
+            document = policyResp.get('PolicyVersion').get('Document')
             
-    #         pObj = Policy(document)
-    #         pObj.inspectAccess()
-    #         if pObj.hasFullAccessToOneResource() or pObj.hasFullAccessAdmin():
-    #             return False
+            pObj = Policy(document)
+            pObj.inspectAccess()
+            if pObj.hasFullAccessToOneResource() or pObj.hasFullAccessAdmin():
+                return False
                 
-    #     return True
+        return True
         
-    # def _checkRoleLeastPrivilege(self):
-    #     roleName = self.clusterInfo.get('roleArn').split('role/', 1)[1]
+    def _checkRoleLeastPrivilege(self):
+        roleName = self.clusterInfo.get('roleArn').split('role/', 1)[1]
         
-    #     result = self.inlinePolicyLeastPrivilege(roleName)
-    #     if result is False:
-    #         self.results['eksClusterRoleLeastPrivilege'] = [-1, roleName]
-    #         return
+        result = self.inlinePolicyLeastPrivilege(roleName)
+        if result is False:
+            self.results['eksClusterRoleLeastPrivilege'] = [-1, roleName]
+            return
         
-    #     result = self.attachedPolicyLeastPrivilege(roleName)
-    #     if result is False:
-    #         self.results['eksClusterRoleLeastPrivilege'] = [-1, roleName]
-    #         return
+        result = self.attachedPolicyLeastPrivilege(roleName)
+        if result is False:
+            self.results['eksClusterRoleLeastPrivilege'] = [-1, roleName]
+            return
         
-    #     return
+        return
 
     def __get_node_groups(self):
         _cluster_name = self.clusterInfo.get("name")
@@ -260,93 +260,93 @@ class EksCommon(Evaluator):
 
         return nodegroups_list
 
-    # def _checkSpotUsage(self) -> bool:
-    #     """EKS-25 Leverage spot instances for  deeper discount for fault-tolerant workload.
+    def _checkSpotUsage(self) -> bool:
+        """EKS-25 Leverage spot instances for  deeper discount for fault-tolerant workload.
 
-    #     https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
+        https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html
 
-    #     :return: bool
-    #     """
+        :return: bool
+        """
 
-    #     print("EKS-25 Leverage spot instances for  deeper discount for fault-tolerant workload")
-    #     _cluster_name = self.clusterInfo.get("name")
+        print("EKS-25 Leverage spot instances for  deeper discount for fault-tolerant workload")
+        _cluster_name = self.clusterInfo.get("name")
 
-    #     mng_wo_spot = []  # Empty list for Managed Node Groups with Capacity Type != SPOT
+        mng_wo_spot = []  # Empty list for Managed Node Groups with Capacity Type != SPOT
 
-    #     if len(self.nodegroups_list) != 0:
-    #         for each_nodegroup in self.nodegroups_list:
-    #             each_nodegroup_detail = self.eksClient.describe_nodegroup(
-    #                 clusterName=_cluster_name,
-    #                 nodegroupName=each_nodegroup
-    #             )
+        if len(self.nodegroups_list) != 0:
+            for each_nodegroup in self.nodegroups_list:
+                each_nodegroup_detail = self.eksClient.describe_nodegroup(
+                    clusterName=_cluster_name,
+                    nodegroupName=each_nodegroup
+                )
 
-    #             if each_nodegroup_detail.get("nodegroup").get("capacityType") != "SPOT":
-    #                 mng_wo_spot.append(each_nodegroup)
+                if each_nodegroup_detail.get("nodegroup").get("capacityType") != "SPOT":
+                    mng_wo_spot.append(each_nodegroup)
 
-    #     if len(mng_wo_spot) != 0:
-    #         print("Node Groups without Spot Instance")
-    #         print(mng_wo_spot)  # TODO To print out to the result thingy
+        if len(mng_wo_spot) != 0:
+            print("Node Groups without Spot Instance")
+            print(mng_wo_spot)  # TODO To print out to the result thingy
 
-    #     print("Spot Instance Usage Check Completed")
+        print("Spot Instance Usage Check Completed")
 
-    #     return len(mng_wo_spot) == 0
+        return len(mng_wo_spot) == 0
 
-    # def _checkCostVisibility(self) -> bool:
-    #     """
-    #     EKS-10 Implement a tool for cost  visibility
+    def _checkCostVisibility(self) -> bool:
+        """
+        EKS-10 Implement a tool for cost  visibility
 
-    #     https://docs.aws.amazon.com/eks/latest/userguide/cost-monitoring.html
-    #     :return: bool
-    #     """
-    #     print("EKS-10 Implement a tool for cost  visibility")
+        https://docs.aws.amazon.com/eks/latest/userguide/cost-monitoring.html
+        :return: bool
+        """
+        print("EKS-10 Implement a tool for cost  visibility")
 
-    #     return self.__kube_cost()
+        return self.__kube_cost()
 
-    # def __kube_cost(self) -> bool:
-    #     """
-    #     Check if Kube Cost plugin is installed.
+    def __kube_cost(self) -> bool:
+        """
+        Check if Kube Cost plugin is installed.
 
-    #     :return: bool
-    #     """
-    #     print("Checking if Kube Cost Plugin is installed")
+        :return: bool
+        """
+        print("Checking if Kube Cost Plugin is installed")
 
-    #     kube_cost_addon_name = "kubecost_kubecost"  # TODO Move to constants.py
+        kube_cost_addon_name = "kubecost_kubecost"  # TODO Move to constants.py
 
-    #     _cluster_name = self.clusterInfo.get("name")
+        _cluster_name = self.clusterInfo.get("name")
 
-    #     addons = self.eksClient.list_addons(
-    #         clusterName=_cluster_name
-    #     ).get("addons")
+        addons = self.eksClient.list_addons(
+            clusterName=_cluster_name
+        ).get("addons")
 
-    #     if kube_cost_addon_name not in addons:
-    #         print(f"{_cluster_name} - Kube Cost Plugin is not installed")
-    #         return False
+        if kube_cost_addon_name not in addons:
+            print(f"{_cluster_name} - Kube Cost Plugin is not installed")
+            return False
 
-    #     return True
+        return True
 
-    # def _checkAMIs(self) -> bool:
-    #     """
-    #     EKS-13 Use EKS-optimized AMI or Bottlerocket for host OS
+    def _checkAMIs(self) -> bool:
+        """
+        EKS-13 Use EKS-optimized AMI or Bottlerocket for host OS
 
-    #     :return:
-    #     """
-    #     _cluster_name = self.clusterInfo.get("name")
+        :return:
+        """
+        _cluster_name = self.clusterInfo.get("name")
 
-    #     regex_pattern = r"^Bottlerocket"
+        regex_pattern = r"^Bottlerocket"
 
-    #     nodegroups_not_using_bottlerocket = list()
+        nodegroups_not_using_bottlerocket = list()
 
-    #     if len(self.nodegroups_list) != 0:
-    #         for each_nodegroup in self.nodegroups_list:
-    #             each_nodegroup_amitype = self.eksClient.describe_nodegroup(
-    #                 clusterName=_cluster_name,
-    #                 nodegroupName=each_nodegroup
-    #             )["nodegroup"]["amiType"]
+        if len(self.nodegroups_list) != 0:
+            for each_nodegroup in self.nodegroups_list:
+                each_nodegroup_amitype = self.eksClient.describe_nodegroup(
+                    clusterName=_cluster_name,
+                    nodegroupName=each_nodegroup
+                )["nodegroup"]["amiType"]
 
-    #             if not re.match(regex_pattern, each_nodegroup_amitype):
-    #                 nodegroups_not_using_bottlerocket.append(each_nodegroup)
+                if not re.match(regex_pattern, each_nodegroup_amitype):
+                    nodegroups_not_using_bottlerocket.append(each_nodegroup)
 
-    #     return len(nodegroups_not_using_bottlerocket) == 0
+        return len(nodegroups_not_using_bottlerocket) == 0
         
     def _checkAuthenticationMode(self):
         authenticationMode = self.clusterInfo.get('accessConfig').get('authenticationMode')
