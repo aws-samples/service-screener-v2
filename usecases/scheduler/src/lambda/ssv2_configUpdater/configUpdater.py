@@ -102,13 +102,13 @@ def updateEventBridge(ssv2configId, ssparams, cronPattern, crossAccounts):
 
     print("Attempting to update EventBridge Scheduler: ...")
     print(json.dumps(args, indent=4, default=str))
-    scheduler.create_schedule(**args)
+    # scheduler.create_schedule(**args)
 
-    # try:
-    #     scheduler.create_schedule(**args)
-    # except botocore.exceptions.ClientError as e:
-    #     if(e.response['Error']['Code'] == 'ConflictException'):
-    #         scheduler.update_schedule(**args)
+    try:
+        scheduler.create_schedule(**args)
+    except botocore.exceptions.ClientError as e:
+        if(e.response['Error']['Code'] == 'ConflictException'):
+            scheduler.update_schedule(**args)
 
 ## update SNS reciepient
 def updateSnsRecipient(ssv2configId, emails):

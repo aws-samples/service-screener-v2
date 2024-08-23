@@ -8,16 +8,22 @@ From left to right
 1. DynamoDB: 
 1. Lambda - ConfigUpdater: This lambda is only triggered through DynamoDB stream. It updates the EventBridge scheduler setting, parameters, and email recipients
 1. EventBridge (behind-the-scene): It is the main component to perform scheduling event. Based on the scheduler setting, EventBridge triggers AWS Batch to run Screener
-1. AWS Batch: It provides compute environments to runs Screener and shutdown as soon as results are generated. It first look at Spot instance availability 
-1.
+1. AWS Batch: It provides compute environments to runs Screener and shutdown as soon as results are generated. It first look at Spot instance availability ...
+1. ...
 
 ### Costs
 
-## Deployment Guide
-### Prerequisite - Permission
+## Deployment Guide (Recommend to run in Cloudshell)
+### Prerequisite - Permission 
 1. AWS User ID to log into AWS Console
 1. [TODO] Permission required
 1. 
+
+### Prereqsuite - running at your own environment 
+Note: All the following already preinstall for you in Cloudshell environment
+1. Python3.12 & pip3
+1. awscli & awscdk
+1. Docker
 
 ### Cloudshell
 The deployment requires 1/ CDK, 2/ git, 3/ docker and 4/ aws-cli. Using AWS Cloudshell is the cleanest way to deploy.

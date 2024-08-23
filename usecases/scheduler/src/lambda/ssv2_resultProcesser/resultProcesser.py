@@ -81,6 +81,7 @@ def lambda_handler(event, context):
 def processXlsx(s3, targetBucket, configId, acct, info):
     latestObjname = "{}/{}/{}/workItem.xlsx".format(configId, info['currentRun'], acct)
     s3.download_file(targetBucket, latestObjname, '/tmp/current.xlsx')
+    
     loadXlsx('/tmp/current.xlsx')
 
     previousObjname = None
@@ -93,6 +94,9 @@ def processXlsx(s3, targetBucket, configId, acct, info):
 
     compared = compareXlsx(hasPreviousObj)
     html = formatCompared(compared, hasPreviousObj)
+    
+    os.remove('/tmp/current.xlsx')
+    os.remove('/tmp/previous.xlsx')
 
     return html
 
@@ -107,7 +111,7 @@ def loadXlsx(filename):
         tcnt = 0
 
         ws = wb[sheetName]
-        for row in ws.values:
+        for row in ws.iter_rows(min_row=2, values_only=True):
             _row = list(row)
             if _row[0] == 'Region':
                 continue
@@ -119,8 +123,8 @@ def loadXlsx(filename):
             tcnt = tcnt + 1
 
             results.append('::'.join(_row))
-
-        if filename == 'current.xlsx':
+            
+        if filename == '/tmp/current.xlsx':
             currentResults[sheetName] = {'obj': results, 'High': hcnt, 'Total': tcnt}
         else:
             previousResults[sheetName] = {'obj': results, 'High': hcnt, 'Total': tcnt}
@@ -231,7 +235,6 @@ def checkIfPreviousScanFound():
 
 def sendSnsEmail(sns, configId, html):
     topic = snsPrefix + '-' + configId
-    print(topic)
     rrr = sns.list_topics()
     topicArn = [tp['TopicArn'] for tp in sns.list_topics()['Topics'] if topic in tp['TopicArn']]
 
