@@ -7,16 +7,13 @@ from datetime import datetime
 ## Environment Variables
 ## Should comment out in actual production
 
-# os.environ['SSV2_S3_BUCKET'] = 'myBucket'
-# os.environ['SSV2_SNSARN_PREFIX'] = 'ssv2'
-# os.environ['SSV2_REGION'] = 'ap-southeast-1'
-# os.environ['SSV2_EVENTBRIDGE_ROLES_ARN'] = 'arn:aws:iam::1111111111:role/AWSEventBridgeRoles'
-# os.environ['SSV2_JOB_DEF'] = 'TEEHEE'
-# os.environ['SSV2_JOB_QUEUE'] = 'TEEHEE'
-# os.environ['SSV2_SCHEDULER_NAME'] = 'screener-scheduler-group'
-
-## Sample Event Data 
-
+os.environ['SSV2_S3_BUCKET'] = 'servicescreenerautomations-bucketnamehere13136ac56-3btw7efod0n8'
+os.environ['SSV2_SNSARN_PREFIX'] = 'ssv2'
+os.environ['SSV2_REGION'] = 'ap-southeast-1'
+os.environ['SSV2_EVENTBRIDGE_ROLES_ARN'] = 'arn:aws:iam::058264210765:role/ServiceScreenerAutomation-eventbridgelambdaScreener-UhWxTYdkuVFl'
+os.environ['SSV2_JOB_DEF'] = 'TEEHEE'
+os.environ['SSV2_JOB_QUEUE'] = 'TEEHEE'
+os.environ['SSV2_SCHEDULER_NAME'] = 'ScreenerScheduleGroup'
 
 ## Initialize
 region = os.environ['SSV2_REGION']
@@ -38,28 +35,44 @@ successResp = {
 
 ##  
 def lambda_handler(event, context):
-    items = sanitizeEvent(event)
-    for item in items:
-        configId = item['configId']
-        emails = item['emails']
-        ssparams = item['ssparams']
-        cronPattern = item['frequency']
-        crossAccounts = item['crossAccounts']
+    # If event is Insert item to DDB
+    if event['Records'][0]['eventName']== 'INSERT':
+        items = sanitizeEvent(event, 'INSERT')
+        for item in items:
+            configId = item['configId']
+            emails = item['emails']
+            ssparams = item['ssparams']
+            cronPattern = item['frequency']
+            crossAccounts = item['crossAccounts']
 
-        print('Patching the following Config: {}'.format(configId))
-        result = updateSnsRecipient(configId, emails)
-        if result == False:
-            msg = 'Fail to update SNS - email recipients'
-            resp = {'statusCode': 500, 'body': msg}
-            return resp
+            print('Patching the following Config: {}'.format(configId))
+            result = updateSnsRecipient(configId, emails)
+            if result == False:
+                msg = 'Fail to update SNS - email recipients'
+                resp = {'statusCode': 500, 'body': msg}
+                return resp
 
-        result = updateEventBridge(configId, ssparams, cronPattern, crossAccounts)
-        if result == False:
-            msg = 'Fail to update eventBridge Configuration for: {}'.format(configId)
-            resp = {'statusCode': 500, 'body': msg}
-            return resp
+            result = updateEventBridge(configId, ssparams, cronPattern, crossAccounts)
+            if result == False:
+                msg = 'Fail to update eventBridge Configuration for: {}'.format(configId)
+                resp = {'statusCode': 500, 'body': msg}
+                return resp
 
+    # If event is Delete item from DDB
+    else:
+        items = sanitizeEvent(event, 'REMOVE')
+        for item in items:
+            configId = item['configId']
+            print('Deleting the following Config: {}'.format(configId))
+
+            result = deleteEventBridge(configId)
+            if result == False:
+                msg = 'Failed to delete eventBridge Configuration for: {}'.format(configId)
+                resp = {'statusCode': 500, 'body': msg}
+                return resp
+    
     return successResp
+    
 
 ## update EventBridge
 def updateEventBridge(ssv2configId, ssparams, cronPattern, crossAccounts):
@@ -156,50 +169,59 @@ def updateSnsRecipient(ssv2configId, emails):
     
     pass    
 
-def sanitizeEvent(event):
+def deleteEventBridge(configId):
+    print("Attempting to delete EventBridge Scheduler: ...")
+
+    scheduler.delete_schedule(
+        GroupName=schedulerGroupName,
+        Name='ScreenerScheduler-' + configId
+    )
+
+def sanitizeEvent(event, action):
     records = event['Records']
     deserializer = ddbDeserializer()
 
     items = [] 
-    for record in records:
-        configId = record['dynamodb']['Keys']['name']['S']
-        _sanitized = {k: deserializer.deserialize(v) for k,v in record['dynamodb']['NewImage'].items()}
-        
-        params = ''
-        regions = list(_sanitized['regions'])
-        services = list(_sanitized['services'])
 
-        params = "--regions {}".format( ','.join(regions) )
-        if services:
-            params = params + " --services {}".format( ','.join(services))
-        
-        items.append({
-            'configId': configId,
-            'ssparams': params,
-            'frequency': _sanitized['frequency'],
-            'emails': list(_sanitized['emails']),
-            'crossAccounts': _sanitized['crossAccounts']
-        })
+    if action == 'INSERT':
+        for record in records:
+            configId = record['dynamodb']['Keys']['name']['S']
+            _sanitized = {k: deserializer.deserialize(v) for k,v in record['dynamodb']['NewImage'].items()}
+            
+            params = ''
+            regions = list(_sanitized['regions'])
+            services = list(_sanitized['services'])
+
+            params = "--regions {}".format( ','.join(regions) )
+            if services:
+                params = params + " --services {}".format( ','.join(services))
+            
+            items.append({
+                'configId': configId,
+                'ssparams': params,
+                'frequency': _sanitized['frequency'],
+                'emails': list(_sanitized['emails']),
+                'crossAccounts': _sanitized['crossAccounts']
+            })
+
+        print("This are items: {}".format(items))
+    else:
+        for record in records:
+            configId = record['dynamodb']['Keys']['name']['S']
+            items.append({
+                'configId': configId,
+            })
+
+        print("This are items: {}".format(items))
 
     return items
 
 
+# test run 
 
-## test run 
-
-# read a json file
-# with open('sampleDDBStream.json', 'r') as f:
+#read a json file
+# with open('sampleDDBDelete.json', 'r') as f:
 #    event = json.load(f)
 
 # output = lambda_handler(event, '')
 # print(output)
-# print(event['Records'])
-
-# items = sanitizeEvent(event)
-# print(items)
-
-# updateSnsRecipient('default', ['yongkue+testpp@amazon.com', 'kt.xtrik@gmail.com'])
-# updateSnsRecipient('default', [])
-# lambda_handler(event, '')
-
-# updateEventBridge('ssv2default', "--regions ap-southeast-1,us-east-1 --services ec2,rds,cloudtrail")

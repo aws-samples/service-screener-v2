@@ -10,7 +10,7 @@
           "ApproximateCreationDateTime": 1480642020,
           "Keys": {
             "name": {
-              "S": "config001"
+              "S": "cdf_delete"
             }
           },
           "NewImage": {

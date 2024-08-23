@@ -3,7 +3,7 @@ Today, you can setup scheduler to run screener automatically at fix schedule. Fo
 
 ## Architecture Components
 ### Components
-
+![architecture diagram](./screener-architecture.png)
 ### Costs
 
 ## Deployment Guide
