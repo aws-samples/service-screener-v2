@@ -100,9 +100,9 @@
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
-		"needFullTest": 0,
+		"needFullTest": 1,
 		"ref": [
-			"[EKS Authentication Mode]<https://aws.amazon.com/blogs/containers/a-deep-dive-into-simplified-amazon-eks-access-management-controls/",
+			"[EKS Authentication Mode]<https://aws.amazon.com/blogs/containers/a-deep-dive-into-simplified-amazon-eks-access-management-controls/>",
             "[EKS Best Practices Guides]<https://aws.github.io/aws-eks-best-practices/security/docs/iam/#cluster-access-manager>"
 		]
     },
@@ -123,7 +123,7 @@
         "category": "R",
 		"^description": "EKS Pod Disruption Budget: {$COUNT} of clusters' don't have Pod Disruption Budget. Prevent disruption and increase  availability of workloads by limitting the number of concurrent disruptions  to Pods.'",
 		"shortDesc": "Implement Pod Disruption Budget",
-		"criticality": "M",
+		"criticality": "H",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
@@ -133,14 +133,14 @@
 		]
     },
     "eksDefaultDenyIngressNetworkPolicy":{
-        "category": "R",
+        "category": "S",
 		"^description": "EKS Default Deny Ingress: {$COUNT} of clusters' don't have a defaut deny ingress network policy. This policy prevent Pods from communicating with each other unless allowed explicitly.",
 		"shortDesc": "Create default deny ingress network policy",
-		"criticality": "H",
+		"criticality": "M",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
-		"needFullTest": 0,
+		"needFullTest": 1,
 		"ref": [
 			"[Default deny all ingress traffic]<https://kubernetes.io/docs/concepts/services-networking/network-policies/#default-deny-all-ingress-traffic>"
 		]
@@ -163,7 +163,7 @@
         "category": "R",
 		"^description": "EKS configure LimitRange: {$COUNT} of clusters' don't have LimitRange defined. This helps to ensure that a single object cannot monopolize all available resources within a namespace. Also enforce default Resource Request and Limit for containers.",
 		"shortDesc": "Defined LimitRange for clusters",
-		"criticality": "M",
+		"criticality": "L",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
@@ -177,7 +177,7 @@
 		"^description": "EKS Pod spread constrant: {$COUNT} of clusters' don't have any Pod Topology Spread Constraints defined. Helps to spread pods across Availability Zones and Hosts. Optional for workload (e.g. data processing) which require Pods to be placed in the same availability zone.",
 		"shortDesc": "Define Pod Topology Spread Constraints",
 		"criticality": "L",
-		"downtime": 0,
+		"downtime": 1,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 0,
@@ -187,13 +187,13 @@
     },
     "eksLivenessReadiness":{
         "category": "R",
-		"^description": "EKS Liveness, Readiness, Startup Probes: {$COUNT} of clusters' contain container without Readiness, Liveness, and Startup Probes defined. By default, traffic are sent to  containers immediately. Setting these probes allow Kubernetes to know when  your applications are ready to receive traffic or if they have became  unresponsive.",
+		"^description": "EKS Liveness, Readiness, Startup Probes: {$COUNT} of clusters' contain container without Readiness, Liveness, and Startup Probes defined. By default, traffic are sent to containers immediately. Setting these probes allow Kubernetes to know when  your applications are ready to receive traffic or if they have became  unresponsive.",
 		"shortDesc": "Implement Readiness, Liveness, and Startup Probes",
 		"criticality": "M",
-		"downtime": 0,
+		"downtime": 1,
 		"slowness": 0,
 		"additionalCost": 0,
-		"needFullTest": 0,
+		"needFullTest": 1,
 		"ref": [
 			"[Configure Liveness, Readiness and Startup Probes]<https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/>"
 		]
@@ -203,10 +203,10 @@
 		"^description": "EKS security context: {$COUNT} of clusters' contain container without security context. A security context defines privilege and access control setting for a Pod or Container. It prevents attacker from getting too many priviledges if Pod is compromised.",
 		"shortDesc": "Configure Pods and Containers  Security Context",
 		"criticality": "M",
-		"downtime": 0,
+		"downtime": 1,
 		"slowness": 0,
 		"additionalCost": 0,
-		"needFullTest": 0,
+		"needFullTest": 1,
 		"ref": [
 			"[Configure security context]<https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>"
 		]
@@ -216,10 +216,10 @@
 		"^description": "EKS Pod Identity IRSA: {$COUNT} of clusters' don't use Pod Identities or IRSA. Applications in a Pod's containers can use an AWS SDK or the AWS CLI to make API requests to AWS services using AWS IAM permissions. EKS Pod Identities and IRSA provide the  ability to manage credentials for your applications, similar to the way that  Amazon EC2 instance profiles provide credentials to Amazon EC2 instances. Instead of creating and distributing your AWS credentials to the containers  or using the Amazon EC2 instance's role, you associate an IAM role with a Kubernetes service account and configure your Pods to use the service account.",
 		"shortDesc": "Use EKS Pod Identities or IRSA",
 		"criticality": "M",
-		"downtime": 0,
+		"downtime": 1,
 		"slowness": 0,
 		"additionalCost": 0,
-		"needFullTest": 0,
+		"needFullTest": 1,
 		"ref": [
 			"[Configure security context]<https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>"
 		]
@@ -229,10 +229,10 @@
 		"^description": "EKS Update Insights: {$COUNT} of clusters' have ERROR and/or WARNING update insights. To fix these findings, you need  to update your Kubernetes manifests to stop using deprecated APIs. This helps  to avoid compatibility issues after upgrading your EKS clusters.",
 		"shortDesc": "Fix ERROR and WARNING update insights",
 		"criticality": "M",
-		"downtime": 0,
-		"slowness": 0,
+		"downtime": 1,
+		"slowness": 1,
 		"additionalCost": 0,
-		"needFullTest": 0,
+		"needFullTest": 1,
 		"ref": [
 			"[Test and verify update with update insights]<https://aws.amazon.com/blogs/containers/accelerate-the-testing-and-verification-of-amazon-eks-upgrades-with-upgrade-insights/>"
 		]
@@ -255,7 +255,7 @@
 		"^description": "EKS Karpenter limits: {$COUNT} of clusters' includes NodePool without limits. Set limits for node pools to keep cost in check.",
 		"shortDesc": "Set limits for node pools",
 		"criticality": "M",
-		"downtime": 0,
+		"downtime": 1,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 0,
