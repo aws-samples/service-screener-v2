@@ -9,7 +9,7 @@ Today, you can setup scheduler to run screener automatically at fix schedule. Fo
 ## Deployment Guide
 ### Prerequisite - Permission
 1. AWS User ID to log into AWS Console
-1. <TODO> Permission required
+1. [TODO] Permission required
 1. 
 
 ### Cloudshell
@@ -42,9 +42,9 @@ The configuration setup is to be done in DynamoDB, a table called: <TODO>
 
 ## Troubleshooting
 ### CDK Deploy Failed
-1. <TODO>
-1. <TODO>
-1. <TODO>
+1. [TODO]
+1. [TODO]
+1. [TODO]
 
 ### Invalid Cron
 1. Check logs in cloudwatch in the configUpdater lambda to identify error
@@ -53,6 +53,6 @@ The configuration setup is to be done in DynamoDB, a table called: <TODO>
 
 ### Not receiving reporter email
 1. Check logs in cloudwatch in the resultProcesser lambda to identify error
-1. Next you can go to the S3 Bucket to check if file exists. The key should have the following pattern <bucketname>/<dynamodbKey>/<YYYYMMDD>/<AWS_ACCOUNTID>/workItem.xlsx ... if files not exists, likely AWS Batch does not run properly due to configuration or permission errros, go to next step
+1. Next you can go to the S3 Bucket to check if file exists. The key should have the following pattern bucketname/dynamodbKey/YYYYMMDD/AWS_ACCOUNTID/workItem.xlsx ... if files not exists, likely AWS Batch does not run properly due to configuration or permission errros, go to next step
 1. Next you can go to AWS Batch to look for any jobs' errors
 1. Next you can go to AWS SNS, select topic with prefix, make sure you subscribe to the email notification
