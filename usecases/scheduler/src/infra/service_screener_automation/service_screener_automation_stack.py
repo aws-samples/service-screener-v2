@@ -1,7 +1,6 @@
 from aws_cdk import (
-    # Duration,
-    Stack,
     Duration,
+    Stack,
     Size,
     RemovalPolicy,
     aws_ec2 as ec2,
@@ -14,11 +13,15 @@ from aws_cdk import (
     aws_dynamodb as dynamodb,
     aws_lambda as lambda_,
     aws_lambda_event_sources as eventsources,
-    aws_scheduler as scheduler
+    aws_scheduler as scheduler,
+    custom_resources
     # aws_sqs as sqs,
 )
 from aws_solutions_constructs.aws_eventbridge_lambda import EventbridgeToLambda
-from os import path
+from aws_cdk.aws_lambda_python_alpha import (
+    PythonFunction,
+)
+from os import path, environ
 from constructs import Construct
 
 class ServiceScreenerAutomationStack(Stack):
@@ -26,7 +29,7 @@ class ServiceScreenerAutomationStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         dirname = path.dirname(__file__)
         super().__init__(scope, construct_id, **kwargs)
-        bucket_name = "BucketNameHere1"
+        bucket_name = environ["BUCKET_NAME"]
         prefix="Screener"
 
         vpc = ec2.Vpc(self, "VPC")
@@ -53,16 +56,30 @@ class ServiceScreenerAutomationStack(Stack):
             )
             ]
         )
+        job_role_ = iam.Role(self, "ScreenerJobRole",
+            assumed_by=iam.ServicePrincipal("ecs-tasks.amazonaws.com"),
+            description="Screener ECS JOB Scheduler Role"
+        )
+        job_role_.add_to_policy(iam.PolicyStatement(
+            resources=[bucket.bucket_arn],
+            actions=["s3:PutObject", "s3:GetObject","s3:DeleteObject"]
+        ))
+        job_role_.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("ReadOnlyAccess"))
+        job_role_.add_to_policy(iam.PolicyStatement(
+            resources=["*"],
+            actions=["cloudformation:CreateStack","cloudformation:DeleteStack"]
+        ))
         #Job Definition
         job_defn = batch.EcsJobDefinition(self, "JobDefn",
             container=batch.EcsFargateContainerDefinition(self, "ScreenerContainer",
-                image=ecs.ContainerImage.from_registry("public.ecr.aws/amazonlinux/amazonlinux:latest"),
+                image=ecs.ContainerImage.from_registry("yingtingaws/screener-scheduler:latest"),
                 memory= Size.mebibytes(2048),
                 cpu=1,
                 ephemeral_storage_size=Size.gibibytes(30),
                 fargate_cpu_architecture=ecs.CpuArchitecture.X86_64,
                 fargate_operating_system_family=ecs.OperatingSystemFamily.LINUX,
-            )
+                job_role=job_role_
+            ),
         )
         job_defn.container.execution_role.add_to_policy(iam.PolicyStatement(
             resources=[bucket.bucket_arn],
@@ -97,8 +114,9 @@ class ServiceScreenerAutomationStack(Stack):
         #Lambda Update Function
         update_fn = lambda_.Function(self, "ScreenerUpdate",
             runtime=lambda_.Runtime.PYTHON_3_12,
-            handler="configUpdate.lambda_handler",
+            handler="configUpdater.lambda_handler",
             code=lambda_.Code.from_asset(path.join(dirname, "../../lambda/ssv2_configUpdater")),
+            timeout=Duration.minutes(5),
             environment={
                 "SSV2_S3_BUCKET": bucket.bucket_name,
                 "SSV2_SNSARN_PREFIX": prefix,
@@ -130,29 +148,79 @@ class ServiceScreenerAutomationStack(Stack):
             actions=["iam:PassRole"]
         ))
         #Findings Function
+        results_fn = PythonFunction(self, "ScreenerResultsProcessor",
+            entry=path.join(dirname, "../../lambda/ssv2_resultProcesser"),  # required
+            runtime=lambda_.Runtime.PYTHON_3_12,  # required
+            index="resultProcesser.py",  # optional, defaults to 'index.py'
+            handler="lambda_handler",
+            timeout=Duration.minutes(5),
+            environment={
+                "SSV2_SNSARN_PREFIX": prefix
+            }
+        )
         event_lambda = EventbridgeToLambda(self, 'eventbridge-lambda',
-                lambda_function_props=lambda_.FunctionProps(
-                function_name="ScreenerFindingsAlert",
-                runtime=lambda_.Runtime.PYTHON_3_12,
-                handler="index.lambda_handler",
-                code=lambda_.Code.from_asset(path.join(dirname, "findings_function")),
-
-            ),
+                existing_lambda_obj=results_fn,
             event_rule_props=events.RuleProps(
                 event_pattern=events.EventPattern(
-                    source=["aws.s3"]
+                    source=["aws.s3"],
+                    detail_type=["Object Created"],
+                    detail= {
+                        "bucket": {
+                        "name": [bucket.bucket_name]
+                        },
+                        "object": {
+                        "key": [{
+                            "wildcard": "*.zip"
+                        }]
+                        }
+                    }
                 ),
                 
             )
 
         )
-        findings_role = event_lambda.lambda_function.role
-        findings_role.add_to_policy(iam.PolicyStatement(
+        
+        event_lambda.lambda_function.role.add_to_policy(iam.PolicyStatement(
             resources=["arn:aws:sns:"+self.region+":"+self.account+":"+prefix+"*"],
             actions=["sns:Publish"]
         ))
+        event_lambda.lambda_function.role.add_to_policy(iam.PolicyStatement(
+            resources=["arn:aws:sns:"+self.region+":"+self.account+":*"],
+            actions=["sns:ListTopics"]
+        ))
+        
+        event_lambda.lambda_function.role.add_to_policy(iam.PolicyStatement(
+            resources=[bucket.bucket_arn, bucket.bucket_arn+"/*"],
+            actions=["s3:PutObject", "s3:GetObject","s3:DeleteObject", "s3:ListBucket"]
+        ))
+        initial_insert = custom_resources.AwsCustomResource(
+            scope=self,
+            id='InitialConfigInsert',
+            policy=custom_resources.AwsCustomResourcePolicy.from_sdk_calls(resources=[table.table_arn]),
+            on_create=self.insert(table),
+            resource_type='Custom::MyCustomResource'
+        )
 
+    def insert(self, table):
+            insert_params = {
 
+                "TableName": table.table_name,
+                "Item": {
+                    "name": {"S": environ["NAME"]},
+                    "emails": {"SS": environ["EMAIL_LIST"].split(",")},
+                    "services": {"SS": environ["SERVICES"].split(",")},
+                    "regions": {"SS": environ["REGIONS"].split(",")},
+                    "frequency": {"S": environ["FREQUENCY"]},
+                    "crossAccounts": {"S": environ["CROSSACCOUNTS"]}
+                }
+
+            }
+            return custom_resources.AwsSdkCall(
+                action='putItem',
+                service='dynamodb',
+                parameters=insert_params,
+                physical_resource_id=custom_resources.PhysicalResourceId.of(table.table_name+'_insert')
+            )
 
 
 
