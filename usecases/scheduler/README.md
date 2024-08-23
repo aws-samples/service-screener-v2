@@ -4,6 +4,13 @@ Today, you can setup scheduler to run screener automatically at fix schedule. Fo
 ## Architecture Components
 ### Components
 
+From left to right
+1. DynamoDB: 
+1. Lambda - ConfigUpdater: This lambda is only triggered through DynamoDB stream. It updates the EventBridge scheduler setting, parameters, and email recipients
+1. EventBridge (behind-the-scene): It is the main component to perform scheduling event. Based on the scheduler setting, EventBridge triggers AWS Batch to run Screener
+1. AWS Batch: It provides compute environments to runs Screener and shutdown as soon as results are generated. It first look at Spot instance availability 
+1.
+
 ### Costs
 
 ## Deployment Guide
@@ -18,6 +25,7 @@ The deployment requires 1/ CDK, 2/ git, 3/ docker and 4/ aws-cli. Using AWS Clou
 1. Access Cloudshell
 1. Run the following commands
 ```
+## Perform normal Screener setup
 python3 -m venv .
 source bin/activate
 python3 -m pip install --upgrade pip
@@ -25,8 +33,13 @@ rm -rf service-screener-v2
 git clone https://github.com/aws-samples/service-screener-v2.git
 cd service-screener-v2
 pip install -r requirements.txt
+```
 
+```
+## Deploy the architecture
+export AWS_DEFAULT_REGION=<YOUR_REGION>
 cd usecases/scheduler/src/infra
+pip install -r requirements.txt
 cdk bootstrap
 cdk deploy
 ```
@@ -41,10 +54,13 @@ The configuration setup is to be done in DynamoDB, a table called: <TODO>
 - crossAccounts (string, optional): need to upload a valid crossAccounts.json here. You can refers to [this sample](https://github.com/aws-samples/service-screener-v2/blob/main/crossAccounts.sample.json) or [follows this](https://github.com/aws-samples/service-screener-v2/tree/main/usecases/accountsWithinOrganization) to generate the json if the list of accounts are within the same Organization.
 
 ## Troubleshooting
+### CDK Bootstrap Failed
+1. Go to cloudformation and search for "CDKToolKit", if the account previously has failed deployment on this, you have to remove it first and rerun "CDK bootstrap". 
+1. Please make sure the IAM role has the permission to perform `iam:CreateRole` action
+
 ### CDK Deploy Failed
-1. [TODO]
-1. [TODO]
-1. [TODO]
+1. Make sure your CDK bootstrap `region` is same as the one used for CDK deploy. You can either 1/ export AWS_DEFAULT_REGION=<YOUR_REGION>, or 2/ cdk deploy --profile <YOUR_PROFILE>
+
 
 ### Invalid Cron
 1. Check logs in cloudwatch in the configUpdater lambda to identify error
@@ -56,3 +72,8 @@ The configuration setup is to be done in DynamoDB, a table called: <TODO>
 1. Next you can go to the S3 Bucket to check if file exists. The key should have the following pattern bucketname/dynamodbKey/YYYYMMDD/AWS_ACCOUNTID/workItem.xlsx ... if files not exists, likely AWS Batch does not run properly due to configuration or permission errros, go to next step
 1. Next you can go to AWS Batch to look for any jobs' errors
 1. Next you can go to AWS SNS, select topic with prefix, make sure you subscribe to the email notification
+
+### Author
+1. Ying Ting
+1. Wanich Keatkajonjumroen
+1. KuetTai
