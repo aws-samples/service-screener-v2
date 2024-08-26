@@ -13,6 +13,7 @@ class Ecs(Service):
         super().__init__(region)
         ssBoto = self.ssBoto
         self.ecsClient = ssBoto.client('ecs', config=self.bConfig)
+        self.iamClient = ssBoto.client('iam', config=self.bConfig)
     
     def getTaskDefinitionsFamily(self):
         taskDefFamilyList = []
@@ -70,7 +71,7 @@ class Ecs(Service):
 
         for taskDef in taskDefFamilyList:
             taskDefName = taskDef
-            obj = EcsTaskDefinition(taskDefName, self.ecsClient)
+            obj = EcsTaskDefinition(taskDefName, self.ecsClient, self.iamClient)
             
             obj.run(self.__class__)
             objs['ECSTaskDefinition::' + taskDefName ] = obj.getInfo()
