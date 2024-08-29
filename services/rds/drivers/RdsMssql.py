@@ -49,6 +49,9 @@ class RdsMssql(RdsCommon):
                 self.results['MSSQL__EE2017'] = [-1, self.enginePatches['DBEngineVersionDescription']]
     
     def _checkParamCostThresholdParallelism(self):
+        if self.sqlEdition.find('custom') == 1:
+            return
+        
         costT = self.dbParams['cost threshold for parallelism']
         recommendedThreshold = 50
         defaultThreshold = 5
@@ -56,6 +59,9 @@ class RdsMssql(RdsCommon):
             self.results['MSSQL__ParamCostThresholdTooLow'] = [-1, "Recommended: >{}<br>Current:{}".format(recommendedThreshold, costT)]
     
     def _checkParamMaxServerMemory(self):
+        if self.sqlEdition.find('custom') == 1:
+            return
+        
         ## Calculate max server memory:
         GbToKbRatio = 1024*1024
         # total_RAM - (memory_for_the_OS + MemoryToLeave)
@@ -90,6 +96,9 @@ class RdsMssql(RdsCommon):
             self.results['MSSQL__ParamMaxMemoryTooLow'] = [-1, "Recommended: {}<br>current: {}<br>diff: {}%".format(memRecommend, maxMemorySettings, round(diff*100, 2))]
     
     def _checkParamMaxDOP(self):
+        if self.sqlEdition.find('custom') == 1:
+            return
+        
         maxDegreeParallism = self.dbParams['max degree of parallelism']
         if maxDegreeParallism == 0:
             self.results['MSSQL__ParamMaxDegreeParallism'] = [-1, 0]
