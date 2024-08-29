@@ -18,6 +18,7 @@ class RdsCommon(Evaluator):
         self.rdsClient = rdsClient
         self.cwClient = cwClient
         self.ctClient = ctClient
+        self.certInfo = None
         
         self.__configPrefix = 'rds::' + db['Engine'] + '::' + db['EngineVersion'] + '::'
         self.isCluster = True
@@ -42,6 +43,10 @@ class RdsCommon(Evaluator):
         if self.isCluster == True:
             return
         
+        if not 'CACertificateIdentifier'in self.db:
+            _warn("Unable to locate CACertificateIdentifier")
+            return
+            
         ca = self.db['CACertificateIdentifier']
         k = 'RDSCaInfo::' + ca
         
@@ -452,6 +457,9 @@ class RdsCommon(Evaluator):
             self.results['ManualSnapshotTooOld'] = [-1, days]
             
     def _checkCAExpiry(self):
+        if self.certInfo == None:
+            return
+        
         if self.isCluster == False and self.certInfo['isExpireIn365days'] == True:
             exp = self.certInfo['ValidTill'].strftime("%Y-%m-%d")
             self.results['CACertExpiringIn365days'] = [-1, "Expired on {}, ({} days left)".format(exp, self.certInfo['expiredInDays'])]
