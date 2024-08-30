@@ -9,7 +9,6 @@ adminlte/aws/**/*.xlsx
 adminlte/aws/**/error.txt
 .~c9_invoke*
 pyvenv.cfg
-.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
