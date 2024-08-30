@@ -220,6 +220,19 @@
             ""
         ]
     },
+    "EBSStoppedInstance": {
+        "category": "C",
+        "^description": "Storage Utilization: {$COUNT} of EBS storage volumes are attached to stopped instances. Remove volumes to reduce the storage cost.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Remove EBS attached to Stopped EC2",
+        "ref": [
+            "[Delete EBS Volume that you no longer need]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-deleting-volume.html/>"    
+        ]
+    },
     "EBSEncrypted": {
         "category": "S",
         "^description": "Storage Encyrption: {$COUNT} of EBS storage volumes are not encrypted. Enable encryption for EBS volumes to meet security and compliance requirements.",
@@ -298,6 +311,19 @@
             "[Best practices for Amazon EBS Encryption]<https://aws.amazon.com/blogs/compute/must-know-best-practices-for-amazon-ebs-encryption/>"    
         ]
     },
+    "EBSSnapshotDeletedVolume": {
+        "category": "C",
+        "^description": "Snapshot from Deleted Volume: You have EBS snapshots retained from deleted volumes. Use Data Lifecycle Manager to manage them.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Use Data Lifecycle Manager to manage snapshot",
+        "ref": [
+            "[Best practices for Amazon EBS Snapshot Management]<https://aws.amazon.com/blogs/storage/automating-amazon-ebs-snapshots-management-using-data-lifecycle-manager/>"    
+        ]
+    },
     "EBSLowUtilization": {
         "category": "C",
         "^description": "EBS Low Utilization: {$COUNT} of EBS volume has less than 1 IOPS utilization for past 7 days. Remove volumes that are not required to reduce costs.",
@@ -309,6 +335,32 @@
         "shortDesc": "EBS Low Utilization",
         "ref": [
             "[Controlling AWS costs by deleting unused Amazon EBS volumes]<https://aws.amazon.com/blogs/mt/controlling-your-aws-costs-by-deleting-unused-amazon-ebs-volumes/>"    
+        ]
+    },
+    "EBSHighUtilization": {
+        "category": "P",
+        "^description": "EBS High Utilization: {$COUNT} of EBS volume have high IOPS utilization for past 7 days. Increase provisioned IOPS to improve performance.",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "EBS High Utilization",
+        "ref": [
+            "[EBS Volume User Guide]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volume-types.html>"
+        ]
+    },
+    "EBSRightSizing": {
+        "category": "C",
+        "^description": "EBS Right Sizing: {$COUNT} of EBS volume has low IOPS utilization for past 7 days. Reduce provisioned IOPS to reduce costs.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "EBS Right Sizing",
+        "ref": [
+            "[EBS Volume User Guide]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volume-types.html>"   
         ]
     },
     "EBSFastSnapshot": {

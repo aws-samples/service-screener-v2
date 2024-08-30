@@ -6,12 +6,18 @@ from .RdsCommon import RdsCommon
 class RdsMssql(RdsCommon):
     def __init__(self, db, rdsClient, ctClient, cwClient):
         super().__init__(db, rdsClient, ctClient, cwClient)
-        self.loadParameterInfo()
-        
+        # self.loadParameterInfo()
+        self.isCustom = False
         self.getMSSQLEdition()
     
     def getMSSQLEdition(self):
-        self.sqlEdition = self.db['Engine'][10:]
+        engine = self.db['Engine']
+        startPos = 10
+        if engine.find('custom') == 0:
+            startPos = 17
+            self.isCustom = True
+        
+        self.sqlEdition = self.db['Engine'][startPos:]
         
     
     # check if MSSQL engine is Express Edition / Web Edition
@@ -26,7 +32,7 @@ class RdsMssql(RdsCommon):
     def _checkEntSpecs(self):
         # if engine.find('sqlserver') != -1:
         ## Skip RDS Custom checks on this
-        if self.sqlEdition.find('custom') == 1:
+        if self.isCustom:
             return
         if self.sqlEdition in ['ex', 'web']:
             self.results['MSSQL_EditionIsWebOrExpress'] = [-1, self.sqlEdition]
@@ -49,6 +55,9 @@ class RdsMssql(RdsCommon):
                 self.results['MSSQL__EE2017'] = [-1, self.enginePatches['DBEngineVersionDescription']]
     
     def _checkParamCostThresholdParallelism(self):
+        if self.isCustom:
+            return
+        
         costT = self.dbParams['cost threshold for parallelism']
         recommendedThreshold = 50
         defaultThreshold = 5
@@ -56,6 +65,9 @@ class RdsMssql(RdsCommon):
             self.results['MSSQL__ParamCostThresholdTooLow'] = [-1, "Recommended: >{}<br>Current:{}".format(recommendedThreshold, costT)]
     
     def _checkParamMaxServerMemory(self):
+        if self.isCustom:
+            return
+        
         ## Calculate max server memory:
         GbToKbRatio = 1024*1024
         # total_RAM - (memory_for_the_OS + MemoryToLeave)
@@ -90,6 +102,9 @@ class RdsMssql(RdsCommon):
             self.results['MSSQL__ParamMaxMemoryTooLow'] = [-1, "Recommended: {}<br>current: {}<br>diff: {}%".format(memRecommend, maxMemorySettings, round(diff*100, 2))]
     
     def _checkParamMaxDOP(self):
+        if self.isCustom:
+            return
+        
         maxDegreeParallism = self.dbParams['max degree of parallelism']
         if maxDegreeParallism == 0:
             self.results['MSSQL__ParamMaxDegreeParallism'] = [-1, 0]

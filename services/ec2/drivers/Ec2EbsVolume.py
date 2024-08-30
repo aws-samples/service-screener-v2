@@ -27,8 +27,75 @@ class Ec2EbsVolume(Evaluator):
         
         self.launchTimeDeltaInDays = launchDay
     
-    #check functions 
-    
+    #check functions
+    def _checkEBSIops(self):
+        volume_id = self.ebsVolumeData['VolumeId']
+        volume_type = self.ebsVolumeData['VolumeType']
+        if volume_type not in ('io1', 'io2', 'gp3'): # gp2 is under new gen check hence ignore
+            return
+        provisioned_iops = self.ebsVolumeData['Iops']
+        # print(f"Checking IOPS for volume: {volume_id} (Type: {volume_type}) with provisioned IOPS ({iops})")
+
+        metrics = ['VolumeReadOps', 'VolumeWriteOps']
+        total_iops = 0
+        max_iops = 0
+
+        check_days = 7 # number of days checked
+        period = 60 * 60 # 1hr interval
+        end_time = datetime.datetime.now(datetime.UTC)
+        start_time = end_time - datetime.timedelta(days=check_days)
+
+        for metric in metrics:
+            response = self.cwClient.get_metric_statistics(
+                Namespace='AWS/EBS',
+                MetricName=metric,
+                Dimensions=[
+                    {'Name': 'VolumeId', 'Value': volume_id}
+                ],
+                StartTime=start_time,
+                EndTime=end_time,
+                Period=period,
+                Statistics=['Sum']
+            )
+
+            # Sum up the IOPS from read and write operations
+            for datapoint in response['Datapoints']:
+                total_iops += datapoint['Sum']
+                max_iops = max(max_iops, datapoint['Sum']/period)
+        
+        average_iops = total_iops / (check_days * 24 * 60 * 60)
+        # print(f"Average IOPS for volume {volume_id}: {average_iops:.2f}")
+        if average_iops > provisioned_iops * 0.9: # 90% threshold
+            self.results['EBSHighUtilization'] = [-1, '']
+            return
+        
+        if volume_type == 'gp3':
+            if provisioned_iops > 3000: # baseline, can't further right size
+                if max_iops < provisioned_iops * 0.5:
+                    self.results['EBSRightSizing'] = [-1, '']
+            return
+        
+        return
+
+
+
+    def _checkEBSAttachedStoppedEC2(self):
+        if not self.ebsVolumeData['Attachments']:
+            return
+        
+        for attachment in self.ebsVolumeData['Attachments']:
+            instance_id = attachment['InstanceId']
+            
+            instance_response = self.ec2Client.describe_instances(InstanceIds=[instance_id])
+            instance_state = instance_response['Reservations'][0]['Instances'][0]['State']['Name']
+
+            # all ec2 attached have to be in stopped/stopping state
+            if instance_state not in ('stopped', 'stopping'):
+                return
+
+        self.results['EBSStoppedInstance'] = [-1, '']
+        return
+
     def _checkEncryptedBlock(self):
         if self.ebsVolumeData['Encrypted']:
             self.results['EBSEncrypted'] = [1,self.ebsVolumeData['Encrypted']]
