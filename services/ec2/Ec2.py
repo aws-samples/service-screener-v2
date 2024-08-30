@@ -558,7 +558,8 @@ class Ec2(Service):
             
         #EBS Snapshots
         print('... (EBS::Snapshots) inspecting')
-        obj = Ec2EbsSnapshot(self.ec2Client)
+        volume_ids = [volume['VolumeId'] for volume in volumes]
+        obj = Ec2EbsSnapshot(volume_ids, self.ec2Client)
         obj.run(self.__class__)
         objs["EBS::Snapshots"] = obj.getInfo()
         

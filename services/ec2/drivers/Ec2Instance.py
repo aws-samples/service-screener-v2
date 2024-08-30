@@ -10,6 +10,17 @@ from services.Evaluator import Evaluator
 
 import constants as _C
 
+import json
+
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime.datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+        # print(json.dumps(self.ec2InstanceData, indent=4, cls=DateTimeEncoder))
+
+
 class Ec2Instance(Evaluator):
     def __init__(self, ec2InstanceData,ec2Client, cwClient):
         super().__init__()
