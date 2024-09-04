@@ -59,10 +59,25 @@ export NAME="scheduler-deploy"
 export EMAIL_LIST="keatkw@amazon.com"
 export SERVICES="ec2,rds" 
 export REGIONS="ap-southeast-5" 
-export FREQUENCY="cron(*, *, 1, *, ?, *)" 
+export FREQUENCY="cron(30 0 ? * SUN *) " 
 export CROSSACCOUNTS="1"
 export BUCKET_NAME="screener-scheduler" 
 ```
+
+Here are some example on FREQUENCY format
+```
+# Run weekly on every Sunday at 0030 UTC
+cron(30 0 ? * SUN *) 
+
+# Run monthly on every 28th of the month at 0500 UTC
+cron(0 5 28 * ? *)
+
+# Run daily at 2315 UTC
+cron(15 23 * * ? *)
+
+# Run monthly
+```
+
 ```
 ## Deploy the architecture
 export AWS_DEFAULT_REGION=<YOUR_REGION>

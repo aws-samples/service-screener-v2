@@ -7,14 +7,6 @@ from datetime import datetime
 ## Environment Variables
 ## Should comment out in actual production
 
-os.environ['SSV2_S3_BUCKET'] = 'servicescreenerautomations-bucketnamehere13136ac56-3btw7efod0n8'
-os.environ['SSV2_SNSARN_PREFIX'] = 'ssv2'
-os.environ['SSV2_REGION'] = 'ap-southeast-1'
-os.environ['SSV2_EVENTBRIDGE_ROLES_ARN'] = 'arn:aws:iam::058264210765:role/ServiceScreenerAutomation-eventbridgelambdaScreener-UhWxTYdkuVFl'
-os.environ['SSV2_JOB_DEF'] = 'TEEHEE'
-os.environ['SSV2_JOB_QUEUE'] = 'TEEHEE'
-os.environ['SSV2_SCHEDULER_NAME'] = 'ScreenerScheduleGroup'
-
 ## Initialize
 region = os.environ['SSV2_REGION']
 s3Bucket = os.environ['SSV2_S3_BUCKET']
@@ -36,7 +28,7 @@ successResp = {
 ##  
 def lambda_handler(event, context):
     # If event is Insert item to DDB
-    if event['Records'][0]['eventName']== 'INSERT':
+    if event['Records'][0]['eventName'] in ('INSERT', 'MODIFY'):
         items = sanitizeEvent(event, 'INSERT')
         for item in items:
             configId = item['configId']
