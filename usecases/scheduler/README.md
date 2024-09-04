@@ -74,8 +74,6 @@ cron(0 5 28 * ? *)
 
 # Run daily at 2315 UTC
 cron(15 23 * * ? *)
-
-# Run monthly
 ```
 
 ```
