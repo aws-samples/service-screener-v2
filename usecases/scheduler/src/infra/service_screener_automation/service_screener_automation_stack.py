@@ -32,7 +32,23 @@ class ServiceScreenerAutomationStack(Stack):
         bucket_name = environ["BUCKET_NAME"]
         prefix="Screener"
 
-        vpc = ec2.Vpc(self, "VPC")
+        vpc = ec2.Vpc(self, "VPC",
+                    max_azs=2,
+                    nat_gateways=0,
+                    subnet_configuration=[
+                        ec2.SubnetConfiguration(
+                            name="Public",
+                            subnet_type=ec2.SubnetType.PUBLIC,
+                            cidr_mask=24
+                        ),
+                        ec2.SubnetConfiguration(
+                            name="Isolated",
+                            subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
+                            cidr_mask=24
+                        )
+                    ]
+        
+        )
         #add check for existing bucket
         #S3 Bucket
         bucket = s3.Bucket(self, bucket_name,
@@ -73,8 +89,8 @@ class ServiceScreenerAutomationStack(Stack):
         job_defn = batch.EcsJobDefinition(self, "JobDefn",
             container=batch.EcsFargateContainerDefinition(self, "ScreenerContainer",
                 image=ecs.ContainerImage.from_registry("yingtingaws/screener-scheduler:latest"),
-                memory= Size.mebibytes(2048),
-                cpu=1,
+                memory= Size.mebibytes(4096),
+                cpu=2,
                 ephemeral_storage_size=Size.gibibytes(30),
                 fargate_cpu_architecture=ecs.CpuArchitecture.X86_64,
                 fargate_operating_system_family=ecs.OperatingSystemFamily.LINUX,
@@ -114,9 +130,11 @@ class ServiceScreenerAutomationStack(Stack):
         #Lambda Update Function
         update_fn = lambda_.Function(self, "ScreenerUpdate",
             runtime=lambda_.Runtime.PYTHON_3_12,
+            retry_attempts=1,
             handler="configUpdater.lambda_handler",
             code=lambda_.Code.from_asset(path.join(dirname, "../../lambda/ssv2_configUpdater")),
             timeout=Duration.minutes(5),
+            # dead_letter_topic=
             environment={
                 "SSV2_S3_BUCKET": bucket.bucket_name,
                 "SSV2_SNSARN_PREFIX": prefix,
@@ -153,13 +171,14 @@ class ServiceScreenerAutomationStack(Stack):
             runtime=lambda_.Runtime.PYTHON_3_12,  # required
             index="resultProcesser.py",  # optional, defaults to 'index.py'
             handler="lambda_handler",
+            retry_attempts=1,
             timeout=Duration.minutes(5),
             environment={
                 "SSV2_SNSARN_PREFIX": prefix
             }
         )
         event_lambda = EventbridgeToLambda(self, 'eventbridge-lambda',
-                existing_lambda_obj=results_fn,
+            existing_lambda_obj=results_fn,
             event_rule_props=events.RuleProps(
                 event_pattern=events.EventPattern(
                     source=["aws.s3"],
