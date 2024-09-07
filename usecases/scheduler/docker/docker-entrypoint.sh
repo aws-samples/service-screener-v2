@@ -25,9 +25,9 @@ fi
 
 # Check if need to run for ALL regions
 if echo "$PARAMS" | grep -q "ALL"; then
-    echo "y" | python3 main.py $PARAMS $crossAccountsParam 
+    echo "y" | python3 main.py $PARAMS $crossAccountsParam --workerCounts 8
 else
-    python3 main.py $PARAMS $crossAccountsParam 
+    python3 main.py $PARAMS $crossAccountsParam --workerCounts 8
 fi
 
 # Get the current date

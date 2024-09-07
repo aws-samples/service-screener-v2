@@ -5,16 +5,6 @@ from botocore.exceptions import ClientError
 
 
 ## Environment Variables
-# Test values only, should comment out in actual production
-os.environ['SSV2_REGION'] = 'ap-southeast-1'
-os.environ['DDB_NAME'] = 'ServiceScreenerAutomationStack-screenerscheduler1291276B-1XUG5VQXHSYLR'
-os.environ['FREQUENCY'] = '*/2 * * * *'
-os.environ['REGIONS'] = 'ap-southeast-1'
-os.environ['EMAILS'] = 'yingting@amazon.com'
-os.environ['SERVICES'] = 'iam, rds'
-os.environ['CONFIG_ID'] = 'cdk_'
-os.environ['CROSSACCOUNTS'] = '1'
-
 ## Initialize
 deploy_region = os.environ['SSV2_REGION']
 ddb_name = os.environ['DDB_NAME']

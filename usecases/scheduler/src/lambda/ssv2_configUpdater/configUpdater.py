@@ -5,8 +5,6 @@ import json
 from datetime import datetime
 
 ## Environment Variables
-## Should comment out in actual production
-
 ## Initialize
 region = os.environ['SSV2_REGION']
 s3Bucket = os.environ['SSV2_S3_BUCKET']
@@ -15,6 +13,8 @@ ebrolesARN = os.environ['SSV2_EVENTBRIDGE_ROLES_ARN']
 jobDef = os.environ['SSV2_JOB_DEF']
 jobQueue = os.environ['SSV2_JOB_QUEUE']
 schedulerGroupName = os.environ['SSV2_SCHEDULER_NAME']
+deploy_region = os.environ['SSV2_REGION']
+deploy_account = os.environ['SSV2_ACCOUNT']
 
 s3 = boto3.client('s3', region_name=region)
 sns = boto3.client('sns', region_name=region)
@@ -60,6 +60,12 @@ def lambda_handler(event, context):
             result = deleteEventBridge(configId)
             if result == False:
                 msg = 'Failed to delete eventBridge Configuration for: {}'.format(configId)
+                resp = {'statusCode': 500, 'body': msg}
+                return resp
+
+            result = deleteSnsRecipient(configId)
+            if result == False:
+                msg = 'Failed to delete SNS topic for: {}'.format(configId)
                 resp = {'statusCode': 500, 'body': msg}
                 return resp
     
@@ -164,10 +170,23 @@ def updateSnsRecipient(ssv2configId, emails):
 def deleteEventBridge(configId):
     print("Attempting to delete EventBridge Scheduler: ...")
 
-    scheduler.delete_schedule(
+    try:
+        scheduler.delete_schedule(
         GroupName=schedulerGroupName,
         Name='ScreenerScheduler-' + configId
-    )
+        )
+    except botocore.exceptions.ClientError as e:
+        print(e.response['Error']['Message'])
+
+## delete SNS reciepient
+def deleteSnsRecipient(ssv2configId):
+    snsTopicArn = "arn:aws:sns:" + deploy_region + ":" + deploy_account + ":" + snsArnPrefix + '-' + ssv2configId
+
+    try:
+        resp = sns.delete_topic(TopicArn=snsTopicArn)
+    except botocore.exceptions.ClientError as e:
+        print(e.response['Error']['Message'])
+
 
 def sanitizeEvent(event, action):
     records = event['Records']

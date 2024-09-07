@@ -15,6 +15,7 @@ From left to right
 8. Lambda - resultProcessor: Identifies high findings and compare with the previous run to identify changes, new findings or what has been resolved.
 9. SNS: Sends the summary of findings to the email recipients. 
 ![architecture diagram](./screener-architecture.png)
+
 ### Costs
 <TODO>
 

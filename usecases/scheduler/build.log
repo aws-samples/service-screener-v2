@@ -1,6 +1,0 @@
-#0 building with "desktop-linux" instance using docker driver
-
-#1 [internal] load build definition from Dockerfile
-#1 transferring dockerfile: 2B done
-#1 DONE 0.0s
-ERROR: failed to solve: failed to read dockerfile: open Dockerfile: no such file or directory
