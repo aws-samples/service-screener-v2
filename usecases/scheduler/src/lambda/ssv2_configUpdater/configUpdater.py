@@ -181,7 +181,6 @@ def deleteEventBridge(configId):
         return False
 
 def deleteSnsRecipient(ssv2configId):
-    # snsTopicArn = "arn:aws:sns:" + deploy_region + ":" + deploy_account + ":" + snsArnPrefix + '-' + ssv2configId
     # List all topics to find the one with the desired name
     topics = []
     next_token = None
