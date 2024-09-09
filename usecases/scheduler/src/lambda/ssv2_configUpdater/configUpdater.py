@@ -175,17 +175,48 @@ def deleteEventBridge(configId):
         GroupName=schedulerGroupName,
         Name='ScreenerScheduler-' + configId
         )
+        return True
     except botocore.exceptions.ClientError as e:
         print(e.response['Error']['Message'])
+        return False
 
-## delete SNS reciepient
 def deleteSnsRecipient(ssv2configId):
-    snsTopicArn = "arn:aws:sns:" + deploy_region + ":" + deploy_account + ":" + snsArnPrefix + '-' + ssv2configId
+    # snsTopicArn = "arn:aws:sns:" + deploy_region + ":" + deploy_account + ":" + snsArnPrefix + '-' + ssv2configId
+    # List all topics to find the one with the desired name
+    topics = []
+    next_token = None
+    topic_name = snsArnPrefix + '-' + ssv2configId
+    
+    while True:
+        if next_token:
+            response = sns.list_topics(NextToken=next_token)
+        else:
+            response = sns.list_topics()
+        
+        topics.extend(response['Topics'])
+        
+        if 'NextToken' in response:
+            next_token = response['NextToken']
+        else:
+            break
+    
+    # Find the topic with the specified name
+    topic_arn = None
+    for topic in topics:
+        if topic_name in topic['TopicArn']:
+            topic_arn = topic['TopicArn']
+            break
+    
+    if topic_arn is not None:
+        # Delete the topic by its ARN
+        sns.delete_topic(TopicArn=topic_arn)
+        print(f"Deleted topic: {topic_arn}")
+        return True
+    else:
+        print(f"Topic with name '{topic_name}' not found.")
+        return False
 
-    try:
-        resp = sns.delete_topic(TopicArn=snsTopicArn)
-    except botocore.exceptions.ClientError as e:
-        print(e.response['Error']['Message'])
+
 
 
 def sanitizeEvent(event, action):
