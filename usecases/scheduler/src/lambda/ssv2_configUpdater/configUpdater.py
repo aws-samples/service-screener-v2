@@ -13,8 +13,6 @@ ebrolesARN = os.environ['SSV2_EVENTBRIDGE_ROLES_ARN']
 jobDef = os.environ['SSV2_JOB_DEF']
 jobQueue = os.environ['SSV2_JOB_QUEUE']
 schedulerGroupName = os.environ['SSV2_SCHEDULER_NAME']
-deploy_region = os.environ['SSV2_REGION']
-deploy_account = os.environ['SSV2_ACCOUNT']
 
 s3 = boto3.client('s3', region_name=region)
 sns = boto3.client('sns', region_name=region)
@@ -118,6 +116,7 @@ def updateEventBridge(ssv2configId, ssparams, cronPattern, crossAccounts):
     try:
         scheduler.create_schedule(**args)
     except botocore.exceptions.ClientError as e:
+        print(e)
         if(e.response['Error']['Code'] == 'ConflictException'):
             scheduler.update_schedule(**args)
 

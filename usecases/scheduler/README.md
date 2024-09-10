@@ -56,13 +56,13 @@ export CROSSACCOUNTS="<1 or empty>"
 export BUCKET_NAME="<insert name>" 
 
 ### Example
-export NAME="scheduler-deploy" 
+export NAME="example-deploy" 
 export EMAIL_LIST="keatkw@amazon.com"
 export SERVICES="ec2,rds" 
 export REGIONS="ap-southeast-5" 
 export FREQUENCY="cron(30 0 ? * SUN *) " 
 export CROSSACCOUNTS="1"
-export BUCKET_NAME="screener-scheduler" 
+export BUCKET_NAME="example-scheduler" 
 ```
 
 Here are some example on FREQUENCY format

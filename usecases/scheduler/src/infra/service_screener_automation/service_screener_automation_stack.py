@@ -40,12 +40,13 @@ class ServiceScreenerAutomationStack(Stack):
                             name="Public",
                             subnet_type=ec2.SubnetType.PUBLIC,
                             cidr_mask=24
-                        ),
-                        ec2.SubnetConfiguration(
-                            name="Isolated",
-                            subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
-                            cidr_mask=24
                         )
+                        # ),
+                        # ec2.SubnetConfiguration(
+                        #     name="Isolated",
+                        #     subnet_type=ec2.SubnetType.PRIVATE_ISOLATED,
+                        #     cidr_mask=24
+                        # )
                     ]
         
         )
@@ -80,6 +81,10 @@ class ServiceScreenerAutomationStack(Stack):
             resources=[bucket.bucket_arn+"/*"],
             actions=["s3:PutObject", "s3:GetObject","s3:DeleteObject"]
         ))
+        job_role_.add_to_policy(iam.PolicyStatement(
+            resources=["*"],
+            actions=["iam:SetSecurityTokenServicePreferences", "sts:AssumeRole"]
+        ))
         job_role_.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("ReadOnlyAccess"))
         job_role_.add_to_policy(iam.PolicyStatement(
             resources=["*"],
@@ -94,7 +99,8 @@ class ServiceScreenerAutomationStack(Stack):
                 ephemeral_storage_size=Size.gibibytes(30),
                 fargate_cpu_architecture=ecs.CpuArchitecture.X86_64,
                 fargate_operating_system_family=ecs.OperatingSystemFamily.LINUX,
-                job_role=job_role_
+                job_role=job_role_,
+                assign_public_ip=True,
             ),
         )
         job_defn.container.execution_role.add_to_policy(iam.PolicyStatement(
@@ -158,7 +164,7 @@ class ServiceScreenerAutomationStack(Stack):
             actions=["scheduler:*"]
         ))
         update_role.add_to_policy(iam.PolicyStatement(
-            resources=["arn:aws:sns:"+self.region+":"+self.account+":"+prefix+"*"],
+            resources=["arn:aws:sns:"+self.region+":"+self.account+":"+"*"],
             actions=["sns:*"]
         ))
         update_role.add_to_policy(iam.PolicyStatement(
@@ -219,6 +225,9 @@ class ServiceScreenerAutomationStack(Stack):
             on_create=self.insert(table),
             resource_type='Custom::MyCustomResource'
         )
+        initial_insert.node.add_dependency(cfn_schedule_group)
+        initial_insert.node.add_dependency(update_fn)
+
 
     def insert(self, table):
             insert_params = {
