@@ -26,7 +26,14 @@ For 1 config and monthly, it will be around $0.025/mth, or $0.3/yrs
 ## Deployment Guide (Recommended to run in Cloudshell)
 ### Prerequisite - Permission 
 1. AWS User Console access
-2. [TODO] Permissions required - AWSReadOnlyAccess, IAM??
+1. cloudshell:FullAccess, 
+1. cloudFormation:CreateStack, DeleteStack,
+1. dynamoDB:CreateTable, EnableKinesisStreamingDestination, UpdateKinesisStreamingDestination, Describe*, ListStreams
+1. s3:CreateBucket, PutLifecycleConfiguration
+1. batch:CreateComputeEnvironment, CreateJobQueue, RegisterJobDefinition, UpdateComputeEnvironment, SubmitJob, UpdateJobQueue, CreateSchedulingPolicy, UpdateSchedulingPolicy
+1. eventbridge:Create*
+1. scheduler:Create*
+1. lambda:Create*
 
 
 ### Prereqsuite - running in your own environment 
@@ -54,19 +61,19 @@ pip install -r requirements.txt
 ## Set up your environment variables to deploy the infrastructure
 export NAME="<insert config name>" 
 export EMAIL_LIST="<insert email>"
-export SERVICES="<insert services>" 
-export REGIONS="<insert regions>" 
+export SERVICES="<insert services | leave it BLANK to scan all services>" 
+export REGIONS="<insert regions | leave it BLANK to scan all regions>" 
 export FREQUENCY="<insert cron expression>" 
-export CROSSACCOUNTS="<1 or empty>"
+export CROSSACCOUNTS="<ProperCrossAccountsJSON or empty>"
 export BUCKET_NAME="<insert name>" 
 
 ### Example
 export NAME="example-deploy" 
-export EMAIL_LIST="keatkw@amazon.com"
+export EMAIL_LIST="abc@sample.com,def@sample.com"
 export SERVICES="ec2,rds" 
-export REGIONS="ap-southeast-5" 
+export REGIONS="ap-southeast-1,us-east-1" 
 export FREQUENCY="cron(30 0 ? * SUN *) " 
-export CROSSACCOUNTS="1"
+export CROSSACCOUNTS=""
 export BUCKET_NAME="example-scheduler" 
 ```
 
