@@ -92,6 +92,20 @@ cdk bootstrap
 cdk deploy 
 
 ## cdk deploy will ask if you wish to deploy the changes, type "y" and press "enter"
+
+## After CDK deploy finish, run the following scripts to insert the first configuration to dynamodb
+DDBTable=$(aws dynamodb list-tables --query "TableNames[?contains(@, 'Screener')]")
+
+aws dynamodb put-item \
+  --table-name "$DDBTable" \
+  --item '{
+    "name": {"S": "'"$NAME"'"},
+    "services": {"SS": ["'"$(echo $SERVICES | sed "s/,/\",\"/g")"'"]},
+    "regions": {"SS": ["'"$(echo $REGIONS | sed "s/,/\",\"/g")"'"]},
+    "emails": {"SS": ["'"$(echo $EMAIL_LIST | sed "s/,/\",\"/g")"'"]},
+    "frequency": {"S": "'"$FREQUENCY"'"},
+    "crossAccounts": {"S": "'"$(echo "$CROSSACCOUNTS" | sed 's/"/\\"/g')"'"}
+  }'
 ```
 
 ## Configuration

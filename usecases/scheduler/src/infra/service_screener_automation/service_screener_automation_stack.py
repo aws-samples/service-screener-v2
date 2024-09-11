@@ -218,6 +218,9 @@ class ServiceScreenerAutomationStack(Stack):
             resources=[bucket.bucket_arn, bucket.bucket_arn+"/*"],
             actions=["s3:PutObject", "s3:GetObject","s3:DeleteObject", "s3:ListBucket"]
         ))
+        
+        ## Comment out, use AWS CLI to generate the first insert instead
+        '''
         initial_insert = custom_resources.AwsCustomResource(
             scope=self,
             id='InitialConfigInsert',
@@ -249,6 +252,7 @@ class ServiceScreenerAutomationStack(Stack):
                 parameters=insert_params,
                 physical_resource_id=custom_resources.PhysicalResourceId.of(table.table_name+'_insert')
             )
+            '''
 
 
 

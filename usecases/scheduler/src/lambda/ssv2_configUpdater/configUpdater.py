@@ -118,6 +118,7 @@ def updateEventBridge(ssv2configId, ssparams, cronPattern, crossAccounts):
     except botocore.exceptions.ClientError as e:
         print(e)
         if(e.response['Error']['Code'] == 'ConflictException'):
+            print("Calling scheduler.update_schedule...")
             scheduler.update_schedule(**args)
 
 ## update SNS reciepient
@@ -231,6 +232,12 @@ def sanitizeEvent(event, action):
             params = ''
             regions = list(_sanitized['regions'])
             services = list(_sanitized['services'])
+            
+            if regions == ['']:
+                regions = ['ALL']
+            
+            if services == ['']:
+                services = None
 
             params = "--regions {}".format( ','.join(regions) )
             if services:
