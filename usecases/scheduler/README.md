@@ -17,12 +17,17 @@ From left to right
 ![architecture diagram](./screener-architecture.png)
 
 ### Costs
-<TODO>
+For a 5 configs and weekly execution, total cost a month is $0.42/mth, or $5/yrs. You may refers the [cost calculator here](https://calculator.aws/#/estimate?id=bae7c90fbe563768fd4c5d2726f3a8476ed190a0)
+
+For 1 config and weekly, it will be around $0.1/mth or $1.2/yrs
+
+For 1 config and monthly, it will be around $0.025/mth, or $0.3/yrs
 
 ## Deployment Guide (Recommended to run in Cloudshell)
 ### Prerequisite - Permission 
 1. AWS User Console access
 2. [TODO] Permissions required - AWSReadOnlyAccess, IAM??
+
 
 ### Prereqsuite - running in your own environment 
 Note: All the following is already preinstalled for you in  your Cloudshell environment
@@ -84,7 +89,9 @@ cd usecases/scheduler/src/infra
 pip install -r requirements.txt
 cdk synth 
 cdk bootstrap
-cdk deploy
+cdk deploy 
+
+## cdk deploy will ask if you wish to deploy the changes, type "y" and press "enter"
 ```
 
 ## Configuration
@@ -115,6 +122,11 @@ The configuration setup is to be done in DynamoDB, a table called: <TODO>
 1. Next you can go to the S3 Bucket to check if file exists. The key should have the following pattern bucketname/dynamodbKey/YYYYMMDD/AWS_ACCOUNTID/workItem.xlsx ... if files not exists, likely AWS Batch does not run properly due to configuration or permission errros, go to next step
 1. Next you can go to AWS Batch to look for any jobs' errors
 1. Next you can go to AWS SNS, select topic with prefix, make sure you subscribe to the email notification
+
+### Useful Logs for troubleshooting AWS Batch
+1. AWS Batch => Jobs => click on the failed job => Logging. This consists of the container cli output.
+1. AWS Batch => Jobs => click on the failed job => JSON. Looks at the values "container" => "environment", make sure values are valid and no typo. Typical typo can be 1/ AWS Region names (wrong e.g: us-east1, ap-south-east-1, apsoutheast-1, ap-north-1a), 2/ typo on services name, 3/ if you are using CrossAccounts, please refers to the sample here.
+1. If all failed, please raise a github issue and provide the above 2 informations.
 
 ### Author
 1. Ying Ting

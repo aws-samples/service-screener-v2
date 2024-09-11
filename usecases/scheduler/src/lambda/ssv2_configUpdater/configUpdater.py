@@ -244,7 +244,7 @@ def sanitizeEvent(event, action):
                 'crossAccounts': _sanitized['crossAccounts']
             })
 
-        print("This are items: {}".format(items))
+        print("DDB event item(s): {}".format(items))
     else:
         for record in records:
             configId = record['dynamodb']['Keys']['name']['S']
@@ -252,7 +252,7 @@ def sanitizeEvent(event, action):
                 'configId': configId,
             })
 
-        print("This are items: {}".format(items))
+        print("DDB event item(s): {}".format(items))
 
     return items
 

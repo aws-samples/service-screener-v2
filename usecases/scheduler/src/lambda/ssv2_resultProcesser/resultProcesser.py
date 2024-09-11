@@ -96,7 +96,8 @@ def processXlsx(s3, targetBucket, configId, acct, info):
     html = formatCompared(compared, hasPreviousObj)
     
     os.remove('/tmp/current.xlsx')
-    os.remove('/tmp/previous.xlsx')
+    if 'previousRun' in info:
+        os.remove('/tmp/previous.xlsx')
 
     return html
 
@@ -134,12 +135,17 @@ def compareXlsx(hasPreviousObj):
     for sheets in currentResults:
         newFindings = []
         resolvedItems = []
+        diffHigh = 0
+        diffTotal = 0
         if hasPreviousObj:
             diff = list(set(currentResults[sheets]['obj']) - set(previousResults[sheets]['obj']))
             newFindings = diff
             
             diff = list(set(previousResults[sheets]['obj']) - set(currentResults[sheets]['obj']))
             resolvedItems = diff
+
+            diffHigh = currentResults[sheets]['High'] - previousResults[sheets]['High']
+            diffTotal = currentResults[sheets]['Total'] - previousResults[sheets]['Total']
         
         nf = ""
         ri = ""
@@ -153,8 +159,8 @@ def compareXlsx(hasPreviousObj):
             sheets,
             currentResults[sheets]['High'],
             currentResults[sheets]['Total'],
-            currentResults[sheets]['High'] - previousResults[sheets]['High'],
-            currentResults[sheets]['Total'] - previousResults[sheets]['Total'],
+            diffHigh,
+            diffTotal,
             nf,
             ri,
             len(newFindings),
