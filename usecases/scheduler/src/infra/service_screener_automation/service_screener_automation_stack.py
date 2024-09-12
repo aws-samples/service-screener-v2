@@ -14,8 +14,7 @@ from aws_cdk import (
     aws_lambda as lambda_,
     aws_lambda_event_sources as eventsources,
     aws_scheduler as scheduler,
-    custom_resources
-    # aws_sqs as sqs,
+    CfnOutput
 )
 from aws_solutions_constructs.aws_eventbridge_lambda import EventbridgeToLambda
 from aws_cdk.aws_lambda_python_alpha import (
@@ -218,6 +217,11 @@ class ServiceScreenerAutomationStack(Stack):
             resources=[bucket.bucket_arn, bucket.bucket_arn+"/*"],
             actions=["s3:PutObject", "s3:GetObject","s3:DeleteObject", "s3:ListBucket"]
         ))
+        # In your __init__ method, after creating the DynamoDB table:
+        CfnOutput(self, "DynamoDBTableName", 
+            value=table.table_name,
+            description="The name of the DynamoDB table"
+        )
         
         ## Comment out, use AWS CLI to generate the first insert instead
         '''
@@ -255,13 +259,3 @@ class ServiceScreenerAutomationStack(Stack):
             '''
 
 
-
-
-
-        # The code that defines your stack goes here
-
-        # example resource
-        # queue = sqs.Queue(
-        #     self, "ServiceScreenerAutomationQueue",
-        #     visibility_timeout=Duration.seconds(300),
-        # )

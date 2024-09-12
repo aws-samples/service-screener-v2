@@ -16,12 +16,12 @@ From left to right
 9. SNS: Sends the summary of findings to the email recipients. 
 ![architecture diagram](./screener-architecture.png)
 
-### Costs
-For a 5 configs and weekly execution, total cost a month is $0.42/mth, or $5/yrs. You may refers the [cost calculator here](https://calculator.aws/#/estimate?id=bae7c90fbe563768fd4c5d2726f3a8476ed190a0)
+### Costs 
+The actual cost incurred will depend on the frequency of execution, the number of configurations, amount of resources and number of accounts you are scanning. You may refer to [cost calculator here](https://calculator.aws/#/estimate?id=bae7c90fbe563768fd4c5d2726f3a8476ed190a0) for exact calculations. Following are some estimates based on different scenarios:
 
-For 1 config and weekly, it will be around $0.1/mth or $1.2/yrs
-
-For 1 config and monthly, it will be around $0.025/mth, or $0.3/yrs
+- Configs: 5, Schedule: Weekly. $0.42/Month or $5/Year. 
+- Configs: 1, Schedule: Weekly. $0.1/Month or $1.2/Year
+- Configs: 1, Schedule: Monthly. $0.025/Month or $0.3/Year
 
 ## Deployment Guide (Recommended to run in Cloudshell)
 ### Prerequisite - Permission 
@@ -68,13 +68,13 @@ export CROSSACCOUNTS="<ProperCrossAccountsJSON or empty>"
 export BUCKET_NAME="<insert name>" 
 
 ### Example
-export NAME="example-deploy" 
-export EMAIL_LIST="abc@sample.com,def@sample.com"
+export NAME="scheduler-sample" 
+export EMAIL_LIST="scheduler@amazon.com"
 export SERVICES="ec2,rds" 
-export REGIONS="ap-southeast-1,us-east-1" 
-export FREQUENCY="cron(30 0 ? * SUN *) " 
-export CROSSACCOUNTS=""
-export BUCKET_NAME="example-scheduler" 
+export REGIONS="ap-southeast-1, us-east-1"
+export FREQUENCY="cron(1 9 * * ? *)" 
+export CROSSACCOUNTS='{"general": {"IncludeThisAccount": true,"RoleName": "OrganizationAccountAccessRole","ExternalId": ""},"accountLists": {"123456789": {}}}'
+export BUCKET_NAME="example-scheduler"
 ```
 
 Here are some example on FREQUENCY format
@@ -126,7 +126,7 @@ The configuration setup is to be done in DynamoDB, a table called: <TODO>
 
 ## Troubleshooting
 ### CDK Bootstrap Failed
-1. Go to cloudformation and search for "CDKToolKit", if the account previously has failed deployment on this, you have to remove it first and rerun "CDK bootstrap". 
+1. Go to CloudFormation console and search for "CDKToolKit", if the account previously has failed deployment on this, you have to remove it first and rerun "CDK bootstrap". 
 1. Please make sure the IAM role has the permission to perform `iam:CreateRole` action
 
 ### CDK Deploy Failed
