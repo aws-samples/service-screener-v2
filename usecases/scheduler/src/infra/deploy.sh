@@ -3,15 +3,14 @@ set -e
 
 # Function to validate AWS services
 validate_services() {
-    local input_services=$1
-    local valid_services=$(aws servicecatalog list-services --query 'ServiceSummaries[].Name' --output text)
+    local valid_services=$(aws service-quotas list-services --query 'Services[].ServiceCode')
     local invalid_services=()
 
-    IFS=',' read -ra services <<< "$input_services"
-    for service in "${services[@]}"; do
+    IFS=',' read -ra service_array <<< "$SERVICES"
+    for service in "${service_array[@]}"; do
         service=$(echo $service | xargs)
-        if [[ ! $valid_services =~ (^|[[:space:]])$service($|[[:space:]]) ]]; then
-            invalid_services+=($service)
+        if ! echo "$valid_services" | grep -qw "$service"; then
+            invalid_services+=("$service")
         fi
     done
 
@@ -26,11 +25,10 @@ validate_services() {
 
 # Function to validate AWS regions
 validate_regions() {
-    local input_regions=$1
     local valid_regions=$(aws ec2 describe-regions --query 'Regions[].RegionName' --output text)
     local invalid_regions=()
 
-    IFS=',' read -ra regions <<< "$input_regions"
+    IFS=',' read -ra regions <<< "$REGIONS"
     for region in "${regions[@]}"; do
         region=$(echo $region | xargs)
         if [[ ! $valid_regions =~ (^|[[:space:]])$region($|[[:space:]]) ]]; then
@@ -49,13 +47,14 @@ validate_regions() {
 
 # Function to validate cron expression
 validate_cron() {
-    local cron_expr=$1
-    if [[ $cron_expr =~ ^cron\([0-9*,/-]+ [0-9*,/-]+ [0-9*,/-]+ [0-9*,/-]+ [?*,/-]+ [0-9*,/-]+\)$ ]]; then
-        echo "Cron expression is valid."
-        return 0
-    else
-        echo "Invalid cron expression: $cron_expr"
+    local cron_regex='^cron\(([0-9*/,-]+) ([0-9*/,-]+) ([0-9*/,-]+|[?]) ([0-9*/,-]+|\*) ([0-9*/,-]+|[?]) ([0-9*/,-]+|\*)\)$'
+    
+    if [[ ! $FREQUENCY =~ $cron_regex ]]; then
+        echo "Invalid cron expression format: $FREQUENCY"
         return 1
+    else
+        echo "Cron expressiom is valid"
+        return 0
     fi
 }
 

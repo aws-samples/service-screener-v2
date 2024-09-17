@@ -100,20 +100,12 @@ cdk deploy
 
 ## cdk deploy will ask if you wish to deploy the changes, type "y" and press "enter"
 
-## After CDK deploy finish, run the following scripts to insert the first configuration to dynamodb
-DDBTable=$(aws dynamodb list-tables --query "TableNames[?contains(@, 'Screener')]")
-
-aws dynamodb put-item \
-  --table-name "$DDBTable" \
-  --item '{
-    "name": {"S": "'"$NAME"'"},
-    "services": {"SS": ["'"$(echo $SERVICES | sed "s/,/\",\"/g")"'"]},
-    "regions": {"SS": ["'"$(echo $REGIONS | sed "s/,/\",\"/g")"'"]},
-    "emails": {"SS": ["'"$(echo $EMAIL_LIST | sed "s/,/\",\"/g")"'"]},
-    "frequency": {"S": "'"$FREQUENCY"'"},
-    "crossAccounts": {"S": "'"$(echo "$CROSSACCOUNTS" | sed 's/"/\\"/g')"'"}
-  }'
+## After CDK deploy finish, run the following commands to insert the first configuration to dynamodb
+chmod +x ./deploy.sh
+./deploy.sh
 ```
+
+After the item has been inserted into DynamoDB, an EventBridge Scheduler and SNS topic will be created. Check the email you exported as environment variable previously and confirm the subscription. This email will receive the updates whenever Service Screener runs.
 
 ## Configuration
 The configuration setup is to be done in DynamoDB, a table called: <TODO>
