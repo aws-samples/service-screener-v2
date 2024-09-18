@@ -31,14 +31,9 @@ validate_services() {
 
 # Function to validate AWS regions
 validate_regions() {
-    # Return false if REGIONS is an empty string
-    if [ -z "$REGIONS" ]; then
-        echo "Regions can't be empty."
-        return 1
-    fi
 
     # Return true if REGIONS is "ALL"
-    if [ "$REGIONS" = "ALL" ]; then
+    if [ "$REGIONS" = "ALL" ] || [ -z "$REGIONS" ]; then
         echo "All regions selected."
         return 0
     fi
@@ -55,7 +50,7 @@ validate_regions() {
     done
 
     if [ ${#invalid_regions[@]} -eq 0 ]; then
-        echo "All specified regions are valid."
+        echo "Regions are valid."
         return 0
     else
         echo "The following regions are invalid: ${invalid_regions[*]}"
