@@ -36,6 +36,7 @@ class Screener:
         }
         
         contexts = {}
+        charts = {}
         time_start = time.time()
         
         tempCount = 0
@@ -73,6 +74,9 @@ class Screener:
             
             if not service[0] in contexts:
                 contexts[service[0]] = {}
+
+            if not service[0] in charts:
+                charts[service[0]] = {}
             
             Config.set('CWClient', cw.getClient())
             try:
@@ -88,6 +92,7 @@ class Screener:
                     info[identifier] = obj['info']
                     
                 contexts[service[0]][region] = arr
+                charts[service[0]][region] = serv.getChart()
                 
             except botocore.exceptions.ClientError as e:
                 contexts[service[0]][region] = {}
@@ -124,6 +129,10 @@ class Screener:
         
         with open(_C.FORK_DIR + '/' + service[0] + '.stat.json', 'w') as f:
             json.dump(scanned, f)
+
+        ## write the charts data per region
+        with open(_C.FORK_DIR + '/' + service[0] + '.charts.json', 'w') as f:
+            json.dump(charts[service[0]], f)
             
         cp.writeOutput(service[0].lower())
 
@@ -184,8 +193,6 @@ class Screener:
             if hasGlobal:
                 regions.append('GLOBAL')
             
-            rawServices = []
-            
             if runmode == 'report':
                 params = []
                 for key, val in Config.get('_SS_PARAMS').items():
@@ -196,11 +203,12 @@ class Screener:
                 summary = Config.get('SCREENER-SUMMARY')
                 excelObj = ExcelBuilder(stsInfo['Account'], ' '.join(params))
             
-            for service, resultSets in contexts.items():
-                rawServices.append(service)
-                
+            for service, dataSets in contexts.items():
+                resultSets = dataSets['results']
+                chartSets = dataSets['charts']
+
                 reporter = Reporter(service)
-                reporter.process(resultSets).getSummary().getDetails()
+                reporter.process(resultSets).processCharts(chartSets).getSummary().getDetails()
                 
                 if runmode == 'report':
                     ## <TODO> -- verification

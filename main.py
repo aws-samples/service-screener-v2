@@ -176,6 +176,7 @@ for acctId, cred in rolesCred.items():
         Config.set('ListOfAccounts', listOfAccts)
     
     contexts = {}
+    charts = {}
     serviceStat = {}
     # GLOBALRESOURCES = []
     
@@ -228,7 +229,14 @@ for acctId, cred in rolesCred.items():
             continue
         f = file.split('.')
         if len(f) == 2:
-            contexts[f[0]] = json.loads(open(_C.FORK_DIR + '/' + file).read())
+            if f[0] not in contexts:
+                contexts[f[0]] = {}
+            contexts[f[0]]['results'] = json.loads(open(_C.FORK_DIR + '/' + file).read())
+        elif f[1] == "charts":
+            ## Create and consolidate charts findings
+            if f[0] not in contexts:
+                contexts[f[0]] = {}
+            contexts[f[0]]['charts'] = json.loads(open(_C.FORK_DIR + '/' + file).read())
         else:
             cnt, rules, exceptions, timespent = list(json.loads(open(_C.FORK_DIR + '/' + file).read()).values())
             
