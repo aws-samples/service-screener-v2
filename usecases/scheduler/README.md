@@ -62,7 +62,7 @@ pip install -r requirements.txt
 export NAME="<insert config name>" 
 export EMAIL_LIST="<insert email>"
 export SERVICES="<insert services | leave it BLANK to scan all services>" 
-export REGIONS="<insert regions | leave it BLANK to scan all regions>" 
+export REGIONS="<insert regions | ALL to scan all regions>" 
 export FREQUENCY="<insert cron expression>" 
 export CROSSACCOUNTS="<ProperCrossAccountsJSON or empty>"
 export BUCKET_NAME="<insert name>" 

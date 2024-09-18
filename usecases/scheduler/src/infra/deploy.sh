@@ -3,6 +3,12 @@ set -e
 
 # Function to validate AWS services
 validate_services() {
+    # Return true if SERVICES is an empty string
+    if [ -z "$SERVICES" ]; then
+        echo "No services specified. Proceeding with empty service list."
+        return 0
+    fi
+
     local valid_services=$(aws service-quotas list-services --query 'Services[].ServiceCode')
     local invalid_services=()
 
@@ -25,6 +31,18 @@ validate_services() {
 
 # Function to validate AWS regions
 validate_regions() {
+    # Return false if REGIONS is an empty string
+    if [ -z "$REGIONS" ]; then
+        echo "Regions can't be empty."
+        return 1
+    fi
+
+    # Return true if REGIONS is "ALL"
+    if [ "$REGIONS" = "ALL" ]; then
+        echo "All regions selected."
+        return 0
+    fi
+
     local valid_regions=$(aws ec2 describe-regions --query 'Regions[].RegionName' --output text)
     local invalid_regions=()
 
@@ -59,14 +77,14 @@ validate_cron() {
 }
 
 # Validate environment variables
-if [ -z "$SERVICES" ] || [ -z "$REGIONS" ] || [ -z "$FREQUENCY" ]; then
-    echo "Error: SERVICES, REGIONS, and FREQUENCY environment variables must be set."
+if [ -z "${SERVICES+x}" ] || [ -z "${REGIONS+x}" ] || [ -z "${FREQUENCY+x}" ]; then
+    echo "Error: SERVICES, REGIONS, and FREQUENCY environment variables must be set (can be empty, but must be set)."
     exit 1
 fi
 
 # Validate services
 if ! validate_services "$SERVICES"; then
-    echo "Please enter valid service(s)"
+    echo "Please enter valid service(s) or leave empty"
     exit 1
 fi
 
