@@ -37,5 +37,20 @@
         "ref": [
             "[EFS Backup]<https://docs.aws.amazon.com/efs/latest/ug/awsbackup.html>"    
         ]
+    },
+    "IsSingleAZ": {
+        "category": "R",
+        "^description": "Using EFS in SingleAZ is only suitable for development workload. It offers up to 47% cost saving compare to EFS Standard storage classes. It is not resilient to the loss of the Availability Zone.",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "Recreate new Regional EFS and migrate data over",
+        "ref": [
+            "[Create EFS]<https://docs.aws.amazon.com/efs/latest/ug/creating-using-create-fs.html>",
+            "[Options to transfer data]<https://docs.aws.amazon.com/efs/latest/ug/transfer-data-to-efs.html>",
+            "[Comparison between Regional vs SingleAZ]<https://docs.aws.amazon.com/efs/latest/ug/features.html>"
+        ]
     }
 }

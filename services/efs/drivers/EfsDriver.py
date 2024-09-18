@@ -42,3 +42,8 @@ class EfsDriver(Evaluator):
 
         if backup['BackupPolicy']['Status'] == 'DISABLED':
             self.results['AutomatedBackup'] = [-1, 'Disabled']
+
+    def _checkSingleAZ(self):
+        if 'AvailabilityZoneName' in self.efs:
+            self.results['IsSingleAZ'] = [-1, self.efs['AvailabilityZoneName']]
+
