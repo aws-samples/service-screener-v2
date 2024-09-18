@@ -1,4 +1,5 @@
 # Custom
+.DS_Store
 test*
 crossAccounts.json
 output.zip
