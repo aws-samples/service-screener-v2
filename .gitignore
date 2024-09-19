@@ -68,7 +68,4 @@ venv/
 ENV/
 env.bak/
 venv.bak/
->>>>>>> 533bf7053abb2c4935e28536b76d2a14435ef1fd
-.DS_Store
-service-screener-v2.code-workspace
 .DS_Store
