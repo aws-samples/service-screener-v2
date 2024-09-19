@@ -428,7 +428,7 @@ class Ec2(Service):
             obj = Ec2EbsVolume(volume,self.ec2Client, self.cwClient)
             obj.run(self.__class__)
             objs[f"EBS::{volume['VolumeId']}"] = obj.getInfo()
-            
+
         #EBS Snapshots
         print('... (EBS::Snapshots) inspecting')
         obj = Ec2EbsSnapshot(self.ec2Client)

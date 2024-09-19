@@ -56,15 +56,17 @@ class Ec2EbsVolume(Evaluator):
     
     def _checkSnapshot(self):
         filterData = [{
-                'Name': 'volume-id',
-                'Values': [self.ebsVolumeData['VolumeId']]
-            }]
+            'Name': 'volume-id',
+            'Values': [self.ebsVolumeData['VolumeId']]
+        }]
         
         snapshotData = self.ec2Client.describe_snapshots(
             Filters = filterData
         )
         
         if len(snapshotData['Snapshots']) > 0:
+            self.hasFastSnapshot(snapshotData['Snapshots'])
+
             # take latest snapshot to calculate how recently it was created
             snapshotStartTime = snapshotData['Snapshots'][0]['StartTime']
             timeDelta = datetime.datetime.now().timestamp() - snapshotStartTime.timestamp()
@@ -79,11 +81,24 @@ class Ec2EbsVolume(Evaluator):
         
         return
     
-    def _checkFastSnapshot(self):
-        result = self.ec2Client.describe_fast_snapshot_restores()
+    def hasFastSnapshot(self, snapshots):
+        items = [snapshot['SnapshotId'] for snapshot in snapshots]
+
+        filterData = [{
+            'Name': 'snapshot-id',
+            'Values': items
+        }]
         
-        if len(result) > 0:
-            self.results['EBSSnapshot'] = [-1,''] 
+        result = self.ec2Client.describe_fast_snapshot_restores(
+            Filters=filterData
+        )
+
+        fastSnapshots = result.get('FastSnapshotRestores')
+        
+        items = []
+        if len(fastSnapshots) > 0:
+            items = list(set(snapshot['SnapshotId'] for snapshot in fastSnapshots))
+            self.results['EBSFastSnapshot'] = [-1, ('|').join(items)] 
         
         return
     
