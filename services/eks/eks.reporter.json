@@ -42,7 +42,7 @@
     },
     "eksSecretsEncryption":{
         "category": "S",
-		"^description": "EKS secrets encryption: {$COUNT} of your clusters have disabled secrets encryption. Enable secrets encryption to protect your secrets in your clusters",
+		"^description": "EKS secrets encryption: {$COUNT} of your clusters have disabled secrets encryption. Enable secrets encryption to protect your secrets in your clusters.",
 		"shortDesc": "EKS secrets encryption disabled",
 		"criticality": "H",
 		"downtime": 0,
@@ -102,85 +102,88 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>",
+			"[Karpenter Capacity Type]<https://karpenter.sh/docs/concepts/nodepools/#capacity-type>"
 		]
 	},
 	"eksCostVisibilityPlugins":{
-		"category": "C",
+		"category": "OC",
 		"^description": "{$COUNT} Managed Nodegroup(s) do not have cost visibility plugins installed.",
-		"shortDesc": "Leverage spot instances for  deeper discount for fault-tolerant workload.",
+		"shortDesc": "Implement tool for cost visibility at granular level (e.g. by namespace)",
 		"criticality": "M",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+			"[Kubecost]<https://docs.aws.amazon.com/eks/latest/userguide/cost-monitoring.html>"
 		]
 	},
 	"eksNodegroupsWithoutBottleRocketAMI":{
 		"category": "S",
-		"^description": "{$COUNT} Managed Nodegroup(s) are not using Bottlerocket AMI",
+		"^description": "{$COUNT} Managed Nodegroup(s) are not using Bottlerocket AMI.",
 		"shortDesc": "Use EKS-optimized AMI or  Bottlerocket for host OS. These AMIs reduce the surface of  attack, are light-weight and improve resource utilization of the container  host.",
-		"criticality": "M",
+		"criticality": "H",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>",
+			"[Karpenter Node Class]<https://karpenter.sh/docs/concepts/nodeclasses/>"
 		]
 	},
 	"eksCheckAutoScaling":{
-		"category": "C",
-		"^description": "{$COUNT} Managed Nodegroup(s) are not using Bottlerocket AMI",
-		"shortDesc": "Use EKS-optimized AMI or  Bottlerocket for host OS. These AMIs reduce the surface of  attack, are light-weight and improve resource utilization of the container  host.",
+		"category": "P",
+		"^description": "{$COUNT} Pod Autoscaler (Cluster Autoscaler or Karpenter) is not installed in the cluster.",
+		"shortDesc": "Enable autoscaling of Pods based on metrics (Horizontal Pod Autoscaler) or events (KEDA)",
 		"criticality": "M",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+			"[Horizontal Pod Autoscaler]<https://docs.aws.amazon.com/eks/latest/userguide/horizontal-pod-autoscaler.html>",
+			"[KEDA]<https://keda.sh/>"
 		]
 	},
 	"eksAutoMountServiceAccountToken":{
-		"category": "C",
-		"^description": "{$COUNT} Managed Nodegroup(s) are not using Bottlerocket AMI",
-		"shortDesc": "Use EKS-optimized AMI or  Bottlerocket for host OS. These AMIs reduce the surface of  attack, are light-weight and improve resource utilization of the container  host.",
-		"criticality": "M",
+		"category": "S",
+		"^description": "You have not opt out of automounting service token for your pods.",
+		"shortDesc": "Prevent attacker from using API token to communicate with the API Server if the Pod is compromised.",
+		"criticality": "H",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+			"[Opt out API Credential automounting]<https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#opt-out-of-api-credential-automounting>"
 		]
 	},
 	"eksPodSecurityStandards":{
-		"category": "C",
-		"^description": "{$COUNT} Managed Nodegroup(s) are not using Bottlerocket AMI",
-		"shortDesc": "Use EKS-optimized AMI or  Bottlerocket for host OS. These AMIs reduce the surface of  attack, are light-weight and improve resource utilization of the container  host.",
-		"criticality": "M",
+		"category": "S",
+		"^description": "Pod Security Standard is not enforced with 'pod-security.kubernetes.io/enforce' label.",
+		"shortDesc": "Implement Pod Security Standards and Admissions for all namespaces.",
+		"criticality": "H",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+			"[Pod Security Standards]<https://kubernetes.io/docs/concepts/security/pod-security-standards/>"
 		]
 	},
 	"eksNamespaceResourceQuotas":{
 		"category": "C",
-		"^description": "{$COUNT} Managed Nodegroup(s) are not using Bottlerocket AMI",
-		"shortDesc": "Use EKS-optimized AMI or  Bottlerocket for host OS. These AMIs reduce the surface of  attack, are light-weight and improve resource utilization of the container  host.",
-		"criticality": "M",
+		"^description": "Resource Quota is not configured for all namespaces in {$COUNT} cluster(s).",
+		"shortDesc": "Limit total resources (e.g. CPU and Memory) that can be requested in a given namespace. Helps to avoid bill shock when overprovisioning pods.",
+		"criticality": "H",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Managed Node Groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+			"[Resource Quotas]<https://kubernetes.io/docs/concepts/policy/resource-quotas/>"
 		]
 	},
   "eksAuthenticationMode":{
@@ -199,7 +202,7 @@
     },
     "eksPermissionToAccessCluster":{
         "category": "S",
-		"^description": "EKS permission error: Service screen don't have access to your {$COUNT} EKS clusters, somecheck will be skipped on these clusters, please make sure your user have enough permission.'",
+		"^description": "EKS permission error: Service Screener don't have access to your {$COUNT} EKS clusters, some check will be skipped on these clusters, please make sure your user have enough permission.",
 		"shortDesc": "User don't have permission to access EKS clusters",
 		"criticality": "I",
 		"downtime": 0,
@@ -212,7 +215,7 @@
     },
     "eksImplementedPodDisruptionBudget":{
         "category": "R",
-		"^description": "EKS Pod Disruption Budget: {$COUNT} of clusters' don't have Pod Disruption Budget. Prevent disruption and increase  availability of workloads by limitting the number of concurrent disruptions  to Pods.'",
+		"^description": "EKS Pod Disruption Budget: {$COUNT} of clusters' don't have Pod Disruption Budget. Prevent disruption and increase  availability of workloads by limitting the number of concurrent disruptions to Pods.",
 		"shortDesc": "Implement Pod Disruption Budget",
 		"criticality": "H",
 		"downtime": 0,
@@ -263,7 +266,7 @@
 			"[Define LimitRange]<https://kubernetes.io/docs/concepts/policy/limit-range/>"
 		]
     },
-    "eksPodSpead":{
+    "eksPodSpread":{
         "category": "R",
 		"^description": "EKS Pod spread constrant: {$COUNT} of clusters' don't have any Pod Topology Spread Constraints defined. Helps to spread pods across Availability Zones and Hosts. Optional for workload (e.g. data processing) which require Pods to be placed in the same availability zone.",
 		"shortDesc": "Define Pod Topology Spread Constraints",
@@ -304,7 +307,7 @@
     },
     "eksPodIdentityIRSA":{
         "category": "S",
-		"^description": "EKS Pod Identity IRSA: {$COUNT} of clusters' don't use Pod Identities or IRSA. Applications in a Pod's containers can use an AWS SDK or the AWS CLI to make API requests to AWS services using AWS IAM permissions. EKS Pod Identities and IRSA provide the  ability to manage credentials for your applications, similar to the way that  Amazon EC2 instance profiles provide credentials to Amazon EC2 instances. Instead of creating and distributing your AWS credentials to the containers  or using the Amazon EC2 instance's role, you associate an IAM role with a Kubernetes service account and configure your Pods to use the service account.",
+		"^description": "EKS Pod Identity IRSA: {$COUNT} of clusters' don't use Pod Identities or IRSA. Applications in a Pod's containers can use an AWS SDK or the AWS CLI to make API requests to AWS services using AWS IAM permissions. EKS Pod Identities and IRSA provide the ability to manage credentials for your applications, similar to the way that Amazon EC2 instance profiles provide credentials to Amazon EC2 instances. Instead of creating and distributing your AWS credentials to the containers or using the Amazon EC2 instance's role, you associate an IAM role with a Kubernetes service account and configure your Pods to use the service account.",
 		"shortDesc": "Use EKS Pod Identities or IRSA",
 		"criticality": "M",
 		"downtime": 1,
@@ -312,7 +315,9 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Configure security context]<https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>"
+			"[Configure security context]<https://kubernetes.io/docs/tasks/configure-pod-container/security-context/>",
+			"[EKS Pod Identities]<https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html>",
+			"[IAM Roles for Service Accounts (IRSA)]<https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html>"
 		]
     },
     "eksUpdateInsights":{

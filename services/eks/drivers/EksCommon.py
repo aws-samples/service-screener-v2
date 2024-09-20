@@ -432,7 +432,7 @@ class EksCommon(Evaluator):
             regex_cluster_autoscaler = r'\bcluster-autoscaler\b'
 
             # Check for Karpenter
-            # Assumping if the karpenter is in separate namespace
+            # Assuming if the karpenter is in separate namespace
             pods = self.k8sClient.CoreV1Client.list_namespaced_pod("karpenter").items
             if not len(pods) == 0:
                 karpenter_installed = True
@@ -523,7 +523,7 @@ class EksCommon(Evaluator):
             namespaces_wo_pod_security = []
             for namespace in namespace_list.items:
                 labels = namespace.metadata.labels
-                print(labels)
+                #print(labels)
                 if not labels and "pod-security.kubernetes.io/enforce" in labels:
                     namespaces_wo_pod_security.append(namespace.metadata.name)
             # if namespaces_wo_pod_security:
@@ -771,7 +771,7 @@ class EksCommon(Evaluator):
                         break
 
             if not havePodSpread:
-                self.results['eksPodSpead'] = [-1, None]
+                self.results['eksPodSpread'] = [-1, None]
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Pod Spread check')
@@ -1017,7 +1017,7 @@ class EksCommon(Evaluator):
                 self.results['eksKarpenterRestrictedInstanceType'] = [-1, allowedInstanceTypes]
 
         except k8sClient.exceptions.ApiException:
-            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Configure Consolidation check')
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Restricted Instance Type check')
     
         except Exception as e:
             error_body = json.loads(e.body)
