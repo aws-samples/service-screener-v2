@@ -4,16 +4,8 @@ import constants as _C
 
 from services.Evaluator import Evaluator
 
-###### TO DO #####
-## Import modules that needed for this driver
-## Example
-## from services.ec2.drivers.Ec2SecGroup import Ec2SecGroup
-
 class EcsCommon(Evaluator):
     
-    ###### TO DO #####
-    ## Replace resource variable to meaningful name
-    ## Modify based on your need
     def __init__(self, clusterName, clusterInfo,ecsClient):
         super().__init__()
         self.clusterName = clusterName
@@ -58,7 +50,8 @@ class EcsCommon(Evaluator):
                 capacityProviders=[ec2CapacityProvider]
             ).get('capacityProviders')[0]
             #print(response['autoScalingGroupProvider']['autoScalingGroupArn'])
-    
+        
+        # TODO: Continue writing logic for this
 
         # self.results['ecsGraviton'] = [-1, "TODO: InstanceType here"]
         return
