@@ -171,12 +171,22 @@ class ServiceScreenerAutomationStack(Stack):
             actions=["iam:PassRole"]
         ))
         #Findings Function
-        results_fn = PythonFunction(self, "ScreenerResultsProcessor",
-            entry=path.join(dirname, "../../lambda/ssv2_resultProcesser"),  # required
-            runtime=lambda_.Runtime.PYTHON_3_12,  # required
-            index="resultProcesser.py",  # optional, defaults to 'index.py'
-            handler="lambda_handler",
+        # results_fn = PythonFunction(self, "ScreenerResultsProcessor",
+        #     entry=path.join(dirname, "../../lambda/ssv2_resultProcesser"),  # required
+        #     runtime=lambda_.Runtime.PYTHON_3_12,  # required
+        #     index="resultProcesser.py",  # optional, defaults to 'index.py'
+        #     handler="lambda_handler",
+        #     retry_attempts=1,
+        #     timeout=Duration.minutes(5),
+        #     environment={
+                
+        #     }
+        # )
+        results_fn = lambda_.Function(self, "ScreenerResultsProcessor",
+            runtime=lambda_.Runtime.PYTHON_3_12,
             retry_attempts=1,
+            handler="resultProcesser.lambda_handler",
+            code=lambda_.Code.from_asset(path.join(dirname, "../../lambda/ssv2_resultProcesser")),
             timeout=Duration.minutes(5),
             environment={
                 "SSV2_SNSARN_PREFIX": prefix
