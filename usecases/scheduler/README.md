@@ -90,7 +90,7 @@ cron(15 23 * * ? *)
 ```
 
 ```
-## Deploy the architecture
+## Prepare the architecture
 export AWS_DEFAULT_REGION=<YOUR_REGION>
 cd usecases/scheduler/src/infra
 pip install -r requirements.txt
@@ -98,12 +98,13 @@ cd ../lambda/ssv2_resultProcesser
 pip install -r requirements.txt -t . 
 cd ../../infra
 cdk synth
-cdk bootstrap
-cdk deploy
 
-## If you see CDK CLI incompatibility, update your CDK
+## If there is a CDK CLI incompatibility error, update your CDK
 sudo npm install -g aws-cdk@latest
 
+## Deploy the architecture
+cdk bootstrap
+cdk deploy
 ## cdk deploy will ask if you wish to deploy the changes, type "y" and press "enter"
 
 ## After CDK deploy finish, run the following commands to insert the first configuration to dynamodb
