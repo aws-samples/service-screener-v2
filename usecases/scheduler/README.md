@@ -91,7 +91,7 @@ cron(15 23 * * ? *)
 
 ```
 ## Deploy the architecture
-export AWS_DEFAULT_REGION=ap-southeast-1
+export AWS_DEFAULT_REGION=<YOUR_REGION>
 cd usecases/scheduler/src/infra
 pip install -r requirements.txt
 cd ../lambda/ssv2_resultProcesser
@@ -100,6 +100,9 @@ cd ../../infra
 cdk synth
 cdk bootstrap
 cdk deploy
+
+## If you see CDK CLI incompatibility, update your CDK
+sudo npm install -g aws-cdk@latest
 
 ## cdk deploy will ask if you wish to deploy the changes, type "y" and press "enter"
 

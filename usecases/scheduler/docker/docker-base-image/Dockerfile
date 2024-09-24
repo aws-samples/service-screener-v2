@@ -1,5 +1,5 @@
 # Use a base image with the necessary dependencies
-FROM --platform=linux/amd64 python:3.12-slim 
+FROM --platform=linux/x86-64 python:3.12-slim 
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
