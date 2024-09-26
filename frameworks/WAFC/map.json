@@ -1,0 +1,54 @@
+{
+  "metadata": {
+    "originator": "AWS",
+    "shortname": "WAFC",
+    "fullname": "AWS Well-Architected Framework - Cost Optimization Pillar (version Jun 2024)",
+    "description": "The Cost Optimization pillar  provides in-depth guidance for building capability within your organization, designing your workload, selecting your services, configuring and operating the services, and applying cost optimization techniques. ",
+    "_": "https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html",
+    "emptyCheckDefaultMsg": ""
+  },
+  "mapping": {
+    "COST01": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": []
+    },
+    "COST02": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": []
+    },
+    "COST03": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": []
+    },
+    "COST04": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": []
+    },
+    "COST05": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": []
+    }
+
+    
+  }
+}

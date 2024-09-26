@@ -1,0 +1,104 @@
+{
+  "metadata": {
+    "originator": "AWS",
+    "shortname": "WAFO",
+    "fullname": "AWS Well-Architected Framework - Operational Excellence Pillar (version Jun 2024)",
+    "description": "The Operational Excellence pillar provides a way to consistently measure your operations and architectures against best practices and identify areas for improvement.",
+    "_": "https://docs.aws.amazon.com/wellarchitected/latest/operational-excellence-pillar/welcome.html",
+    "emptyCheckDefaultMsg": ""
+  },
+  "mapping": {
+    "OPS01": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": []
+    },
+    "OPS02": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": []
+    },
+    "OPS03": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": [],
+      "BP07": []
+    },
+    "OPS04": {
+      "BP01": [],
+      "BP02": ["cw.trailWithoutCWLogs"],
+      "BP03": [],
+      "BP04": [],
+      "BP05": []
+    },
+    "OPS05": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": ["iam.EnableConfigService", "iam.PartialEnableConfigService"],
+      "BP04": [],
+      "BP05": ["**ec2.hasImageBuilderImage", "**ec2.hasSSMPatchManagerMaintenance"],
+      "BP06": [],
+      "BP07": [],
+      "BP08": ["iam.hasOrganization"],
+      "BP09": [],
+      "BP10": []
+    },
+    "OPS06": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": []
+    },
+    "OPS07": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": []
+    },
+    "OPS08": {
+      "BP01": ["cw.trailWithCWLogsWithoutMetrics"],
+      "BP02": ["cw.trailWithoutCWLogs"],
+      "BP03": ["**cw.hasXrayTraces"],
+      "BP04": ["**cw.hasAnomalyDetectors"],
+      "BP05": ["**cw.hasXrayInsights"],
+      "BP06": ["**cw.hasDashboards"]
+    },
+    "OPS09": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": []
+    },
+    "OPS10": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": [],
+      "BP07": []
+    },
+    "OPS11": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": [],
+      "BP07": [],
+      "BP08": [],
+      "BP09": []
+    }
+    
+  }
+}
