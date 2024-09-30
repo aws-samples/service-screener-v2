@@ -1,16 +1,43 @@
 {
-	"<CHECK_NAME>": {
-		"category": '<ENUM>', 		//REQUIRED, valid value (combination): O,S,R,P,C
-		"^description": '<string>', //REQUIRED
-		"shortDesc": '<string>', 	//OPTIONAL
-		"criticality": '<ENUM>', 	//REQUIRED, valid value (single): I, L, M, H
-		"downtime": '<int>', 		//OPTIONAL
-		"slowness": '<int>', 		//OPTIONAL
-		"additionalCost": '<int>', 	//OPTIONAL
-		"needFullTest": '<int>', 	//OPTIONAL
-		"ref": [					//OPTIONAL
-			"[<text_to_display>]<url>",
-			"[<text_to_display>]<url>",
-		],
-	}
+    "ecsTaskDefinitionReadOnlyRootFilesystem": {
+        "category": "S",
+        "^description": "You have not enabled 'Read-only root file  system' for every container in a Task definition. Give containers read-only access to root file system. Modifications are not allowed to the root file system.",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "Enable read-only root file system",
+        "ref": [
+            "[Container Definition Under Storage and Logging]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definitions>"    
+        ]
+    },
+
+	"ecsTaskDefinitionTaskIAMRole": {
+        "category": "S",
+        "^description": "ECS Task Role does not align with IAM principle of least privilege, IAM roles should be more restrictive instead of providing Administrator Access or Full Access to AWS Service.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "IAM roles least privilege",
+        "ref": [
+            "[IAM best practice for ECS]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/security-iam-bestpractices.html>"    
+        ]
+    },
+
+    "ecsTaskDefinitionTaskExecutionIAMRole": {
+        "category": "S",
+        "^description": "ECS Task Definition Roles does not align with IAM principle of least privilege, IAM roles should be more restrictive instead of providing Administrator Access or Full Access to AWS Service.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "IAM roles least privilege",
+        "ref": [
+            "[IAM best practice for ECS]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/security-iam-bestpractices.html>"    
+        ]
+    }
 }

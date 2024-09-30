@@ -63,6 +63,8 @@ class Config:
         'ec2nacl': ['DICT', 'nacl', 'NetworkAclId'],
         'efsdriver': ['DICT', 'efs', 'FileSystemId'],
         'ekscommon': ['ATTR', 'cluster'],
+        'ecscommon': ['ATTR', 'clusterName'],
+        'ecstaskdefinition': ['ATTR', 'taskDefName'],
         'elasticachememcached': ['DICT', 'cluster', 'ARN'],
         'elasticacheredis': ['DICT', 'cluster', 'ARN'],
         'elasticachereplicationgroup': ['DICT', 'group', 'ReplicationGroupId'],

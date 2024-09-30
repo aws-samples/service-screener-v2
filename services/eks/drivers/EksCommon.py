@@ -307,7 +307,10 @@ class EksCommon(Evaluator):
                 self.results['eksNodeGroupSpotInstanceUsage'] = [-1, str(mng_wo_spot)]
 
         except Exception as e:
-            print(f"Error Checking Spot Instance Usage {e}")
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " skipping Spot Instance Usage check")
 
     def _checkCostVisibility(self):
         """
@@ -364,7 +367,10 @@ class EksCommon(Evaluator):
             return kube_cost_addon_name in addons
 
         except Exception as e:
-            print(f"Error checking Kube Cost Plugin installation: {e}")
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " skipping Kube Cost Plugin Installation check")
 
     def _checkAMIs(self) -> bool:
         """
@@ -399,8 +405,12 @@ class EksCommon(Evaluator):
 
             if nodegroups_not_using_bottlerocket:
                 self.results["eksNodegroupsWithoutBottleRocketAMI"] = [-1, str(nodegroups_not_using_bottlerocket)]
+
         except Exception as e:
-            print(f"Error checking node group AMIs: {e}")
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " skipping Node Group AMI check")
 
     def _checkAutoScaling(self):
         """
@@ -422,7 +432,7 @@ class EksCommon(Evaluator):
             regex_cluster_autoscaler = r'\bcluster-autoscaler\b'
 
             # Check for Karpenter
-            # Assumping if the karpenter is in separate namespace
+            # Assuming if the karpenter is in separate namespace
             pods = self.k8sClient.CoreV1Client.list_namespaced_pod("karpenter").items
             if not len(pods) == 0:
                 karpenter_installed = True
@@ -439,8 +449,10 @@ class EksCommon(Evaluator):
                 self.results["eksCheckAutoScaling"] = [-1, ""]
 
         except Exception as e:
-            print(f"Error checking pod autoscaler: {e}")
-            pass
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " skipping Pod Autoscaler check")
 
     def _checkAutoMountServiceAccountToken(self):
         """
@@ -489,7 +501,10 @@ class EksCommon(Evaluator):
                 self.results["eksAutoMountServiceAccountToken"] = [-1, str(results)]
 
         except Exception as e:
-            print(f"Error checking Automount Service Account Token: {e}")
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " skipping Automount Service Account Token check")
 
     def _checkPodSecurityStandards(self):
         """
@@ -508,14 +523,17 @@ class EksCommon(Evaluator):
             namespaces_wo_pod_security = []
             for namespace in namespace_list.items:
                 labels = namespace.metadata.labels
-                print(labels)
+                #print(labels)
                 if not labels and "pod-security.kubernetes.io/enforce" in labels:
                     namespaces_wo_pod_security.append(namespace.metadata.name)
             # if namespaces_wo_pod_security:
             self.results["eksPodSecurityStandards"] = [-1, str(namespaces_wo_pod_security)]
 
         except Exception as e:
-            print(f"Error checking Pod Security Standards: {e}")
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " skipping Pod Security Standards check")
 
     def _checkNamespaceResourceQuotas(self):
         """
@@ -535,22 +553,28 @@ class EksCommon(Evaluator):
         Reference:
             https://kubernetes.io/docs/concepts/policy/resource-quotas/
         """
+        try:
+            # Get all namespaces
+            namespaces = self.k8sClient.CoreV1Client.list_namespace()
+            namespaces_wo_resource_quota = list()
 
-        # Get all namespaces
-        namespaces = self.k8sClient.CoreV1Client.list_namespace()
-        namespaces_wo_resource_quota = list()
+            for each_namespace in namespaces.items:
+                namespace = each_namespace.metadata.name
 
-        for each_namespace in namespaces.items:
-            namespace = each_namespace.metadata.name
+                # Get resource quotas for the namespace
+                quotas = self.k8sClient.CoreV1Client.list_namespaced_resource_quota(namespace)
 
-            # Get resource quotas for the namespace
-            quotas = self.k8sClient.CoreV1Client.list_namespaced_resource_quota(namespace)
+                if not quotas.items:
+                    namespaces_wo_resource_quota.append(namespace)
 
-            if not quotas.items:
-                namespaces_wo_resource_quota.append(namespace)
+            if namespaces_wo_resource_quota:
+                self.results["eksNamespaceResourceQuotas"] = [-1, str(namespaces_wo_resource_quota)]
 
-        if namespaces_wo_resource_quota:
-            self.results["eksNamespaceResourceQuotas"] = [-1, str(namespaces_wo_resource_quota)]
+        except Exception as e:
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " skipping Namespace Resource Quota check")
 
     def _checkAddonsNodeGroups(self):
         # Define the add-ons to check
@@ -558,14 +582,18 @@ class EksCommon(Evaluator):
         cluster_addons = self.eksClient.list_addons(clusterName=self.clusterInfo.get("name")).get("addons")
 
         print(f"Cluster Addons - {cluster_addons}")
+        try:
+            nodes = self.k8sClient.CoreV1Client.list_node().items
 
-        nodes = self.k8sClient.CoreV1Client.list_node().items
+            # for node in nodes:
+                # print(f"Node - {node.metadata}")
+                # labels = node.metadata.labels.get("eks.amazonaws.com/nodegroup")
 
-        # for node in nodes:
-            # print(f"Node - {node.metadata}")
-            # labels = node.metadata.labels.get("eks.amazonaws.com/nodegroup")
+            self.__check_karpenter()
 
-        self.__check_karpenter()
+        except k8sClient.exceptions.ApiException:
+            print("No permission to access cluster " + self.clusterInfo.get("name") + " skipping AddOns Node Groups check")
+            
     def __check_core_dns(self):
         pass
 
@@ -573,7 +601,7 @@ class EksCommon(Evaluator):
         pass
     def __check_karpenter(self):
         """
-        Assumpting the karpenter is in seperate namespace.
+        Assuming the karpenter is in seperate namespace.
 
         :return:
         """
@@ -589,8 +617,12 @@ class EksCommon(Evaluator):
 
                     if nodegroup_name:
                         nodegroups.append(nodegroup_name)
+
         except Exception as e:
-            print(f"Error Checking Karpenter Details {e}")
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " skipping Karpenter Details check")
 
         if not len(nodegroups) == 0:
             for each_nodegroup in nodegroups:
@@ -624,8 +656,12 @@ class EksCommon(Evaluator):
             self.k8sClient.CoreV1Client.list_namespace()
         except k8sClient.exceptions.ApiException:
             self.results['eksPermissionToAccessCluster'] = [-1, 'No permission']
+
         except Exception as e:
-            print(f"Error checking permission to access cluster: {e}")
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " skipping permission to access cluster check")
 
         return
 
@@ -643,8 +679,12 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Implemented Pod Disruption Budget check')
+        
         except Exception as e:
-            print(f"Error checking implemented pod disruption budget: {e}")
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " skipping Pod Disruption Budget check")
 
         return
 
@@ -666,9 +706,12 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Implemented Default Deny Ingress Network Policy check')
+        
         except Exception as e:
-            print(f"Error checking default deny ingress network policy: {e}")
-
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " error checking default deny ingress network policy")
         return
 
     def _checkDefinedResourceRequestAndLimit(self):
@@ -688,8 +731,12 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Defined Resource Request And Limit For Container check')
+        
         except Exception as e:
-            print(f"Error checking defined resource request and limit: {e}")
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " error checking defined resource request and limit")
 
         return
 
@@ -705,9 +752,12 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Defined LimitRange check')
+        
         except Exception as e:
-            print(f"Error checking defined limit range: {e}")
-
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " error checking defined limit range")
         return
 
     def _checkPodSpread(self):
@@ -721,12 +771,15 @@ class EksCommon(Evaluator):
                         break
 
             if not havePodSpread:
-                self.results['eksPodSpead'] = [-1, None]
+                self.results['eksPodSpread'] = [-1, None]
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Pod Spread check')
         except Exception as e:
-            print(f"Error checking pod spead: {e}")
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " error checking pod spread")
 
         return
 
@@ -748,8 +801,12 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Liveness Readiness check')
+
         except Exception as e:
-            print(f"Error checking liveness readiness: {e}")
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " error checking liveness readiness")
 
         return
 
@@ -802,9 +859,12 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Defined Security Context check')
-        except Exception as e:
-            print(f"Error checking security context: {e}")
 
+        except Exception as e:
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " error checking security context")
         return
 
     def _checkPodIdentityIRSA(self):
@@ -824,9 +884,12 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Pod Identity IRSA check')
-        except Exception as e:
-            print(f"Error checking pod indentity IRSA: {e}")
 
+        except Exception as e:
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " error checking pod indentity IRSA")
         return
 
     def _checkUpdateInsights(self):
@@ -854,9 +917,12 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Update Insights check')
-        except Exception as e:
-            print(f"Error checking update insights: {e}")
 
+        except Exception as e:
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " error checking update insights")
         return
 
     def _checkKarpenterConfiguredExpireAfter(self):
@@ -873,9 +939,12 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Configured ExpireAfter check')
+        
         except Exception as e:
-            print(f"Error checking Karpenter configured expireAfter: {e}")
-
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " error checking Karpenter configured expireAfter")
         return
 
     def _checkKarpenterResourceLimit(self):
@@ -892,8 +961,12 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Resource Limit check')
+            
         except Exception as e:
-            print(f"Error checking Karpenter Resource Limit: {e}")
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " error checking Karpenter Resource Limit")
 
         return
 
@@ -914,9 +987,12 @@ class EksCommon(Evaluator):
 
         except k8sClient.exceptions.ApiException:
             print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Configure Consolidation check')
+    
         except Exception as e:
-            print(f"Error checking Karpenter Configure Consolidation: {e}")
-
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " error checking Karpenter Configure Consolidation")
         return
 
     def _checkKarpenterRestrictedInstanceType(self):
@@ -941,8 +1017,12 @@ class EksCommon(Evaluator):
                 self.results['eksKarpenterRestrictedInstanceType'] = [-1, allowedInstanceTypes]
 
         except k8sClient.exceptions.ApiException:
-            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Configure Consolidation check')
+            print('No permission to access cluster ' + self.clusterInfo.get("name") + ', skipping Karpenter Restricted Instance Type check')
+    
         except Exception as e:
-            print(f"Error checking Karpenter Restricted Instance Type: {e}")
+            error_body = json.loads(e.body)
+            reason = error_body.get('reason', 'Unknown')
+            code = error_body.get('code', 'Unknown')
+            print(f"Error {code}: Reason: {reason}," + " error checking Karpenter Restricted Instance Type")
 
         return
