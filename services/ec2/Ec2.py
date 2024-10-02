@@ -25,6 +25,11 @@ from services.ec2.drivers.Ec2Vpc import Ec2Vpc
 from services.ec2.drivers.Ec2NACL import Ec2NACL
 
 class Ec2(Service):
+    CHARTSTYPE = {
+        'EC2 Instance Family Pricing': 'bar',
+        'EC2 Instance Utilization': 'bar'
+    }
+
     def __init__(self, region):
         super().__init__(region)
         ssBoto = self.ssBoto
@@ -42,8 +47,17 @@ class Ec2(Service):
         self.getOutdateSQLVersion()
         self.getWindowsVersion()
 
+        self.setChartsType(self.CHARTSTYPE)
+        self.setChartData({
+            "EC2 Instance Utilization": {
+                'Under Provisioned': 0,
+                'Over Provisioned': 0,
+                'Spiky': 0,
+                'Right Sized': 0
+            }
+        })
+
         self.chartGen = None
-        self.chartCPUUtil = None
     
     def getOutdateSQLVersion(self):
         outdateVersion = Config.get('SQLEolVersion', None)
@@ -477,8 +491,6 @@ class Ec2(Service):
             else:
                 formatted_instance_dict[f'[PREV GEN] {instance_family}'] = metadata['cost']
         self.chartGen = formatted_instance_dict
-        
-        print(self.chartGen)
 
         return self.chartGen
 
@@ -523,30 +535,20 @@ class Ec2(Service):
         
         # EC2 instance checks
         instances = self.getResources()
-        if instances:
-            self.chartCPUUtil = {
-                'Under Provisioned': 0,
-                'Over Provisioned': 0,
-                'Spiky': 0,
-                'Right Sized': 0
-            }
         for instanceArr in instances:
             for instanceData in instanceArr['Instances']:
                 print('... (EC2) inspecting ' + instanceData['InstanceId'])
                 obj = Ec2Instance(instanceData,self.ec2Client, self.cwClient)
                 obj.run(self.__class__)
                 
-                self.chartCPUUtil[obj.getCPUUtil()] += 1
-                
                 objs[f"EC2::{instanceData['InstanceId']}"] = obj.getInfo()
+                self.setChartData(obj.getChartData())
                 
                 ## Gather SecGroups in dict first to prevent check same sec groups multiple time
                 instanceSG = self.getEC2SecurityGroups(instanceData)
                 for group in instanceSG:
                     secGroups[group['GroupId']] = group
         
-        if self.chartCPUUtil:
-            print(self.chartCPUUtil)
             
         #EBS checks
         volumes = self.getEBSResources()
@@ -639,6 +641,6 @@ class Ec2(Service):
             objs[f"NACL::{nacl['NetworkAclId']}"] = obj.getInfo()
         
         
-        self.getChartGenCost()
+        self.setChartData({"EC2 Instance Family Pricing": self.getChartGenCost()})
 
         return objs

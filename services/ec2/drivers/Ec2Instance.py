@@ -34,8 +34,6 @@ class Ec2Instance(Evaluator):
     
         self.addII('platform', ec2InstanceData['Platform'] if 'Platform' in ec2InstanceData else 'linux')
         self.addII('instanceType', ec2InstanceData['InstanceType'])
-
-        self.ec2Util = 'Right Sized'
     
     # supporting functions
     def getCPUUtil(self):
@@ -340,7 +338,7 @@ class Ec2Instance(Evaluator):
             return
         
         self.results['EC2LowUtilization'] = [-1, '']
-        self.ec2Util = 'Over Provisioned'
+        self.setChartData("EC2 Instance Utilization", 'Over Provisioned', 1)
         return
 
 
@@ -360,7 +358,7 @@ class Ec2Instance(Evaluator):
             return
     
         self.results['EC2HighUtilization'] = [-1, '']
-        self.ec2Util = 'Under Provisioned'
+        self.setChartData("EC2 Instance Utilization", 'Under Provisioned', 1)
         return
     
     def _checkEC2SpikyUtilization(self):
@@ -380,7 +378,7 @@ class Ec2Instance(Evaluator):
             return
 
         self.results['EC2SpikyUtilization'] = [-1, '']
-        self.ec2Util = 'Spiky'
+        self.setChartData("EC2 Instance Utilization", 'Spiky', 1)
         return
     
     def _checkEC2PublicIP(self):

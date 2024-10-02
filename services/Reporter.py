@@ -13,6 +13,8 @@ class Reporter:
         self.summaryRegion = {}
         self.detail = {}
         self.config = {}
+        self.charts = {}
+        self.chartsConfig = {}
         self.service = service
         self.warningList = []
         self.stats = {}
@@ -23,6 +25,7 @@ class Reporter:
             folder = service + '_'
         
         serviceReporterJsonPath = _C.SERVICE_DIR + '/' + folder + '/' + service + '.reporter.json'
+        serviceChartJsonPath = _C.SERVICE_DIR + '/' + folder + '/' + service + '.chart.json'
         
         if not os.path.exists(serviceReporterJsonPath):
             print("[Fatal] " + serviceReporterJsonPath + " not found")
@@ -307,6 +310,38 @@ class Reporter:
         
     def resetDashboard(self):
         cfg.dashboard = {}
+
+    ## Process Data for Charts
+    ## <TO DO> Enhance to support bar charts data and grouping without region
+    def processCharts(self, chartsObjs):
+        for region in chartsObjs:
+            chartDetails = chartsObjs[region]
+            configList = chartDetails['config']
+            dataList = chartDetails['data']
+            
+            for chartTitle in configList:
+                if chartTitle not in self.chartsConfig:
+                    self.chartsConfig[chartTitle] = {}
+
+                if not self.chartsConfig[chartTitle]:
+                    self.chartsConfig[chartTitle] = configList[chartTitle]
+                else:
+                    mergedLegends = list(set(self.chartsConfig[chartTitle]['legends']).union(set(configList[chartTitle]['legends'])))
+                    self.chartsConfig[chartTitle]['legends'] = mergedLegends
+            
+
+            for chartTitle in dataList:
+                if chartTitle not in self.charts:
+                    self.charts[chartTitle] = {}
+                
+                if region not in self.charts[chartTitle]:
+                    self.charts[chartTitle][region] = {}
+                
+                self.charts[chartTitle][region] = dataList[chartTitle]
+
+
+        
+        return self
         
 if __name__ == "__main__":
     from services.PageBuilder import PageBuilder
