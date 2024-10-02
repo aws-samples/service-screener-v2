@@ -8,6 +8,8 @@ import constants as _C
 class Service:
     _AWS_OPTIONS = {}
     charts = {}
+    chartsType = {}
+    chartData = {}
     RULESPREFIX = None
     tags = []
     chartsConfig = {}
@@ -35,26 +37,32 @@ class Service:
         
         print('PREPARING -- ' + classname.upper()+ '::'+region)
 
-    def setChart(self, title, chartType, chartData):
-        legends = list(chartData.keys())
-        data = list(chartData.values())
-
-        self.setChartConfig(title, chartType, legends)
-        self.setChartData(title, data)
-
-    def setChartConfig(self, title, chartType, legends):
+    def setChartConfig(self, title, chartType, legends, data):
         if title not in self.chartsConfig:
             self.chartsConfig[title] = {}
-            self.chartsConfig[title] = {
-                'chartType' : chartType,
-                'legends': legends
-            }
+        self.chartsConfig[title] = {
+            'chartType' : chartType,
+            'legends': legends
+        }
 
-    def setChartData(self, title, chartData):
-        if title not in self.charts:
-            self.charts[title] = {}
+        self.charts[title] = data
+
+
+    def setChartsType(self, chartsType):
+        self.chartsType = chartsType
+    
+
+    def setChartData(self,chartData):
+        for title in chartData:
+            if title not in self.chartData:
+                self.chartData[title] = {}
+            
+            for cat in chartData[title]:
+                if cat not in self.chartData[title]:
+                    self.chartData[title][cat] = chartData[title][cat]
+                else:
+                    self.chartData[title][cat] += chartData[title][cat]
         
-        self.charts[title] = chartData
 
 
     def getChartsConfig(self):
@@ -149,6 +157,16 @@ class Service:
             nTags.append({'Key': i['TagKey'], 'Value': i['TagValue']})
             
         return nTags
+    
+    def __del__(self):
+        if len(self.chartData) > 0:
+            for title, data in self.chartData.items():
+                legends = list(data.keys())
+                values = list(data.values())
+                chartType = self.chartsType[title]
+
+                self.setChartConfig(title, chartType, legends, values)
+
 
 if __name__ == "__main__":
     Config.init()
