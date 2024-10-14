@@ -1,4 +1,4 @@
-import boto3
+import boto3, botocore
 
 import time
 import datetime
@@ -18,6 +18,7 @@ class RdsCommon(Evaluator):
         self.rdsClient = rdsClient
         self.cwClient = cwClient
         self.ctClient = ctClient
+        self.certInfo = None
         
         self.__configPrefix = 'rds::' + db['Engine'] + '::' + db['EngineVersion'] + '::'
         self.isCluster = True
@@ -41,26 +42,35 @@ class RdsCommon(Evaluator):
     def getCAInfo(self):
         if self.isCluster == True:
             return
-        
+    
+        if not 'CACertificateIdentifier'in self.db:
+            _warn("Unable to locate CACertificateIdentifier")
+            return
+            
         ca = self.db['CACertificateIdentifier']
         k = 'RDSCaInfo::' + ca
         
         myCert = Config.get(k, None)
         if myCert == None:
-            resp = self.rdsClient.describe_certificates(CertificateIdentifier=ca)
-            certInfo = resp.get('Certificates')
-            
-            for cert in certInfo:
-                diff = cert['ValidTill'].replace(tzinfo=None) - datetime.datetime.now()
+            try:
+                resp = self.rdsClient.describe_certificates(CertificateIdentifier=ca)
+                certInfo = resp.get('Certificates')
                 
-                cert['expiredInDays'] = diff.days
-                cert['isExpireIn365days'] = False
-                if diff.days < 365:
-                    cert['isExpireIn365days'] = True
-                
-                myCert = cert
-                Config.set(k, cert)
-                break
+                for cert in certInfo:
+                    diff = cert['ValidTill'].replace(tzinfo=None) - datetime.datetime.now()
+                    
+                    cert['expiredInDays'] = diff.days
+                    cert['isExpireIn365days'] = False
+                    if diff.days < 365:
+                        cert['isExpireIn365days'] = True
+                    
+                    myCert = cert
+                    Config.set(k, cert)
+                    break
+            except botocore.exceptions.ClientError as e:
+                ecode = e.response['Error']['Code']
+                emsg = e.response['Error']['Message']
+                print("[{}] {}".format(ecode, emsg))
         
         self.certInfo = myCert
         
@@ -452,6 +462,9 @@ class RdsCommon(Evaluator):
             self.results['ManualSnapshotTooOld'] = [-1, days]
             
     def _checkCAExpiry(self):
+        if self.certInfo == None:
+            return
+        
         if self.isCluster == False and self.certInfo['isExpireIn365days'] == True:
             exp = self.certInfo['ValidTill'].strftime("%Y-%m-%d")
             self.results['CACertExpiringIn365days'] = [-1, "Expired on {}, ({} days left)".format(exp, self.certInfo['expiredInDays'])]
