@@ -13,10 +13,13 @@ adminlte/aws/**/error.txt
 __pycache__/
 *.py[cod]
 *$py.class
+.DS_Store
+*.xlsx
 
 # Distribution / packaging
 .Python
 build/
+build.log
 develop-eggs/
 # dist/
 downloads/

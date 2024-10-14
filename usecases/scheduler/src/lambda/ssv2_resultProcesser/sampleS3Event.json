@@ -1,0 +1,33 @@
+{
+    "region": "ap-southeast-1",
+    "detail": 
+      {
+        "eventVersion": "2.1",
+        "eventSource": "aws:s3",
+        "eventTime": "2019-09-03T19:37:27.192Z",
+        "eventName": "ObjectCreated:Put",
+        "userIdentity": {
+          "principalId": "AWS:AIDAINPONIXQXHT3IKHL2"
+        },
+        "requestParameters": {
+          "sourceIPAddress": "205.255.255.255"
+        },
+        "responseElements": {
+          "x-amz-request-id": "D82B88E5F771F645",
+          "x-amz-id-2": "vlR7PnpV2Ce81l0PRw6jlUpck7Jo5ZsQjryTjKlc5aLWGVHPZLj5NeC6qMa0emYBDXOo6QBU0Wo="
+        },
+        "bucket": {
+            "name": "ssv2test-ugym-results",
+            "ownerIdentity": {
+                "principalId": "A3I5XTEXAMAI3E"
+            },
+            "arn": "arn:aws:s3:::lambda-artifacts-deafc19498e3f2df"
+        },
+        "object": {
+            "key": "config001/20240820/output.zip",
+            "size": 1305107,
+            "eTag": "b21b84d653bb07b05b1e6b33684dc11b",
+            "sequencer": "0C0F6F405D6ED209E1"
+        }
+      }
+  }
