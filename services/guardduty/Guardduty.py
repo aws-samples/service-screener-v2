@@ -1,5 +1,6 @@
 import os
-from botocore.exceptions import ClientError
+from utils.Tools import _warn
+from botocore.exceptions import ClientError, EndpointConnectionError
 import boto3
 from services.Service import Service
 from services.guardduty.drivers.GuarddutyDriver import GuarddutyDriver
@@ -12,8 +13,12 @@ class Guardduty(Service):
         self.guardduty_client = ssBoto.client('guardduty', config=self.bConfig)
 
     def get_resources(self):
-        results = self.guardduty_client.list_detectors()
-        detector_ids = results['DetectorIds']
+        try:
+            results = self.guardduty_client.list_detectors()
+            detector_ids = results['DetectorIds']
+        except EndpointConnectionError as e:
+            _warn("(Not showstopper: Services not available: {}".format(e))
+            return []
         return detector_ids
 
     def advise(self):
