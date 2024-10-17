@@ -180,7 +180,7 @@ for acctId, cred in rolesCred.items():
     # GLOBALRESOURCES = []
     
     oo = Config.get('_AWS_OPTIONS')
-
+    
     ## Added mpeid to CFStack
     mpeid = None
     otherParams = _cli_options.get('others', None)
@@ -335,7 +335,7 @@ else:
     shutil.rmtree(apiFolder)
 
 print("Pages generated, download \033[1;42moutput.zip\033[0m to view")
-print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m /tmp/service-screener-v2/output.zip \033[1;42m <===== \033[0m")
+print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m ~/service-screener-v2/output.zip \033[1;42m <===== \033[0m")
 
 scriptTimeSpent = round(time.time() - scriptStartTime, 3)
 print("@ Thank you for using {}, script spent {}s to complete @".format(Config.ADVISOR['TITLE'], scriptTimeSpent))
