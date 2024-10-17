@@ -181,8 +181,25 @@ for acctId, cred in rolesCred.items():
     
     oo = Config.get('_AWS_OPTIONS')
     
+    ## Added mpeid to CFStack
+    mpeid = None
+    otherParams = _cli_options.get('others', None)
+    if otherParams is not None:
+        try:
+            oparams = json.loads(otherParams)
+            mpeInfo = oparams.get('mpe', None)
+            if mpeInfo is not None:
+                mpeid = mpeInfo.get('id', None)
+        except json.JSONDecodeError as e:
+            print("Unable to read --others parameters, invalid JSON format provided")
+            print(f"Error decoding JSON: {e}")
+            exit()
+
     if testmode == False:
-        CfnTrailObj.boto3init()
+        cfnAdditionalStr = None
+        if mpeid is not None: 
+            cfnAdditionalStr = " --mpeid:{}".format(mpeid)
+        CfnTrailObj.boto3init(cfnAdditionalStr)
         CfnTrailObj.createStack()
     
     overallTimeStart = time.time()
@@ -318,7 +335,7 @@ else:
     shutil.rmtree(apiFolder)
 
 print("Pages generated, download \033[1;42moutput.zip\033[0m to view")
-print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m ~/service-screener-v2/output.zip \033[1;42m <===== \033[0m")
+print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m /tmp/service-screener-v2/output.zip \033[1;42m <===== \033[0m")
 
 scriptTimeSpent = round(time.time() - scriptStartTime, 3)
 print("@ Thank you for using {}, script spent {}s to complete @".format(Config.ADVISOR['TITLE'], scriptTimeSpent))

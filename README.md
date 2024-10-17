@@ -37,6 +37,7 @@ Running this tool is free as it is covered under the AWS Free Tier. If you have 
 
 In the AWS CloudShell terminal, run this script this to install the dependencies:
 ```bash
+cd /tmp
 python3 -m venv .
 source bin/activate
 python3 -m pip install --upgrade pip
