@@ -16,7 +16,7 @@ class Guardduty(Service):
         try:
             results = self.guardduty_client.list_detectors()
             detector_ids = results['DetectorIds']
-        except EndpointConnectionError as e:
+        except ClientError as e:
             _warn("(Not showstopper: Services not available: {}".format(e))
             return []
         return detector_ids
