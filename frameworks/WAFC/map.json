@@ -11,28 +11,52 @@
     "COST01": {
       "BP01": [],
       "BP02": [],
-      "BP03": [],
+      "BP03": ["iam.enableCostBudget"],
       "BP04": [],
-      "BP05": [],
-      "BP06": []
+      "BP05": ["**iam.hasBudgetNotification"],
+      "BP06": [],
+      "BP07": [],
+      "BP08": [],
+      "BP09": []
     },
     "COST02": {
       "BP01": [],
       "BP02": [],
-      "BP03": [],
-      "BP04": [],
-      "BP05": [],
+      "BP03": ["iam.hasOrganization"],
+      "BP04": ["iam.hasSSORoles", "iam.noUsersFound"],
+      "BP05": ["**iam.hasBudgetNotification"],
       "BP06": []
     },
     "COST03": {
-      "BP01": [],
-      "BP02": [],
-      "BP03": [],
+      "BP01": ["**iam.hasCostReport", "**iam.hasCostDataExports"],
+      "BP02": ["**iam.hasTagPolicies", "**iam.hasTaggedResources"],
+      "BP03": ["**iam.hasCostCategories"],
       "BP04": [],
-      "BP05": [],
+      "BP05": ["**iam.hasBudget", "**iam.hasBudgetNotification", "**iam.hasCostAnomalyMonitors", "**iam.hasCostCategories"],
       "BP06": []
     },
     "COST04": {
+      "BP01": ["**iam.hasTaggedResources"],
+      "BP02": [],
+      "BP03": [],
+      "BP04": ["dynamodb.autoScalingStatus", "**ec2.hasASG", "**ec2.useSeverless"],
+      "BP05": ["cloudtrail.EnableTrailS3BucketLifecycle", "**ec2.hasDataLifecyclePolicies"]
+    },
+    "COST05": {
+      "BP01": [],
+      "BP02": ["**iam.hasCostReport"],
+      "BP03": [],
+      "BP04": [],
+      "BP05": ["**ec2.useSeverless", "**rds.useApplication", "**dynamodb.useApplication"],
+      "BP06": []
+    },
+    "COST06": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": ["**ec2.useRAM"]
+    },
+    "COST07": {
       "BP01": [],
       "BP02": [],
       "BP03": [],
@@ -40,7 +64,31 @@
       "BP05": [],
       "BP06": []
     },
-    "COST05": {
+    "COST08": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": []
+    },
+    "COST09": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": []
+    },
+    "COST10": {
+      "BP01": [],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": [],
+      "BP06": []
+    },
+    "COST11": {
       "BP01": [],
       "BP02": [],
       "BP03": [],
@@ -48,7 +96,5 @@
       "BP05": [],
       "BP06": []
     }
-
-    
   }
 }
