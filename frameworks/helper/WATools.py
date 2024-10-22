@@ -3,6 +3,7 @@ from botocore.exceptions import BotoCoreError
 from botocore.config import Config as bConfig
 from utils.Config import Config
 from datetime import datetime
+from utils.Tools import _warn
 
 ## --others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":0}}'
 
@@ -14,6 +15,8 @@ class WATools():
         'WorkloadId': None,
         'LensesAlias': 'wellarchitected'
     }
+
+    HASPERMISSION = True
 
     def __init__(self, pillarId):
         self.pillarId = pillarId
@@ -57,12 +60,16 @@ class WATools():
                     self.waInfo['WorkloadId'] = workload['WorkloadId']
 
         except Exception as e:
-            print(f"An error occurred: {str(e)}")
+            _warn(f"Error checking if workload exists: {str(e)}")
+            self.HASPERMISSION = False
             return False, None
         
     def createReportIfNotExists(self):
         workload_name = self.cfg['reportName']
         self.checkIfReportExists()
+
+        if self.HASPERMISSION == False:
+            return False
 
         if self.waInfo['isExists'] == True:
             return True
@@ -82,6 +89,7 @@ class WATools():
             self.waInfo['WorkloadId'] = response['WorkloadId']
             return True
         except Exception as e:
+            self.HASPERMISSION = False
             print(f"An error occurred while creating the workload: {str(e)}")
             return False
         
@@ -147,10 +155,14 @@ class WATools():
 
             return True
         except BotoCoreError as e:
-            print(f"An error occurred while creating the milestone: {str(e)}")
+            self.HASPERMISSION = False
+            _warn(f"An error occurred while creating the milestone: {str(e)}")
             return None
         
     def listAnswers(self):
+        if self.HASPERMISSION == False:
+            return None
+
         next_token = None
         ansArgs = {
             'WorkloadId': self.waInfo['WorkloadId'],
@@ -161,17 +173,22 @@ class WATools():
         }
 
         answers = []
-        while True:
-            if next_token:
-                ansArgs['nextToken'] = next_token
+        try:
+            while True:
+                if next_token:
+                    ansArgs['nextToken'] = next_token
 
-            resp = self.waClient.list_answers(**ansArgs)
-            # print(resp['AnswerSummaries'])
-            answers.extend(resp['AnswerSummaries'])
+                resp = self.waClient.list_answers(**ansArgs)
+                # print(resp['AnswerSummaries'])
+                answers.extend(resp['AnswerSummaries'])
 
-            next_token = resp.get('NextTOken')
-            if not next_token:
-                break
+                next_token = resp.get('NextTOken')
+                if not next_token:
+                    break
+        except BotoCoreError as e:
+            _warn(f"[ERROR - WATOOLS]: {str(e)}")
+            self.HASPERMISSION = False
+            return None
 
         i = 1
         j = 1
@@ -191,6 +208,9 @@ class WATools():
         self.answerSets = answerSets
     
     def updateAnswers(self, questionId, selectedChoices, unselectedNotes):
+        if self.HASPERMISSION == False:
+            return None
+
         ansArgs = {
             'WorkloadId': self.waInfo['WorkloadId'],
             'LensAlias': self.waInfo['LensesAlias'],
@@ -199,7 +219,13 @@ class WATools():
             'Notes': unselectedNotes
         }
 
-        resp = self.waClient.update_answer(**ansArgs)
+        try:
+            resp = self.waClient.update_answer(**ansArgs)
+        except BotoCoreError as e:
+            _warn(f"[ERROR - WATOOLS]: {str(e)}")
+            self.HASPERMISSION = False
+            return None
+
         pass
 '''
 stsInfo = {'UserId': 'AIDA55JZ3XKTBZPEJU5K7', 'Account': '956288449190', 'Arn': 'arn:aws:iam::956288449190:user/macbook-ss'}

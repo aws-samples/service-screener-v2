@@ -31,7 +31,7 @@ class WAFS(Framework):
         
 
     def _hookPostItemActivity(self, title, section, checks, comp):
-        if self.WATools == None:
+        if self.WATools == None or self.WATools.HASPERMISSION == False:
             return title, section, checks, comp
         
         titleNum = self.extractNumber(title)
@@ -60,6 +60,9 @@ class WAFS(Framework):
         return title, section, newChecks, comp
         
     def _hookPostItemsLoop(self):
+        if self.WATools == None or self.WATools.HASPERMISSION == False:
+            return
+
         for title, opts in self.ResultCache.items():
             if len(opts["1"]) == 0 and len(opts["-1"]) == 0:
                 continue 
