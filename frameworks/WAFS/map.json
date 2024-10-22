@@ -12,7 +12,7 @@
       "BP01": ["iam.hasOrganization"],
       "BP02": ["iam.rootMfaActive", "iam.hasAlternateContact", "iam.rootHasAccessKey", "iam.rootConsoleLogin30days", "iam.passwordPolicy", "iam.enableGuardDuty", "iam.rootConsoleLogin30days"],
       "BP03": ["iam.mfaActive", "iam.passwordPolicyWeak", "iam.passwordLastChange90", "iam.hasAccessKeyNoRotate30days"],
-      "BP04": ["iam.enableGuardDuty""iam.enableGuardDuty"],
+      "BP04": ["iam.enableGuardDuty"],
       "BP05": ["lambda.$length", "rds.$length", "ecs.$length", "eks.$length", "dynamodb.$length", "elasticache.$length"],
       "BP06": [],
       "BP07": [],
@@ -47,7 +47,6 @@
       "BP01": ["cloudfront.$length"],
       "BP02": ["ec.SGSensitivePortOpenToAll", "ec2.SGAllTCPOpen", "ec2.SGAllUDPOpen", "ec2.SGDefaultInUsed", "ec2.SGEncryptionInTransit", "ec2.ELBListenerInsecure", "rds.PubliclyAccessible"],
       "BP03": [],
-      "BP04": []
       "BP04": []
     },
     "SEC06":{
