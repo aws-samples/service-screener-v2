@@ -218,8 +218,15 @@ for acctId, cred in rolesCred.items():
         pass
     
     input_ranges = []
+
+    ## Force IAM to run first, it takes the longest time
+    if 'IAM' in services:
+        input_ranges = [('IAM', regions, filters)]
+
     for service in services:
-        input_ranges = [(service, regions, filters) for service in services]
+        otherInputs = [(service, regions, filters) for service in services]
+    
+    input_ranges.extend(otherInputs)
     
     pool = Pool(processes=int(workerCounts))
     pool.starmap(Screener.scanByService, input_ranges)

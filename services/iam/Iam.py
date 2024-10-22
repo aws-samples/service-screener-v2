@@ -182,7 +182,9 @@ class Iam(Service):
             'GatedGarden',
             'PVRE-SSMOnboarding',
             'PVRE-Maintenance',
-            'InternalAuditInternal'
+            'InternalAuditInternal',
+            'isengard-',
+            'AWS-QuickSetup',
         ]
         
         for kw in keywords:

@@ -1,11 +1,42 @@
 import traceback
 import botocore
 import time
+import copy
+
+import concurrent.futures as cf
 
 from utils.Config import Config
 from utils.Tools import _warn, _info
 from utils.CustomPage.CustomPage import CustomPage
 import constants as _C
+
+def runSingleCheck(tmp_obj, method_name):
+    debugFlag = Config.get('DEBUG')
+    obj = tmp_obj
+    try:
+        startTime = time.time()
+        if debugFlag:
+            print('--- --- fn: ' + method_name)
+            
+        getattr(obj, method_name)()
+        if debugFlag:
+            timeSpent = round(time.time() - startTime, 3)
+            if timeSpent >= 0.2:
+                _warn("Long running checks {}s".format(timeSpent))
+
+        getattr(obj, method_name)()
+        return 'OK'
+    except botocore.exceptions.ClientError as e:
+        code = e.response['Error']['Code']
+        msg = e.response['Error']['Message']
+        print(code, msg)
+        print(traceback.format_exc())
+        traceback.format_exc()
+    except Exception:
+        print(traceback.format_exc())
+        traceback.format_exc()
+
+    return traceback.format_exc()
 
 class Evaluator():
     def __init__(self):
@@ -25,42 +56,65 @@ class Evaluator():
         else:
             _warn("{} is not found in drivers/{}.InventoryInfo".format(k, self.classname), forcePrint=False)
             return None
-        
+
     def run(self, serviceName):
         servClass = self.classname
         rulePrefix = serviceName.__name__ + '::rules'
+        servMethods = servClass + '::methods'
         rules = Config.get(rulePrefix, [])
         
         debugFlag = Config.get('DEBUG')
         
         ecnt = cnt = 0
         emsg = []
-        methods = [method for method in dir(self) if method.startswith('__') is False and method.startswith('_check') is True]
-        for method in methods:
-            if not rules or str.lower(method[6:]) in rules:
-                try:
-                    
-                    startTime = time.time()
-                    if debugFlag:
-                        print('--- --- fn: ' + method)
+
+        #Improve of methods scanning
+        methods = Config.get(servMethods, [])
+        if methods == []:
+            methods = [method for method in dir(self) if method.startswith('__') is False and method.startswith('_check') is True]
+            Config.set(servMethods, methods)
+
+        filteredMethods = [method for method in methods if not rules or method[6:].lower() in rules]
+
+        cnt = len(filteredMethods)
+        runUsingConcurrent = 1
+        if runUsingConcurrent:
+            with cf.ThreadPoolExecutor(max_workers=4) as executor:
+                futures = [executor.submit(runSingleCheck, self, method) for method in filteredMethods]
+                
+                for future in cf.as_completed(futures):
+                    for fr in future.result():
+                        if fr == 'OK': 
+                            continue 
+                        else:
+                            emsg.append(fr)
+                            ecnt += 1
+                            
+        else:
+            for method in methods:
+                if not rules or str.lower(method[6:]) in rules:
+                    try:
                         
-                    getattr(self, method)()
-                    if debugFlag:
-                        timeSpent = round(time.time() - startTime, 3)
-                        if timeSpent >= 0.2:
-                            _warn("Long running checks {}s".format(timeSpent))
+                        startTime = time.time()
+                        if debugFlag:
+                            print('--- --- fn: ' + method)
+                            
+                        getattr(self, method)()
+                        if debugFlag:
+                            timeSpent = round(time.time() - startTime, 3)
+                            if timeSpent >= 0.2:
+                                _warn("Long running checks {}s".format(timeSpent))
                         
-                    cnt += 1
-                except botocore.exceptions.ClientError as e:
-                    code = e.response['Error']['Code']
-                    msg = e.response['Error']['Message']
-                    print(code, msg)
-                    print(traceback.format_exc())
-                    emsg.append(traceback.format_exc())
-                except Exception:
-                    ecnt += 1
-                    print(traceback.format_exc())
-                    emsg.append(traceback.format_exc())
+                    except botocore.exceptions.ClientError as e:
+                        code = e.response['Error']['Code']
+                        msg = e.response['Error']['Message']
+                        print(code, msg)
+                        print(traceback.format_exc())
+                        emsg.append(traceback.format_exc())
+                    except Exception:
+                        ecnt += 1
+                        print(traceback.format_exc())
+                        emsg.append(traceback.format_exc())
             
         if emsg:
             with open(_C.FORK_DIR + '/error.txt', 'a+') as f:

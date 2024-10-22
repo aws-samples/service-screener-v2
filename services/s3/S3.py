@@ -93,11 +93,7 @@ class S3(Service):
             print('... (S3Account) inspecting ')
             obj = S3Control(self.s3Control)
             obj.run(self.__class__)
-            
             objs["Account::Control"] = obj.getInfo()
-            
-            # globalKey = 'GLOBALRESOURCES_s3'
-            # Config.set(globalKey, objs)
             
             Config.set('S3_HasAccountScanned', True)
             del obj
