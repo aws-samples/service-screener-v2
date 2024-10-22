@@ -1,7 +1,8 @@
 import traceback
 import botocore
 import time
-import copy
+import os
+import math
 
 import concurrent.futures as cf
 
@@ -79,7 +80,7 @@ class Evaluator():
         cnt = len(filteredMethods)
         runUsingConcurrent = 1
         if runUsingConcurrent:
-            with cf.ThreadPoolExecutor(max_workers=4) as executor:
+            with cf.ThreadPoolExecutor() as executor:
                 futures = [executor.submit(runSingleCheck, self, method) for method in filteredMethods]
                 
                 for future in cf.as_completed(futures):
