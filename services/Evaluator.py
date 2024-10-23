@@ -81,7 +81,6 @@ class Evaluator():
 
         isBeta = Config.get('beta', False)
         if isBeta:
-            _info('[Beta Features] Concurrent Thread on _checks...', True)
             with cf.ThreadPoolExecutor() as executor:
                 futures = [executor.submit(runSingleCheck, self, method) for method in filteredMethods]
                 

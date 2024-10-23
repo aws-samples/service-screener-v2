@@ -197,8 +197,8 @@ for acctId, cred in rolesCred.items():
         cfnAdditionalStr = None
         if mpeid is not None: 
             cfnAdditionalStr = " --mpeid:{}".format(mpeid)
-        CfnTrailObj.boto3init(cfnAdditionalStr)
-        CfnTrailObj.createStack()
+        # CfnTrailObj.boto3init(cfnAdditionalStr)
+        # CfnTrailObj.createStack()
     
     overallTimeStart = time.time()
     # os.chdir('__fork')
@@ -231,7 +231,8 @@ for acctId, cred in rolesCred.items():
     pool.close()
 
     if testmode == False:
-        CfnTrailObj.deleteStack()
+        ppp = 1
+        # CfnTrailObj.deleteStack()
     
     ## <TODO>
     ## parallel logic to be implement in Python
@@ -344,3 +345,12 @@ print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m /tmp/se
 
 scriptTimeSpent = round(time.time() - scriptStartTime, 3)
 print("@ Thank you for using {}, script spent {}s to complete @".format(Config.ADVISOR['TITLE'], scriptTimeSpent))
+
+if beta:
+    print("")
+    print("\033[93m[-- ..... --] BETA MODE ENABLED [-- ..... --] \033[0m")
+    print("Current Beta Features:")
+    print("\033[96m  01/ Concurrent Mode on Evaluator \033[0m")
+    print("\033[96m  02/ WA Frameworks Integration \033[0m")
+    print("\033[96m  03/ GenAI Api Caller Button \033[0m")
+    print("\033[93m[-- ..... --] THANK YOU FOR TESTING BETA FEATURES [-- ..... --] \033[0m")

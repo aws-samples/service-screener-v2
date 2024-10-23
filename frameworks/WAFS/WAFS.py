@@ -17,7 +17,6 @@ class WAFS(Framework):
         if self.isBeta == False:
             return
 
-        _info('[Beta Features] WA Tools integration...', True)
         waTools = WATools('security')
         cliParams = Config.get('_SS_PARAMS')
 
