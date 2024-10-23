@@ -2,15 +2,22 @@ import json, re
 
 import constants as _C
 from utils.Config import Config
+from utils.Tools import _warn, _info
 from frameworks.Framework import Framework
 from frameworks.helper.WATools import WATools
 
 class WAFS(Framework):
     WATools = None
     ResultCache = {}
+    isBeta = False
     def __init__(self, data):
         super().__init__(data)
+        self.isBeta = Config.get('beta', False)
 
+        if self.isBeta == False:
+            return
+
+        _info('[Beta Features] WA Tools integration...', True)
         waTools = WATools('security')
         cliParams = Config.get('_SS_PARAMS')
 
