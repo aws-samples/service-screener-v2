@@ -170,7 +170,7 @@ class Screener:
     
     
     @staticmethod    
-    def generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS3, bucket):
+    def generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS3):
         htmlFolder = Config.get('HTML_ACCOUNT_FOLDER_FULLPATH')
         if not os.path.exists(htmlFolder):
             os.makedirs(htmlFolder)

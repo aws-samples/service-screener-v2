@@ -31,7 +31,6 @@ debugFlag = _cli_options['debug']
 # feedbackFlag = _cli_options['feedback']
 # testmode = _cli_options['dev']
 testmode = _cli_options['ztestmode']
-bucket = _cli_options['bucket']
 runmode = _cli_options['mode']
 filters = _cli_options['tags']
 crossAccounts = _cli_options['crossAccounts']
@@ -44,10 +43,6 @@ crossAccounts = True if crossAccounts in _C.CLI_TRUE_KEYWORD_ARRAY or crossAccou
 _cli_options['crossAccounts'] = crossAccounts
 
 runmode = runmode if runmode in ['api-raw', 'api-full', 'report'] else 'report'
-
-# <TODO>, yet to convert to python
-# S3 upload specific variables 
-# uploadToS3 = Uploader.getConfirmationToUploadToS3(bucket)
 
 # <TODO> analyse the impact profile switching
 _AWS_OPTIONS = {
@@ -309,7 +304,7 @@ for acctId, cred in rolesCred.items():
     Config.set('cli_regions', regions)
     Config.set('cli_frameworks', frameworks)
     
-    Screener.generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS3, bucket)
+    Screener.generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS3)
     
     # os.chdir(_C.FORK_DIR)
     filetodel = _C.FORK_DIR + '/tail.txt'
