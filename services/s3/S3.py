@@ -111,6 +111,8 @@ class S3(Service):
             
             objs["Bucket::" + bucket['Name']] = obj.getInfo()
             del obj
+
+            print(obj.getChart())
         
         obj = S3Macie(self.macieV2Client)
         obj.run(self.__class__)

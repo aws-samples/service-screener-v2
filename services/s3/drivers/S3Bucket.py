@@ -9,6 +9,11 @@ from utils.Config import Config
 from utils.Policy import Policy
 from services.Evaluator import Evaluator
 
+# Lists to store buckets missing specific lifecycle rules
+buckets_missing_abort_mpu = []
+buckets_missing_expire_noncurrent = []
+buckets_missing_transition_rules = []
+
 class S3Bucket(Evaluator):
     def __init__(self, bucket, s3Client):
         super().__init__()
@@ -178,3 +183,97 @@ class S3Bucket(Evaluator):
                             return
         except botocore.exceptions.ClientError as e:
             return
+        
+## Everything below is for cost optimization checks     
+# 
+#    
+
+    def _checkMultiUploadLifecycle(self):
+        try:
+            resp = self.s3Client.get_bucket_lifecycle_configuration(Bucket=self.bucket)
+            
+            # Check if any rule contains 'AbortIncompleteMultipartUpload'
+            has_abort_mpu = any('AbortIncompleteMultipartUpload' in rule for rule in resp.get('Rules', []))
+            
+            # Set result based on presence of the rule
+            self.results['MultiUploadLifecycle'] = [1, 'On'] if has_abort_mpu else [-1, 'Off']
+            
+            # If the rule is missing, add the bucket to the list
+            if not has_abort_mpu:
+                buckets_missing_abort_mpu.append(self.bucket)
+            
+            # Count the number of buckets missing the rule
+            count_missing_abort_mpu = len(buckets_missing_abort_mpu)
+            
+            # Store data in self.charts
+            self.charts["MultiUploadLifecycleChart"] = {
+                "BucketsMissingAbortMPU": count_missing_abort_mpu
+            }
+
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchLifecycleConfiguration':
+                self.results['MultiUploadLifecycle'] = [-1, 'Off']
+                buckets_missing_abort_mpu.append(self.bucket)
+                count_missing_abort_mpu = len(buckets_missing_abort_mpu)
+                self.charts["MultiUploadLifecycleChart"] = {
+                    "BucketsMissingAbortMPU": count_missing_abort_mpu
+                }
+
+
+
+    def _checkExpireNonCurrentLifecycle(self):
+        try:
+            resp = self.s3Client.get_bucket_lifecycle_configuration(Bucket=self.bucket)
+            
+            has_noncurrent_expiration = any('NoncurrentVersionExpiration' in rule for rule in resp.get('Rules', []))
+            
+            self.results['ExpireNonCurrentLifecycle'] = [1, 'On'] if has_noncurrent_expiration else [-1, 'Off']
+
+            if not has_noncurrent_expiration:
+                buckets_missing_expire_noncurrent.append(self.bucket)
+            
+            count_missing_expire_noncurrent = len(buckets_missing_expire_noncurrent)
+            
+            self.charts["ExpireNonCurrentLifecycleChart"] = {
+                "BucketsMissingExpireNonCurrent": count_missing_expire_noncurrent
+            }
+
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchLifecycleConfiguration':
+                self.results['ExpireNonCurrentLifecycle'] = [-1, 'Off']
+                buckets_missing_expire_noncurrent.append(self.bucket)
+                count_missing_expire_noncurrent = len(buckets_missing_expire_noncurrent)
+                self.charts["ExpireNonCurrentLifecycleChart"] = {
+                    "BucketsMissingExpireNonCurrent": count_missing_expire_noncurrent
+                }
+
+
+    def _checkTransitionNonCurrentLifecycle(self):
+        try:
+            resp = self.s3Client.get_bucket_lifecycle_configuration(Bucket=self.bucket)
+            
+            has_noncurrent_transition = any('NoncurrentVersionTransition' in rule for rule in resp.get('Rules', []))
+            
+            self.results['TransitionNonCurrentLifecycle'] = [1, 'On'] if has_noncurrent_transition else [-1, 'Off']
+            
+            if not has_noncurrent_transition:
+                buckets_missing_transition_rules.append(self.bucket)
+            
+            count_missing_transition_rules = len(buckets_missing_transition_rules)
+            
+            self.charts["TransitionNonCurrentLifecycleChart"] = {
+                "BucketsMissingTransitionRules": count_missing_transition_rules
+            }
+
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == 'NoSuchLifecycleConfiguration':
+                self.results['TransitionNonCurrentLifecycle'] = [-1, 'Off']
+                buckets_missing_transition_rules.append(self.bucket)
+                count_missing_transition_rules = len(buckets_missing_transition_rules)
+                self.charts["TransitionNonCurrentLifecycleChart"] = {
+                    "BucketsMissingTransitionRules": count_missing_transition_rules
+                }
+
+    def getChart(self):
+            return self.charts
+
