@@ -78,8 +78,10 @@ class Evaluator():
         filteredMethods = [method for method in methods if not rules or method[6:].lower() in rules]
 
         cnt = len(filteredMethods)
-        runUsingConcurrent = 1
-        if runUsingConcurrent:
+
+        isBeta = Config.get('beta', False)
+        if isBeta:
+            _info('[Beta Features] Concurrent Thread on _checks...', True)
             with cf.ThreadPoolExecutor() as executor:
                 futures = [executor.submit(runSingleCheck, self, method) for method in filteredMethods]
                 

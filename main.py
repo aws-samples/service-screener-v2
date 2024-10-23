@@ -35,11 +35,13 @@ runmode = _cli_options['mode']
 filters = _cli_options['tags']
 crossAccounts = _cli_options['crossAccounts']
 workerCounts = _cli_options['workerCounts']
+beta = _cli_options['beta']
 
 # print(crossAccounts)
 DEBUG = True if debugFlag in _C.CLI_TRUE_KEYWORD_ARRAY or debugFlag is True else False
 testmode = True if testmode in _C.CLI_TRUE_KEYWORD_ARRAY or testmode is True else False
 crossAccounts = True if crossAccounts in _C.CLI_TRUE_KEYWORD_ARRAY or crossAccounts is True else False
+beta = True if beta in _C.CLI_TRUE_KEYWORD_ARRAY or beta is True else False
 _cli_options['crossAccounts'] = crossAccounts
 
 runmode = runmode if runmode in ['api-raw', 'api-full', 'report'] else 'report'
@@ -52,6 +54,7 @@ _AWS_OPTIONS = {
 Config.init()
 Config.set('_AWS_OPTIONS', _AWS_OPTIONS)
 Config.set('DEBUG', DEBUG)
+Config.set('beta', beta)
 
 _AWS_OPTIONS = {
     'signature_version': Config.AWS_SDK['signature_version']
