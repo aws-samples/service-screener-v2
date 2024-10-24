@@ -59,9 +59,14 @@ When running Service Screener, you will need to specify the regions and services
 
 We recommend running it in all regions where you have deployed workloads in. Adjust the code samples below to suit your needs then copy and paste it into Cloudshell to run Service Screener. 
 
-**Example 1: Run in the Singapore region, check all services**
+**Example 1: (Recommended) Run in the Singapore region, check all services with beta features enabled**
 ```
-screener --regions ap-southeast-1 
+screener --regions ap-southeast-1 --beta 1
+```
+
+**Example 1a: Run in the Singapore region, check all services on stable releases**
+```
+screener --regions ap-southeast-1
 ```
 
 **Example 2: Run in the Singapore region, check only Amazon S3**
@@ -89,6 +94,7 @@ screener --regions ap-southeast-1 --tags env=prod%department=hr,coe
 screener --regions ALL
 ```
 
+
 ### Other parameters
 ```bash
 ##mode
@@ -97,6 +103,16 @@ screener --regions ALL
 # api-full: give full results in JSON format
 # api-raw: raw findings
 # report: generate default web html
+
+##others
+# AWS Partner used, migration evaluation id
+--others '{"mpe": {"id": "aaaa-1111-cccc"}}'
+
+# To override default Well Architected Tools integration parameter
+--others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":0}}'
+
+# you can combine both
+--others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":0}, "mpe": {"id": "aaaa-1111-cccc"}}'
 ```
 <details>
 <summary>Get Report Walkthrough</summary>

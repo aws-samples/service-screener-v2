@@ -266,7 +266,7 @@ for acctId, cred in rolesCred.items():
                 hasGlobal = True
     
     if testmode == True:
-        exit("Test mode enable, script halted")
+       exit("Test mode enable, script halted")
     
     timespent = round(time.time() - overallTimeStart, 3)
     scanned['timespent'] = timespent

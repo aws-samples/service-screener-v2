@@ -23,7 +23,6 @@ def runSingleCheck(tmp_obj, method_name):
             if timeSpent >= 0.2:
                 _warn("Long running checks {}s".format(timeSpent))
 
-        getattr(obj, method_name)()
         return 'OK'
     except botocore.exceptions.ClientError as e:
         code = e.response['Error']['Code']
@@ -184,7 +183,7 @@ class Evaluator():
             if name == None:
                 return
             
-            scanned.append(';'.join([Config.get(classPrefix), driver, name, hasError]))
+            scanned.append(';'.join([Config.get(classPrefix, ""), driver, name, hasError]))
             Config.set(ConfigKey, scanned)
             
             

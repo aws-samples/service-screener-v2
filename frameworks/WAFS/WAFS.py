@@ -27,7 +27,7 @@ class WAFS(Framework):
 
             if 'WA' in cfg:
                 tmpParams = cfg['WA']
-        
+
         if waTools.preCheck(tmpParams): 
             self.WATools = waTools
             self.WATools.init(tmpParams)

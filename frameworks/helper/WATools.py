@@ -1,9 +1,10 @@
-import boto3, json
+import boto3, json, botocore
 from botocore.exceptions import BotoCoreError
 from botocore.config import Config as bConfig
 from utils.Config import Config
 from datetime import datetime
 from utils.Tools import _warn
+import time
 
 ## --others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":0}}'
 
@@ -31,6 +32,8 @@ class WATools():
 
         if not 'region' in params:
             params['region'] = Config.get('REGIONS_SELECTED')[0]
+
+        print("*** [WATool] Attempting to deploy WA Tools in this region: {}".format(params['region']))
         
         return True
 
@@ -171,6 +174,26 @@ class WATools():
             # 'MilestoneNumber': self.waInfo['MilestoneNumber'],
             'MaxResults': 50
         }
+
+        isSuccess = False
+        maxRetry = 3
+        currAttempt = 0
+        while True:
+            currAttempt = currAttempt + 1
+            try:
+                resp = self.waClient.list_answers(**ansArgs)
+                isSuccess = True
+                break
+            except botocore.errorfactory.ResourceNotFoundException:
+                # wait for 3 seconds before retrying
+                print("*** [WATools] ListAnswer failed, waiting workload to be generated, retry in 3 seconds")
+                if currAttempt >= maxRetry:
+                    break
+                time.sleep(3)
+                
+        if isSuccess == False:
+            print("*** [WATools] Unable to retrieve list of checklists, skipped WATool integration")
+            return None
 
         answers = []
         try:
