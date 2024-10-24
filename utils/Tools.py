@@ -31,6 +31,9 @@ def _printStatus(status, s, forcePrint = False):
 
 def checkIsPrivateIp(ipaddr):
     ip = ipaddr.split('/')
+    if ip[0] == '0.0.0.0':
+        return False
+    
     return IPAddress(ip[0]).is_private()
 
 def aws_parseInstanceFamily(instanceFamily: str, region=None) -> Dict[str, str]:
