@@ -29,13 +29,12 @@ def runSingleCheck(tmp_obj, method_name):
         code = e.response['Error']['Code']
         msg = e.response['Error']['Message']
         print(code, msg)
-        print(traceback.format_exc())
-        traceback.format_exc()
+        emsg = traceback.format_exc()
     except Exception:
-        print(traceback.format_exc())
-        traceback.format_exc()
+        emsg = traceback.format_exc()
 
-    return traceback.format_exc()
+    print(emsg)
+    return emsg
 
 class Evaluator():
     def __init__(self):
@@ -83,13 +82,11 @@ class Evaluator():
                 futures = [executor.submit(runSingleCheck, self, method) for method in filteredMethods]
                 
                 for future in cf.as_completed(futures):
-                    for fr in future.result():
-                        if fr == 'OK': 
-                            continue 
-                        else:
-                            emsg.append(fr)
-                            ecnt += 1
-                            
+                    if future.result() == 'OK':
+                        continue
+                    else:
+                        emsg.append(future.result())
+                        ecnt += 1
         else:
             for method in methods:
                 if not rules or str.lower(method[6:]) in rules:
