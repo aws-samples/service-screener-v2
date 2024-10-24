@@ -197,8 +197,8 @@ for acctId, cred in rolesCred.items():
         cfnAdditionalStr = None
         if mpeid is not None: 
             cfnAdditionalStr = " --mpeid:{}".format(mpeid)
-        # CfnTrailObj.boto3init(cfnAdditionalStr)
-        # CfnTrailObj.createStack()
+        CfnTrailObj.boto3init(cfnAdditionalStr)
+        CfnTrailObj.createStack()
     
     overallTimeStart = time.time()
     # os.chdir('__fork')
@@ -223,18 +223,18 @@ for acctId, cred in rolesCred.items():
         input_ranges['iam'] = ('iam', regions, filters)
 
     input_ranges.update({service: (service, regions, filters) for service in services if service not in special_services})
-    input_ranges = list(input_ranges.values())
 
     if 's3' in services:
         input_ranges['s3'] = ('s3', regions, filters)
+
+    input_ranges = list(input_ranges.values())
 
     pool = Pool(processes=int(workerCounts))
     pool.starmap(Screener.scanByService, input_ranges)
     pool.close()
 
     if testmode == False:
-        ppp = 1
-        # CfnTrailObj.deleteStack()
+        CfnTrailObj.deleteStack()
     
     ## <TODO>
     ## parallel logic to be implement in Python
