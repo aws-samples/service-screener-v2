@@ -388,7 +388,7 @@ class Ec2(Service):
 
     def getChartGenCost(self):
         '''
-        Generate Pie Chart by EC2 Instance Type & Region
+        Generate Chart by EC2 Instance Type & Region
         Provide customer insight on percentage of older generation EC2 Instance Type
         '''
         def get_next_gen(instance_family):
@@ -641,6 +641,7 @@ class Ec2(Service):
             objs[f"NACL::{nacl['NetworkAclId']}"] = obj.getInfo()
         
         
-        self.setChartData({"EC2 Instance Family Pricing": self.getChartGenCost()})
+        if self.getChartGenCost():
+            self.setChartData({"EC2 Instance Family Pricing": self.getChartGenCost()})
 
         return objs
