@@ -15,7 +15,15 @@ from services.rds.drivers.RdsSecretsManager import RdsSecretsManager
 from services.rds.drivers.RdsSecretsVsDB import RdsSecretsVsDB
 from services.rds.drivers.RdsSecurityGroup import RdsSecurityGroup
 
+from datetime import datetime, timedelta, time, timezone
+
 class Rds(Service):
+    CHARTSTYPE = {
+        'RDS Price': 'bar',
+        'RDS Price per Instance Type': 'bar',
+        'RDS Price per Engine': 'bar',
+        'RDS Price per Deployment Option': 'bar'
+    }
     def __init__(self, region):
         super().__init__(region)
         
@@ -25,6 +33,8 @@ class Rds(Service):
         self.ctClient = ssBoto.client('cloudtrail', config=self.bConfig)
         self.smClient = ssBoto.client('secretsmanager', config=self.bConfig)
         self.cwClient = ssBoto.client('cloudwatch', config=self.bConfig)
+        self.ceClient = ssBoto.client('ce', config=self.bConfig)
+        self.setChartsType(self.CHARTSTYPE)
         
         self.secrets = []
 
@@ -109,14 +119,78 @@ class Rds(Service):
             
             resp = self.smClient.describe_secret(SecretId=secret['ARN'])
             self.secrets.append(resp)
+    
+    def getCEResults(self, groupBy, filter):
+        ## Fix for 30 days data
+        endDate = datetime.now().date()
+        startDate = endDate - timedelta(days=30)
+
+        response = self.ceClient.get_cost_and_usage(
+            TimePeriod={"Start": str(startDate), "End": str(endDate)},
+            Granularity="MONTHLY",
+            Metrics=["UnblendedCost"],
+            GroupBy=[{"Type": "DIMENSION", "Key": groupBy}],
+            Filter=filter,
+        )
+        return response
+    
+    
+    def getRDSCost(self, dimension, unuse_group=[]):
+        results = {}
+        filter = {
+            "And": [
+                {"Dimensions": {"Key": "SERVICE", "Values": ["Amazon Relational Database Service"]}},
+                {"Dimensions": {"Key": "REGION", "Values": [self.region]}}
+            ]
+        }
+        response = self.getCEResults(dimension, filter)
+
+        for item in response.get('ResultsByTime'):
+            for group in item.get("Groups"):
+                if 'Keys' in group:
+                    key = group.get("Keys")[0]
+                    if key in unuse_group:
+                        continue
+                    amt = group.get("Metrics").get("UnblendedCost").get("Amount")
+                    if float(amt) == 0:
+                        continue                    
+
+                    if key in results:
+                        results[key] = results[key] + float(amt)
+                    else:
+                        results[key] = float(amt)
         
+        return results
+    
+    def setRDSChartData(self):
+        chart_data = {}
+        service_result = self.getRDSCost("SERVICE")
+        if service_result:
+            chart_data['RDS Price'] = service_result
+
+        instance_type_result = self.getRDSCost("INSTANCE_TYPE",["NoInstanceType"])
+        if instance_type_result:
+            chart_data['RDS Price per Instance Type'] = instance_type_result
+
+        engine_result = self.getRDSCost("DATABASE_ENGINE",["NoDatabaseEngine"])
+        if engine_result:
+            chart_data['RDS Price per Engine'] = engine_result
+
+        deploy_option_result = self.getRDSCost("DEPLOYMENT_OPTION",["NoDeploymentOption"])
+        if deploy_option_result:
+            chart_data['RDS Price per Deployment Option'] = deploy_option_result
+        
+        self.setChartData(chart_data)
+
+        return
+    
     def advise(self):
         objs = {}
         instances = self.getResources()
         securityGroupArr = {}
         
         clusters = self.getClusters()
-        
+
         groupedResources = instances + clusters
         
         for instance in groupedResources:
@@ -177,6 +251,9 @@ class Rds(Service):
         objs['SecretsRDS::General'] = obj.getInfo()
         del obj
         
+        ## Set RDS CO Chart
+        self.setRDSChartData()
+
         return objs
     
 if __name__ == "__main__":
