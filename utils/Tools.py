@@ -7,6 +7,12 @@ from utils.Config import Config
 from typing import Set, Dict, Union
 from netaddr import IPAddress
 
+## from utils.Tools import _pi
+def _pi(group, res=''):
+    det = ''
+    if res: 
+        det = '- '
+    print("... \x1b[1;37;44m({})\x1b[0m {}\x1b[1;37;45m{}\x1b[0m".format(group, det, res))
 
 def _pr(s, forcePrint = False):
     DEBUG = Config.get('DEBUG')

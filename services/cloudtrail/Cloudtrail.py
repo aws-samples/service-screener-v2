@@ -9,6 +9,8 @@ from services.Service import Service
 from services.cloudtrail.drivers.CloudtrailCommon import CloudtrailCommon
 from services.cloudtrail.drivers.CloudtrailAccount import CloudtrailAccount
 
+from utils.Tools import _pi
+
 class Cloudtrail(Service):
     def __init__(self, region):
         super().__init__(region)
@@ -65,10 +67,10 @@ class Cloudtrail(Service):
         
         for trail in trails:
             if trail['TrailARN'] in ctRanList:
-                print('... [Cloudtrail::SKIPPED] ' + trail['Name'] + ', executed in other regions')
+                print('[Cloudtrail::SKIPPED] {} executed in other regions'.format(trail['Name']))
                 continue
             
-            print("... [Cloudtrail] inspecting " + trail['Name'])
+            _pi('Cloudtrail', trail['Name'])
             ctRanList.append(trail['TrailARN'])
             
             obj = CloudtrailCommon(trail, self.ctClient, self.snsClient, self.s3Client)
@@ -78,7 +80,7 @@ class Cloudtrail(Service):
         
         Config.set('CloudTrail_ranList', ctRanList)
         
-        print('... (CloudTrail:Common) inspecting')
+        _pi('CloudTrail:Common')
         obj = CloudtrailAccount(self.ctClient, len(trails))
         objs['Cloudtrail::General'] = obj.getInfo()
         del obj

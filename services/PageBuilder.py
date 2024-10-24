@@ -144,7 +144,7 @@ class PageBuilder:
         output.append("<div id='{}' class='card {} {}'>".format(pid, lteCardClass, defaultCollapseClass))
         
         genAiButton = ''
-        if self.isBeta:
+        if self.isBeta and pid[:8]=="SUMMARY_":
             genAiButton = '<span class="beta-genai" data-toggle="modal" data-target="#genai-modal"><i class="fas fa-question-circle"></i> '
 
         if title:
@@ -650,7 +650,10 @@ $('#changeAcctId').change(function(){
         return s
     
     def genaiModalHtml(self):
-        genAIJS = """$('.beta-genai').click(function(){
+        genAIJS = """serv = $('h1').text()
+activeAcct = $('#changeAcctId').val()
+        
+$('.beta-genai').click(function(){
   t = $(this)
   currentInfo = {'activeAcct': activeAcct, 'service': serv,'title': t.parent().text().trim(),'resources': {}, 'href': []}
   t.parent().parent().parent().find('.card-body dd').each(function(index, el){
@@ -781,7 +784,7 @@ $('#genai-savequery').click(function(){
             body = self.generateSummaryCardContent(attrs)
 
             badge = self.generatePriorityPrefix(attrs['criticality'], "style='float:right'") + ' ' + self.generateCategoryBadge(attrs['__categoryMain'], "style='float:right'")
-            card = self.generateCard(pid=self.getHtmlId(label), html=body, cardClass='', title=label, titleBadge=badge, collapse=9, noPadding=False)
+            card = self.generateCard(pid="SUMMARY_"+self.getHtmlId(label), html=body, cardClass='', title=label, titleBadge=badge, collapse=9, noPadding=False)
             divHtmlAttr = "data-category='" + attrs['__categoryMain'] + "' data-criticality='" + attrs['criticality'] + "'"
 
             if self.checkIsLowHangingFruit(attrs):

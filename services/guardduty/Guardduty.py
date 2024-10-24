@@ -5,6 +5,8 @@ import boto3
 from services.Service import Service
 from services.guardduty.drivers.GuarddutyDriver import GuarddutyDriver
 
+from utils.Tools import _pi
+
 class Guardduty(Service):
     def __init__(self, region):
         super().__init__(region)
@@ -25,7 +27,7 @@ class Guardduty(Service):
         objs = {}
         detectors = self.get_resources()
         for detector in detectors:
-            print(f"... (GuardDuty) inspecting {detector}")
+            _pi("GuardDuty", detector)
             obj = GuarddutyDriver(detector, self.guardduty_client, self.region)
             obj.run(self.__class__)
             objs[f"Detector::{detector}"] = obj.getInfo()

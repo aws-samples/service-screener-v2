@@ -215,17 +215,19 @@ for acctId, cred in rolesCred.items():
     with open(directory + '/tail.txt', 'w') as fp:
         pass
     
-    input_ranges = []
+    special_services = {'iam', 's3'}
+    input_ranges = {}
 
-    ## Force IAM to run first, it takes the longest time
-    if 'IAM' in services:
-        input_ranges = [('IAM', regions, filters)]
+    ## Make IAM and S3 to be separate pool
+    if 'iam' in services:
+        input_ranges['iam'] = ('iam', regions, filters)
 
-    for service in services:
-        otherInputs = [(service, regions, filters) for service in services]
-    
-    input_ranges.extend(otherInputs)
-    
+    input_ranges.update({service: (service, regions, filters) for service in services if service not in special_services})
+    input_ranges = list(input_ranges.values())
+
+    if 's3' in services:
+        input_ranges['s3'] = ('s3', regions, filters)
+
     pool = Pool(processes=int(workerCounts))
     pool.starmap(Screener.scanByService, input_ranges)
     pool.close()

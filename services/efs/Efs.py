@@ -7,6 +7,8 @@ from utils.Config import Config as Config_int
 
 from services.efs.drivers.EfsDriver import EfsDriver
 
+from utils.Tools import _pi
+
 class Efs(Service):
     def __init__(self, region):
         super().__init__(region)
@@ -35,7 +37,7 @@ class Efs(Service):
         driver = 'EfsDriver'
         if globals().get(driver):
             for efs in efs_list:
-                print('... (EFS) inspecting ' + efs['FileSystemId'])
+                _pi('EFS', efs['FileSystemId'])
                 obj = globals()[driver](efs, self.efs_client)
                 obj.run(self.__class__)
 

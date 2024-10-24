@@ -6,6 +6,8 @@ from utils.Config import Config
 from services.Service import Service
 from services.redshift.drivers.RedshiftCluster import RedshiftCluster
 
+from utils.Tools import _pi
+
 class Redshift(Service):
     def __init__(self, region):
         super().__init__(region)
@@ -48,7 +50,7 @@ class Redshift(Service):
         
         self.getClusterResources()
         for cluster in self.redshifts:
-            print('... (Redshift) inspecting ' + cluster['ClusterIdentifier'])
+            _pi('Redshift', cluster['ClusterIdentifier'])
             obj = RedshiftCluster(cluster, self.rsClient)
             obj.run(self.__class__)
             objs[f"Redshift::{cluster['ClusterIdentifier']}"] = obj.getInfo()

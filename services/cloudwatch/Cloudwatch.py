@@ -11,6 +11,7 @@ from services.Service import Service
 from services.cloudwatch.drivers.CloudwatchCommon import CloudwatchCommon
 from services.cloudwatch.drivers.CloudwatchTrails import CloudwatchTrails
 
+from utils.Tools import _pi
 
 ###### TO DO #####
 ## Replace ServiceName with
@@ -75,7 +76,7 @@ class Cloudwatch(Service):
         
         self.loopTrail()
         for log in self.ctLogs:
-            print("... (Cloudwatch Logs) inspecting CloudTrail's related LogGroup [{}]".format(log[0]))
+            _pi("CloudTrail's CloudWatch Logs", log[0])
             obj = CloudwatchTrails(log, log[2], self.cwLogClient)
             obj.run(self.__class__)
             
@@ -84,24 +85,11 @@ class Cloudwatch(Service):
         
         self.getAllLogs()
         for log in self.logGroups:
-            print("... (Cloudwatch Logs inspecting LogGroup [{}]".format(log['logGroupName']))
+            _pi('Cloudwatch Logs', log['logGroupName'])
             obj = CloudwatchCommon(log, self.cwLogClient)
             obj.run(self.__class__)
             
             objs[f"Log::{log['logGroupName']}"] = obj.getInfo()
             del obj
-        ###### TO DO #####
-        ## call getResources method
-        ## loop through the resources and run the checks in drivers
-        ## Example
-        # instances = self.getResources()
-        # for instance in instances:
-        #     instanceData = instance['Instances'][0]
-        #     print('... (EC2) inspecting ' + instanceData['InstanceId'])
-        #     obj = Ec2Instance(instanceData,self.ec2Client, self.cwClient)
-        #     obj.run(self.__class__)
             
-        #     objs[f"EC2::{instanceData['InstanceId']}"] = obj.getInfo()
-        #.    del obj
-        
         return objs

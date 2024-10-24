@@ -16,12 +16,10 @@ def runSingleCheck(tmp_obj, method_name):
     obj = tmp_obj
     try:
         startTime = time.time()
-        if debugFlag:
-            print('--- --- fn: ' + method_name)
-            
         getattr(obj, method_name)()
         if debugFlag:
             timeSpent = round(time.time() - startTime, 3)
+            print('--- --- fn: ' + method_name)
             if timeSpent >= 0.2:
                 _warn("Long running checks {}s".format(timeSpent))
 

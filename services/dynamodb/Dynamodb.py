@@ -8,6 +8,8 @@ from utils.Config import Config
 from services.dynamodb.drivers.DynamoDbCommon import DynamoDbCommon
 from services.dynamodb.drivers.DynamoDbGeneric import DynamoDbGeneric
 
+from utils.Tools import _pi
+
 class Dynamodb(Service):
     
     
@@ -66,7 +68,7 @@ class Dynamodb(Service):
         
         try:
             #Run generic checks
-            print('... (Dynamodb::Generic) inspecting')
+            _pi('Dynamodb::Generic')
             obj = DynamoDbGeneric(listOfTables, self.dynamoDbClient, self.cloudWatchClient, self.serviceQuotaClient, self.appScalingPolicyClient, self.backupClient, self.cloudTrailClient)
             obj.run(self.__class__)
             objs['DynamoDb::Generic'] = obj.getInfo()
@@ -75,7 +77,7 @@ class Dynamodb(Service):
             #Run table specific checks
             for eachTable in listOfTables:
                 objName = 'Dynamodb::' + eachTable['Table']['TableName']
-                print('... ({}) inspecting'.format(objName))
+                _pi('Dynamodb::Table', objName)
                 obj = DynamoDbCommon(eachTable, self.dynamoDbClient, self.cloudWatchClient, self.serviceQuotaClient, self.appScalingPolicyClient, self.backupClient, self.cloudTrailClient)
                 obj.run(self.__class__)
                 objs[objName] = obj.getInfo()

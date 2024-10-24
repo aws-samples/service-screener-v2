@@ -6,6 +6,8 @@ from services.Service import Service
 ##import drivers here
 from services.kms.drivers.KmsCommon import KmsCommon
 
+from utils.Tools import _pi
+
 class Kms(Service):
     def __init__(self, region):
         super().__init__(region)
@@ -47,7 +49,7 @@ class Kms(Service):
         self.getResources()
         
         for key in self.kmsCustomerManagedKeys:
-            print('... (KMS) inspecting ' + key['KeyId'] + ' (' + key['Arn'] +')')
+            _pi('KMS', key['KeyId'] + ' (' + key['Arn'] +')')
             
             obj = KmsCommon(key, self.kmsClient)        
             obj.run(self.__class__)
