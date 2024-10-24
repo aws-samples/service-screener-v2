@@ -7,9 +7,7 @@ import constants as _C
 
 class Service:
     _AWS_OPTIONS = {}
-    charts = {}
     chartsType = {}
-    chartData = {}
     RULESPREFIX = None
     tags = []
     chartsConfig = {}
@@ -31,6 +29,9 @@ class Service:
             region_name = region    
         )
         
+        self.charts = {}
+        self.chartData = {}
+        
         self.ssBoto = Config.get('ssBoto', None)
         if self.ssBoto == None:
             print('BOTO3 SESSION IS MISSING')
@@ -44,7 +45,7 @@ class Service:
             'chartType' : chartType,
             'legends': legends
         }
-
+        
         self.charts[title] = data
 
 
@@ -63,19 +64,12 @@ class Service:
                 else:
                     self.chartData[title][cat] += chartData[title][cat]
         
-
-
-    def getChartsConfig(self):
-        return self.chartsConfig
-
-    def getChartData(self):
-        return self.charts
-    
     def getChart(self):
-        return {
+        result = {
             'config': self.chartsConfig,
             'data': self.charts
         }
+        return result
 
     
     def setRules(self, rules):
@@ -84,6 +78,7 @@ class Service:
         Config.set(self.RULESPREFIX, rules)
         
     def __del__(self):
+        self.processChartData()
         timespent = round(time.time() - self.overallTimeStart, 3)
         print('\033[1;42mCOMPLETED\033[0m -- ' + self.__class__.__name__.upper() + '::'+self.region+' (' + str(timespent) + 's)')
         
@@ -158,7 +153,7 @@ class Service:
             
         return nTags
     
-    def __del__(self):
+    def processChartData(self):
         if len(self.chartData) > 0:
             for title, data in self.chartData.items():
                 legends = list(data.keys())
