@@ -14,6 +14,8 @@ from services.s3.drivers.S3Bucket import S3Bucket
 from services.s3.drivers.S3Control import S3Control
 from services.s3.drivers.S3Macie import S3Macie
 
+from utils.Tools import _pi
+
 class S3(Service):
     def __init__(self, region):
         super().__init__(region)
@@ -90,14 +92,10 @@ class S3(Service):
         objs = {}
         accountScanned = Config.get('S3_HasAccountScanned', False)
         if accountScanned == False:
-            print('... (S3Account) inspecting ')
+            _pi('S3Account')
             obj = S3Control(self.s3Control)
             obj.run(self.__class__)
-            
             objs["Account::Control"] = obj.getInfo()
-            
-            globalKey = 'GLOBALRESOURCES_s3'
-            Config.set(globalKey, objs)
             
             Config.set('S3_HasAccountScanned', True)
             del obj
@@ -105,13 +103,14 @@ class S3(Service):
         objs = {}
         buckets = self.getResources()
         for bucket in buckets:
-            print('... (S3Bucket) inspecting ' + bucket['Name'])
+            _pi('S3Bucket', bucket['Name'])
             obj = S3Bucket(bucket['Name'], self.s3Client)
             obj.run(self.__class__)
             
             objs["Bucket::" + bucket['Name']] = obj.getInfo()
             del obj
         
+        _pi('S3Macie')
         obj = S3Macie(self.macieV2Client)
         obj.run(self.__class__)
         objs["Macie"] = obj.getInfo()

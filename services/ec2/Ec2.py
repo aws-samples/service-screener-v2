@@ -8,6 +8,8 @@ from datetime import date, datetime
 import json
 import time
 
+from utils.Tools import _pi
+
 from utils.Config import Config
 from services.Service import Service
 from services.ec2.drivers.Ec2Instance import Ec2Instance
@@ -381,7 +383,7 @@ class Ec2(Service):
                 )
                 
                 if 'Parameters' in compOptCheck and len(compOptCheck['Parameters']) > 0:
-                    print('... (Compute Optimizer Recommendations) inspecting')
+                    _pi('Compute Optimizer Recommendations')
                     obj = Ec2CompOpt(self.compOptClient)
                     obj.run(self.__class__)
                     objs['ComputeOptimizer'] = obj.getInfo()
@@ -399,7 +401,7 @@ class Ec2(Service):
         #EC2 Cost Explorer checks
         hasRunRISP = Config.get('EC2_HasRunRISP', False)
         if hasRunRISP == False:
-            print('... (Cost Explorer Recommendations) inspecting')
+            _pi('Cost Explorer Recommendations')
             obj = Ec2CostExplorerRecs(self.ceClient)
             obj.run(self.__class__)
     
@@ -410,7 +412,7 @@ class Ec2(Service):
         instances = self.getResources()
         for instanceArr in instances:
             for instanceData in instanceArr['Instances']:
-                print('... (EC2) inspecting ' + instanceData['InstanceId'])
+                _pi('EC2', instanceData['InstanceId'])
                 obj = Ec2Instance(instanceData,self.ec2Client, self.cwClient)
                 obj.run(self.__class__)
                 
@@ -424,13 +426,13 @@ class Ec2(Service):
         #EBS checks
         volumes = self.getEBSResources()
         for volume in volumes:
-            print('... (EBS) inspecting ' + volume['VolumeId'])
+            _pi('EBS', volume['VolumeId'])
             obj = Ec2EbsVolume(volume,self.ec2Client, self.cwClient)
             obj.run(self.__class__)
             objs[f"EBS::{volume['VolumeId']}"] = obj.getInfo()
 
         #EBS Snapshots
-        print('... (EBS::Snapshots) inspecting')
+        _pi('EBS::Snapshots')
         obj = Ec2EbsSnapshot(self.ec2Client)
         obj.run(self.__class__)
         objs["EBS::Snapshots"] = obj.getInfo()
@@ -443,7 +445,7 @@ class Ec2(Service):
             for group in elbSGList:
                 secGroups[group['GroupId']] = group
             
-            print(f"... (ELB::Load Balancer) inspecting {lb['LoadBalancerName']}")
+            _pi('ELB::Load Balancer', lb['LoadBalancerName'])
             obj = Ec2ElbCommon(lb, elbSGList, self.elbClient, self.wafv2Client)
             obj.run(self.__class__)
             objs[f"ELB::{lb['LoadBalancerName']}"] = obj.getInfo()
@@ -452,7 +454,7 @@ class Ec2(Service):
         # ELB classic checks
         lbClassic = self.getELBClassic()
         for lb in lbClassic:
-            print(f"... (ELB::Load Balancer Classic) inspecting {lb['LoadBalancerName']}")
+            _pi('ELB::Load Balancer Classic', lb['LoadBalancerName'])
             obj = Ec2ElbClassic(lb, self.elbClassicClient)
             obj.run(self.__class__)
             objs[f"ELB Classic::{lb['LoadBalancerName']}"] = obj.getInfo()
@@ -464,7 +466,7 @@ class Ec2(Service):
         # ASG checks
         autoScalingGroups = self.getASGResources()
         for group in autoScalingGroups:
-            print(f"... (ASG::Auto Scaling Group) inspecting {group['AutoScalingGroupName']}");
+            _pi('ASG::Auto Scaling Group', group['AutoScalingGroupName']);
             obj = Ec2AutoScaling(group, self.asgClient, self.elbClient, self.elbClassicClient, self.ec2Client)
             obj.run(self.__class__)
             objs[f"ASG::{group['AutoScalingGroupName']}"] = obj.getInfo()
@@ -479,7 +481,7 @@ class Ec2(Service):
         # SG checks
         if secGroups:
             for group in secGroups.values():
-                print(f"... (EC2::Security Group) inspecting {group['GroupId']}")
+                _pi('EC2::Security Group', group['GroupId'])
                 obj = Ec2SecGroup(group, self.ec2Client)
                 obj.run(self.__class__)
                 
@@ -488,7 +490,7 @@ class Ec2(Service):
         # EIP checks    
         eips = self.getEIPResources()
         for eip in eips:
-            print('... (Elastic IP Recommendations) inspecting {}'.format(eip['PublicIp']))
+            _pi('Elastic IP Recommendations', eip['PublicIp'])
             obj = Ec2EIP(eip)
             obj.run(self.__class__)
             objs[f"ElasticIP::{eip['AllocationId']}"] = obj.getInfo()
@@ -497,7 +499,7 @@ class Ec2(Service):
         vpcs = self.getVpcs()
         flowLogs = self.getFlowLogs()
         for vpc in vpcs:
-            print(f"... (VPC::Virtual Private Cloud) inspecting {vpc['VpcId']}")
+            _pi('VPC::Virtual Private Cloud', vpc['VpcId'])
             obj = Ec2Vpc(vpc, flowLogs, self.ec2Client)
             obj.run(self.__class__)
             objs[f"VPC::{vpc['VpcId']}"] = obj.getInfo()
@@ -505,7 +507,7 @@ class Ec2(Service):
         # NACL Checks
         nacls = self.getNetworkACLs()
         for nacl in nacls:
-            print(f"... (NACL::Network ACL) inspecting {nacl['NetworkAclId']}")
+            _pi('NACL::Network ACL', nacl['NetworkAclId'])
             obj = Ec2NACL(nacl, self.ec2Client)
             obj.run(self.__class__)
             objs[f"NACL::{nacl['NetworkAclId']}"] = obj.getInfo()

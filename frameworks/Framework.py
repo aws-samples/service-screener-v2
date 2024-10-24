@@ -37,6 +37,12 @@ class Framework():
     # To be overwrite if needed
     def _hookGenerateMetaData(self):
         pass
+
+    def _hookPostItemActivity(self, title, section, checks, comp):
+        return title, section, checks, comp
+
+    def _hookPostItemsLoop(self):
+        pass
     
     # ['Main', 'ARC-003', 0, '[iam,rootMfaActive] Root ID, Admin<br>[iam.passwordPolicy] sss', 'Link 1<br>Link2']
     def generateMappingInformation(self):
@@ -70,6 +76,8 @@ class Framework():
                         pre.append(tmp)
                         
                     checks, links, comp = self.formatCheckAndLinks(pre)
+
+                title, section, checks, comp = self._hookPostItemActivity(title, section, checks, comp)
                 
                 outp.append([title, section, comp, checks, links])
                 pos = comp
@@ -78,6 +86,7 @@ class Framework():
                 
                 summ[title][pos] += 1    
         
+        self._hookPostItemsLoop()
         self.stats = summ
         return outp
     

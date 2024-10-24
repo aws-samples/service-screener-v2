@@ -41,6 +41,7 @@ class PageBuilder:
     }
 
     isHome = False
+    isBeta = False
     
     colorCustomHex = None
     colorCustomRGB = None
@@ -108,11 +109,10 @@ class PageBuilder:
         else:
             cls = self.__class__.__name__
             print("[{}] Template for ContentDetail not found: {}".format(cls, method))
-            
+
     def generateRowWithCol(self, size=12, items=[], rowHtmlAttr=''):
         output = []
         output.append("<div class='row' {}>".format(rowHtmlAttr))
-
         _size = size
         for ind, item in enumerate(items):
             if isinstance(size, list):
@@ -142,9 +142,13 @@ class PageBuilder:
         defaultCollapseIcon = "plus" if collapse == 9 else "minus"
 
         output.append("<div id='{}' class='card {} {}'>".format(pid, lteCardClass, defaultCollapseClass))
+        
+        genAiButton = ''
+        if self.isBeta and pid[:8]=="SUMMARY_":
+            genAiButton = '<span class="beta-genai" data-toggle="modal" data-target="#genai-modal"><i class="fas fa-question-circle"></i> '
 
         if title:
-            output.append("<div class='card-header'><h3 class='card-title'>{}</h3>".format(title))
+            output.append("<div class='card-header'><h3 class='card-title'>{}{}</h3>".format(genAiButton, title))
 
             if collapse:
                 output.append("<div class='card-tools'><button type='button' class='btn btn-tool' data-card-widget='collapse'><i class='fas fa-{}'></i></button></div>".format(defaultCollapseIcon))
@@ -645,8 +649,98 @@ $('#changeAcctId').change(function(){
         
         return s
     
+    def genaiModalHtml(self):
+        genAIJS = """serv = $('h1').text()
+activeAcct = $('#changeAcctId').val()
+        
+$('.beta-genai').click(function(){
+  t = $(this)
+  currentInfo = {'activeAcct': activeAcct, 'service': serv,'title': t.parent().text().trim(),'resources': {}, 'href': []}
+  t.parent().parent().parent().find('.card-body dd').each(function(index, el){
+    _t = $(this)
+    cls = _t.attr('class')
+    tmpText = _t.text()
+
+    if(cls == 'detail-desc'){
+      currentInfo['desc'] = tmpText.trim()
+    }
+
+    if(cls == 'detail-regions'){
+      let colonIndex = tmpText.indexOf(':')
+      region = tmpText.substring(0, colonIndex)
+      resources = tmpText.substring(colonIndex+2) //include : and space
+
+      currentInfo['resources'][region] = resources.split(' | ')
+    }
+
+    if(cls == 'detail-href'){
+      _t.find('a').each(function(){
+        __t = $(this)
+        currentInfo['href'].push(__t.attr('href'))
+      })
+    }
+  })
+})
+
+genaiResp = $('#genai-modal-response')
+$('#genai-savequery').click(function(){
+  genaikeys = $('#genai-key').val().split('|')
+  
+  if((genaikeys.length < 2) || (genaikeys.length > 2)){
+    alert('invalid keys')
+    return
+  }
+
+  a_url = genaikeys[0]
+  a_key = genaikeys[1]
+
+  $.ajax({
+    url: a_url,
+    headers: {'x-api-key': a_key},
+    type: 'POST',
+    data: JSON.stringify(currentInfo),
+    contentType: 'application/json',
+    success: function(response) {
+      genaiResp.text(response['createdAt'])
+    },
+    error: function(xhr, status, error) {
+      genaiResp.text("Error..., check console.log")
+      console.error('Error:', error);
+    }
+  });
+})"""
+
+        self.addJS(genAIJS)
+
+        return '''<div class="modal fade" id="genai-modal" tabindex="-1" role="dialog" aria-labelledby="genai-modal" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="genai-modalTitle">Beta - GenAi</h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        Please provide your GenAI key, which can be obtained from AWS Partner
+        <input type="text" id="genai-key" name="genai-key" style="width:100%">
+        <br>Response:<br>
+        <textarea id="genai-modal-response" readonly style="color: #b55d00; width: 100%; background: #ededed; height: 300px; font-family: monospace; font-size: 12px;"></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="genai-savequery">Save and Query</button>
+      </div>
+    </div>
+  </div>
+</div>'''
+
     def buildContentSummary_default(self):
         output = []
+
+        self.isBeta = Config.get('beta', False)
+        if self.isBeta == True:
+            output.append(self.genaiModalHtml())
 
         ## KPI Building, 2023-10-16
         items = []
@@ -690,7 +784,7 @@ $('#changeAcctId').change(function(){
             body = self.generateSummaryCardContent(attrs)
 
             badge = self.generatePriorityPrefix(attrs['criticality'], "style='float:right'") + ' ' + self.generateCategoryBadge(attrs['__categoryMain'], "style='float:right'")
-            card = self.generateCard(pid=self.getHtmlId(label), html=body, cardClass='', title=label, titleBadge=badge, collapse=9, noPadding=False)
+            card = self.generateCard(pid="SUMMARY_"+self.getHtmlId(label), html=body, cardClass='', title=label, titleBadge=badge, collapse=9, noPadding=False)
             divHtmlAttr = "data-category='" + attrs['__categoryMain'] + "' data-criticality='" + attrs['criticality'] + "'"
 
             if self.checkIsLowHangingFruit(attrs):

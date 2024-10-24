@@ -58,10 +58,6 @@ class ArguParser:
             "required": False,
             "default": False
         },
-        "bucket": {
-            "required": False,
-            "default": False
-        },
         "tags": {
             "required": False,
             "default": False
@@ -84,6 +80,11 @@ class ArguParser:
             "required": False,
             "default": 4,
             "help": "Number of parallel threads, recommend 4 for Cloudshell"
+        },
+        'beta': {
+            "required": False,
+            "default": False,
+            "help": "Enable Beta features"
         }
     }
 
@@ -94,6 +95,7 @@ class ArguParser:
         for k, v in ArguParser.CLI_ARGUMENT_RULES.items():
             parser.add_argument('-' + k[:1], '--' + k, required=v['required'], default=v['default'], help=v.get('help', None))
         
+        parser.allow_abbrev = False
         args = vars(parser.parse_args())
         
         return args

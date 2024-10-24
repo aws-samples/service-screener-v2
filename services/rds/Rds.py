@@ -15,6 +15,8 @@ from services.rds.drivers.RdsSecretsManager import RdsSecretsManager
 from services.rds.drivers.RdsSecretsVsDB import RdsSecretsVsDB
 from services.rds.drivers.RdsSecurityGroup import RdsSecurityGroup
 
+from utils.Tools import _pi
+
 class Rds(Service):
     def __init__(self, region):
         super().__init__(region)
@@ -126,7 +128,7 @@ class Rds(Service):
                 dbInfo = 'Instance'
                 dbKey = 'DBInstanceIdentifier'
             
-            print('... (RDS) inspecting {}::{}'.format(dbInfo, instance[dbKey]))
+            _pi('RDS', '{}::{}'.format(dbInfo, instance[dbKey]))
             
             if 'VpcSecurityGroups' in instance:
                 for sg in instance['VpcSecurityGroups']:
@@ -157,7 +159,7 @@ class Rds(Service):
                 del obj
         
         for sg, rdsList in securityGroupArr.items():
-            print('... (RDS-SG) inspecting ' + sg)
+            _pi('RDS-SG', sg)
             obj = RdsSecurityGroup(sg, self.ec2Client, rdsList)
             obj.run(self.__class__)
             objs['RDS_SG::' + sg] = obj.getInfo()
@@ -165,7 +167,7 @@ class Rds(Service):
 
         self.getSecrets()
         for secret in self.secrets:
-            print('... (SecretsManager) inspecting ' + secret['Name'])
+            _pi('SecretsManager', secret['Name'])
             obj = RdsSecretsManager(secret, self.smClient, self.ctClient)
             obj.run(self.__class__)
             

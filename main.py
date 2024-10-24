@@ -31,23 +31,20 @@ debugFlag = _cli_options['debug']
 # feedbackFlag = _cli_options['feedback']
 # testmode = _cli_options['dev']
 testmode = _cli_options['ztestmode']
-bucket = _cli_options['bucket']
 runmode = _cli_options['mode']
 filters = _cli_options['tags']
 crossAccounts = _cli_options['crossAccounts']
 workerCounts = _cli_options['workerCounts']
+beta = _cli_options['beta']
 
 # print(crossAccounts)
 DEBUG = True if debugFlag in _C.CLI_TRUE_KEYWORD_ARRAY or debugFlag is True else False
 testmode = True if testmode in _C.CLI_TRUE_KEYWORD_ARRAY or testmode is True else False
 crossAccounts = True if crossAccounts in _C.CLI_TRUE_KEYWORD_ARRAY or crossAccounts is True else False
+beta = True if beta in _C.CLI_TRUE_KEYWORD_ARRAY or beta is True else False
 _cli_options['crossAccounts'] = crossAccounts
 
 runmode = runmode if runmode in ['api-raw', 'api-full', 'report'] else 'report'
-
-# <TODO>, yet to convert to python
-# S3 upload specific variables 
-# uploadToS3 = Uploader.getConfirmationToUploadToS3(bucket)
 
 # <TODO> analyse the impact profile switching
 _AWS_OPTIONS = {
@@ -57,6 +54,7 @@ _AWS_OPTIONS = {
 Config.init()
 Config.set('_AWS_OPTIONS', _AWS_OPTIONS)
 Config.set('DEBUG', DEBUG)
+Config.set('beta', beta)
 
 _AWS_OPTIONS = {
     'signature_version': Config.AWS_SDK['signature_version']
@@ -217,10 +215,20 @@ for acctId, cred in rolesCred.items():
     with open(directory + '/tail.txt', 'w') as fp:
         pass
     
-    input_ranges = []
-    for service in services:
-        input_ranges = [(service, regions, filters) for service in services]
-    
+    special_services = {'iam', 's3'}
+    input_ranges = {}
+
+    ## Make IAM and S3 to be separate pool
+    if 'iam' in services:
+        input_ranges['iam'] = ('iam', regions, filters)
+
+    input_ranges.update({service: (service, regions, filters) for service in services if service not in special_services})
+
+    if 's3' in services:
+        input_ranges['s3'] = ('s3', regions, filters)
+
+    input_ranges = list(input_ranges.values())
+
     pool = Pool(processes=int(workerCounts))
     pool.starmap(Screener.scanByService, input_ranges)
     pool.close()
@@ -258,7 +266,7 @@ for acctId, cred in rolesCred.items():
                 hasGlobal = True
     
     if testmode == True:
-        exit("Test mode enable, script halted")
+       exit("Test mode enable, script halted")
     
     timespent = round(time.time() - overallTimeStart, 3)
     scanned['timespent'] = timespent
@@ -302,7 +310,7 @@ for acctId, cred in rolesCred.items():
     Config.set('cli_regions', regions)
     Config.set('cli_frameworks', frameworks)
     
-    Screener.generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS3, bucket)
+    Screener.generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS3)
     
     # os.chdir(_C.FORK_DIR)
     filetodel = _C.FORK_DIR + '/tail.txt'
@@ -339,3 +347,12 @@ print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m /tmp/se
 
 scriptTimeSpent = round(time.time() - scriptStartTime, 3)
 print("@ Thank you for using {}, script spent {}s to complete @".format(Config.ADVISOR['TITLE'], scriptTimeSpent))
+
+if beta:
+    print("")
+    print("\033[93m[-- ..... --] BETA MODE ENABLED [-- ..... --] \033[0m")
+    print("Current Beta Features:")
+    print("\033[96m  01/ Concurrent Mode on Evaluator \033[0m")
+    print("\033[96m  02/ WA Frameworks Integration \033[0m")
+    print("\033[96m  03/ GenAI Api Caller Button \033[0m")
+    print("\033[93m[-- ..... --] THANK YOU FOR TESTING BETA FEATURES [-- ..... --] \033[0m")

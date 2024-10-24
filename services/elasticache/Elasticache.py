@@ -10,6 +10,7 @@ from services.elasticache.drivers.ElasticacheRedis import ElasticacheRedis
 from services.elasticache.drivers.ElasticacheReplicationGroup import ElasticacheReplicationGroup
 from typing import Dict, List, Set
 
+from utils.Tools import _pi
 
 class Elasticache(Service):
     def __init__(self, region) -> None:
@@ -171,7 +172,7 @@ class Elasticache(Service):
         
         repGroups = self.getReplicationGroupInfo()
         for group in repGroups:
-            print(f"... (ElastiCache::ReplicationGroup) inspecting {group.get('ReplicationGroupId')}")
+            _pi("ElastiCache::ReplicationGroup", group.get('ReplicationGroupId'))
             obj = ElasticacheReplicationGroup(group, self.elasticacheClient)
             obj.run(self.__class__)
             objs[f"ElastiCache::{group.get('ReplicationGroupId')}"] = obj.getInfo()
@@ -197,7 +198,7 @@ class Elasticache(Service):
 
             if obj is not None:
                 objName = cluster.get('Engine') + f"{cluster.get('ARN')}"
-                print("... (ElastiCache:" + cluster.get('Engine') + ') ' + f"{cluster.get('ARN')}")
+                _pi("ElastiCache:" + cluster.get('Engine'), cluster.get('ARN'))
                 obj.run(self.__class__)
                 objs[objName] = obj.getInfo()
                 del obj

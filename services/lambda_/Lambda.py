@@ -7,6 +7,8 @@ from services.lambda_.drivers.LambdaCommon import LambdaCommon
 from services.Service import Service
 from utils.Config import Config
 
+from utils.Tools import _pi
+
 class Lambda(Service):
     def __init__(self, region):
         super().__init__(region)
@@ -70,7 +72,7 @@ class Lambda(Service):
             try:
                 # module = importlib.import_module(f"drivers.{driver}")
                 # cls = getattr(module, driver)
-                print(f"... (Lambda) inspecting {lambda_function['FunctionName']}")
+                _pi('Lambda', lambda_function['FunctionName'])
                 # obj = cls(lambda_function, self.lambda_client, self.iam_client, role_count)
                 obj = LambdaCommon(lambda_function, self.lambda_client, self.iam_client, role_count)
                 obj.run(self.__class__)

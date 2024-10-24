@@ -77,12 +77,21 @@ class LambdaCommon(Evaluator):
         
         self.results['UseArmArchitecture'] = [-1, ', '.join(self.lambda_['Architectures'])]
     
-    def _check_function_url_in_used(self):
-        url_config = self.lambda_client.list_function_url_configs(
-            FunctionName=self.function_name
-        )
-        if url_config['FunctionUrlConfigs']:
-            self.results['lambdaURLInUsed'] = [-1, "Enabled"]
+    def _check_function_url_in_used_and_auth(self):
+        try:
+            url_config = self.lambda_client.list_function_url_configs(
+                FunctionName=self.function_name
+            )
+            if url_config['FunctionUrlConfigs']:
+                self.results['lambdaURLInUsed'] = [-1, "Enabled"]
+
+                for config in url_config['FunctionUrlConfigs']:
+                    if config['AuthType'] == 'NONE':
+                        self.results['lambdaURLWithoutAuth'] = [-1, config['AuthType']]
+                        return
+
+        except botocore.exceptions.ClientError as e:
+            print("No permission to access lambda:list_function_url_configs")
         return
 
     def _check_missing_role(self):
@@ -100,28 +109,17 @@ class LambdaCommon(Evaluator):
                 raise e
         return
 
-    def _check_url_without_auth(self):
-        url_configs = self.lambda_client.list_function_url_configs(
-            FunctionName=self.function_name
-        )
-
-        if url_configs['FunctionUrlConfigs']:
-            for config in url_configs['FunctionUrlConfigs']:
-                if config['AuthType'] == 'NONE':
-                    self.results['lambdaURLWithoutAuth'] = [-1, config['AuthType']]
-                    return
-
-        return
-
     def _check_code_signing_disabled(self):
         if self.lambda_['PackageType'] != 'Zip':
             return
-        
-        code_sign = self.lambda_client.get_function_code_signing_config(
-            FunctionName=self.function_name
-        )
-        if not code_sign.get('CodeSigningConfigArn'):
-            self.results['lambdaCodeSigningDisabled'] = [-1, 'Disabled']
+        try:
+            code_sign = self.lambda_client.get_function_code_signing_config(
+                FunctionName=self.function_name
+            )
+            if not code_sign.get('CodeSigningConfigArn'):
+                self.results['lambdaCodeSigningDisabled'] = [-1, 'Disabled']
+        except botocore.exceptions.ClientError as e:
+            print("No permission to access get_function_code_signing_config")
 
         return
 

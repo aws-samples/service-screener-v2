@@ -8,6 +8,8 @@ from utils.Tools import _pr
 from services.Service import Service
 from services.cloudfront.drivers.cloudfrontDist import cloudfrontDist
 
+from utils.Tools import _pi
+
 
 class Cloudfront(Service):
     def __init__(self, region):
@@ -48,7 +50,7 @@ class Cloudfront(Service):
         
         dists = self.getDistributions()
         for dist in dists:
-            print('... (CloudFront::Distribution) inspecting ' + dist)
+            _pi('CloudFront::Distribution', dist)
             obj = cloudfrontDist(dist, self.cloudfrontClient)
             obj.run(self.__class__)
             

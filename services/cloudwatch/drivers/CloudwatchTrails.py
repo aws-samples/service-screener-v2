@@ -24,8 +24,8 @@ class CloudwatchTrails(Evaluator):
             ]
         },
         {'trailWOMAunauthAPI2': [
-                ["$.errorCode", "=", "\*UnauthorizedOperation"], 
-                ["$.errorCode", "=", "AccessDenied\*"]
+                ["$.errorCode", "=", r"\*UnauthorizedOperation"], 
+                ["$.errorCode", "=", r"AccessDenied\*"]
             ]
         },
         {'trailWOMAnoMFA3': [
@@ -175,7 +175,7 @@ class CloudwatchTrails(Evaluator):
     def regexBuilder(self, rules):
         regexPatterns = []
         for rule in rules:
-            regexPattern = "\\" + rule[0] + "\s*\\" + rule[1] + "\s*[\\'\\\"]*" + rule[2] + "[\\'\\\"]*"
+            regexPattern = r"\\" + rule[0] + r"\s*\\" + rule[1] + r"\s*[\'\"]*" + rule[2] + r"[\'\"]*"
             regexPatterns.append(regexPattern)
         
         return regexPatterns
