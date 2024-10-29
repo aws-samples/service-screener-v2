@@ -94,7 +94,6 @@ class CloudtrailCommon(Evaluator):
         ## For safety purpose, though all trails must have bucket
         if 'S3BucketName' in self.trailInfo and len(self.trailInfo['S3BucketName']) > 0:
             s3Bucket = self.trailInfo['S3BucketName']
-            print(s3Bucket)
             # help me retrieve s3 bucket public
             try:
                 resp = self.s3Client.get_public_access_block(

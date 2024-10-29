@@ -1,4 +1,5 @@
 ## First installation
+cd /tmp
 python -m venv .
 source bin/activate
 git clone https://github.com/aws-samples/service-screener-v2.git
