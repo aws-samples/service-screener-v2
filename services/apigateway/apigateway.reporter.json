@@ -51,6 +51,19 @@
             "[API Gateway should be associated with a WAF Web ACL]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-aws-waf.html>"
         ]
     },
+    "CachingEnabled": {
+        "category": "S",
+        "^description": "You can enable API caching in Amazon API Gateway to cache your endpoint's responses. With caching, you can reduce the number of calls made to your endpoint and also improve the latency of requests to your API.",
+        "shortDesc": "Enable API caching",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": -1,
+        "ref": [
+            "[Cache settings for REST APIs in API Gateway]<https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-caching.html>"
+        ]
+    },
     "EncryptionAtRest": {
         "category": "S",
         "^description": "Encrypting data at rest reduces the risk of data stored on disk being accessed by a user not authenticated to AWS. It adds another set of access controls to limit unauthorized users ability access the data. For example, API permissions are required to decrypt the data before it can be read. API Gateway REST API caches should be encrypted at rest for an added layer of security.",

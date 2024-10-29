@@ -1,0 +1,428 @@
+{
+    "metadata": {
+        "originator": "BNM",
+        "shortname": "BNM RMiT",
+        "fullname": "Bank Negara Malaysia (BNM) Risk Management in Technology (RMiT)",
+        "description": "The Risk Management in Technology (RMiT) is a policy document issued by Bank Negara Malaysia (BNM) to provide guidance on the management of technology risk for financial institutions in Malaysia.",
+        "_": "https://docs.aws.amazon.com/config/latest/developerguide/operational-best-practices-for-bnm-rmit.html",
+        "emptyCheckDefaultMsg": "<small><i>Please refer to the BNM RMiT section for further details. Kindly provide evidence or artifacts demonstrating compliance with the respective RMiT control.</i></small>"
+    },
+    "mapping": {
+        "10.18": {
+            "1": [],
+            "2": ["apigateway.CachingEnabled", "apigateway.EncryptionAtRest"],
+            "3": ["apigateway.EncryptionInTransit"],
+            "4": [],
+            "5": ["cloudtrail.NeedToEnableCloudTrail","clooudtrail.EnableCloudTrailLogging","cloudtrail.HasOneMultiRegionTrail","cloudtrail.LogFileValidationEnabled","cloudtrail.RequiresKmsKey"],
+            "6": [],
+            "7": ["kms.KeyRotationEnabled"],
+            "8": [],
+            "9": ["ec2.EBSEncrypted"],
+            "10": ["efs.EncryptedAtRest"],
+            "11": [],
+            "12": ["ec2.EBSEncrypted"],
+            "13": ["kms.KeyInPendingDeletion"],
+            "14": ["opensearch.EncyptionAtRest"],
+            "15": ["opensearch.TLSEnforced"],
+            "16": ["opensearch.NodeToNodeEncryption"],
+            "17": [],
+            "18": ["rds.StorageEncrypted"],
+            "19": ["redshift.EncryptedAtRest","redshift.AuditLogging"],
+            "20": ["redshift.EncryptedWithKMS"],
+            "21": ["redshift.EncryptedInTransit"],
+            "22": ["s3.ServerSideEncrypted"],
+            "23": ["s3.TlsEnforced"],
+            "24": ["s3.SSEWithKMS"],
+            "25": [],
+            "26": [],
+            "27": [],
+            "28": []
+        },
+        "10.2": {
+            "1": [],
+            "2": []
+        },
+        "10.27": {
+            "1": ["ec2.ASGELBHealthCheckEnabled"],
+            "2": [],
+            "3": [],
+            "4": ["cloudtrail.trailWithoutCWLogs"],
+            "5": ["dynamodb.rcuServiceLimit","dynamodb.wcuServiceLimit"],
+            "6": ["ec2.EC2DetailedMonitor"],
+            "7": ["lambda.lambdaReservedConcurrencyDisabled"],
+            "8": ["opensearch.ApplicationLogs"],
+            "9": ["rds.EnhancedMonitor"]
+        },
+        "10.34": {
+            "1": [],
+            "2": []
+        },
+        "10.35": {
+            "1": ["apigateway.XRayTracing"],
+            "2": [],
+            "3": [],
+            "4": ["ec2.VPCFlowLogEnabled"]
+        },
+        "10.36": {
+            "1": [],
+            "2": ["apigateway.EncryptionInTransit"],
+            "3": [],
+            "4": [],
+            "5": ["ec2.ELBCrossZone"]
+        },
+        "10.38": {
+            "1": ["cloudwatch.SetRetentionDays"]
+        },
+        "10.51": {
+            "1": ["iam.hasAccessKeyNoRotate90days"],
+            "2": ["iam.hasOrganization"],
+            "3": [],
+            "4": ["apigateway.CachingEnabled", "apigateway.EncryptionAtRest"],
+            "5": ["apigateway.EncryptionInTransit"],
+            "6": [],
+            "7": [],
+            "8": ["cloudtrail.NeedToEnableCloudTrail","clooudtrail.EnableCloudTrailLogging","cloudtrail.HasOneMultiRegionTrail","cloudtrail.LogFileValidationEnabled","cloudtrail.RequiresKmsKey"],
+            "9": [],
+            "10": ["kms.KeyRotationEnabled"],
+            "11": [],
+            "12": [],
+            "13": ["ec2.EBSSnapshotIsPublic"],
+            "14": ["ec2.EBSEncrypted"],
+            "15": ["ec2.EC2InstancePublicIP"],
+            "16": ["efs.EncryptedAtRest"],
+            "17": [],
+            "18": [],
+            "19": [],
+            "20": ["ec2.EBSEncrypted"],
+            "21": [],
+            "22": ["iam.InlinePolicy"],
+            "23": ["iam.passwordPolicy","iam.passwordPolicyWeak"],
+            "24": ["iam.FullAdminAccess","iam.ManagedPolicyFullAccessOneServ"],
+            "25": ["iam.rootHasAccessKey"],
+            "26": ["iam.userNotUsingGroup"],
+            "27": ["iam.rootMfaActive","iam.mfaActive"],
+            "28": [],
+            "29": ["iam.consoleLastAccess90"],
+            "30": [],
+            "31": ["kms.KeyInPendingDeletion"],
+            "32": ["lambda.lambdaPublicAccess"],
+            "33": [],
+            "34": [],
+            "35": ["opensearch.EncyptionAtRest"],
+            "36": ["opensearch.TLSEnforced"],
+            "37": ["opensearch.DomainWithinVPC"],
+            "38": ["opensearch.NodeToNodeEncryption"],
+            "39": ["rds.PubliclyAccessible"],
+            "40": ["rds.SnapshotRDSIsPublic"],
+            "41": [],
+            "42": ["rds.StorageEncrypted"],
+            "43": ["redshift.EncryptedAtRest","redshift.AuditLogging"],
+            "44": ["redshift.EncryptedWithKMS"],
+            "45": ["redshift.PubliclyAccessible"],
+            "46": ["redshift.EnhancedVpcRouting"],
+            "47": ["redshift.EncryptedInTransit"],
+            "48": [],
+            "49": ["iam.rootMfaActive"],
+            "50": ["s3.S3AccountPublicAccessBlock"],
+            "51": ["s3.PublicReadAccessBlock"],
+            "52": ["s3.PublicWriteAccessBlock"],
+            "53": ["s3.ServerSideEncrypted"],
+            "54": ["s3.TlsEnforced"],
+            "55": ["s3.SSEWithKMS"],
+            "56": [],
+            "57": [],
+            "58": [],
+            "59": [],
+            "60": [],
+            "61": ["ec2.EC2SubnetAutoPublicIP"]
+        },
+        "10.52": {
+            "1": ["iam.hasAccessKeyNoRotate90days"],
+            "2": ["iam.hasOrganization"],
+            "3": ["ec2.EC2IamProfile"],
+            "4": [],
+            "5": [],
+            "6": ["iam.InlinePolicy"],
+            "7": ["iam.passwordPolicy","iam.passwordPolicyWeak"],
+            "8": ["iam.FullAdminAccess","iam.ManagedPolicyFullAccessOneServ"],
+            "9": ["iam.rootHasAccessKey"],
+            "10": ["iam.userNotUsingGroup"],
+            "11": ["iam.mfaActive"],
+            "12": [],
+            "13": ["iam.consoleLastAccess90"],
+            "14": [],
+            "15": ["iam.rootMfaActive"]
+        },
+        "10.53(b)(h)(i)": {
+            "1": ["iam.rootHasAccessKey"]
+        },
+        "10.53(b)": {
+            "1": ["ec2.EC2IamProfile"],
+            "2": [],
+            "3": [],
+            "4": ["iam.InlinePolicy"],
+            "5": ["iam.FullAdminAccess","iam.ManagedPolicyFullAccessOneServ"],
+            "6": ["iam.userNotUsingGroup"],
+            "7": []
+        },
+        "10.53(c)(f)": {
+            "1": ["iam.passwordPolicy","iam.passwordPolicyWeak"]
+        },
+        "10.53(f)(h)": {
+            "1": ["iam.mfaActive"],
+            "2": [],
+            "3": ["iam.rootMfaActive"]
+        },
+        "10.54": {
+            "1": ["iam.mfaActive"],
+            "2": [],
+            "3": ["iam.rootMfaActive"]
+        },
+        "10.55": {
+            "1": ["iam.passwordPolicy","iam.passwordPolicyWeak"]
+        },
+        "10.56": {
+            "1": ["iam.mfaActive"],
+            "2": [],
+            "3": ["iam.rootMfaActive"]
+        },
+        "10.59": {
+            "1": ["iam.hasAccessKeyNoRotate90days"],
+            "2": ["iam.hasOrganization"],
+            "3": ["apigateway.ExecutionLogging"],
+            "4": ["cloudtrail.EnableTrailS3BucketLogging"],
+            "5": ["cloudtrail.NeedToEnableCloudTrail","clooudtrail.EnableCloudTrailLogging","cloudtrail.HasOneMultiRegionTrail","cloudtrail.LogFileValidationEnabled","cloudtrail.RequiresKmsKey"],
+            "6": ["cloudtrail.CloudWatchLogsLogGroupArn"],
+            "7": ["cloudwatch.SetRetentionDays"],
+            "8": ["ec2.EC2IamProfile"],
+            "9": [],
+            "10": [],
+            "11": ["iam.passwordPolicy","iam.passwordPolicyWeak"],
+            "12": ["iam.FullAdminAccess","iam.ManagedPolicyFullAccessOneServ"],
+            "13": ["iam.rootHasAccessKey"],
+            "14": ["iam.userNotUsingGroup"],
+            "15": [],
+            "16": ["opensearch.ApplicationLogs"],
+            "17": [],
+            "18": ["redshift.EncryptedAtRest","redshift.AuditLogging"],
+            "19": ["s3.BucketLogging"],
+            "20": []
+        },
+        "10.6": {
+            "1": ["cloudtrail.CloudWatchLogsLogGroupArn"],
+            "2": ["guardduty.Settings"],
+            "3": []
+        },
+        "10.61": {
+            "1": [],
+            "2": [],
+            "3": [],
+            "4": [],
+            "5": ["redshift.AutomaticUpgrades"]
+        },
+        "10.64(a)": {
+            "1": [],
+            "2": ["apigateway.CachingEnabled", "apigateway.EncryptionAtRest"],
+            "3": ["apigateway.EncryptionInTransit"],
+            "4": [],
+            "5": ["cloudtrail.NeedToEnableCloudTrail","clooudtrail.EnableCloudTrailLogging","cloudtrail.HasOneMultiRegionTrail","cloudtrail.LogFileValidationEnabled","cloudtrail.RequiresKmsKey"],
+            "6": [],
+            "7": [],
+            "8": ["ec2.EBSEncrypted"],
+            "9": ["efs.EncryptedAtRest"],
+            "10": [],
+            "11": ["ec2.EBSEncrypted"],
+            "12": ["opensearch.EncyptionAtRest"],
+            "13": ["opensearch.TLSEnforced"],
+            "14": ["opensearch.NodeToNodeEncryption"],
+            "15": [],
+            "16": ["rds.StorageEncrypted"],
+            "17": ["redshift.EncryptedAtRest","redshift.AuditLogging"],
+            "18": ["redshift.EncryptedWithKMS"],
+            "19": ["redshift.EncryptedInTransit"],
+            "20": ["s3.ServerSideEncrypted"],
+            "21": ["s3.TlsEnforced"],
+            "22": [],
+            "23": [],
+            "24": [],
+            "25": []
+        },
+        "10.64(b)": {
+            "1": ["dynamodb.autoScalingStatus"],
+            "2": ["ec2.EC2Active"],
+            "3": [],
+            "4": ["ec2.ELBCrossZone"],
+            "5": ["rds.DeleteProtection"],
+            "6": ["rds.MultiAZ"],
+            "7": []
+        },
+        "10.64(d)": {
+            "1": ["apigateway.ExecutionLogging"],
+            "2": ["ec2.ASGELBHealthCheckEnabled"],
+            "3": ["cloudtrail.EnableTrailS3BucketLogging"],
+            "4": ["cloudtrail.NeedToEnableCloudTrail","clooudtrail.EnableCloudTrailLogging","cloudtrail.HasOneMultiRegionTrail","cloudtrail.LogFileValidationEnabled","cloudtrail.RequiresKmsKey"],
+            "5": [],
+            "6": ["cloudtrail.CloudWatchLogsLogGroupArn"],
+            "7": ["dynamodb.rcuServiceLimit","dynamodb.wcuServiceLimit"],
+            "8": ["ec2.EC2DetailedMonitor"],
+            "9": [],
+            "10": ["guardduty.Settings"],
+            "11": ["opensearch.ApplicationLogs"],
+            "12": ["rds.EnhancedMonitor"],
+            "13": [],
+            "14": ["redshift.EncryptedAtRest","redshift.AuditLogging"],
+            "15": ["s3.BucketLogging"],
+            "16": [],
+            "17": ["ec2.VPCFlowLogEnabled"],
+            "18": []
+        },
+        "10.64(e)": {
+            "1": [],
+            "2": ["rds.Backup"],
+            "3": ["dynamodb.disabledPointInTimeRecovery"],
+            "4": [],
+            "5": [],
+            "6": [],
+            "7": [],
+            "8": ["efs.AutomatedBackup"],
+            "9": [],
+            "10": [],
+            "11": ["redshift.AutomaticSnapshots"],
+            "12": ["s3.BucketVersioning"],
+            "13": []
+        },
+        "11.7": {
+            "1": ["guardduty.Settings"],
+            "2": []
+        },
+        "11.8": {
+            "1": ["guardduty.Settings"],
+            "2": []
+        },
+        "11.18(c)(f)": {
+            "1": ["guardduty.Settings"],
+            "2": ["guardduty.Findings"],
+            "3": []
+        },
+        "Appendix 5.1": {
+            "1": ["guardduty.Settings"],
+            "2": []
+        },
+        "Appendix 5.5(b)": {
+            "1": [],
+            "2": ["apigateway.EncryptionInTransit"],
+            "3": ["opensearch.TLSEnforced"],
+            "4": ["opensearch.NodeToNodeEncryption"],
+            "5": ["redshift.EncryptedInTransit"],
+            "6": ["s3.TlsEnforced"]
+        },
+        "Appendix 5.5(c)": {
+            "1": ["guardduty.Settings"],
+            "2": ["ec2.SGDefaultInUsed"],
+            "3": ["ec2.SGSensitivePortOpenToAll", "ec2.SGAllTCPOpen",  "ec2.SGAllUDPOpen", "ec2.SGAllPortOpen", "ec2.SGAllPortOpenToAll"]
+        },
+        "Appendix 5.6": {
+            "1": [],
+            "2": ["apigateway.EncryptionInTransit"],
+            "3": ["opensearch.TLSEnforced"],
+            "4": ["redshift.EncryptedInTransit"],
+            "5": ["ec2.SGDefaultInUsed"],
+            "6": ["ec2.SGSensitivePortOpenToAll", "ec2.SGAllTCPOpen",  "ec2.SGAllUDPOpen", "ec2.SGAllPortOpen", "ec2.SGAllPortOpenToAll"]
+        },
+        "Appendix 10 Part B - 1 (a)": {
+            "1": ["iam.hasOrganization"]
+        },
+        "Appendix 10 Part B - 1 (b)": {
+            "1": ["ec2.ELBEnableWAF"],
+            "2": ["ec2.EC2SubnetAutoPublicIP"],
+            "3": ["ec2.SGDefaultInUsed"],
+            "4": ["ec2.SGSensitivePortOpenToAll", "ec2.SGAllTCPOpen",  "ec2.SGAllUDPOpen", "ec2.SGAllPortOpen", "ec2.SGAllPortOpenToAll"]
+        },
+        "Appendix 10 Part B - 1 (c)": {
+            "1": ["guardduty.Settings"],
+            "2": ["ec2.VPCFlowLogEnabled"]
+        },
+        "Appendix 10 Part B - 1 (d)": {
+            "1": [],
+            "2": ["s3.TlsEnforced"]
+        },
+        "Appendix 10 Part B - 1 (f) i)": {
+            "1": ["apigateway.AuthorizationType"]
+        },
+        "Appendix 10 Part B - 1 (f) ii)": {
+            "1": ["apigateway.WAFWACL"],
+            "2": ["apigateway.ExecutionLogging"]
+        },
+        "Appendix 10 Part B - 2 (b) ii)": {
+            "1": []
+        },
+        "Appendix 10 Part B - 3 (b) vi)": {
+            "1": ["cloudtrail.NeedToEnableCloudTrail","clooudtrail.EnableCloudTrailLogging","cloudtrail.HasOneMultiRegionTrail","cloudtrail.LogFileValidationEnabled","cloudtrail.RequiresKmsKey"]
+        },
+        "Appendix 10 Part B - 5 (a) i)": {
+            "1": [],
+            "2": [],
+            "3": [],
+            "4": ["efs.AutomatedBackup"],
+            "5": [],
+            "6": []
+        },
+        "Appendix 10 Part B - 5 (b)": {
+            "1": []
+        },
+        "Appendix 10 Part B - 5 (c) i)": {
+            "1": []
+        },
+        "Appendix 10 Part B - 5 (d) i)": {
+            "1": [],
+            "2": ["ec2.ELBCrossZone"],
+            "3": [],
+            "4": ["ec2.ELBCrossZone"],
+            "5": ["rds.MultiAZ"],
+            "6": ["rds.MultiAZ"]
+        },
+        "Appendix 10 Part B - 8 (a)": {
+            "1": ["apigateway.CachingEnabled", "apigateway.EncryptionAtRest"],
+            "2": [],
+            "3": ["cloudtrail.NeedToEnableCloudTrail","clooudtrail.EnableCloudTrailLogging","cloudtrail.HasOneMultiRegionTrail","cloudtrail.LogFileValidationEnabled","cloudtrail.RequiresKmsKey"],
+            "4": [],
+            "5": [],
+            "6": ["ec2.EBSEncrypted"],
+            "7": ["efs.EncryptedAtRest"],
+            "8": ["eks.eksSecretsEncryption"],
+            "9": ["ec2.EBSEncrypted"],
+            "10": ["opensearch.EncyptionAtRest"],
+            "11": [],
+            "12": ["redshift.EncryptedWithKMS"],
+            "13": ["s3.SSEWithKMS"],
+            "14": [],
+            "15": []
+        },
+        "Appendix 10 Part B - 8 (d)": {
+            "1": ["kms.KeyRotationEnabled"],
+            "2": ["kms.KeyInPendingDeletion"]
+        },
+        "Appendix 10 Part B - 9 (a) ii)": {
+            "1": ["iam.passwordPolicy","iam.passwordPolicyWeak"],
+            "2": ["iam.mfaActive"],
+            "3": [],
+            "4": ["iam.rootMfaActive"]
+        },
+        "Appendix 10 Part B - 9 (a) iii)": {
+            "1": ["iam.FullAdminAccess","iam.ManagedPolicyFullAccessOneServ"],
+            "2": []
+        },
+        "Appendix 10 Part B - 9 (a) iv)": {
+            "1": ["cloudtrail.NeedToEnableCloudTrail","clooudtrail.EnableCloudTrailLogging","cloudtrail.HasOneMultiRegionTrail","cloudtrail.LogFileValidationEnabled","cloudtrail.RequiresKmsKey"],
+            "2": ["cloudtrail.CloudWatchLogsLogGroupArn"]
+        },
+        "Appendix 10 Part B - 12 (a)": {
+            "1": ["guardduty.Settings"],
+            "2": ["s3.MacieToEnable"]
+        },
+        "Appendix 10 Part B - 14 (c) i)": {
+            "1": ["guardduty.Settings"],
+            "2": ["guardduty.Findings"]
+        }
+    }
+}

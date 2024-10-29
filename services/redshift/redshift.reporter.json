@@ -115,5 +115,45 @@
 		"ref": [
 			"[Changing cluster encryption]<https://docs.aws.amazon.com/redshift/latest/mgmt/changing-cluster-encryption.html>"
 		]
+	},
+	"EncryptedWithKMS": {
+		"category": "S",
+		"^description": "To help protect data at rest, ensure encryption with AWS Key Management Service (AWS KMS) is enabled for your Amazon Redshift cluster. Because sensitive data can exist at rest in Redshift clusters, enable encryption at rest to help protect that data.",
+		"shortDesc": "Encrypt with KMS",
+		"criticality": "M",
+		"downtime": -1,
+		"slowness": 1,
+		"additionalCost": -1,
+		"needFullTest": -1,
+		"ref": [
+			"[Database encryption for Amazon Redshift using AWS KMS]<https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-db-encryption.html#working-with-aws-kms>"
+		]
+	},
+	"ReservedNode": {
+		"category": "C",
+		"^description": "Amazon Redshift offers reserved nodes, which are a cost-effective way to operate your data warehouse by allowing you to reserve compute capacity for a one or three-year period. With reserved nodes, you can receive a significant discount compared to pay-as-you-go pricing. This can help you reduce your overall costs while maintaining the flexibility to scale compute capacity up or down based on your workload needs.",
+		"shortDesc": "Use reserved nodes",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Reserved nodes]<https://aws.amazon.com/redshift/pricing/reserved-nodes/>"
+		]
+	},
+	"UnderutilisedCluster": {
+		"category": "C",
+		"^description": "An underutilized Amazon Redshift cluster can lead to unnecessary costs. It's important to monitor your cluster usage and right-size your cluster based on your workload requirements. You can use Amazon Redshift metrics, such as CPU utilization, disk space usage, and query performance, to determine if your cluster is underutilized.",
+		"shortDesc": "Downsize cluster",
+		"criticality": "L",
+		"downtime": 1,
+		"slowness": 1,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Monitor Redshift Performance]<https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-clusters.html#rs-cluster-performance>"
+		]
 	}
+
 }

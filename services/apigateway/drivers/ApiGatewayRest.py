@@ -25,13 +25,15 @@ class ApiGatewayRest(Evaluator):
         for stage in item:
             if stage['methodSettings'] == []:
                 self.results['ExecutionLogging'] = [-1, "Stage name: " + stage['stageName']]
-                self.results['EncryptionAtRest'] = [-1, "Stage name: " + stage['stageName']]
+                self.results['CachingEnabled'] = [-1, "Stage name: " + stage['stageName']]
             
             for k, json in stage['methodSettings'].items():
                 for key, value in json.items():
                     if key == 'loggingLevel' and value != 'INFO' or 'ERROR':
                         self.results['ExecutionLogging'] = [-1, "Stage name: " + stage['stageName']]    
                     if key == 'cachingEnabled' and value is True:
+                        self.results['CachingEnabled'] = [1, "Stage name: " + stage['stageName']]
+                        self.results['EncryptionAtRest'] = [-1, "Stage name: " + stage['stageName']]
                         if key == 'cacheDataEncrypted' and value is False:
                             self.results['EncryptionAtRest'] = [-1, "Stage name: " + stage['stageName']]
             

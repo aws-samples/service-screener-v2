@@ -15,7 +15,7 @@ class RedshiftCluster(Evaluator):
         # print(self.cluster)
         return
     
-    def _checkPubliclyAcessible(self):
+    def _checkCluster(self):
 
         # check if publicly accessible
         if self.cluster['PubliclyAccessible']:
@@ -75,6 +75,16 @@ class RedshiftCluster(Evaluator):
             print(f"Error: {e}")
             return None
         
+        # check if encryption is done with KMS
+        try:
+            if self.cluster['KmsKeyId'] == '':
+                self.results['EncryptedWithKMS'] = [-1, "Encryption is not done with KMS"]
+
+        except Exception as e:
+            print(f"Error: {e}")
+            return None
+
+
         # # check if default port is used
         # try:
         #     if self.cluster['Endpoint']['Port'] == 5439:
