@@ -8,6 +8,8 @@ from utils.Config import Config
 from services.Service import Service
 from services.eks.drivers.EksCommon import EksCommon
 
+from utils.Tools import _pi
+
 class Eks(Service):
     def __init__(self, region):
         super().__init__(region)
@@ -42,7 +44,7 @@ class Eks(Service):
         clusters = self.getClusters()
         
         for cluster in clusters:
-            print('...(EKS:Cluster) inspecting ' + cluster)
+            _pi('EKS:Cluster', cluster)
             clusterInfo = self.describeCluster(cluster)
             
             #if clusterInfo.get('status') == 'CREATING':

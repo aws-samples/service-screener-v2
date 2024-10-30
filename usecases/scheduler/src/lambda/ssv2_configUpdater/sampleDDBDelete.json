@@ -1,0 +1,23 @@
+{
+    "Records": [
+      {
+        "eventID": "7de3041dd709b024af6f29e4fa13d34c",
+        "eventName": "REMOVE",
+        "eventVersion": "1.1",
+        "eventSource": "aws:dynamodb",
+        "awsRegion": "ap-southeast-1",
+        "dynamodb": {
+          "ApproximateCreationDateTime": 1479499740,
+          "Keys": {
+            "name": {
+              "S": "cdf_delete"
+            }
+          },
+          "SequenceNumber": "13021600000000001596893679",
+          "SizeBytes": 38,
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "eventSourceARN": "arn:aws:dynamodb:us-east-1:123456789012:table/ExampleTableWithStream/stream/2015-06-27T00:48:05.899"
+      }
+    ]
+  }

@@ -61,6 +61,10 @@ class FindingsPageBuilder(CustomPageBuilder):
             "<table id='findings-table' class='table table-bordered table-striped'>",
             "<thead><tr>"
         ]
+
+        if not columnTitles:
+            return ''
+
         for title in columnTitles:
             tableHTMLList.append("<th>" + title + "</th>")
         tableHTMLList.append("</tr></thead>")

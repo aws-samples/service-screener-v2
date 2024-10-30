@@ -6,6 +6,8 @@ from services.Service import Service
 ##import drivers here
 from services.opensearch.drivers.OpensearchCommon import OpensearchCommon
 
+from utils.Tools import _pi
+
 class Opensearch(Service):
     def __init__(self, region):
         super().__init__(region)
@@ -46,7 +48,7 @@ class Opensearch(Service):
         
         for domain in domains:
             domain_name = domain["DomainName"]
-            print("... (OpenSearch) inspecting " + domain_name)
+            _pi("OpenSearch", domain_name)
             
             obj = OpensearchCommon(self.bConfig, domain_name, domain['info'], self.osClient, self.cwClient)
             obj.run(self.__class__)

@@ -7,6 +7,8 @@ from services.Service import Service
 from services.apigateway.drivers.ApiGatewayCommon import ApiGatewayCommon
 from services.apigateway.drivers.ApiGatewayRest import ApiGatewayRest
 
+from utils.Tools import _pi
+
 class Apigateway(Service):
    
    
@@ -54,7 +56,7 @@ class Apigateway(Service):
             self.getApis()
             for api in self.apisv2:
                 objName = api['ProtocolType'] + '::' + api['Name']
-                print('... (APIGateway) inspecting ' + objName)
+                _pi('APIGateway', objName)
                 obj = ApiGatewayCommon(api, self.apiv2Client)
                 obj.run(self.__class__)
                 objs[objName] = obj.getInfo()
@@ -63,7 +65,7 @@ class Apigateway(Service):
             self.getRestApis()
             for api in self.apis:
                 objName = 'REST' + '::' + api['name']
-                print('... (APIGateway) inspecting ' + objName)
+                _pi('APIGateway', objName)
                 obj = ApiGatewayRest(api, self.apiClient)
                 obj.run(self.__class__)
                 objs[objName] = obj.getInfo()

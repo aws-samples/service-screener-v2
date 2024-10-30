@@ -101,6 +101,10 @@ class Screener:
                 print(_cli_options['crossAccounts'])
                 if eCode == 'InvalidClientTokenId' and _cli_options['crossAccounts'] == True:
                     _warn('Impacted Region: [{}], Services: {}... Cross Account limitation, encounted errors: {}'.format(reg, service[0], e))
+
+            except botocore.exceptions.EndpointConnectionError as e:
+                contexts[service[0]][region] = {}
+                _warn("(Not showstopper: Service <{}> not available: {}".format(service[0], e))
                 
             tempCount += len(contexts[service[0]][region])
             del serv
@@ -175,7 +179,7 @@ class Screener:
     
     
     @staticmethod    
-    def generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS3, bucket):
+    def generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS3):
         htmlFolder = Config.get('HTML_ACCOUNT_FOLDER_FULLPATH')
         if not os.path.exists(htmlFolder):
             os.makedirs(htmlFolder)

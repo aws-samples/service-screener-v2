@@ -10,6 +10,7 @@ from utils.Tools import _warn, _info
 
 ## Class name decided by Sarika
 class CfnTrail():
+    additionalDesc = None
     def __init__(self):
         self.stackName = None
         self.cfnTemplate = "zNullResourcesCfn.yml"
@@ -17,7 +18,7 @@ class CfnTrail():
         self.defaultRegion = "us-east-1"
         self.ymlBody='''
 AWSTemplateFormatVersion: '2010-09-09'
-Description: '[aws-gh-ss-v2] Service Screener V2'
+Description: '[aws-gh-ss-v2] Service Screener V2{}'
 
 Conditions:
   HasNot: !Equals [ 'true', 'false' ]
@@ -27,7 +28,8 @@ Resources:
   NullResource:
     Type: 'Custom::NullResource'
     Condition: HasNot 
- 
+'''
+        self.ymlBodyOutput='''
 Outputs:
   ExportsStackName:
     Value: !Ref 'AWS::StackName'
@@ -37,19 +39,22 @@ Outputs:
 
         # self.boto3init()
         
-    def boto3init(self):
+    def boto3init(self, additionalDesc = None):
         self.bConfig = bConfig(
             region_name = self.getRegion()
         )
         
         ssBoto = Config.get('ssBoto', None)
         self.cfClient = ssBoto.client('cloudformation', config=self.bConfig)
+
+        self.additionalDesc = additionalDesc
         
     def createStack(self):
         try:
+            yml = self.ymlBody.format(self.additionalDesc) + self.ymlBodyOutput
             self.cfClient.create_stack(
                 StackName=self.getStackName(),
-                TemplateBody=self.ymlBody
+                TemplateBody=yml
             )
             msg = "Empty CF stacked created successfully, name:" + self.getStackName()
             _info(msg, alwaysPrint=True)

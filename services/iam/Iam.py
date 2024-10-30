@@ -11,6 +11,8 @@ from services.iam.drivers.IamGroup import IamGroup
 from services.iam.drivers.IamUser import IamUser
 from services.iam.drivers.IamAccount import IamAccount
 
+from utils.Tools import _pi
+
 class Iam(Service):
     def __init__(self, region):
         super().__init__(region)
@@ -139,7 +141,7 @@ class Iam(Service):
             return objs
         
         for user in users:
-            print('... (IAM::User) inspecting ' + user['user'])
+            _pi('IAM::User', user['user'])
             obj = IamUser(user, self.iamClient)
             obj.run(self.__class__)
             
@@ -149,7 +151,7 @@ class Iam(Service):
         
         roles = self.getRoles()
         for role in roles:
-            print('... (IAM::Role) inspecting ' + role['RoleName'])
+            _pi('IAM::Role', role['RoleName'])
             obj = IamRole(role, self.iamClient)
             obj.run(self.__class__)
             
@@ -158,14 +160,14 @@ class Iam(Service):
 
         groups = self.getGroups()
         for group in groups:
-            print('... (IAM::Group) inspecting ' + group['GroupName'])
+            _pi('IAM::Group', group['GroupName'])
             obj = IamGroup(group, self.iamClient)
             obj.run(self.__class__)
             
             objs['Group::' + group['GroupName']] = obj.getInfo()
             del obj
         
-        print('... (IAM:Account) inspecting')
+        _pi('IAM:Account')
         obj = IamAccount(None, self.awsClients, users, roles, self.ssBoto)
         obj.run(self.__class__)
         objs['Account::Config'] = obj.getInfo()
@@ -182,7 +184,9 @@ class Iam(Service):
             'GatedGarden',
             'PVRE-SSMOnboarding',
             'PVRE-Maintenance',
-            'InternalAuditInternal'
+            'InternalAuditInternal',
+            'isengard-',
+            'AWS-QuickSetup',
         ]
         
         for kw in keywords:

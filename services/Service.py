@@ -36,7 +36,7 @@ class Service:
         if self.ssBoto == None:
             print('BOTO3 SESSION IS MISSING')
         
-        print('PREPARING -- ' + classname.upper()+ '::'+region)
+        print('\x1b[1;37;43mPREPARING\x1b[0m -- \x1b[1;31;43m' + classname.upper()+ '::'+region + '\x1b[0m')
 
     def setChartConfig(self, title, chartType, legends, data):
         if title not in self.chartsConfig:
@@ -71,7 +71,6 @@ class Service:
         }
         return result
 
-    
     def setRules(self, rules):
         ## Class method is case insensitive, lower to improve accessibilities
         rules = rules.lower().split('^')
@@ -80,7 +79,7 @@ class Service:
     def __del__(self):
         self.processChartData()
         timespent = round(time.time() - self.overallTimeStart, 3)
-        print('\033[1;42mCOMPLETED\033[0m -- ' + self.__class__.__name__.upper() + '::'+self.region+' (' + str(timespent) + 's)')
+        print('\033[1;42mCOMPLETED\033[0m -- \x1b[4;30;47m' + self.__class__.__name__.upper() + '::'+self.region+'\x1b[0m (' + str(timespent) + 's)')
         
         items = Config.retrieveAllCache()
         key = [k for k in items.keys() if 'AllScannedResources' in k]

@@ -1,4 +1,5 @@
 # Custom
+.DS_Store
 test*
 crossAccounts.json
 output.zip
@@ -14,10 +15,13 @@ pyvenv.cfg
 __pycache__/
 *.py[cod]
 *$py.class
+.DS_Store
+*.xlsx
 
 # Distribution / packaging
 .Python
 build/
+build.log
 develop-eggs/
 # dist/
 downloads/
