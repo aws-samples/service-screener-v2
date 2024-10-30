@@ -151,6 +151,9 @@ class RdsCommon(Evaluator):
     ##All checks start from __check;
     def _checkPublicSnapshot(self):
         if self.engine[0:6] == 'aurora':
+            if self.db.get('DBClusterIdentifier', None) == None:
+                return
+
             resp = self.rdsClient.describe_db_cluster_snapshots(
                 DBClusterIdentifier=self.db['DBClusterIdentifier'],
                 SnapshotType='public',
@@ -159,6 +162,9 @@ class RdsCommon(Evaluator):
             )
             publicSnapshots = resp.get('DBClusterSnapshots')
         else:
+            if self.db.get('DBInstanceIdentifier', None) == None:
+                return
+
             resp = self.rdsClient.describe_db_snapshots(
                 DBInstanceIdentifier=self.db['DBInstanceIdentifier'],
                 SnapshotType='public',
