@@ -42,7 +42,7 @@ class Ec2EbsVolume(Evaluator):
 
         check_days = 7 # number of days checked
         period = 60 * 60 # 1hr interval
-        end_time = datetime.datetime.now(datetime.UTC)
+        end_time = datetime.datetime.now()
         start_time = end_time - datetime.timedelta(days=check_days)
 
         for metric in metrics:
