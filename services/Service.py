@@ -7,8 +7,10 @@ import constants as _C
 
 class Service:
     _AWS_OPTIONS = {}
+    chartsType = {}
     RULESPREFIX = None
     tags = []
+    chartsConfig = {}
 
     TAGS_SEPARATOR = '%'
     KEYVALUE_SEPARATOR = '='
@@ -27,18 +29,55 @@ class Service:
             region_name = region    
         )
         
+        self.charts = {}
+        self.chartData = {}
+        
         self.ssBoto = Config.get('ssBoto', None)
         if self.ssBoto == None:
             print('BOTO3 SESSION IS MISSING')
         
         print('\x1b[1;37;43mPREPARING\x1b[0m -- \x1b[1;31;43m' + classname.upper()+ '::'+region + '\x1b[0m')
+
+    def setChartConfig(self, title, chartType, legends, data):
+        if title not in self.chartsConfig:
+            self.chartsConfig[title] = {}
+        self.chartsConfig[title] = {
+            'chartType' : chartType,
+            'legends': legends
+        }
         
+        self.charts[title] = data
+
+
+    def setChartsType(self, chartsType):
+        self.chartsType = chartsType
+    
+
+    def setChartData(self,chartData):
+        for title in chartData:
+            if title not in self.chartData:
+                self.chartData[title] = {}
+            
+            for cat in chartData[title]:
+                if cat not in self.chartData[title]:
+                    self.chartData[title][cat] = chartData[title][cat]
+                else:
+                    self.chartData[title][cat] += chartData[title][cat]
+        
+    def getChart(self):
+        result = {
+            'config': self.chartsConfig,
+            'data': self.charts
+        }
+        return result
+
     def setRules(self, rules):
         ## Class method is case insensitive, lower to improve accessibilities
         rules = rules.lower().split('^')
         Config.set(self.RULESPREFIX, rules)
         
     def __del__(self):
+        self.processChartData()
         timespent = round(time.time() - self.overallTimeStart, 3)
         print('\033[1;42mCOMPLETED\033[0m -- \x1b[4;30;47m' + self.__class__.__name__.upper() + '::'+self.region+'\x1b[0m (' + str(timespent) + 's)')
         
@@ -112,6 +151,16 @@ class Service:
             nTags.append({'Key': i['TagKey'], 'Value': i['TagValue']})
             
         return nTags
+    
+    def processChartData(self):
+        if len(self.chartData) > 0:
+            for title, data in self.chartData.items():
+                legends = list(data.keys())
+                values = list(data.values())
+                chartType = self.chartsType[title]
+
+                self.setChartConfig(title, chartType, legends, values)
+
 
 if __name__ == "__main__":
     Config.init()

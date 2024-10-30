@@ -42,6 +42,7 @@ class Evaluator():
     def init(self):
         self.results = {}
         self.InventoryInfo = {}
+        self.chartData = {}
         self.classname = type(self).__name__
     
     def addII(self, k, v):
@@ -53,6 +54,15 @@ class Evaluator():
         else:
             _warn("{} is not found in drivers/{}.InventoryInfo".format(k, self.classname), forcePrint=False)
             return None
+
+    def setChartData(self, title: str, category: str, data: int):
+        if title not in self.chartData:
+            self.chartData[title] = {category: data}
+        else:
+            self.chartData[title][category] = data
+            
+    def getChartData(self):
+        return self.chartData
 
     def run(self, serviceName):
         servClass = self.classname

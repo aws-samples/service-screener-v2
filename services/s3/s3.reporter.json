@@ -51,6 +51,32 @@
             "[Block S3 Public Access]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html#access-control-block-public-access-options>"   
         ]
     },
+    "PublicReadAccessBlock": {
+        "category": "S",
+        "^description": "You have allowed public read access on {$COUNT} S3 buckets. This leaves your bucket accessible by anyone. Unless absolutely necessary, enable public access block. Block Public Access at the S3 bucket level provides controls to ensure that objects never have public access. Public access is granted to buckets and objects through access control lists (ACLs), bucket policies, or both.",
+        "shortDesc": "Disable Public Read Access",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Block S3 Public Access]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html#access-control-block-public-access-options>"   
+        ]
+    },
+    "PublicWriteAccessBlock": {
+        "category": "S",
+        "^description": "You have allowed public write access on {$COUNT} S3 buckets. This leaves your data to be accessible by anyone. Unless absolutely necessary, enable public access block. Block Public Access at the S3 bucket level provides controls to ensure that objects never have public access. Public access is granted to buckets and objects through access control lists (ACLs), bucket policies, or both.",
+        "shortDesc": "Disable Public Write Access",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Block S3 Public Access]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html#access-control-block-public-access-options>"   
+        ]
+    },
     "MFADelete": {
         "category": "S",
         "^description": "You have not enabled MFA delete on {$COUNT} buckets. MFA delete provides added security if, for example, your security credentials are compromised. MFA delete can help prevent accidental bucket deletions by requiring the user who initiates the delete action to prove physical possession of an MFA device with an MFA code and adding an extra layer of friction and security to the delete action.",
