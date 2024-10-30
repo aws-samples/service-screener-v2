@@ -316,7 +316,17 @@ class GuarddutypageBuilder(PageBuilder):
             for topic, arrayItem in det.items():
                 tab.append("<ul><li><a href='{}' target=_blank rel='noopener noreferrer'>{}</a><ul>".format(self.findingsLink[serv+topic], topic))
                 for it in arrayItem['items']:
-                    tab.append("<li>{}: ({}), {} | <small>{}</small></li>".format(it['region'], it['Count'], it['Title'], it['Id']))
+                    liStyle = supIcon = ''
+                    if it['isArchived'] == True: 
+                        liStyle = "style='font-size: 12px; color: #b5c081'"
+                        supIcon = "<i class='fa fa-eye-slash'></i>"
+                    else:
+                        if it['failResolvedAfterXDays']:
+                            liStyle = "style='color: #c31b1b'"
+                            supIcon = "<i class='fa fa-exclamation-triangle'></i>"
+
+
+                    tab.append("<li {}>{}{}: ({}), {} | <small>({} days ago), {}</small></li>".format(liStyle, supIcon, it['region'], it['Count'], it['Title'], it['days'], it['Id']))
                 tab.append("</ul>") #findings
                 tab.append("</li></ul>") #topic
             tab.append("</li></ul>") #Service

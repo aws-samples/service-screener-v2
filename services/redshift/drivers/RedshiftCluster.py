@@ -77,7 +77,7 @@ class RedshiftCluster(Evaluator):
         
         # check if encryption is done with KMS
         try:
-            if self.cluster['KmsKeyId'] == '':
+            if self.cluster.get('KmsKeyId', '') == '':
                 self.results['EncryptedWithKMS'] = [-1, "Encryption is not done with KMS"]
 
         except Exception as e:

@@ -125,7 +125,11 @@ class Framework():
             
             ## <TODO>
             # format affectedResources to have better HTML output
-            return {"c": check, "d": tmp['shortDesc'], "r": tmp['__affectedResources'], "l": "<br>".join(tmp['__links'])}
+            ln = tmp.get('__links', '')
+            if ln == '':
+                print('###########:', check)
+
+            return {"c": check, "d": tmp['shortDesc'], "r": tmp['__affectedResources'], "l": "<br>".join(ln)}
         else:
             return {"c": check}
             

@@ -2,6 +2,7 @@ import re
 from botocore.exceptions import ClientError
 from services.Evaluator import Evaluator
 from utils.Config import Config
+from datetime import datetime, timezone
     
 class GuarddutyDriver(Evaluator):
     def __init__(self, detector_id, guardduty_client, region):
@@ -42,20 +43,31 @@ class GuarddutyDriver(Evaluator):
                     )
 
                     for finding in findings.get('Findings', []):
+                        date_str = finding['CreatedAt']
+                        given_date = datetime.strptime(date_str, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
+                        current_date = datetime.now(timezone.utc)
+
+                        days_difference = (current_date - given_date).days
+
                         type_ = finding['Type']
+                        sev = self.convertSev(finding['Severity'])
 
-                        if finding['Severity'] not in arr:
-                            arr[finding['Severity']] = {}
-                        if type_ not in arr[finding['Severity']]:
-                            arr[finding['Severity']][type_] = {}
-                        if 'res_' not in arr[finding['Severity']][type_]:
-                            arr[finding['Severity']][type_]['res_'] = []
+                        if sev not in arr:
+                            arr[sev] = {}
+                        if type_ not in arr[sev]:
+                            arr[sev][type_] = {}
+                        if 'res_' not in arr[sev][type_]:
+                            arr[sev][type_]['res_'] = []
 
-                        arr[finding['Severity']][type_]['res_'].append({
+                        isArchived = finding['Service']['Archived']
+                        arr[sev][type_]['res_'].append({
                             'Id': finding['Id'],
                             'Count': finding['Service']['Count'],
                             'Title': finding['Title'],
-                            'region': self.region
+                            'region': self.region,
+                            'failResolvedAfterXDays': self.isFail_cfg_gd_non_archived_findings(sev, days_difference),
+                            'days': days_difference,
+                            'isArchived': isArchived
                         })
 
                 next_token = results.get('NextToken')
@@ -72,6 +84,27 @@ class GuarddutyDriver(Evaluator):
                 arr[serv][type_]['__'] = self._build_doc_links(type_)
 
         self.results['Findings'] = [-1, arr]
+
+    # https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_findings-severity.html
+    def convertSev(self, sev):
+        if sev >= 7:
+            return 8
+        if sev >= 4:
+            return 5
+        return 2
+
+    def isFail_cfg_gd_non_archived_findings(self, sev, days):
+        SEVERITY_TO_DAYS_MAPPING = {
+            '2': 30,  # Low severity - 30 days
+            '5': 7,   # Medium severity - 7 days
+            '8': 1    # High severity - 1 day
+        }
+
+        _d = SEVERITY_TO_DAYS_MAPPING[str(sev)]
+
+        if days > _d: 
+            self.results['FailMeetingCompliances'] = [-1, None]
+            return True
 
     def _checkUsage_statistics(self):
         try:

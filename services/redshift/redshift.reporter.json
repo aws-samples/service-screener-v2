@@ -139,7 +139,8 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Reserved nodes]<https://aws.amazon.com/redshift/pricing/reserved-nodes/>"
+			"[Purchase Reserved nodes]<https://docs.aws.amazon.com/redshift/latest/mgmt/purchase-reserved-node-instance.html>",
+			"[Redshift Pricing]<https://aws.amazon.com/redshift/pricing>"
 		]
 	},
 	"UnderutilisedCluster": {

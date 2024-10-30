@@ -42,5 +42,17 @@
       "shortDesc": "Settings",
       "ref": [
       ]
+  },
+  "FailMeetingCompliances": {
+      "category": "S",
+      "^description": "You have {$COUNT} findings that breach the SLA that yet to be resolved. Checks if Amazon GuardDuty has findings that are non-archived. The rule is NON_COMPLIANT if GuardDuty has non-archived low/medium/high severity findings older than the specified number in the daysLowSev/daysMediumSev/daysHighSev parameter.",
+      "downtime": -1,
+      "slowness": -1,
+      "additionalCost": 0,
+      "criticality": "H",
+      "shortDesc": "Unresolved items after X days",
+      "ref": [
+        "[Unresolved Items Info Mapping]<https://docs.aws.amazon.com/config/latest/developerguide/guardduty-non-archived-findings.html>"
+      ]
   }
 }

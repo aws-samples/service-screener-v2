@@ -138,7 +138,7 @@
       "needFullTest": 0,
       "criticality": "H",
       "shortDesc": "Enable Delete Protection",
-      "ref": ["[Enable Delete Protection]<https://docs.fugue.co/FG_R00280.html>"]
+      "ref": ["[Enable Delete Protection - Instance]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_DeleteInstance.html>"]
   },
   "DeleteProtectionCluster":{
       "category": "O",
@@ -149,7 +149,7 @@
       "needFullTest": 0,
       "criticality": "H",
       "shortDesc": "Enable Delete Protection",
-      "ref": ["[Enable Delete Protection]<https://docs.fugue.co/FG_R00280.html>"]
+      "ref": ["[Delete Protection - Cluster]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_DeleteCluster.html>"]
   },
   "PubliclyAccessible":{
     "category": "S",
@@ -311,7 +311,7 @@
     "criticality": "M",
     "shortDesc": "Set value to 1",
     "ref": [
-      "[What Is]<https://dev.mysql.com/doc/refman/5.7/en/replication-options-binary-log.html#sysvar_sync_binlog>"
+      "[What Is]<https://dev.mysql.com/doc/refman/8.4/en/replication-options-binary-log.html#sysvar_sync_binlog>"
     ]
   },
   "MYSQL__param_innodbFlushTrxCommit":{
@@ -989,7 +989,7 @@
     "criticality": "M",
     "shortDesc": "Set the innodb_open_files parameter to a minimum value of 65",
     "ref": [
-      "[Mysql Doc on innodb_open_files]<https://dev.mysql.com/doc/refman/5.7/en/innodb-parameters.html#sysvar_innodb_open_files>",
+      "[Mysql Doc on innodb_open_files]<https://dev.mysql.com/doc/refman/8.4/en/innodb-parameters.html#sysvar_innodb_open_files>",
       "[AWS view on innodb_open_files]<https://docs.aws.amazon.com/awssupport/latest/user/performance-checks.html#rds-innodb-open-files-parameter-low>"
     ]
   },

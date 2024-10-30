@@ -1,12 +1,6 @@
 import json
-
+import importlib.util
 from services.PageBuilder import PageBuilder
-from frameworks.FTR.FTR import FTR
-from frameworks.SSB.SSB import SSB
-from frameworks.WAFS.WAFS import WAFS
-from frameworks.MSR.MSR import MSR
-from frameworks.CIS.CIS import CIS
-from frameworks.NIST.NIST import NIST
 
 class FrameworkPageBuilder(PageBuilder):
     COMPLIANCE_STATUS = ["Not available", "Compliant", "Need Attention"]
@@ -39,21 +33,30 @@ class FrameworkPageBuilder(PageBuilder):
     
     def __init__(self, service=None, reporter=None):
         framework = service
+        FrameworkClass = FrameworkPageBuilder.getServiceModuleDynamically(framework)
+
         super().__init__(framework, reporter)
         
-        if framework in globals():
-            obj = globals()[framework](reporter)
-            
-            self.framework = obj
-            self.framework.readFile()
-            
-            self.initCSS()
-            self.initJSLib()
-            self.populate()
-            self.addDataTableJS()
-        else:
-            print('[Framework] -{}- not found'.format(framework))
-    
+        obj = FrameworkClass(reporter)
+        
+        self.framework = obj
+        self.framework.readFile()
+        
+        self.initCSS()
+        self.initJSLib()
+        self.populate()
+        self.addDataTableJS()
+        
+    @staticmethod
+    def getServiceModuleDynamically(framework):
+        folder = framework
+        className = framework
+        module = 'frameworks.' + folder + '.' + className
+        
+        ServiceClass = getattr(importlib.import_module(module), className)
+        return ServiceClass
+
+
     def getGateCheckStatus(self):
         return self.framework.gateCheck()
     
