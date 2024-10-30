@@ -10,6 +10,17 @@ from services.Evaluator import Evaluator
 
 import constants as _C
 
+import json
+
+class DateTimeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, datetime.datetime):
+            return obj.isoformat()
+        return super().default(obj)
+
+        # print(json.dumps(self.ec2InstanceData, indent=4, cls=DateTimeEncoder))
+
+
 class Ec2Instance(Evaluator):
     def __init__(self, ec2InstanceData,ec2Client, cwClient):
         super().__init__()
@@ -25,8 +36,10 @@ class Ec2Instance(Evaluator):
         self.addII('instanceType', ec2InstanceData['InstanceType'])
     
     # supporting functions
+    def getCPUUtil(self):
+        return self.ec2Util
     
-    def getEC2UtilizationMetrics(self, metricName, verifyDay):
+    def getEC2UtilizationMetrics(self, metricName, verifyDay, statistics=['Average']):
         cwClient = self.cwClient
         instance = self.ec2InstanceData
         
@@ -44,7 +57,7 @@ class Ec2Instance(Evaluator):
             StartTime=datetime.datetime.utcnow() - timedelta(days=verifyDay),
             EndTime=datetime.datetime.utcnow(),
             Period=24 * 60 * 60,
-            Statistics=['Average'],
+            Statistics=statistics,
         )
         
         return results
@@ -72,6 +85,22 @@ class Ec2Instance(Evaluator):
         cnt = 0
         for datapoint in result['Datapoints']:
             if datapoint['Average'] > thresholdValue:
+                cnt += 1
+        
+        if cnt < thresholdDay:
+            return False
+        else:
+            return True
+
+    def checkMetricsSpikyUsage(self, metricName, verifyDay, thresholdDay, maxThresholdValue, avgThresholdValue, statistics):
+        result = self.getEC2UtilizationMetrics(metricName, verifyDay, statistics)
+        
+        if len(result['Datapoints']) < verifyDay:
+            return False
+        
+        cnt = 0
+        for datapoint in result['Datapoints']:
+            if (datapoint['Average'] < avgThresholdValue) and (datapoint['Maximum'] > maxThresholdValue):
                 cnt += 1
         
         if cnt < thresholdDay:
@@ -309,7 +338,9 @@ class Ec2Instance(Evaluator):
             return
         
         self.results['EC2LowUtilization'] = [-1, '']
+        self.setChartData("EC2 Instance Utilization", 'Over Provisioned', 1)
         return
+
 
     def _checkEC2HighUtilization(self):
         instance = self.ec2InstanceData
@@ -327,6 +358,27 @@ class Ec2Instance(Evaluator):
             return
     
         self.results['EC2HighUtilization'] = [-1, '']
+        self.setChartData("EC2 Instance Utilization", 'Under Provisioned', 1)
+        return
+    
+    def _checkEC2SpikyUtilization(self):
+        instance = self.ec2InstanceData
+        launchDay = self.launchTimeDeltaInDays
+
+        verifyDay = 14
+        thresholdDay = 4
+
+        if launchDay < verifyDay:
+            return
+
+        cpuMaxThresholdPercent = 90
+        cpuAvgThresholdPercent = 30
+        cpuSpikyUsage = self.checkMetricsSpikyUsage('CPUUtilization', verifyDay, thresholdDay, cpuMaxThresholdPercent, cpuAvgThresholdPercent,  statistics=['Average', 'Maximum'])
+        if not cpuSpikyUsage:
+            return
+
+        self.results['EC2SpikyUtilization'] = [-1, '']
+        self.setChartData("EC2 Instance Utilization", 'Spiky', 1)
         return
     
     def _checkEC2PublicIP(self):
