@@ -3,7 +3,7 @@
 import boto3
 import botocore
 import requests
-from datetime import date, datetime, timedelta, UTC
+from datetime import date, datetime, timedelta
 
 import re
 import json
@@ -407,7 +407,7 @@ class Ec2(Service):
             return new_instance_family
 
         # Define the time period for the this month
-        end_date = datetime.now(UTC)
+        end_date = datetime.now()
         start_date = end_date - timedelta(days=30)
         time_period = {
             'Start': start_date.strftime('%Y-%m-%d'),
