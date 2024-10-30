@@ -3,7 +3,7 @@
         "originator": "BNM",
         "shortname": "BNM RMiT",
         "fullname": "Bank Negara Malaysia (BNM) Risk Management in Technology (RMiT)",
-        "description": "The Risk Management in Technology (RMiT) is a policy document issued by Bank Negara Malaysia (BNM) to provide guidance on the management of technology risk for financial institutions in Malaysia.",
+        "description": "The Risk Management in Technology (RMiT) is a policy document issued by Bank Negara Malaysia (BNM) to provide guidance on the management of technology risk for financial institutions in Malaysia. This is operational best practices for BNM RMiT, the following items being flagged out by SS can be use as a guidance to identify actions required to be taken on specific resources in order to comply to the these rules.",
         "_": "https://docs.aws.amazon.com/config/latest/developerguide/operational-best-practices-for-bnm-rmit.html",
         "emptyCheckDefaultMsg": "<small><i>Please refer to the BNM RMiT section for further details. Kindly provide evidence or artifacts demonstrating compliance with the respective RMiT control.</i></small>"
     },
@@ -210,7 +210,7 @@
         },
         "10.6": {
             "1": ["cloudtrail.CloudWatchLogsLogGroupArn"],
-            "2": ["guardduty.Settings"],
+            "2": ["iam.enableGuardDuty"],
             "3": []
         },
         "10.61": {
@@ -266,7 +266,7 @@
             "7": ["dynamodb.rcuServiceLimit","dynamodb.wcuServiceLimit"],
             "8": ["ec2.EC2DetailedMonitor"],
             "9": [],
-            "10": ["guardduty.Settings"],
+            "10": ["iam.enableGuardDuty"],
             "11": ["opensearch.ApplicationLogs"],
             "12": ["rds.EnhancedMonitor"],
             "13": [],
@@ -292,20 +292,20 @@
             "13": []
         },
         "11.7": {
-            "1": ["guardduty.Settings"],
+            "1": ["iam.enableGuardDuty"],
             "2": []
         },
         "11.8": {
-            "1": ["guardduty.Settings"],
+            "1": ["iam.enableGuardDuty"],
             "2": []
         },
         "11.18(c)(f)": {
-            "1": ["guardduty.Settings"],
-            "2": ["guardduty.Findings"],
+            "1": ["iam.enableGuardDuty"],
+            "2": ["guardduty.FailMeetingCompliances"],
             "3": []
         },
         "Appendix 5.1": {
-            "1": ["guardduty.Settings"],
+            "1": ["iam.enableGuardDuty"],
             "2": []
         },
         "Appendix 5.5(b)": {
@@ -317,7 +317,7 @@
             "6": ["s3.TlsEnforced"]
         },
         "Appendix 5.5(c)": {
-            "1": ["guardduty.Settings"],
+            "1": ["iam.enableGuardDuty"],
             "2": ["ec2.SGDefaultInUsed"],
             "3": ["ec2.SGSensitivePortOpenToAll", "ec2.SGAllTCPOpen",  "ec2.SGAllUDPOpen", "ec2.SGAllPortOpen", "ec2.SGAllPortOpenToAll"]
         },
@@ -339,7 +339,7 @@
             "4": ["ec2.SGSensitivePortOpenToAll", "ec2.SGAllTCPOpen",  "ec2.SGAllUDPOpen", "ec2.SGAllPortOpen", "ec2.SGAllPortOpenToAll"]
         },
         "Appendix 10 Part B - 1 (c)": {
-            "1": ["guardduty.Settings"],
+            "1": ["iam.enableGuardDuty"],
             "2": ["ec2.VPCFlowLogEnabled"]
         },
         "Appendix 10 Part B - 1 (d)": {
@@ -417,12 +417,12 @@
             "2": ["cloudtrail.CloudWatchLogsLogGroupArn"]
         },
         "Appendix 10 Part B - 12 (a)": {
-            "1": ["guardduty.Settings"],
+            "1": ["iam.enableGuardDuty"],
             "2": ["s3.MacieToEnable"]
         },
         "Appendix 10 Part B - 14 (c) i)": {
-            "1": ["guardduty.Settings"],
-            "2": ["guardduty.Findings"]
+            "1": ["iam.enableGuardDuty"],
+            "2": ["guardduty.FailMeetingCompliances"]
         }
     }
 }

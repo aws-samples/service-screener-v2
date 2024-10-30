@@ -193,7 +193,7 @@ class Evaluator():
             if name == None:
                 return
             
-            scanned.append(';'.join([Config.get(classPrefix, ""), driver, name, hasError]))
+            scanned.append(';'.join([Config.get(classPrefix, ""), driver or "", name or "", hasError or ""]))
             Config.set(ConfigKey, scanned)
             
             

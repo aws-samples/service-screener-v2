@@ -1,11 +1,15 @@
 import boto3
 import re
 import time
+from functools import lru_cache
 
 from pprint import pprint
 from utils.Config import Config
 from typing import Set, Dict, Union
 from netaddr import IPAddress
+from functools import lru_cache
+from functools import lru_cache
+from functools import lru_cache
 
 ## from utils.Tools import _pi
 def _pi(group, res=''):
@@ -29,12 +33,16 @@ def _printStatus(status, s, forcePrint = False):
     p = "["+status+"] "+ s
     _pr(p, forcePrint)
 
+@lru_cache(maxsize=1024)
 def checkIsPrivateIp(ipaddr):
-    ip = ipaddr.split('/')
-    if ip[0] == '0.0.0.0':
-        return False
-    
-    return IPAddress(ip[0]).is_private()
+    try:
+        ip = ipaddr.split('/')
+        if ip[0] == '0.0.0.0':
+            return False
+        
+        return IPAddress(ip[0]).is_private()
+    except ValueError as e:
+        raise ValueError(f"Invalid IP address format: {ip_addr}") from e
 
 def aws_parseInstanceFamily(instanceFamily: str, region=None) -> Dict[str, str]:
     if region:

@@ -204,7 +204,8 @@
         "needFullTest": 0,
         "shortDesc": "EC2 with AMD chips",
         "ref": [
-            ""
+            "[Auto Change (With AWS SUpport)]<https://repost.aws/knowledge-center/ec2-auto-change-instance-to-amd>",
+            "[Resize Instance]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-resize.html>"
         ]
     },
     "EC2Graviton": {
@@ -217,7 +218,8 @@
         "needFullTest": 0,
         "shortDesc": "EC2 with AMD chips",
         "ref": [
-            ""
+            "[EC2 Linux Migrate to Graviton]<https://repost.aws/knowledge-center/ec2-linux-migrate-to-graviton>",
+            "[What is AWS Graviton]<https://docs.aws.amazon.com/whitepapers/latest/aws-graviton-performance-testing/what-is-aws-graviton.html>"
         ]
     },
     "EBSStoppedInstance": {
@@ -230,7 +232,7 @@
         "needFullTest": 0,
         "shortDesc": "Remove EBS attached to Stopped EC2",
         "ref": [
-            "[Delete EBS Volume that you no longer need]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-deleting-volume.html/>"    
+            "[Delete EBS Volume that you no longer need]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-deleting-volume.html>"    
         ]
     },
     "EBSEncrypted": {

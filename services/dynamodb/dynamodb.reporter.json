@@ -113,7 +113,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Turn on DDB delete protection]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-deletion-protection.html>"
+			"[Turn on DDB delete protection]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/WorkingWithTables.Basics.html#WorkingWithTables.Basics.DeletionProtection>"
 		]
 	},
 	"disabledBackup":{
