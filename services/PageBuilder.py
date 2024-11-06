@@ -25,7 +25,8 @@ class PageBuilder:
         'rds': 'database',
         's3': 'hdd',
         'Modernize': 'chart-line',
-        'Finding': 'bug'
+        'Findings': 'bug',
+        'TA': 'user-md'
     }
     
     frameworkIcon = 'tasks'
@@ -201,20 +202,20 @@ class PageBuilder:
         resHtml = []
         for region, resource in resources.items():
             items = []
-            resHtml.append(f"<dd>{region}: ")
+            resHtml.append(f"<dd class='detail-regions'>{region}: ")
             for identifier in resource:
                 items.append(f"<a href='#{self.service}-{identifier}'>{identifier}</a>")
             resHtml.append(" | ".join(items))
             resHtml.append("</dd>")
 
-        output.append("<dl><dt>Description</dt><dd>" + summary['^description'] + "</dd><dt>Resources</dt>" + "".join(resHtml))
+        output.append("<dl><dt>Description</dt><dd class='detail-desc'>" + summary['^description'] + "</dd><dt>Resources</dt>" + "".join(resHtml))
 
         hasTags = self.generateSummaryCardTag(summary)
         if len(hasTags.strip()) > 0:
             output.append(f"<dt>Label</dt><dd>{hasTags}</dd>")
 
         if summary['__links']:
-            output.append("<dt>Recommendation</dt><dd>" + "</dd><dd>".join(summary['__links']) + "</dd>")
+            output.append("<dt>Recommendation</dt><dd class='detail-href'>" + "</dd><dd class='detail-href''>".join(summary['__links']) + "</dd>")
 
         output.append("</dl>")
 
@@ -684,6 +685,7 @@ $('.beta-genai').click(function(){
 
 genaiResp = $('#genai-modal-response')
 $('#genai-savequery').click(function(){
+  sbtn = $(this)
   genaikeys = $('#genai-key').val().split('|')
   
   if((genaikeys.length < 2) || (genaikeys.length > 2)){
@@ -691,19 +693,26 @@ $('#genai-savequery').click(function(){
     return
   }
 
+  sbtn.prop('disabled', true)
+  genaiResp.text("... generating results, it can times, please be patient ...")
+  
   a_url = genaikeys[0]
   a_key = genaikeys[1]
 
+  myJsonData = {'api_data': currentInfo}
   $.ajax({
     url: a_url,
-    headers: {'x-api-key': a_key},
+    // headers: {'x-api-key': a_key},
     type: 'POST',
-    data: JSON.stringify(currentInfo),
+    data: JSON.stringify(myJsonData),
     contentType: 'application/json',
+    dataType: 'json',
     success: function(response) {
       genaiResp.text(response['createdAt'])
+      sbtn.prop('disabled', false)
     },
     error: function(xhr, status, error) {
+      sbtn.prop('disabled', false)    
       genaiResp.text("Error..., check console.log")
       console.error('Error:', error);
     }
