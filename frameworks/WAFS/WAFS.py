@@ -32,6 +32,7 @@ class WAFS(Framework):
             self.WATools = waTools
             self.WATools.init(tmpParams)
             self.WATools.createReportIfNotExists()
+            self.WATools.createMilestoneIfNotExists()
             self.WATools.listAnswers()
             # print(self.WATools.answerSets)
         

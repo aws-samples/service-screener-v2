@@ -694,12 +694,13 @@ $('#genai-savequery').click(function(){
   }
 
   sbtn.prop('disabled', true)
-  genaiResp.text("... generating results, it can times, please be patient ...")
+  myJsonData = {'api_data': currentInfo}
+  genaiResp.text("... generating results, it can take times, please be patient ...\\n\\nData sent are as below:\\n" + JSON.stringify(myJsonData, null, 4))
   
   a_url = genaikeys[0]
   a_key = genaikeys[1]
 
-  myJsonData = {'api_data': currentInfo}
+  
   $.ajax({
     url: a_url,
     // headers: {'x-api-key': a_key},
@@ -708,7 +709,7 @@ $('#genai-savequery').click(function(){
     contentType: 'application/json',
     dataType: 'json',
     success: function(response) {
-      genaiResp.text(response['createdAt'])
+      genaiResp.text(response['response'])
       sbtn.prop('disabled', false)
     },
     error: function(xhr, status, error) {
@@ -725,16 +726,16 @@ $('#genai-savequery').click(function(){
   <div class="modal-dialog modal-xl modal-dialog-centered" role="document">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="genai-modalTitle">Beta - GenAi</h5>
+        <h5 class="modal-title" id="genai-modalTitle">Beta - Calls API</h5>
         <button type="button" class="close" data-dismiss="modal" aria-label="Close">
           <span aria-hidden="true">&times;</span>
         </button>
       </div>
       <div class="modal-body">
-        Please provide your GenAI key, which can be obtained from AWS Partner
+        Provide your API endpoints, follows by API Key. E.g: https://xxxx.execute-api.ap-southeast-1.amazonaws.com/prod|mysampleApiKeyHere
         <input type="text" id="genai-key" name="genai-key" style="width:100%">
         <br>Response:<br>
-        <textarea id="genai-modal-response" readonly style="color: #b55d00; width: 100%; background: #ededed; height: 300px; font-family: monospace; font-size: 12px;"></textarea>
+        <textarea id="genai-modal-response" readonly style="color: #b55d00; width: 100%; background: #ededed; height: 500px; font-family: monospace; font-size: 12px;"></textarea>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
