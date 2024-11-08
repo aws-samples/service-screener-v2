@@ -90,4 +90,6 @@ class WAFS(Framework):
         return f"{titleStr} - {sectStr}"
 
     def _hookPostBuildContentDetail(self):
+        if self.isBeta == False:
+            return
         self.WATools.createMilestoneIfNotExists()
