@@ -149,13 +149,15 @@ class FrameworkPageBuilder(PageBuilder):
         items.append([item, ''])
         
         outp.append(self.generateRowWithCol(size=12, items=items, rowHtmlAttr="data-context=detail"))
+
+        self.framework._hookPostBuildContentDetail()
         
         return (outp)
         
     # To be overwrite by custom class
     def _hookPreBuildContentDetail(self):
         pass
-    
+
     def customBuildTableHTML(self):
         outp = []
         

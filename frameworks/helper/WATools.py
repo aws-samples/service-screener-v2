@@ -122,7 +122,7 @@ class WATools():
                     break  # No more pages, exit the loop
 
             if not all_milestones:
-                print(f"No milestones found for workload {workload_id}... creating milestone...")
+                print("No milestones found for workload {}... creating milestone...".format(self.waInfo['WorkloadId']))
                 self.createMilestone()
                 return None
 

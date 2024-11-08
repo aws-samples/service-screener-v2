@@ -32,7 +32,6 @@ class WAFS(Framework):
             self.WATools = waTools
             self.WATools.init(tmpParams)
             self.WATools.createReportIfNotExists()
-            self.WATools.createMilestoneIfNotExists()
             self.WATools.listAnswers()
             # print(self.WATools.answerSets)
         
@@ -89,3 +88,6 @@ class WAFS(Framework):
         titleStr = self.WATools.answerSets.get(titleNum, [None])[1]
         sectStr = self.WATools.answerSets.get(paired, [None])[1]
         return f"{titleStr} - {sectStr}"
+
+    def _hookPostBuildContentDetail(self):
+        self.WATools.createMilestoneIfNotExists()

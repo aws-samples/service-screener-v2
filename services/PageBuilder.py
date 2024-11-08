@@ -68,6 +68,19 @@ class PageBuilder:
         el = el or o[0:11]
         return self.idPrefix + el
 
+    def _prebuildContentSummary(self):
+        pass
+
+    def _postbuildContentSummary(self):
+        pass
+
+    def _preBuildContentDetail(self):
+        pass
+
+    def _postBuildContentDetail(self):
+        pass
+
+
     def buildPage(self):
         self.init()
         self.htmlFolder = Config.get('HTML_ACCOUNT_FOLDER_FULLPATH')
@@ -76,8 +89,15 @@ class PageBuilder:
         output.append(self.buildHeader())
         output.append(self.buildNav())
         output.append(self.buildBreadcrumb())
+
+        self._prebuildContentSummary()
         output.append(self.buildContentSummary())
+        self._postbuildContentSummary()
+
+        self._preBuildContentDetail()
         output.append(self.buildContentDetail())
+        self._postBuildContentDetail()
+
         output.append(self.buildFooter())
 
         finalHTML = ""
