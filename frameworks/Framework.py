@@ -163,3 +163,6 @@ class Framework():
         checks.append("</dl>")
         
         return ["".join(checks), "<br>".join(links), comp]
+    
+    def _hookPostBuildContentDetail(self):
+        pass
