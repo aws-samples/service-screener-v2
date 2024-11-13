@@ -109,11 +109,16 @@ screener --regions ALL
 # AWS Partner used, migration evaluation id
 --others '{"mpe": {"id": "aaaa-1111-cccc"}}'
 
-# To override default Well Architected Tools integration parameter
---others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":0}}'
+# To create a workload and a milestone in the Well-Architected Tool
+# Set `newMileStone` to 1 to create a milestone each time the Service Screener is run. (Recommended)
+# Set `newMileStone` to 0 to create a milestone only once if no milestone has been created.
+# Use the existing workload name as `reportName` to update the milestone and track improvements.
+--others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":1}}'
+
+screener --regions ap-southeast-1 --beta 1 --others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":1}}'
 
 # you can combine both
---others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":0}, "mpe": {"id": "aaaa-1111-cccc"}}'
+--others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":1}, "mpe": {"id": "aaaa-1111-cccc"}}'
 ```
 <details>
 <summary>Get Report Walkthrough</summary>
