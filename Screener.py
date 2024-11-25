@@ -268,6 +268,7 @@ class Screener:
                 reporter.resetDashboard()
                 cp.resetPages()
                 del cp
-            else:
-                with open(htmlFolder + '/api.json', 'w') as f:
-                    json.dump(apiResultArray, f)
+
+            # make both api-full and report mode output the api.json file
+            with open(htmlFolder + "/api.json", "w") as f:
+                json.dump(apiResultArray, f)
