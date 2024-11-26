@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from dateutil.tz import tzlocal
 
 from utils.Config import Config
-from utils.Tools import _warn
+from utils.Tools import _warn, _pr
 from .IamCommon import IamCommon
  
 class IamAccount(IamCommon):
@@ -32,6 +32,17 @@ class IamAccount(IamCommon):
         self.roles = roles
         
         # self.__configPrefix = 'iam::settings::'
+
+        # Assuming AWS Organization is disabled at first
+        self.organizationIsEnabled = False
+
+        # Check if AWS Organization is enabled
+        try:
+            resp = self.orgClient.describe_organization()
+            self.organizationIsEnabled = True
+        except botocore.exceptions.ClientError as e:
+            ecode = e.response['Error']['Code'] 
+
         
         self.init()
         
@@ -246,13 +257,8 @@ class IamAccount(IamCommon):
                 return 0
 
     def _checkHasOrganization(self):
-        try:
-            resp = self.orgClient.describe_organization()
-        except botocore.exceptions.ClientError as e:
-            ecode = e.response['Error']['Code']
-            if ecode == 'AWSOrganizationsNotInUseException':
+        if (self.organizationIsEnabled == False):
                 self.results['hasOrganization'] = [-1, '']
-                return 0
     
     def _checkCURReport(self):
         try:
@@ -298,3 +304,24 @@ class IamAccount(IamCommon):
             self.results['PartialEnableConfigService'] = [-1, ', '.join(badResults)]
         else:
             return
+
+    def _checkSCPEnabled(self):
+        # Run this check only when AWS Organization is activated in the account
+        if self.organizationIsEnabled == True:
+            try:
+                # Get organization root ID
+                roots = self.orgClient.list_roots()
+                root_id = roots['Roots'][0]['Id']
+                
+                policies = self.orgClient.list_policies_for_target(
+                    TargetId=root_id,
+                    Filter='SERVICE_CONTROL_POLICY'
+                )
+                
+                # If no SCPs are attached, add to results
+                if len(policies.get('Policies', [])) == 0:
+                    self.results['SCPEnabled'] = [-1, '']
+                                    
+            except botocore.exceptions.ClientError as e:
+                ecode = e.response['Error']['Code']
+    

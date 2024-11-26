@@ -13,3 +13,6 @@ source bin/activate
 cd service-screener-v2
 pip install -e .
 alias screener="python3 $(pwd)/main.py"
+
+## If the pwd command outputs a working directory which consists of folder name(s) with whitespaces, i.e. "/User/username/Working Directory/service-screener-v2", encapsulate the argument in single-quotes to preserve the whitespaces, like so:
+alias screener="python3 '$(pwd)/main.py'"

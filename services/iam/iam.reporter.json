@@ -500,5 +500,18 @@
 		"ref": [
 			"[Enable AWS Config]<https://docs.aws.amazon.com/config/latest/developerguide/gs-console.html>"
 		]
+	}, 
+	"SCPEnabled":{
+		"category": "S",
+		"^description": "Enabling service control policies (SCPs) in AWS Organizations provides central control over the maximum available permissions for the IAM users and IAM roles in your organization, helping to ensure your accounts stay within your organization's access control guidelines. SCPs are a type of organization policy that are available only when you have enabled all AWS Organizations features, not just consolidated billing, offering the ability to centrally define and enforce the maximum permissions that can be granted to IAM users and roles across your organization's accounts, which helps maintain security and compliance by making it possible to centrally manage and enforce access control policies across your entire organization.",
+		"shortDesc": "Enable Service Control Policy (SCP)",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Enable Service Control Policy (SCP)]<https://docs.aws.amazon.com/organizations/latest/userguide/enable-policy-type.html>"
+		]
 	}
 }
