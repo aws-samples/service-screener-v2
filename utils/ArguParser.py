@@ -9,7 +9,6 @@ class ArguParser:
         "t": "test",
         "p": "profile",
         "b": "bucket",
-        "m": "mode",
         "f": "filters"
     }
     
@@ -48,11 +47,6 @@ class ArguParser:
         "ztestmode": {
             "required": False,
             "default": False
-        },
-        "mode": {
-            "required": False,
-            "default": "report",
-            "help": "--mode report|api|api_full"
         },
         "profile": {
             "required": False,
