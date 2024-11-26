@@ -415,7 +415,10 @@ class Ec2(Service):
         }
 
         # Get the cost data for EC2 instances, grouped by instance type and region
-        ec2_response = self.ceClient.get_cost_and_usage(
+        ec2_response = {}
+        
+        try:
+            ec2_response = self.ceClient.get_cost_and_usage(
             TimePeriod=time_period,
             Granularity='MONTHLY',
             Metrics=['UnblendedCost'],
@@ -436,6 +439,17 @@ class Ec2(Service):
                 }
             }
         )
+            
+        except botocore.exceptions.ClientError as e:
+            ecode = e.response['Error']['Code']
+            emsg = e.response['Error']['Message']
+            print(ecode, emsg)
+        except Exception as e:
+            print('Cost and Usage API call is getting the following error:')
+            print(e)
+
+        if not ec2_response:
+            return # Simply end this function if ec2_response did not return with a proper response
         
         region_instance_dict = dict()
 
