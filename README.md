@@ -98,14 +98,6 @@ screener --regions ALL
 
 ### Other parameters
 ```bash
-##mode
---mode api-full | api-raw | report
-
-# api-full: give full results in JSON format
-# api-raw: raw findings
-# report: generate default web html
-
-##others
 # AWS Partner used, migration evaluation id
 --others '{"mpe": {"id": "aaaa-1111-cccc"}}'
 
@@ -153,6 +145,11 @@ You can navigate to the service(s) listed to see detailed findings on each servi
 The report provides you an easy-to-navigate dashboard of the various best-practice checks that were run. 
 
 Use the left navigation bar to explore the checks for each service. Expand each check to read the description, find out which resources were highlighted, and get recommendations on how to remediate the findings.  
+
+Besides the HTML report, you can also find two JSON files that record the findings in each AWS account's folder:
+
+- `api-raw.json`: Contains the raw findings
+- `api-full.json`: Contains the full results in JSON format
 
 ## Contributing to service-screener
 We encourage public contributions! Please review [CONTRIBUTING](./CONTRIBUTING.md) for details on our code of conduct and development process.

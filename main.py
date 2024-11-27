@@ -31,7 +31,6 @@ debugFlag = _cli_options['debug']
 # feedbackFlag = _cli_options['feedback']
 # testmode = _cli_options['dev']
 testmode = _cli_options['ztestmode']
-runmode = _cli_options['mode']
 filters = _cli_options['tags']
 crossAccounts = _cli_options['crossAccounts']
 workerCounts = _cli_options['workerCounts']
@@ -44,7 +43,6 @@ crossAccounts = True if crossAccounts in _C.CLI_TRUE_KEYWORD_ARRAY or crossAccou
 beta = True if beta in _C.CLI_TRUE_KEYWORD_ARRAY or beta is True else False
 _cli_options['crossAccounts'] = crossAccounts
 
-runmode = runmode if runmode in ['api-raw', 'api-full', 'report'] else 'report'
 
 # <TODO> analyse the impact profile switching
 _AWS_OPTIONS = {
@@ -318,7 +316,7 @@ for acctId, cred in rolesCred.items():
     Config.set('cli_regions', regions)
     Config.set('cli_frameworks', frameworks)
     
-    Screener.generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS3)
+    Screener.generateScreenerOutput(contexts, hasGlobal, regions, uploadToS3)
     
     # os.chdir(_C.FORK_DIR)
     filetodel = _C.FORK_DIR + '/tail.txt'
@@ -338,17 +336,7 @@ for acctId, cred in rolesCred.items():
     
 
 adminlteDir = _C.ADMINLTE_ROOT_DIR
-
-if runmode == 'report':
-    shutil.make_archive('output', 'zip', adminlteDir)
-else:
-    apiFolder = _C.ROOT_DIR + '/aws-api'
-    if os.path.exists(apiFolder):
-        shutil.rmtree(apiFolder)
-        
-    shutil.copytree(adminlteDir, apiFolder, ignore=shutil.ignore_patterns('res*'))
-    shutil.make_archive('output', 'zip', apiFolder)
-    shutil.rmtree(apiFolder)
+shutil.make_archive('output', 'zip', adminlteDir)
 
 print("Pages generated, download \033[1;42moutput.zip\033[0m to view")
 print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m /tmp/service-screener-v2/output.zip \033[1;42m <===== \033[0m")
