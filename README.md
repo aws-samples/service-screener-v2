@@ -4,6 +4,8 @@ An open source guidance tool for the AWS environment. Click [here](https://bit.l
 
 Disclaimer: The generated report has to be hosted locally and MUST NOT be internet accessible
 
+We hear that current Screener is not compatible for Greater China region. Our community folks has tune and make it works here: https://github.com/lijh-aws-tools/service-screener-cn"
+
 ## Overview
 Service Screener is a tool that runs automated checks on AWS environments and provides recommendations based on AWS and community best practices. 
 
