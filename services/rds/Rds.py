@@ -37,6 +37,7 @@ class Rds(Service):
         self.setChartsType(self.CHARTSTYPE)
         
         self.secrets = []
+        self.hasCEPermission = True
 
     engineDriver = {
         'mariadb': 'Mariadb',
@@ -124,14 +125,24 @@ class Rds(Service):
         ## Fix for 30 days data
         endDate = datetime.now().date()
         startDate = endDate - timedelta(days=30)
+        response = {}
 
-        response = self.ceClient.get_cost_and_usage(
-            TimePeriod={"Start": str(startDate), "End": str(endDate)},
-            Granularity="MONTHLY",
-            Metrics=["UnblendedCost"],
-            GroupBy=[{"Type": "DIMENSION", "Key": groupBy}],
-            Filter=filter,
-        )
+        if self.hasCEPermission == True:
+            try:
+                response = self.ceClient.get_cost_and_usage(
+                    TimePeriod={"Start": str(startDate), "End": str(endDate)},
+                    Granularity="MONTHLY",
+                    Metrics=["UnblendedCost"],
+                    GroupBy=[{"Type": "DIMENSION", "Key": groupBy}],
+                    Filter=filter,
+                )
+            except botocore.exceptions.ClientError as e:
+                self.hasCEPermission = False
+                eCode = e.response['Error']['Code']
+                eMsg = e.response['Error']['Message']
+                print("Rds.py error: {}, {}".format(eCode, eMsg))
+                print("[Skipped] RDS Cost Breakdown Charts")
+
         return response
     
     
@@ -144,6 +155,8 @@ class Rds(Service):
             ]
         }
         response = self.getCEResults(dimension, filter)
+        if response == {}:
+            return results
 
         for item in response.get('ResultsByTime'):
             for group in item.get("Groups"):

@@ -97,8 +97,9 @@ class Screener:
             except botocore.exceptions.ClientError as e:
                 contexts[service[0]][region] = {}
                 eCode = e.response['Error']['Code']
-                print(eCode)
-                print(_cli_options['crossAccounts'])
+                eMsg = e.response['Error']['Message']
+                print("Screener.py error: {}, {}".format(eCode, eMsg))
+                print("Screener.py isCrossAccounts: {}".format(_cli_options['crossAccounts']))
                 if eCode == 'InvalidClientTokenId' and _cli_options['crossAccounts'] == True:
                     _warn('Impacted Region: [{}], Services: {}... Cross Account limitation, encounted errors: {}'.format(reg, service[0], e))
 
