@@ -34,6 +34,7 @@ class RdsSecurityGroup(Evaluator):
         
         infoMsg = []
         hasNonPrivateIp = False
+    
         for sg in settings:
             if not 'IpPermissions' in sg:
                 continue
