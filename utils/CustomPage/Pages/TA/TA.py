@@ -32,13 +32,13 @@ class TA(CustomObject):
             except ClientError as e:
                 error_code = e.response['Error']['Code']
                 if error_code == 'SubscriptionRequiredException':
-                    errMsg = "Error: Your AWS account doesn't have the required Business or Enterprise Support plan for Trusted Advisor access."
+                    errMsg = "Error: TA unable to generate. Your AWS account doesn't have the required Business or Enterprise Support plan for Trusted Advisor access."
                     self.taError = errMsg
                     print(errMsg)
                     return
                 elif error_code in ['AccessDeniedException', 'UnauthorizedOperation']:                    
                     # errMsg = "Error: You don't have sufficient permissions to access Trusted Advisor. Required IAM permissions: trustedadvisor:List*, trustedadvisor:Get*"
-                    errMsg = e.response['Error']['Message']
+                    errMsg = "Error: TA unable to generate. " + e.response['Error']['Message']
                     self.taError = errMsg
                     print(errMsg)
                     return
