@@ -6,7 +6,7 @@ from functools import lru_cache
 from pprint import pprint
 from utils.Config import Config
 from typing import Set, Dict, Union
-from netaddr import IPAddress
+from ipaddress import ip_address as IPAddress
 from functools import lru_cache
 from functools import lru_cache
 from functools import lru_cache
@@ -40,7 +40,7 @@ def checkIsPrivateIp(ipaddr):
         if ip[0] == '0.0.0.0':
             return False
         
-        return IPAddress(ip[0]).is_private()
+        return IPAddress(ip[0]).is_private
     except ValueError as e:
         raise ValueError(f"Invalid IP address format: {ip_addr}") from e
 
