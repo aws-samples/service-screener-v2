@@ -179,95 +179,93 @@ class Screener:
     
     
     @staticmethod    
-    def generateScreenerOutput(runmode, contexts, hasGlobal, regions, uploadToS3):
+    def generateScreenerOutput(contexts, hasGlobal, regions, uploadToS3):
         htmlFolder = Config.get('HTML_ACCOUNT_FOLDER_FULLPATH')
         if not os.path.exists(htmlFolder):
             os.makedirs(htmlFolder)
         
         stsInfo = Config.get('stsInfo')
-        if runmode == 'api-raw':
-            with open(htmlFolder + '/api.json', 'w') as f:
-                json.dump(contexts, f)
-        else:
-            cp = CustomPage()
-            pages = cp.getRegistrar()
-            Config.set('CustomPage::Pages', pages)
-            
-            apiResultArray = {}
-            if hasGlobal:
-                regions.append('GLOBAL')
-            
-            if runmode == 'report':
-                params = []
-                for key, val in Config.get('_SS_PARAMS').items():
-                    if val != '':
-                        tmp = '--' + key + ' ' + str(val)
-                        params.append(tmp)
-                        
-                summary = Config.get('SCREENER-SUMMARY')
-                excelObj = ExcelBuilder(stsInfo['Account'], ' '.join(params))
-            
-            for service, dataSets in contexts.items():
-                resultSets = dataSets['results']
-                chartSets = dataSets['charts']
 
-                reporter = Reporter(service)
-                reporter.process(resultSets).processCharts(chartSets).getSummary().getDetails()
-                
-                if runmode == 'report':
-                    ## <TODO> -- verification
-                    ## Maybe need to import module, to validate later
-                    pageBuilderClass = Screener.getServicePagebuilderDynamically(service)
-                    pb = pageBuilderClass(service, reporter)
-                    pb.buildPage()
-                    
-                    ## <TODO>
-                    if service not in ['guardduty']:
-                        excelObj.generateWorkSheet(service, reporter.cardSummary)
-                
-                if runmode == 'report' or runmode == 'api-full':
-                    if not service in apiResultArray:
-                        apiResultArray[service] = {'summary': {}, 'detail': {}}
-                    
-                    apiResultArray[service]['summary'] = reporter.getCard()
-                    apiResultArray[service]['detail'] = reporter.getDetail()
+        # generate raw findings json file
+        with open(htmlFolder + '/api-raw.json', 'w') as f:
+            json.dump(contexts, f)
+
+        cp = CustomPage()
+        pages = cp.getRegistrar()
+        Config.set("CustomPage::Pages", pages)
+
+        apiResultArray = {}
+        if hasGlobal:
+            regions.append('GLOBAL')
+
+        params = []
+        for key, val in Config.get('_SS_PARAMS').items():
+            if val != '':
+                tmp = '--' + key + ' ' + str(val)
+                params.append(tmp)
+
+        summary = Config.get("SCREENER-SUMMARY")
+        excelObj = ExcelBuilder(stsInfo["Account"], " ".join(params))
+
+        for service, dataSets in contexts.items():
+            resultSets = dataSets['results']
+            chartSets = dataSets['charts']
+
+            reporter = Reporter(service)
+            reporter.process(resultSets).processCharts(chartSets).getSummary().getDetails()
+
+            ## <TODO> -- verification
+            ## Maybe need to import module, to validate later
+            pageBuilderClass = Screener.getServicePagebuilderDynamically(service)
+            pb = pageBuilderClass(service, reporter)
+            pb.buildPage()
+
+            ## <TODO>
+            if service not in ['guardduty']:
+                excelObj.generateWorkSheet(service, reporter.cardSummary)
+
+            if not service in apiResultArray:
+                apiResultArray[service] = {'summary': {}, 'detail': {}}
             
-            if runmode == 'report':
-                # serviceStat = Config.get('cli_services')
-                # print(serviceStat)
-                dashPB = DashboardPageBuilder('index', [])
-                dashPB.buildPage()
-                
-                # <TODO>
-                ## dashPB will gather summary info, hence rearrange the sequences
-                excelObj.buildSummaryPage(summary)
-                excelObj._save()
-                
-                ## Enhancement - Framework
-                frameworks = Config.get('cli_frameworks')
-                if len(frameworks) > 0:
-                    for framework in frameworks:
-                        o = FrameworkPageBuilder(framework, apiResultArray)
-                        if o.getGateCheckStatus() == True:
-                            p = o.buildPage()
-                        else:
-                            print(framework + " GATECHECK==FALSE")
-                
-                emsg = []
-                try:
-                    cp.buildPage()
-                except Exception:
-                    print(traceback.format_exc())
-                    emsg.append(traceback.format_exc())
-                
-                if emsg:
-                    with open(_C.FORK_DIR + '/error.txt', 'a+') as f:
-                        f.write('\n\n'.join(emsg))
-                        f.close()
-                
-                reporter.resetDashboard()
-                cp.resetPages()
-                del cp
-            else:
-                with open(htmlFolder + '/api.json', 'w') as f:
-                    json.dump(apiResultArray, f)
+            apiResultArray[service]['summary'] = reporter.getCard()
+            apiResultArray[service]['detail'] = reporter.getDetail()
+
+        # serviceStat = Config.get('cli_services')
+        # print(serviceStat)
+        dashPB = DashboardPageBuilder('index', [])
+        dashPB.buildPage()
+
+        # <TODO>
+        ## dashPB will gather summary info, hence rearrange the sequences
+        excelObj.buildSummaryPage(summary)
+        excelObj._save()
+
+        ## Enhancement - Framework
+        frameworks = Config.get('cli_frameworks')
+        if len(frameworks) > 0:
+            for framework in frameworks:
+                o = FrameworkPageBuilder(framework, apiResultArray)
+                if o.getGateCheckStatus() == True:
+                    p = o.buildPage()
+                else:
+                    print(framework + " GATECHECK==FALSE")
+
+        emsg = []
+        try:
+            cp.buildPage()
+        except Exception:
+            print(traceback.format_exc())
+            emsg.append(traceback.format_exc())
+
+        if emsg:
+            with open(_C.FORK_DIR + '/error.txt', 'a+') as f:
+                f.write('\n\n'.join(emsg))
+                f.close()
+
+        reporter.resetDashboard()
+        cp.resetPages()
+        del cp
+
+        # generate the full results in JSON format
+        with open(htmlFolder + "/api-full.json", "w") as f:
+            json.dump(apiResultArray, f)

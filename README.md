@@ -4,6 +4,8 @@ An open source guidance tool for the AWS environment. Click [here](https://bit.l
 
 Disclaimer: The generated report has to be hosted locally and MUST NOT be internet accessible
 
+We hear that current Screener is not compatible for Greater China region. Our community folks has tune and make it works here: https://github.com/lijh-aws-tools/service-screener-cn"
+
 ## Overview
 Service Screener is a tool that runs automated checks on AWS environments and provides recommendations based on AWS and community best practices. 
 
@@ -98,22 +100,19 @@ screener --regions ALL
 
 ### Other parameters
 ```bash
-##mode
---mode api-full | api-raw | report
-
-# api-full: give full results in JSON format
-# api-raw: raw findings
-# report: generate default web html
-
-##others
 # AWS Partner used, migration evaluation id
 --others '{"mpe": {"id": "aaaa-1111-cccc"}}'
 
-# To override default Well Architected Tools integration parameter
---others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":0}}'
+# To create a workload and a milestone in the Well-Architected Tool
+# Set `newMileStone` to 1 to create a milestone each time the Service Screener is run. (Recommended)
+# Set `newMileStone` to 0 to create a milestone only once if no milestone has been created.
+# Use the existing workload name as `reportName` to update the milestone and track improvements.
+--others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":1}}'
+
+screener --regions ap-southeast-1 --beta 1 --others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":1}}'
 
 # you can combine both
---others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":0}, "mpe": {"id": "aaaa-1111-cccc"}}'
+--others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":1}, "mpe": {"id": "aaaa-1111-cccc"}}'
 ```
 <details>
 <summary>Get Report Walkthrough</summary>
@@ -148,6 +147,11 @@ You can navigate to the service(s) listed to see detailed findings on each servi
 The report provides you an easy-to-navigate dashboard of the various best-practice checks that were run. 
 
 Use the left navigation bar to explore the checks for each service. Expand each check to read the description, find out which resources were highlighted, and get recommendations on how to remediate the findings.  
+
+Besides the HTML report, you can also find two JSON files that record the findings in each AWS account's folder:
+
+- `api-raw.json`: Contains the raw findings
+- `api-full.json`: Contains the full results in JSON format
 
 ## Contributing to service-screener
 We encourage public contributions! Please review [CONTRIBUTING](./CONTRIBUTING.md) for details on our code of conduct and development process.

@@ -102,7 +102,7 @@ class Ec2AutoScaling(Evaluator):
             )
             
             for version in templateResult['LaunchTemplateVersions']:
-                imageId = version['LaunchTemplateVersions']['ImageId']
+                imageId = version.get('LaunchTemplateData').get('ImageId')
                 if version.get('LaunchTemplateData').get('MetadataOptions') is None:
                     self.results['ASGIMDSv2'] = [-1, '']
                 else:

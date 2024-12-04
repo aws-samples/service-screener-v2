@@ -8,6 +8,6 @@ SS today support crossAccounts scanned, which required users to manually setup t
 
 Then, you can execute the following to scan all your accounts within your organization
 ```
-screener --regions ALL --crossAccount 1
+screener --regions ALL --crossAccounts 1
 ```
 
