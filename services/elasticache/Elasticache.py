@@ -189,6 +189,7 @@ class Elasticache(Service):
             return objs
 
         for cluster in self.cluster_info:
+            obj = None
             if cluster.get('Engine') == 'memcached':
                 obj = ElasticacheMemcached(
                     cluster, self.elasticacheClient, self.driverInfo)
