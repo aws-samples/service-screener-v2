@@ -19,7 +19,6 @@ class S3Bucket(Evaluator):
 
     def policyAllowsPublicRead (self, policy_document):
         # Check if the policy allows public read access
-        # Check if the policy allows public read access
         response = None
         policy_allows_public_read = False
         if policy_document:
@@ -39,8 +38,7 @@ class S3Bucket(Evaluator):
         return policy_allows_public_read
     
     def policyAllowsPublicWrite (self, policy_document):
-        # Check if the policy allows public read access
-        # Check if the policy allows public read access
+        # Check if the policy allows write read access
         response = None
         policy_allows_public_write = True
         if policy_document:
