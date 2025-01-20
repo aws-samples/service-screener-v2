@@ -324,4 +324,30 @@ class IamAccount(IamCommon):
                                     
             except botocore.exceptions.ClientError as e:
                 ecode = e.response['Error']['Code']
-    
+
+    def _checkGuardRailPDisableCreationRootAccessKey(self):
+        try:
+        # Get all SCPs attached to the root
+            policies = self.orgClient.list_policies(
+                Filter='SERVICE_CONTROL_POLICY'
+            )
+            
+            for policy in policies['Policies']:
+                policy_content = self.orgClient.describe_policy(
+                    PolicyId=policy['Id']
+                )
+                
+                # Check policy content for root access key creation restrictions
+                policy_document = policy_content['Policy']['Content']
+                
+                # Look for deny statements related to root access key creation
+                if '"Action": "iam:CreateAccessKey"' in policy_document and \
+                '"Resource": "*"' in policy_document and \
+                '"Condition": {"StringLike": {"aws:PrincipalArn": "*root*"}}' in policy_document:
+                    return True
+                    
+            return False
+        
+        except botocore.exceptions.ClientError as e:
+            ecode = e.response['Error']['Code']
+            return

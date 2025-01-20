@@ -513,5 +513,18 @@
 		"ref": [
 			"[Enable Service Control Policy (SCP)]<https://docs.aws.amazon.com/organizations/latest/userguide/enable-policy-type.html>"
 		]
+	},
+	"GuardRailPDisableCreationRootAccessKey": {
+		"category": "S",
+		"^description": "Access keys let you run commands in the AWS Command Line Interface (AWS CLI) or use API operations from one of the AWS SDKs. We strongly recommend that you do not create access key pairs for your root user because the root user has full access to all AWS services and resources in the account, including billing information. Since only a few tasks require the root user and you typically perform those tasks infrequently, we recommend signing in to the AWS Management Console to perform root user tasks",
+		"shortDesc": "Disable root access key creation",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Disable root access key creation]<https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html#ru-bp-access>"
+		]
 	}
 }
