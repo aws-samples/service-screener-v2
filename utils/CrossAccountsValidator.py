@@ -14,12 +14,34 @@ class CrossAccountsValidator():
     DEFAULT_ROLESESSIONNAME = 'ServiceScreenerCrossAcct'    #For CloudTrail tracking purpose, does not impact any logic
     DEFAULT_DURATIONSECONDS = 3600
     ROLEARN_PREFIX = 'arn:aws:iam::{accountId}:role/{roleName}'
+
+    DEFAULT_REGIONS = [
+        'us-east-1',
+        'us-east-2',
+        'us-west-1',
+        'us-west-2',
+        'ap-south-1',
+        'ap-northeast-3',
+        'ap-northeast-2',
+        'ap-southeast-1',
+        'ap-southeast-2',
+        'ap-northeast-1',
+        'ca-central-1',
+        'eu-central-1',
+        'eu-west-1',
+        'eu-west-2',
+        'eu-west-3',
+        'eu-north-1',
+        'sa-east-1'
+    ]
+
     
     ## Remove sample in future
     CONFIGJSON = _C.ROOT_DIR + '/crossAccounts.json'
     ROLEINFO = {}
     
     VALIDATED = False
+    REQUIRES_V2TOKEN = False
     IncludeThisAccount = True
     MAXTOKENCHECKRETRY = 5
     WAIT_TOKENCHECKRETRY = 3
@@ -27,8 +49,34 @@ class CrossAccountsValidator():
     def __init__(self):
         iam = boto3.client('iam', region_name = 'us-east-1')
         self.iamClient = iam
+
+    def checkIfNonDefaultRegionsInParams(self, regions):
+        if not regions or not isinstance(regions, str):
+            raise ValueError("Regions parameter must be a non-empty string")
+
+        _regions = regions.strip().upper()
         
+        if _regions == 'ALL':
+            self.REQUIRES_V2TOKEN = True
+            return
+        
+        try:
+            region_list = [r.strip() for r in regions.split(',') if r.strip()]
+            if not region_list:
+                raise ValueError("No valid regions provided after splitting")
+                
+            self.REQUIRES_V2TOKEN = any(
+                region not in self.DEFAULT_REGIONS 
+                for region in region_list
+            )
+        except Exception as e:
+            raise ValueError(f"Invalid regions format: {str(e)}")
+
     def setIamGlobalEndpointTokenVersion(self):
+        if self.REQUIRES_V2TOKEN == False:
+            print('Default region(s) detected, no need to change IAM:GlobalEndpointToken')
+            return
+
         resp = self.iamClient.get_account_summary()
         SummaryMap = resp.get('SummaryMap')
         token = 1
@@ -61,6 +109,9 @@ class CrossAccountsValidator():
         return self.ROLEINFO
         
     def resetIamGlobalEndpointTokenVersion(self):
+        if self.REQUIRES_V2TOKEN == False:
+            return
+
         if self.GlobalEndpointTokenVersion == 1:
             print('Cross Accounts Validation completed. Resetting GlobalEndpointTokenVersion=1')
             self.iamClient.set_security_token_service_preferences(

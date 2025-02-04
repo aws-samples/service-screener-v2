@@ -75,6 +75,7 @@ rolesCred = {}
 if crossAccounts == True:
     _info('Cross Accounts requested, validating necessary configurations...')
     cav = CrossAccountsValidator()
+    cav.checkIfNonDefaultRegionsInParams(_cli_options['regions'])
     cav.setIamGlobalEndpointTokenVersion()
     cav.runValidation()
     cav.resetIamGlobalEndpointTokenVersion()
@@ -348,7 +349,7 @@ if beta:
     print("")
     print("\033[93m[-- ..... --] BETA MODE ENABLED [-- ..... --] \033[0m")
     print("Current Beta Features:")
-    print("\033[96m  01/ Concurrent Mode on Evaluator \033[0m")
+    print("\033[96m  01/ Concurrent Mode on Evaluator (Attempt to improve performance) \033[0m")
     print("\033[96m  02/ WA Frameworks Integration \033[0m")
-    print("\033[96m  03/ GenAI Api Caller Button \033[0m")
+    print("\033[96m  03/ API Buttons on each service html \033[0m")
     print("\033[93m[-- ..... --] THANK YOU FOR TESTING BETA FEATURES [-- ..... --] \033[0m")
