@@ -26,6 +26,8 @@ Running this tool is free as it is covered under the AWS Free Tier. If you have 
    a. AWSCloudShellFullAccess
    b. cloudformation:CreateStack
    c. cloudformation:DeleteStack
+4. (Optional) If you need to run crossAccounts, additional permission is needed
+   a. iam:SetSecurityTokenServicePreferences
 
 ## Installing service-screener V2
 1. [Log in to your AWS account](https://docs.aws.amazon.com/cloudshell/latest/userguide/getting-started.html#start-session) using the IAM User with sufficient permissions described above. 
