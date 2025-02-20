@@ -4,7 +4,7 @@ An open source guidance tool for the AWS environment. Click [here](https://bit.l
 
 Disclaimer: The generated report has to be hosted locally and MUST NOT be internet accessible
 
-We hear that current Screener is not compatible for Greater China region. Our community folks has tune and make it works here: https://github.com/lijh-aws-tools/service-screener-cn"
+We hear that this version of Service Screener is not compatible with the Greater China region. Our community folks have made it work here: https://github.com/lijh-aws-tools/service-screener-cn"
 
 ## Overview
 Service Screener is a tool that runs automated checks on AWS environments and provides recommendations based on AWS and community best practices. 
@@ -14,7 +14,7 @@ AWS customers can use this tool on their own environments and use the recommenda
 This tool aims to complement the [AWS Well Architected Tool](https://aws.amazon.com/well-architected-tool/). 
 
 ## How does it work?
-Service Screener uses [AWS Cloudshell](https://aws.amazon.com/cloudshell/), a free serivce that provides a browser-based shell to run scripts using the AWS CLI. It runs multiple `describe` and `get` API calls to determine the configuration of your environment.
+Service Screener uses [AWS Cloudshell](https://aws.amazon.com/cloudshell/), a free service that provides a browser-based shell to run scripts using the AWS CLI. It runs multiple `describe` and `get` API calls to determine the configuration of your environment.
 
 ## How much does it cost?
 Running this tool is free as it is covered under the AWS Free Tier. If you have exceeded the free tier limits, each run will cost less than $0.01.
