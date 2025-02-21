@@ -14,7 +14,7 @@ AWS customers can use this tool on their own environments and use the recommenda
 This tool aims to complement the [AWS Well Architected Tool](https://aws.amazon.com/well-architected-tool/). 
 
 ## How does it work?
-Service Screener uses [AWS Cloudshell](https://aws.amazon.com/cloudshell/), a free service that provides a browser-based shell to run scripts using the AWS CLI. It runs multiple `describe` and `get` API calls to determine the configuration of your environment.
+Service Screener uses [AWS CloudShell](https://aws.amazon.com/cloudshell/), a free service that provides a browser-based shell to run scripts using the AWS CLI. It runs multiple `describe` and `get` API calls to determine the configuration of your environment.
 
 ## How much does it cost?
 Running this tool is free as it is covered under the AWS Free Tier. If you have exceeded the free tier limits, each run will cost less than $0.01.
@@ -26,7 +26,7 @@ Running this tool is free as it is covered under the AWS Free Tier. If you have 
    a. AWSCloudShellFullAccess
    b. cloudformation:CreateStack
    c. cloudformation:DeleteStack
-4. (Optional) If you need to run crossAccounts, additional permission is needed
+4. (Optional) If you need to run cross-account operations, additional permissions are required.
    a. iam:SetSecurityTokenServicePreferences
 
 ## Installing service-screener V2
@@ -34,7 +34,7 @@ Running this tool is free as it is covered under the AWS Free Tier. If you have 
 2. Launch [AWS CloudShell](https://docs.aws.amazon.com/cloudshell/latest/userguide/getting-started.html#launch-region-shell) in any region. 
 
 <details>
-<summary>Launch AWS Cloudshell Walkthrough</summary>
+<summary>Launch AWS CloudShell Walkthrough</summary>
    
 ![Launch AWS CloudShell](https://d39bs20xyg7k53.cloudfront.net/services-screener/p1-cloudshell.gif)
 </details>
@@ -54,15 +54,15 @@ alias screener="python3 $(pwd)/main.py"
 
 ```
 <details>
-<summary>Install Dependecies Walkthrough</summary>
+<summary>Install Dependencies Walkthrough</summary>
    
 ![Install dependencies](https://d39bs20xyg7k53.cloudfront.net/services-screener/p2-dependencies.gif)
 </details>
 
 ## Using Service Screener
-When running Service Screener, you will need to specify the regions and services you would like it to run on. It currently supports Amazon Cloudfront, AWS Cloudtrail, Amazon Dynamodb, Amazon EC2, Amazon EFS, Amazon RDS, Amazon EKS, Amazon Elasticache, Amazon Guardduty, AWS IAM, Amazon Opensearch, AWS Lambda, and Amazon S3.
+When running Service Screener, you will need to specify the regions and services you would like it to run on. It currently supports Amazon Cloudfront, AWS Cloudtrail, Amazon DynamoDB, Amazon EC2, Amazon EFS, Amazon RDS, Amazon EKS, Amazon Elasticache, Amazon Guardduty, AWS IAM, Amazon OpenSearch, AWS Lambda, and Amazon S3.
 
-We recommend running it in all regions where you have deployed workloads in. Adjust the code samples below to suit your needs then copy and paste it into Cloudshell to run Service Screener. 
+We recommend running it in all regions where you have deployed workloads in. Adjust the code samples below to suit your needs then copy and paste it into CloudShell to run Service Screener. 
 
 **Example 1: (Recommended) Run in the Singapore region, check all services with beta features enabled**
 ```
@@ -124,7 +124,7 @@ screener --regions ap-southeast-1 --beta 1 --others '{"WA": {"region": "ap-south
 
 ### Downloading the report
 The output is generated as a ~/service-screener-v2/output.zip file. 
-You can [download the file](https://docs.aws.amazon.com/cloudshell/latest/userguide/working-with-cloudshell.html#files-storage) in the CloudShell console by clicking the *Download file* button under the *Actions* menu on the top right of the Cloudshell console. 
+You can [download the file](https://docs.aws.amazon.com/cloudshell/latest/userguide/working-with-cloudshell.html#files-storage) in the CloudShell console by clicking the *Download file* button under the *Actions* menu on the top right of the CloudShell console. 
 
 <details>
 <summary>Download Output & Report Viewing Walkthrough</summary>
