@@ -23,7 +23,7 @@ API_JSON = FORK_DIR + '/api.json'
 
 GENERAL_CONF_PATH = SERVICE_DIR + '/general.reporter.json'
 
-CLI_TRUE_KEYWORD_ARRAY = ['yes', 'y', 'true', '1', 1]
+CLI_TRUE_KEYWORD_ARRAY = ['yes', 'y', 'true', 'True', '1', 1]
 
 SESSUID_FILENAME = 'sess-uuid'
 
