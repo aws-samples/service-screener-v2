@@ -161,4 +161,13 @@ class RedshiftCluster(Evaluator):
         except Exception as e:
             print(f"Error: {e}")
             return None
-        
+
+    # Check if RBAC is enforced
+    def _checkRBAC(self):
+        try:
+            roles_attached = self.cluster.get('IamRoles', [])
+            if not roles_attached:
+                self.results['RBAC'] = [-1, "No IAM roles attached. RBAC is not enforced."]
+        except Exception as e:
+            print(f"Error: {e}")
+            self.results['RBAC'] = [-1, "Error checking RBAC enforcement"]

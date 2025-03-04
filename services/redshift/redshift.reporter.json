@@ -194,6 +194,16 @@
 		"ref": [
 			"[Monitor Redshift Performance]<https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-clusters.html#rs-cluster-performance>"
 		]
+	},
+	"RBAC": {
+		"category": "S",
+		"^description": "Use Role-Based Access Control (RBAC) to manage permissions effectively and adhere to the principle of least privilege.",
+		"shortDesc": "Enforce RBAC",
+		"criticality": "H",
+		"downtime": -1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": ["[Implement Role-Based Access Control]"]
 	}
-
 }
