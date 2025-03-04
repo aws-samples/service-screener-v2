@@ -61,7 +61,7 @@
         "additionalCost": 1,
         "needFullTest": 0,
         "ref": [
-            "[Copying snapshots to another region]<https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-snapshots.html#cross-region-snapshot-copy>"
+            "[Copying snapshots to another region]<https://docs.aws.amazon.com/redshift/latest/mgmt/cross-region-snapshot-copy.html>"
         ]
     },
 	"AuditLogging": {
@@ -77,19 +77,6 @@
 			"[Enable audit logging]<https://docs.aws.amazon.com/redshift/latest/mgmt/db-auditing-console.html>"
 		]
 	},
-	"ClusterVersion": {
-        "category": "SP",
-        "^description": "Running the latest cluster version ensures you have access to the latest features, performance improvements, and security patches. Regular version updates are crucial for maintaining a secure and efficient Redshift cluster.",
-        "shortDesc": "Update cluster version",
-        "criticality": "M",
-        "downtime": 1,
-        "slowness": -1,
-        "additionalCost": 0,
-        "needFullTest": 1,
-        "ref": [
-            "[Upgrading cluster versions]<https://docs.aws.amazon.com/redshift/latest/mgmt/upgrading-cluster-versions.html>"
-        ]
-    },
 	"AutomaticUpgrades": {
 		"category": "SO",
 		"^description": "Enabling automatic major version upgrades ensures that the latest major version updates to Amazon Redshift clusters are installed during the maintenance window. These updates might include security patches and bug fixes. Keeping up to date with patch installation is an important step in securing systems.",
@@ -194,16 +181,18 @@
 		"ref": [
 			"[Monitor Redshift Performance]<https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-clusters.html#rs-cluster-performance>"
 		]
-	},
-	"RBAC": {
-		"category": "S",
-		"^description": "Use Role-Based Access Control (RBAC) to manage permissions effectively and adhere to the principle of least privilege.",
-		"shortDesc": "Enforce RBAC",
-		"criticality": "H",
-		"downtime": -1,
-		"slowness": 0,
-		"additionalCost": 0,
-		"needFullTest": 0,
-		"ref": ["[Implement Role-Based Access Control]"]
-	}
+	}, 
+	"IAMRoles": {
+			"category": "S",
+			"^description": "Use Role-Based Access Control (RBAC) through IAM roles to manage permissions effectively and adhere to the principle of least privilege. IAM roles are essential for secure integration with other AWS services (like S3, KMS, CloudWatch) and eliminate the need for storing long-term credentials. Roles provide temporary credentials that automatically rotate, enabling secure access while maintaining audit trails. Missing or improperly configured IAM roles can lead to security vulnerabilities, operational limitations, and compliance issues.",
+			"shortDesc": "Enforce RBAC with IAM roles",
+			"criticality": "H",
+			"downtime": 0,
+			"slowness": 0,
+			"additionalCost": 0,
+			"needFullTest": 0,
+			"ref": [
+				"[Creating an IAM Role]<https://docs.aws.amazon.com/redshift/latest/mgmt/authorizing-redshift-service.html#authorizing-redshift-service-creating-an-iam-role>"
+			]
+		}
 }
