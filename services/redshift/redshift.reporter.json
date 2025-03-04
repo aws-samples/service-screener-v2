@@ -194,5 +194,18 @@
 			"ref": [
 				"[Creating an IAM Role]<https://docs.aws.amazon.com/redshift/latest/mgmt/authorizing-redshift-service.html#authorizing-redshift-service-creating-an-iam-role>"
 			]
-		}
+		},
+	"AZRelocation": {
+		"category": "R",
+		"^description": "Amazon Redshift clusters are distributed across multiple availability zones. When you relocate a cluster, you can choose to relocate it to a new availability zone or to the same availability zone. Relocating a cluster to a new availability zone can help distribute your workload across multiple availability zones and improve performance.",
+		"shortDesc": "Relocate cluster to new AZ",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 1,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Relocate cluster to new AZ]<https://docs.aws.amazon.com/redshift/latest/mgmt/managing-cluster-recovery.html>"
+		]
+	}
 }

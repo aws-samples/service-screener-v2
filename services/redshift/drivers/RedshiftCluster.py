@@ -125,6 +125,16 @@ class RedshiftCluster(Evaluator):
         # except Exception as e:
         #     print(f"Error: {e}")
         #     return None
+
+        # check if AZ Relocation is enabled
+        try:
+            print(self.cluster['AvailabilityZoneRelocationStatus'])
+            if not self.cluster['AvailabilityZoneRelocationStatus'] == 'enabled':
+                self.results['AZRelocation'] = [-1, "AZ Relocation is not enabled"]
+
+        except Exception as e:
+            print(f"Error: {e}")
+            return None
     
     def _checkParameterGroups(self):
         self.results['EncryptedInTransit'] = [-1, "Redshift cluster is not encrypted in transit"]
