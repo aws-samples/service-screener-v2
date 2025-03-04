@@ -30,6 +30,29 @@ class RedshiftCluster(Evaluator):
             print(f"Error: {e}")
             self.results['AutomaticSnapshots'] = [-1, "Automatic snapshots is disabled"]
         
+        # Check if cluster is running the latest version
+        # try:
+        #     # Get available cluster versions
+        #     versions = self.rsClient.describe_cluster_versions()
+        #     latest_version = versions['ClusterVersions'][-1]['ClusterVersion']
+        #     current_version = self.cluster['ClusterVersion']
+
+        #     print(versions)
+            
+        #     if current_version < latest_version:
+        #         self.results['ClusterVersion'] = [-1, f"Cluster is not on latest version. Current: {current_version}, Latest: {latest_version}"]
+        # except Exception as e:
+        #     print(f"Error checking cluster version: {e}")
+        #     return None
+    
+        # Check if maintenance window is configured
+        try:
+            if not self.cluster.get('PreferredMaintenanceWindow'):
+                self.results['MaintenanceWindow'] = [-1, "Maintenance window is not configured"]
+        except Exception as e:
+            print(f"Error checking maintenance window: {e}")
+            return None
+
         # check if allowversionupgrade is enabled
         try:
             if not self.cluster['AllowVersionUpgrade']:
