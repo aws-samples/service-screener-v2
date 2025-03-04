@@ -51,6 +51,19 @@
 			"[Enable automatic snapshots]<https://docs.aws.amazon.com/securityhub/latest/userguide/redshift-controls.html#redshift-3>"
 		]
 	},
+	"CrossRegionSnapshot": {
+        "category": "DR",
+        "^description": "Cross-region snapshot copying provides disaster recovery capabilities by maintaining backup copies in a different AWS Region. This helps ensure business continuity in case of regional failures.",
+        "shortDesc": "Enable cross-region snapshots",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Copying snapshots to another region]<https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-snapshots.html#cross-region-snapshot-copy>"
+        ]
+    },
 	"AuditLogging": {
 		"category": "S",
 		"^description": "Amazon Redshift audit logging provides additional information about connections and user activities in your cluster. This data can be stored and secured in Amazon S3 and can be helpful in security audits and investigations.",

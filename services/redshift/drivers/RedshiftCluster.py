@@ -30,6 +30,15 @@ class RedshiftCluster(Evaluator):
             print(f"Error: {e}")
             self.results['AutomaticSnapshots'] = [-1, "Automatic snapshots is disabled"]
         
+        # Check if cross-region snapshot copy is configured
+        try:
+            if not self.cluster.get('ClusterSnapshotCopyStatus', {}).get('DestinationRegion'):
+                self.results['CrossRegionSnapshots'] = [-1, "Cross-region snapshots are not enabled"]
+
+        except Exception as e:
+            print(f"Error: {e}")
+            self.results['CrossRegionSnapshots'] = [-1, "Error checking cross-region snapshots"]
+        
         # Check if cluster is running the latest version
         # try:
         #     # Get available cluster versions
