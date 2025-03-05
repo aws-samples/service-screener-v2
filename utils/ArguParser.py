@@ -79,7 +79,13 @@ class ArguParser:
             "required": False,
             "default": False,
             "help": "Enable Beta features"
+        },
+        'nowrite': {
+            "required": False,
+            "default": False,
+            "help": "Enable Read-Only mode, no cloudformation required"
         }
+        
     }
 
     @staticmethod

@@ -35,12 +35,15 @@ filters = _cli_options['tags']
 crossAccounts = _cli_options['crossAccounts']
 workerCounts = _cli_options['workerCounts']
 beta = _cli_options['beta']
+nowrite = _cli_options['nowrite']
+
 
 # print(crossAccounts)
 DEBUG = True if debugFlag in _C.CLI_TRUE_KEYWORD_ARRAY or debugFlag is True else False
 testmode = True if testmode in _C.CLI_TRUE_KEYWORD_ARRAY or testmode is True else False
 crossAccounts = True if crossAccounts in _C.CLI_TRUE_KEYWORD_ARRAY or crossAccounts is True else False
 beta = True if beta in _C.CLI_TRUE_KEYWORD_ARRAY or beta is True else False
+nowrite = True if nowrite in _C.CLI_TRUE_KEYWORD_ARRAY or nowrite is True else False
 _cli_options['crossAccounts'] = crossAccounts
 
 
@@ -97,7 +100,9 @@ for file in os.listdir(_C.ADMINLTE_DIR):
         shutil.rmtree(_C.ADMINLTE_DIR + '/' + file)
 
 acctLoop = 0
-CfnTrailObj = CfnTrail()
+
+if nowrite == False:
+    CfnTrailObj = CfnTrail()
 
 for acctId, cred in rolesCred.items():
     acctLoop = acctLoop + 1
@@ -193,7 +198,7 @@ for acctId, cred in rolesCred.items():
             print(f"Error decoding JSON: {e}")
             exit()
 
-    if testmode == False:
+    if testmode == False and nowrite == False:
         cfnAdditionalStr = None
         if mpeid is not None: 
             cfnAdditionalStr = " --mpeid:{}".format(mpeid)
@@ -233,7 +238,7 @@ for acctId, cred in rolesCred.items():
     pool.starmap(Screener.scanByService, input_ranges)
     pool.close()
 
-    if testmode == False:
+    if testmode == False and nowrite == False:
         CfnTrailObj.deleteStack()
     
     ## <TODO>
