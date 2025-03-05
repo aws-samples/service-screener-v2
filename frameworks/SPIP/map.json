@@ -15,8 +15,7 @@
       "P1.4": ["iam.hasSSORoles" , "iam.hasExternalIdentityProvider"],
       "P1.5": ["iam.SCPEnabled", "iam.hasOrganization"],
       "P1.6": [],
-      "P1.7": [],
-      "BP08": []
+      "P1.7": []
     },
     "Data Protection": {
       "P2.1": ["s3.PublicAccessBlock" , "s3.PublicReadAccessBlock" , "s3.PublicWriteAccessBlock"],
