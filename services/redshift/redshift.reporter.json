@@ -51,7 +51,7 @@
 			"[Enable automatic snapshots]<https://docs.aws.amazon.com/securityhub/latest/userguide/redshift-controls.html#redshift-3>"
 		]
 	},
-	"CrossRegionSnapshot": {
+	"CrossRegionSnapshots": {
         "category": "DR",
         "^description": "Cross-region snapshot copying provides disaster recovery capabilities by maintaining backup copies in a different AWS Region. This helps ensure business continuity in case of regional failures.",
         "shortDesc": "Enable cross-region snapshots",
