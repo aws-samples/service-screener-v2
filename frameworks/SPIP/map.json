@@ -29,7 +29,7 @@
       "P3.2": ["cloudfront.WAFAssociation"],
       "P3.3": ["cloudfront.defaultRootObject"],
       "P3.4": [],
-      "P3.5": [],
+      "P3.5": ["ec2.SGSensitivePortOpenToAll"],
       "P3.6": ["apigateway.WAFWACL"]
     },
     "Detection & Mitigation": {
@@ -43,7 +43,7 @@
       "P4.8": []
     },
     "AppSec & DevSecOps":{
-      "P5.1": [],
+      "P5.1": ["rds.DBwithoutSecretManager"],
       "P5.2": [],
       "P5.3": [],
       "P5.4": [],
