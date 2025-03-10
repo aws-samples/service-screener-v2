@@ -30,6 +30,38 @@ class RedshiftCluster(Evaluator):
             print(f"Error: {e}")
             self.results['AutomaticSnapshots'] = [-1, "Automatic snapshots is disabled"]
         
+        # Check if cross-region snapshot copy is configured
+        try:
+            if not self.cluster.get('ClusterSnapshotCopyStatus', {}).get('DestinationRegion'):
+                self.results['CrossRegionSnapshots'] = [-1, "Cross-region snapshots are not enabled"]
+
+        except Exception as e:
+            print(f"Error: {e}")
+            self.results['CrossRegionSnapshots'] = [-1, "Error checking cross-region snapshots"]
+        
+        # Check if cluster is running the latest version
+        # try:
+        #     # Get available cluster versions
+        #     versions = self.rsClient.describe_cluster_versions()
+        #     latest_version = versions['ClusterVersions'][-1]['ClusterVersion']
+        #     current_version = self.cluster['ClusterVersion']
+
+        #     print(versions)
+            
+        #     if current_version < latest_version:
+        #         self.results['ClusterVersion'] = [-1, f"Cluster is not on latest version. Current: {current_version}, Latest: {latest_version}"]
+        # except Exception as e:
+        #     print(f"Error checking cluster version: {e}")
+        #     return None
+    
+        # Check if maintenance window is configured
+        try:
+            if not self.cluster.get('PreferredMaintenanceWindow'):
+                self.results['MaintenanceWindow'] = [-1, "Maintenance window is not configured"]
+        except Exception as e:
+            print(f"Error checking maintenance window: {e}")
+            return None
+
         # check if allowversionupgrade is enabled
         try:
             if not self.cluster['AllowVersionUpgrade']:
@@ -93,6 +125,16 @@ class RedshiftCluster(Evaluator):
         # except Exception as e:
         #     print(f"Error: {e}")
         #     return None
+
+        # check if AZ Relocation is enabled
+        try:
+            print(self.cluster['AvailabilityZoneRelocationStatus'])
+            if not self.cluster['AvailabilityZoneRelocationStatus'] == 'enabled':
+                self.results['AZRelocation'] = [-1, "AZ Relocation is not enabled"]
+
+        except Exception as e:
+            print(f"Error: {e}")
+            return None
     
     def _checkParameterGroups(self):
         self.results['EncryptedInTransit'] = [-1, "Redshift cluster is not encrypted in transit"]
@@ -129,4 +171,13 @@ class RedshiftCluster(Evaluator):
         except Exception as e:
             print(f"Error: {e}")
             return None
-        
+
+    # Check if IAM Roles is enforced
+    def _checkIAMRoles(self):
+        try:
+            roles_attached = self.cluster.get('IamRoles', [])
+            if not roles_attached:
+                self.results['IAMRoles'] = [-1, "No IAM roles attached."]
+        except Exception as e:
+            print(f"Error: {e}")
+            self.results['IAMRoles'] = [-1, "Error checking IAMRoles"]

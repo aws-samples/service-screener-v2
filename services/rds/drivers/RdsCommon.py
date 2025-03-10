@@ -122,28 +122,47 @@ class RdsCommon(Evaluator):
         
         if self.isCluster == False:
             paramGroupName = self.db['DBParameterGroups'][0]['DBParameterGroupName']
-        else: 
-            paramGroupName = self.db['DBClusterParameterGroup']
-            
-        results = self.rdsClient.describe_db_parameters(
-            DBParameterGroupName = paramGroupName
-        )
-
-        for param in results.get('Parameters'):
-            if param['IsModifiable'] == 1 and 'ParameterValue' in param:
-                arr[param['ParameterName']] = param['ParameterValue']
-        
-        while results.get('Marker') is not None:
             results = self.rdsClient.describe_db_parameters(
-                DBParameterGroupName = paramGroupName,
-                Marker = results.get('Marker')
+                DBParameterGroupName = paramGroupName
             )
 
             for param in results.get('Parameters'):
-                #__pr(param['ParameterName'] + ' = ' + param['ParameterValue'] + ' || ' + param['IsModifiable'])
                 if param['IsModifiable'] == 1 and 'ParameterValue' in param:
                     arr[param['ParameterName']] = param['ParameterValue']
-        
+            
+            while results.get('Marker') is not None:
+                results = self.rdsClient.describe_db_parameters(
+                    DBParameterGroupName = paramGroupName,
+                    Marker = results.get('Marker')
+                )
+
+                for param in results.get('Parameters'):
+                    #__pr(param['ParameterName'] + ' = ' + param['ParameterValue'] + ' || ' + param['IsModifiable'])
+                    if param['IsModifiable'] == 1 and 'ParameterValue' in param:
+                        arr[param['ParameterName']] = param['ParameterValue']
+            
+        else: 
+            paramGroupName = self.db['DBClusterParameterGroup']
+            results = self.rdsClient.describe_db_cluster_parameters(
+                DBClusterParameterGroupName = paramGroupName
+            )
+
+            for param in results.get('Parameters'):
+                if param['IsModifiable'] == 1 and 'ParameterValue' in param:
+                    arr[param['ParameterName']] = param['ParameterValue']
+            
+            while results.get('Marker') is not None:
+                results = self.rdsClient.describe_db_cluster_parameters(
+                    DBClusterParameterGroupName = paramGroupName,
+                    Marker = results.get('Marker')
+                )
+
+                for param in results.get('Parameters'):
+                    #__pr(param['ParameterName'] + ' = ' + param['ParameterValue'] + ' || ' + param['IsModifiable'])
+                    if param['IsModifiable'] == 1 and 'ParameterValue' in param:
+                        arr[param['ParameterName']] = param['ParameterValue']
+            
+
         self.dbParams = arr
         del arr
 

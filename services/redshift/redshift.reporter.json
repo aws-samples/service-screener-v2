@@ -25,6 +25,19 @@
 			"[Encypt in Transit]<https://docs.aws.amazon.com/securityhub/latest/userguide/redshift-controls.html#redshift-2>"
 		]
 	},
+	"MaintenanceWindow": {
+        "category": "O",
+        "^description": "Configure maintenance windows during off-peak hours to minimize impact on your workloads. A well-planned maintenance window ensures system updates and patches are applied with minimal disruption to your operations.",
+        "shortDesc": "Configure maintenance window",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Maintenance windows]<https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-clusters.html#rs-maintenance-windows>"
+        ]
+    },
 	"AutomaticSnapshots": {
 		"category": "R",
 		"^description": "Backups help you to recover more quickly from a security incident. They strengthen the resilience of your systems. Amazon Redshift takes periodic snapshots by default. Automatic snapshots should be enabled and retained for at least seven days.",
@@ -38,6 +51,19 @@
 			"[Enable automatic snapshots]<https://docs.aws.amazon.com/securityhub/latest/userguide/redshift-controls.html#redshift-3>"
 		]
 	},
+	"CrossRegionSnapshots": {
+        "category": "DR",
+        "^description": "Cross-region snapshot copying provides disaster recovery capabilities by maintaining backup copies in a different AWS Region. This helps ensure business continuity in case of regional failures.",
+        "shortDesc": "Enable cross-region snapshots",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Copying snapshots to another region]<https://docs.aws.amazon.com/redshift/latest/mgmt/cross-region-snapshot-copy.html>"
+        ]
+    },
 	"AuditLogging": {
 		"category": "S",
 		"^description": "Amazon Redshift audit logging provides additional information about connections and user activities in your cluster. This data can be stored and secured in Amazon S3 and can be helpful in security audits and investigations.",
@@ -155,6 +181,31 @@
 		"ref": [
 			"[Monitor Redshift Performance]<https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-clusters.html#rs-cluster-performance>"
 		]
+	}, 
+	"IAMRoles": {
+			"category": "S",
+			"^description": "Use Role-Based Access Control (RBAC) through IAM roles to manage permissions effectively and adhere to the principle of least privilege. IAM roles are essential for secure integration with other AWS services (like S3, KMS, CloudWatch) and eliminate the need for storing long-term credentials. Roles provide temporary credentials that automatically rotate, enabling secure access while maintaining audit trails. Missing or improperly configured IAM roles can lead to security vulnerabilities, operational limitations, and compliance issues.",
+			"shortDesc": "Enforce RBAC with IAM roles",
+			"criticality": "H",
+			"downtime": 0,
+			"slowness": 0,
+			"additionalCost": 0,
+			"needFullTest": 0,
+			"ref": [
+				"[Creating an IAM Role]<https://docs.aws.amazon.com/redshift/latest/mgmt/authorizing-redshift-service.html#authorizing-redshift-service-creating-an-iam-role>"
+			]
+		},
+	"AZRelocation": {
+		"category": "R",
+		"^description": "Amazon Redshift clusters are distributed across multiple availability zones. When you relocate a cluster, you can choose to relocate it to a new availability zone or to the same availability zone. Relocating a cluster to a new availability zone can help distribute your workload across multiple availability zones and improve performance.",
+		"shortDesc": "Relocate cluster to new AZ",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 1,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Relocate cluster to new AZ]<https://docs.aws.amazon.com/redshift/latest/mgmt/managing-cluster-recovery.html>"
+		]
 	}
-
 }
