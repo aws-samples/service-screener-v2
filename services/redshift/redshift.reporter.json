@@ -52,7 +52,7 @@
 		]
 	},
 	"CrossRegionSnapshots": {
-        "category": "DR",
+        "category": "R",
         "^description": "Cross-region snapshot copying provides disaster recovery capabilities by maintaining backup copies in a different AWS Region. This helps ensure business continuity in case of regional failures.",
         "shortDesc": "Enable cross-region snapshots",
         "criticality": "H",
