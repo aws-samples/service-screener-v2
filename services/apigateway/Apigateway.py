@@ -55,7 +55,7 @@ class Apigateway(Service):
             objs = {}
             self.getApis()
             for api in self.apisv2:
-                objName = api['ProtocolType'] + '::' + api['Name']
+                objName = api.get('ProtocolType', 'UNKNOWN_PROTOCOL') + '::' + api.get('Name', api.get('ApiId', 'NO_NAME_NO_APIID'))
                 _pi('APIGateway', objName)
                 obj = ApiGatewayCommon(api, self.apiv2Client)
                 obj.run(self.__class__)
