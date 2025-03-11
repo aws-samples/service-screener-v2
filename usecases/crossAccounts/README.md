@@ -52,11 +52,11 @@ Once you have completed that, you are ready to run Service Screener across multi
 
 **Example #1: Run Service Screener across multiple account, in us-east-1**
 ```
-screener --regions us-east-1 --crossAccount 1
+screener --regions us-east-1 --crossAccounts 1
 ```
 **Example #2: Run Service Screener across multiple accounts, in all regions**
 ```
-screener --regions ALL --crossAccount 1
+screener --regions ALL --crossAccounts 1
 ```
 
 ## Downloading the report
