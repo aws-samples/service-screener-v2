@@ -89,20 +89,69 @@ screener --regions ALL
 
 
 ## Other parameters
-```bash
-# AWS Partner used, migration evaluation id
---others '{"mpe": {"id": "aaaa-1111-cccc"}}'
 
-# To create a workload and a milestone in the Well-Architected Tool
-# Set `newMileStone` to 1 to create a milestone each time the Service Screener is run. (Recommended)
-# Set `newMileStone` to 0 to create a milestone only once if no milestone has been created.
-# Use the existing workload name as `reportName` to update the milestone and track improvements.
---others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":1}}'
+### Migration Evaluation ID
+For AWS Partners conducting migration evaluations:
+```json
+{
+    "mpe": {
+        "id": "aaaa-1111-cccc"
+    }
+}
+```
 
-screener --regions ap-southeast-1 --beta 1 --others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":1}}'
+Usage:
 
-# you can combine both
---others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":1}, "mpe": {"id": "aaaa-1111-cccc"}}'
+``` bash
+screener --regions ap-southeast-1 --others '{"mpe": {"id": "aaaa-1111-cccc"}}'
+```
+
+### Well-Architected Tool Integration
+To create a workload and milestone in the Well-Architected Tool:
+``` json
+{
+    "WA": {
+        "region": "ap-southeast-1",
+        "reportName": "SS_Report",
+        "newMileStone": 1
+    }
+}
+```
+
+Parameters:
+
+- `region`: The region where the Well-Architected workload will be created
+- `reportName`: Name of the workload (use existing name to update)
+- `newMileStone`:
+   - Set to 1 to create a new milestone each time (Recommended)
+   - Set to 0 to create a milestone only if none exists
+
+Usage:
+
+``` bash
+screener --regions ap-southeast-1 --beta 1 --others '{"WA": {"region": "ap-southeast-1", "reportName": "SS_Report", "newMileStone": 1}}'
+```
+
+### Combining Parameters
+You can combine both MPE and WA parameters:
+
+``` json
+{
+    "WA": {
+        "region": "ap-southeast-1",
+        "reportName": "SS_Report",
+        "newMileStone": 1
+    },
+    "mpe": {
+        "id": "aaaa-1111-cccc"
+    }
+}
+```
+
+Usage:
+
+``` bash
+screener --regions ap-southeast-1 --others '{"WA": {"region": "ap-southeast-1", "reportName": "SS_Report", "newMileStone": 1}, "mpe": {"id": "aaaa-1111-cccc"}}'
 ```
 
 ## Downloading the report
