@@ -26,7 +26,11 @@ class Service:
         self.RULESPREFIX = classname + '::rules'
         self.region = region
         self.bConfig = bConfig(
-            region_name = region    
+            region_name = region,
+            retries = {
+                'mode': 'standard',
+                'max_attempts': 5
+            }
         )
         
         self.charts = {}
