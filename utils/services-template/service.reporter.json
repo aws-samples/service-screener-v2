@@ -10,7 +10,7 @@
 		"needFullTest": '<int>', 	//OPTIONAL
 		"ref": [					//OPTIONAL
 			"[<text_to_display>]<url>",
-			"[<text_to_display>]<url>",
-		],
+			"[<text_to_display>]<url>"
+		]
 	}
 }
