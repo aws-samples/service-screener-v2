@@ -14,6 +14,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+        with:
+          fetch-depth: 2  # Required to get file changes
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -25,18 +27,33 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Get changed files
+        id: changed-files
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            # For pull requests
+            changed_files=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.event.pull_request.head.sha }} | grep "\.reporter\.json$" || true)
+          else
+            # For pushes
+            changed_files=$(git diff --name-only HEAD^ HEAD | grep "\.reporter\.json$" || true)
+          fi
+          echo "Changed reporter files:"
+          echo "$changed_files"
+          echo "files=${changed_files}" >> $GITHUB_OUTPUT
+
       - name: Run validation
-        run: python scripts/validate_reporter.py
+        if: steps.changed-files.outputs.files != ''
+        run: |
+          python scripts/validate_reporter.py ${{ steps.changed-files.outputs.files }}
 
       - name: Comment on PR
         if: failure() && github.event_name == 'pull_request'
         uses: actions/github-script@v6
         with:
           script: |
-            const output = require('${{ github.workspace }}/validation-output.json');
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: `❌ Reporter file validation failed:\n\n${output.errors.join('\n')}`
+              body: '❌ Reporter file validation failed. Please check the workflow logs for details.'
             });
