@@ -39,7 +39,7 @@
         ""
       ]
   },
-  "More": {
+  "Morreee": {
       "category": "PQ",
       "^description": "Version Currency: {$COUNT} instances/clusters are on an older version. Upgrade to the latest version to get access to new features. You should perform proper testing before upgrading the production environment. There are different options to perform major version upgrades and your choices will depend on architecture, schema and workload. If you choose to upgrade by setting up replication, you may incur additional cost for replication (e.g. when using DMS) and for additional instances.",
       "downtime": -1,
