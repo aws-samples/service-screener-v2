@@ -1,0 +1,42 @@
+{
+  "CheckOne": {
+      "category": "R",
+      "^description": "High Availability: You have {$COUNT} production instances/clusters which are not configured to be tolerant to issues in an Availability Zone. Reconfigure production RDS instances to Multi-AZ. For Aurora clusters, have at least two instances (one each in a different availability zone). Enabling multi-AZ for RDS cluster and adding another instance will lead to additional cost. Converting a single-AZ instance to multi-AZ instances will avoid downtime but you can experience performance impact. You should perform this operation during off-peak hours. You can also create a read replica in a different AZ and then perform a failover.",
+      "downtime": 0,
+      "slowness": 1,
+      "additionalCost": 1,
+      "needFullTest": 0,
+      "criticality": "H",
+      "shortDesc": "Enable MultiAZ",
+      "ref": [
+          "[What Is MultiAZ]<https://aws.amazon.com/rds/features/multi-az/>",
+          "[Guide]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.DBInstance.Modifying.html>"
+      ]
+  },
+  "CheckTwo": {
+      "category": "SP",
+      "^description": "Version Currency: {$COUNT} instances/clusters are on an older version. Upgrade to the latest version to get access to new features. You should perform proper testing before upgrading the production environment. There are different options to perform major version upgrades and your choices will depend on architecture, schema and workload. If you choose to upgrade by setting up replication, you may incur additional cost for replication (e.g. when using DMS) and for additional instances.",
+      "downtime": -1,
+      "slowness": -1,
+      "additionalCost": 0,
+      "needFullTest": 1,
+      "criticality": "H",
+      "shortDesc": "Major version available",
+      "ref": [
+        "[Guide]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_UpgradeDBInstance.Upgrading.html>"
+      ]
+  },
+  "IncorrectCategory": {
+      "category": "PQ",
+      "^description": "Version Currency: {$COUNT} instances/clusters are on an older version. Upgrade to the latest version to get access to new features. You should perform proper testing before upgrading the production environment. There are different options to perform major version upgrades and your choices will depend on architecture, schema and workload. If you choose to upgrade by setting up replication, you may incur additional cost for replication (e.g. when using DMS) and for additional instances.",
+      "downtime": -1,
+      "slowness": -1,
+      "additionalCost": 0,
+      "needFullTest": 1,
+      "criticality": "H",
+      "shortDesc": "",
+      "ref": [
+        ""
+      ]
+  }
+}
