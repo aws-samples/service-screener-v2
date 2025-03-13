@@ -13,7 +13,7 @@ def is_valid_category(category_str):
     category_set = set(category_str.upper())
     
     if not category_set.issubset(valid_chars):
-        return False, f"Category contains invalid characters. Only S,R,O,P,C are allowed."
+        return False, f"Category contains invalid characters. Only S,R,O,P,C,T are allowed."
     
     if len(category_set) != len(category_str):
         return False, f"Category contains duplicate characters."
@@ -31,22 +31,29 @@ def validate_reporter_structure(content):
         
         # Required fields
         required_fields = ['category', '^description', 'shortDesc', 'criticality']
-        for field in required_fields:
-            if not any(field in item for item in data.values()):
-                return False, f"Missing required field: {field}"
+        for check_name, check_data in data.items():
+            for field in required_fields:
+                if field not in check_data:
+                    return False, f"Missing required field '{field}' in check '{check_name}'"
         
         # Validate categories
-        for item in data.values():
-            if 'category' in item:
-                is_valid, message = is_valid_category(item['category'])
+        for check_name, check_data in data.items():
+            if 'category' in check_data:
+                is_valid, message = is_valid_category(check_data['category'])
                 if not is_valid:
-                    return False, f"Invalid category value '{item['category']}': {message}"
+                    return False, f"Invalid category value '{check_data['category']}' in check '{check_name}': {message}"
+                
+        # Check for empty fields
+        for field, value in check_data.items():
+            if value is None or (isinstance(value, str) and not value.strip()):
+                return False, f"Empty field '{field}' in check '{check_name}'"
         
         # Validate criticality values
-        valid_criticality = ['H', 'M', 'L']
-        for item in data.values():
-            if 'criticality' in item and item['criticality'] not in valid_criticality:
-                return False, f"Invalid criticality value: {item['criticality']}"
+        valid_criticality = ['H', 'M', 'L', 'I']
+        for check_name, check_data in data.items():
+            if 'criticality' in check_data:
+                if check_data['criticality'] not in valid_criticality:
+                    return False, f"Invalid criticality value '{check_data['criticality']}' in check '{check_name}'. Must be one of: {', '.join(valid_criticality)}"       
         
         return True, "Validation passed"
     
