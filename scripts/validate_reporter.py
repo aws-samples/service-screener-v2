@@ -6,10 +6,10 @@ import argparse
 
 def is_valid_category(category_str):
     """
-    Validate if the category string contains only valid characters (S,R,O,P,C)
+    Validate if the category string contains only valid characters (S,R,O,P,C,T)
     and each character appears at most once.
     """
-    valid_chars = set('SROPC')
+    valid_chars = set('SROPCT')
     category_set = set(category_str.upper())
     
     if not category_set.issubset(valid_chars):
