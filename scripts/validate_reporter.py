@@ -44,7 +44,7 @@ def validate_reporter_structure(content):
                     return False, f"Invalid category value '{item['category']}': {message}"
                         
         # Validate criticality values
-        valid_criticality = ['H', 'M', 'L']
+        valid_criticality = ['I', 'H', 'M', 'L']
         for item in data.values():
             if 'criticality' in item and item['criticality'] not in valid_criticality:
                 return False, f"Invalid criticality value: {item['criticality']}"
