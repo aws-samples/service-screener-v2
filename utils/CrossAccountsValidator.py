@@ -121,7 +121,7 @@ class CrossAccountsValidator():
     def validateRoles(self):
         canProceedFlag = True
         generalDicts = self.crossAccountsDict['general']
-    
+
         for acct, cfg in self.crossAccountsDict['accountLists'].items():
             params = {**generalDicts, **cfg}
             res = {k: v for k, v in params.items() if v}
@@ -141,9 +141,12 @@ class CrossAccountsValidator():
                     while(tokenCheckPass == False and tokenCheckCounter <= self.MAXTOKENCHECKRETRY):
                         resp = sts.assume_role(**res)
                         cred = resp.get('Credentials')
+                        if not cred:
+                            raise ValueError("No credentials returned from assume_role")
+                        
                         if len(cred['SessionToken']) < 700:
-                            print('Attempt #{}. Waiting IAM GlobalEndpointTokenVersion to reflect V2 token, retry in {} seconds'
-                                  .format(tokenCheckCounter, self.WAIT_TOKENCHECKRETRY))
+                            print('Attempt #{}, Waiting IAM GlobalEndpointTokenVersion to reflect V2 token, retry in {} seconds'
+                                .format(tokenCheckCounter, self.WAIT_TOKENCHECKRETRY))
                             tokenCheckCounter = tokenCheckCounter + 1
                             time.sleep(self.WAIT_TOKENCHECKRETRY)
                         else:
@@ -157,23 +160,30 @@ class CrossAccountsValidator():
                     # For default regions, just assume the role once
                     resp = sts.assume_role(**res)
                     cred = resp.get('Credentials')
+                    if not cred:
+                        raise ValueError("No credentials returned from assume_role")
             
-                if 'AccessKeyId' in cred and 'SecretAccessKey' in cred and 'SessionToken' in cred:
-                    print('[\u2714] {}, assume_role passed'.format(acct))
+                # Verify all required credential components are present
+                required_keys = ['AccessKeyId', 'SecretAccessKey', 'SessionToken']
+                if not all(key in cred for key in required_keys):
+                    missing_keys = [key for key in required_keys if key not in cred]
+                    raise ValueError(f"Missing required credentials: {missing_keys}")
                 
-                    self.ROLEINFO[acct] = {
-                        'aws_access_key_id': cred['AccessKeyId'],
-                        'aws_secret_access_key': cred['SecretAccessKey'],
-                        'aws_session_token': cred['SessionToken']
-                    }
+                print('[✔] {}, assume_role passed'.format(acct))
                 
-            except botocore.exceptions.ClientError as err:
+                self.ROLEINFO[acct] = {
+                    'aws_access_key_id': cred['AccessKeyId'],
+                    'aws_secret_access_key': cred['SecretAccessKey'],
+                    'aws_session_token': cred['SessionToken']
+                }
+                
+            except (botocore.exceptions.ClientError, ValueError) as err:
                 canProceedFlag = False
                 _warn("Unable to assume role, read more below")
                 print('AcctId: {}'.format(acct), str(err))
                 print(res)
                 break
-      
+    
         return canProceedFlag
  
     def getRoleArn(self, acctId, roleName):
