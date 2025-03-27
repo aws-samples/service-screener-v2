@@ -236,12 +236,10 @@ class S3Bucket(Evaluator):
             print("[{}] Unable to get Logging Informaton, skip".format(self.bucket))
     
     def _checkEventNotif(self):
-        self.results['EventNotification'] = [1, 'On']
         try:
             resp = self.s3Client.get_bucket_notification_configuration(
                 Bucket=self.bucket
             )
-            self.results['EventNotification'] = [-1, 'On']
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] ==  'NoSuchNotificationConfiguration':
                 self.results['EventNotification'] = [-1, 'Off']
