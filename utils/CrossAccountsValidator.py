@@ -141,7 +141,7 @@ class CrossAccountsValidator():
                 while(tokenCheckPass == False and tokenCheckCounter <= self.MAXTOKENCHECKRETRY):
                     resp = sts.assume_role(**res)
                     cred = resp.get('Credentials')
-                    if len(cred['SessionToken']) < 700:
+                    if len(cred['SessionToken']) < 700 and self.REQUIRES_V2TOKEN == True:
                         print('Attempt #{}. Waiting IAM GlobalEndpointTokenVersion to reflect V2 token, retry in {} seconds'.format(tokenCheckCounter, self.WAIT_TOKENCHECKRETRY))
                         tokenCheckCounter = tokenCheckCounter + 1
                         time.sleep(self.WAIT_TOKENCHECKRETRY)
