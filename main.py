@@ -350,6 +350,5 @@ if beta:
     print("\033[93m[-- ..... --] BETA MODE ENABLED [-- ..... --] \033[0m")
     print("Current Beta Features:")
     print("\033[96m  01/ Concurrent Mode on Evaluator (Attempt to improve performance) \033[0m")
-    print("\033[96m  02/ WA Frameworks Integration \033[0m")
-    print("\033[96m  03/ API Buttons on each service html \033[0m")
+    print("\033[96m  02/ API Buttons on each service html \033[0m")
     print("\033[93m[-- ..... --] THANK YOU FOR TESTING BETA FEATURES [-- ..... --] \033[0m")

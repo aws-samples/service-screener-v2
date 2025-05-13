@@ -33,6 +33,7 @@ class FrameworkPageBuilder(PageBuilder):
     
     def __init__(self, service=None, reporter=None):
         framework = service
+        print("Generating Framework - {}".format(framework))
         FrameworkClass = FrameworkPageBuilder.getServiceModuleDynamically(framework)
 
         super().__init__(framework, reporter)

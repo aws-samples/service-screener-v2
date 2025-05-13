@@ -14,9 +14,6 @@ class WAFS(Framework):
         super().__init__(data)
         self.isBeta = Config.get('beta', False)
 
-        if self.isBeta == False:
-            return
-
         waTools = WATools('security')
         cliParams = Config.get('_SS_PARAMS')
 
@@ -90,6 +87,4 @@ class WAFS(Framework):
         return f"{titleStr} - {sectStr}"
 
     def _hookPostBuildContentDetail(self):
-        if self.isBeta == False:
-            return
         self.WATools.createMilestoneIfNotExists()
