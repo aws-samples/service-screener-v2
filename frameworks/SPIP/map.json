@@ -19,7 +19,7 @@
     },
     "Data Protection": {
       "P2.1": ["s3.PublicAccessBlock" , "s3.PublicReadAccessBlock" , "s3.PublicWriteAccessBlock"],
-      "P2.2": [],
+      "P2.2": ["ec2.EBSSnapshot", "rds.Backup", "dynamodb.backupStatus", "dynamodb.enabledContinuousBackup", "efs.AutomatedBackup", "redshift.AutomaticSnapshots"],
       "P2.3": ["s3.ServerSideEncrypted" , "s3.SSEWithKMS" , "ec2.EBSEncrypted" , "efs.EncryptedAtRest" , "rds.StorageEncrypted" , "redshift.EncryptedAtRest" , "redshift.EncryptedWithKMS" , "cloudfront.fieldLevelEncryption" , "apigateway.EncryptionAtRest" , "apigateway.EncryptionInTransit"],
       "P2.4": ["s3.MacieToEnable"],
       "P2.5": ["is3.TlsEnforced" , "redshift.EncryptedInTransit" , "rds.MSSQLorPG__TransportEncrpytionDisabled" , "opensearch.NodeToNodeEncryption" , "opensearch.TLSEnforced" , "elasticache.EncInTransitAndRest" , "ec2.SGEncryptionInTransit" , "cloudfront.viewerPolicyHttps"]
@@ -39,8 +39,7 @@
       "P4.4": ["cloudtrail.EnableTrailS3BucketMFADelete" , "cloudtrail.EnableTrailS3BucketVersioning" , "s3.MFADelete" , "s3.BucketVersioning" , "s3.ObjectLock"],
       "P4.5": [],
       "P4.6": [],
-      "P4.7": [],
-      "P4.8": []
+      "P4.7": []
     },
     "AppSec & DevSecOps":{
       "P5.1": ["rds.DBwithoutSecretManager"],
