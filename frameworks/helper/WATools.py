@@ -21,6 +21,12 @@ class WATools():
 
     def __init__(self, pillarId):
         self.pillarId = pillarId
+        self.waInfo = {
+            'isExists': False,
+            'WorkloadId': None,
+            'LensesAlias': 'wellarchitected'
+        }
+
         pass
 
     def preCheck(self, params):
@@ -97,71 +103,102 @@ class WATools():
             print(f"An error occurred while creating the workload: {str(e)}")
             return False
         
+    def _get_latest_milestone(self):
+        """Helper method to get the latest milestone for a workload"""
+        all_milestones = []
+        next_token = None
+
+        while True:
+            params = {
+                'WorkloadId': self.waInfo['WorkloadId'],
+                'MaxResults': 20
+            }
+            if next_token:
+                params['NextToken'] = next_token
+
+            response = self.waClient.list_milestones(**params)
+            all_milestones.extend(response['MilestoneSummaries'])
+
+            next_token = response.get('NextToken')
+            if not next_token:
+                break  # No more pages, exit the loop
+
+        if not all_milestones:
+            return False
+
+        # Sort milestones by date (most recent first)
+        sorted_milestones = sorted(
+            all_milestones,
+            key=lambda x: x['RecordedAt'],
+            reverse=True
+        )
+
+        # Get the latest milestone
+        latest_milestone = sorted_milestones[0]
+        self.waInfo['MilestoneName'] = latest_milestone['MilestoneName']
+        self.waInfo['MilestoneNumber'] = latest_milestone['MilestoneNumber']
+        return True
+
     def createMilestoneIfNotExists(self):
         if self.cfg['newMileStone'] == 1:
             self.createMilestone()
             return
 
-        all_milestones = []
-        next_token = None
-
         try:
-            while True:
-                params = {
-                    'WorkloadId': self.waInfo['WorkloadId'],
-                    'MaxResults': 20
-                }
-                if next_token:
-                    params['NextToken'] = next_token
-
-                response = self.waClient.list_milestones(**params)
-                all_milestones.extend(response['MilestoneSummaries'])
-
-                next_token = response.get('NextToken')
-                if not next_token:
-                    break  # No more pages, exit the loop
-
-            if not all_milestones:
+            if not self._get_latest_milestone():
                 print("No milestones found for workload {}... creating milestone...".format(self.waInfo['WorkloadId']))
                 self.createMilestone()
-                return None
-
-            # Sort milestones by date (most recent first)
-            sorted_milestones = sorted(
-                all_milestones,
-                key=lambda x: x['RecordedAt'],
-                reverse=True
-            )
-
-            # Get the latest milestone
-            latest_milestone = sorted_milestones[0]
-            self.waInfo['MilestoneName'] = latest_milestone['MilestoneName']
-            self.waInfo['MilestoneNumber'] = latest_milestone['MilestoneNumber']
-        
         except BotoCoreError as e:
             print(f"An error occurred: {str(e)}")
             return None
         
     def createMilestone(self):
-        cdate = datetime.now().strftime('%Y%m%d%H%M%S')
-        milestoneName = 'SS-{}'.format(cdate)
-
-        try:
-            resp = self.waClient.create_milestone(
-                WorkloadId=self.waInfo['WorkloadId'],
-                MilestoneName=milestoneName
-            )
+        max_retries = 3
+        retry_delay = 2  # seconds
+        
+        for attempt in range(1, max_retries + 1):
+            cdate = datetime.now().strftime('%Y%m%d%H%M%S')
+            milestoneName = f'SS-{cdate}-{attempt}'
             
-            print(f"Milestone Number: {resp['MilestoneNumber']}")
-
-            self.waInfo['MilestoneName'] = milestoneName
-            self.waInfo['MilestoneNumber'] = resp['MilestoneNumber']
-
-            return True
-        except BotoCoreError as e:
-            self.HASPERMISSION = False
-            _warn(f"An error occurred while creating the milestone: {str(e)}")
-            return None
+            try:
+                resp = self.waClient.create_milestone(
+                    WorkloadId=self.waInfo['WorkloadId'],
+                    MilestoneName=milestoneName
+                )
+                
+                print(f"Milestone Number: {resp['MilestoneNumber']}")
+                self.waInfo['MilestoneName'] = milestoneName
+                self.waInfo['MilestoneNumber'] = resp['MilestoneNumber']
+                return True
+                
+            except Exception as e:
+                if 'ConflictException' in str(e.__class__) or 'Conflict' in str(e):
+                    print(f"Attempt {attempt}/{max_retries}: Milestone conflict: {str(e)}")
+                    if attempt < max_retries:
+                        print(f"Retrying in {retry_delay} seconds...")
+                        time.sleep(retry_delay)
+                        continue
+                    
+                    # All retries failed, try to get existing milestone
+                    print("All creation attempts failed, trying to use existing milestone")
+                    try:
+                        if self._get_latest_milestone():
+                            print(f"Using existing milestone: {self.waInfo.get('MilestoneName', 'Unknown')}")
+                            return True
+                        else:
+                            _warn("No existing milestones found")
+                            return False
+                    except Exception as inner_e:
+                        _warn(f"Failed to get existing milestone: {str(inner_e)}")
+                        return False
+                else:
+                    # Re-raise if it's not a conflict exception
+                    raise
+                    
+            except BotoCoreError as e:
+                self.HASPERMISSION = False
+                _warn(f"An error occurred while creating the milestone: {str(e)}")
+                return None
         
     def listAnswers(self):
         if self.HASPERMISSION == False:
@@ -235,6 +272,15 @@ class WATools():
         if self.HASPERMISSION == False:
             return None
 
+        # Skip if questionId is None
+        if questionId is None:
+            _warn(f"[WATOOLS]: Skipping update for None questionId")
+            return None
+
+        # Ensure selectedChoices is not empty
+        if not selectedChoices:
+            selectedChoices = []
+
         ansArgs = {
             'WorkloadId': self.waInfo['WorkloadId'],
             'LensAlias': self.waInfo['LensesAlias'],
@@ -245,29 +291,9 @@ class WATools():
 
         try:
             resp = self.waClient.update_answer(**ansArgs)
-        except BotoCoreError as e:
+        except Exception as e:
             _warn(f"[ERROR - WATOOLS]: {str(e)}")
             self.HASPERMISSION = False
             return None
 
         pass
-'''
-stsInfo = {'UserId': 'AIDA55JZ3XKTBZPEJU5K7', 'Account': '956288449190', 'Arn': 'arn:aws:iam::956288449190:user/macbook-ss'}
-Config.set('stsInfo', stsInfo)
-
-Config.set('REGIONS_SELECTED', ['ap-southeast-1', 'us-east-1'])
-
-boto3args = {'region_name': 'ap-southeast-1'}
-Config.set('ssBoto', boto3.Session(**boto3args))
-
-myCfg = '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":0}}'
-cfg = json.loads(myCfg)
-
-o = WATools()
-o.init(cfg['WA'])
-o.createReportIfNotExists()
-resp = o.listAnswers('security')
-# resp = o.createMilestoneIfNotExists()
-print(o.waInfo)
-print(resp)
-'''

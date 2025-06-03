@@ -11,7 +11,7 @@
     "SEC01": {
       "BP01": ["iam.hasOrganization"],
       "BP02": ["iam.rootMfaActive", "iam.hasAlternateContact", "iam.rootHasAccessKey", "iam.rootConsoleLogin30days", "iam.passwordPolicy", "iam.enableGuardDuty", "iam.rootConsoleLogin30days"],
-      "BP03": ["Iam.SCPEnabled" , "iam.EnableConfigService"],
+      "BP03": ["iam.SCPEnabled" , "iam.EnableConfigService"],
       "BP04": ["iam.enableGuardDuty"],
       "BP05": [],
       "BP06": ["lambda.$length", "rds.$length", "ecs.$length", "eks.$length", "dynamodb.$length", "elasticache.$length"],
