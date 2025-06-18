@@ -106,11 +106,16 @@ class IamUser(IamCommon):
             if user['access_key_1_active'] == 'false':
                 pass
             else:
-                daysAccesskey = self.getAgeInDay(user['access_key_1_last_rotated'])
+                if user['access_key_2_active'] == 'false':
+                    daysAccesskey = self.getAgeInDay(user['access_key_1_last_used_date'])
+                    daysAccesskeyLastRotated = self.getAgeInDay(user['access_key_1_last_rotated'])
+                else:
+                    daysAccesskey = max(self.getAgeInDay(user['access_key_1_last_used_date']), self.getAgeInDay(user['access_key_2_last_used_date']))
+                    daysAccesskeyLastRotated = max(self.getAgeInDay(user['access_key_1_last_rotated']), self.getAgeInDay(user['access_key_2_last_rotated']))
                 
-                if daysAccesskey >= 90:
+                if daysAccesskeyLastRotated >= 90:
                     k = 'hasAccessKeyNoRotate90days'
-                elif daysAccesskey >= 30:
+                elif daysAccesskeyLastRotated >= 30:
                     k = 'hasAccessKeyNoRotate30days'
                 else:
                     return

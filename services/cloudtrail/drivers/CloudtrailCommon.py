@@ -86,8 +86,9 @@ class CloudtrailCommon(Evaluator):
         
         if not 'IsLogging' in r or r.get('IsLogging') == False:
             self.results['EnableCloudTrailLogging'] = [-1, '']
-            
-        if not r.get('LatestDeliveryError') == 'None':
+        
+        # Only check for delivery errors if the attribute exists and is not 'None'
+        if 'LatestDeliveryError' in r and r.get('LatestDeliveryError') != 'None':
             self.results['TrailDeliverError'] = [-1, r.get('LatestDeliveryError')]
             
     def _checkS3BucketSettings(self):
