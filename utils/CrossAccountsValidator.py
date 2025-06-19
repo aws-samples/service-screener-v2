@@ -117,61 +117,75 @@ class CrossAccountsValidator():
             self.iamClient.set_security_token_service_preferences(
                 GlobalEndpointTokenVersion='v1Token'    
             )
-        
+
     def validateRoles(self):
         canProceedFlag = True
-        
         generalDicts = self.crossAccountsDict['general']
-        
+
         for acct, cfg in self.crossAccountsDict['accountLists'].items():
             params = {**generalDicts, **cfg}
             res = {k: v for k, v in params.items() if v}
-            
+        
             res['RoleSessionName'] = self.DEFAULT_ROLESESSIONNAME    
             res['RoleArn'] = self.getRoleArn(acct, None if not 'RoleName' in res else res['RoleName'])
             res['DurationSeconds'] = self.DEFAULT_DURATIONSECONDS
             res.pop('RoleName')
-            
-            
+        
             sts = boto3.client('sts')
-            
-            tokenCheckPass = False
-            tokenCheckCounter = 1
+        
             try:
-                while(tokenCheckPass == False and tokenCheckCounter <= self.MAXTOKENCHECKRETRY):
+                if self.REQUIRES_V2TOKEN:
+                    # Only check token length if V2 token is required
+                    tokenCheckPass = False
+                    tokenCheckCounter = 1
+                    while(tokenCheckPass == False and tokenCheckCounter <= self.MAXTOKENCHECKRETRY):
+                        resp = sts.assume_role(**res)
+                        cred = resp.get('Credentials')
+                        if not cred:
+                            raise ValueError("No credentials returned from assume_role")
+                        
+                        if len(cred['SessionToken']) < 700:
+                            print('Attempt #{}, Waiting IAM GlobalEndpointTokenVersion to reflect V2 token, retry in {} seconds'
+                                .format(tokenCheckCounter, self.WAIT_TOKENCHECKRETRY))
+                            tokenCheckCounter = tokenCheckCounter + 1
+                            time.sleep(self.WAIT_TOKENCHECKRETRY)
+                        else:
+                            tokenCheckPass = True
+                
+                    if tokenCheckPass == False:
+                        print('... unable to acquired V2 token ...')
+                        canProceedFlag = False
+                        break
+                else:
+                    # For default regions, just assume the role once
                     resp = sts.assume_role(**res)
                     cred = resp.get('Credentials')
-                    if len(cred['SessionToken']) < 700 and self.REQUIRES_V2TOKEN == True:
-                        print('Attempt #{}. Waiting IAM GlobalEndpointTokenVersion to reflect V2 token, retry in {} seconds'.format(tokenCheckCounter, self.WAIT_TOKENCHECKRETRY))
-                        tokenCheckCounter = tokenCheckCounter + 1
-                        time.sleep(self.WAIT_TOKENCHECKRETRY)
-                    else:
-                        tokenCheckPass = True
-                        
-                if tokenCheckPass == False:
-                    print('... unable to acquired V2 token ...')
-                    canProceedFlag = False
-                    break
+                    if not cred:
+                        raise ValueError("No credentials returned from assume_role")
+            
+                # Verify all required credential components are present
+                required_keys = ['AccessKeyId', 'SecretAccessKey', 'SessionToken']
+                if not all(key in cred for key in required_keys):
+                    missing_keys = [key for key in required_keys if key not in cred]
+                    raise ValueError(f"Missing required credentials: {missing_keys}")
                 
-                if 'AccessKeyId' in cred and 'SecretAccessKey' in cred and 'SessionToken' in cred:
-                    print('[\u2714] {}, assume_role passed'.format(acct))
-                    
-                    self.ROLEINFO[acct] = {
-                        'aws_access_key_id': cred['AccessKeyId'],
-                        'aws_secret_access_key': cred['SecretAccessKey'],
-                        'aws_session_token': cred['SessionToken']
-                    }
-                    
-            except botocore.exceptions.ClientError as err:
+                print('[✔] {}, assume_role passed'.format(acct))
+                
+                self.ROLEINFO[acct] = {
+                    'aws_access_key_id': cred['AccessKeyId'],
+                    'aws_secret_access_key': cred['SecretAccessKey'],
+                    'aws_session_token': cred['SessionToken']
+                }
+                
+            except (botocore.exceptions.ClientError, ValueError) as err:
                 canProceedFlag = False
                 _warn("Unable to assume role, read more below")
                 print('AcctId: {}'.format(acct), str(err))
                 print(res)
-                
                 break
-          
-        return canProceedFlag
     
+        return canProceedFlag
+ 
     def getRoleArn(self, acctId, roleName):
         if roleName == None:
             roleName = self.DEFAULT_ROLENAME
