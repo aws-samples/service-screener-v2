@@ -3,9 +3,14 @@
     "originator": "SOC2",
     "shortname": "SOC2 AWS",
     "fullname": "SOC2 Trust Services Criteria for AWS",
-    "description": "The SOC2 framework maps AWS service configurations to SOC2 Trust Service Criteria (TSC) requirements. SOC2 is a framework developed by the American Institute of CPAs (AICPA) that specifies how organizations should manage customer data based on five 'trust service criteria': security, availability, processing integrity, confidentiality, and privacy.",
+    "description": "The SOC2 framework maps AWS service configurations to SOC2 Trust Service Criteria (TSC) requirements. SOC2 is a framework developed by the American Institute of CPAs (AICPA) that specifies how organizations should manage customer data based on five 'trust service criteria': security, availability, processing integrity, confidentiality, and privacy. For detailed implementation guidance, refer to the SOC2_Implementation_Guide.md file in the frameworks/SOC2 directory. For remediation steps to address findings, refer to the SOC2_Remediation_Guide.md file.",
     "_": "https://www.aicpa.org/interestareas/frc/assuranceadvisoryservices/trustservices.html",
-    "emptyCheckDefaultMsg": "<small><i>Please refer to the SOC2 control section for further details. Kindly provide evidence or artifacts demonstrating compliance with the respective SOC2 criteria.</i></small>"
+    "emptyCheckDefaultMsg": "<small><i>Please refer to the SOC2 control section for further details. Kindly provide evidence or artifacts demonstrating compliance with the respective SOC2 criteria.</i></small>",
+    "documentationFiles": {
+      "implementationGuide": "frameworks/SOC2/SOC2_Implementation_Guide.md",
+      "remediationGuide": "frameworks/SOC2/SOC2_Remediation_Guide.md",
+      "mappingGuide": "frameworks/SOC2/SOC2_AWS_Mapping.md"
+    }
   },
   "mapping": {
     "CC1.0 - Control Environment": {
