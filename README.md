@@ -177,6 +177,9 @@ Besides the HTML report, you can also find two JSON files that record the findin
 ## Contributing to service-screener
 We encourage public contributions! Please review [CONTRIBUTING](./CONTRIBUTING.md) for details on our code of conduct and development process.
 
+## Development Guide
+A comprehensive development guide is available at [Development Guide](./docs/DevelopmentGuide.md).
+
 ## Contact
 Please review [CONTRIBUTING](./CONTRIBUTING.md) to raise any issues. 
 
