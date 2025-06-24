@@ -13,6 +13,8 @@ class cloudfrontDist(Evaluator):
         
         self.distConfig = cloudfrontClient.get_distribution_config(Id=dist)
         
+        self._resourceName = dist
+
         self.init()
         
     def _checkAccessLogsEnabled(self):

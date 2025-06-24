@@ -23,6 +23,7 @@ class DynamoDbCommon(Evaluator):
         self.backupClient = backupClient
         self.cloudTrailClient = cloudTrailClient
 
+        self._resourceName = self.tablename
 
     # logic to check delete protection    
     def _check_delete_protection(self):

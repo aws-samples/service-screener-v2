@@ -12,6 +12,8 @@ class IamRole(IamCommon):
         self.iamClient = iamClient
         self._configPrefix = 'iam::role::'
 
+        self._resourceName = self.role['RoleName']
+
         self.init()
         self.retrieveRoleDetail()
         

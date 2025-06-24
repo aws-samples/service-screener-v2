@@ -9,6 +9,8 @@ class CloudtrailAccount(Evaluator):
         self.ctClient = ctClient
         self.sizeofTrail = sizeofTrail
         
+        self._resourceName = 'General'
+
         self.init()
     
     ## For General Trail purpose

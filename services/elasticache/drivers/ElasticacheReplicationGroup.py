@@ -6,6 +6,8 @@ class ElasticacheReplicationGroup(Evaluator):
         super().__init__()
         self.group = group
         self.client = client
+
+        self._resourceName = group['ReplicationGroupId']
     
     def _checkHasReadReplica(self):
         hasReplica = False

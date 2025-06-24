@@ -12,6 +12,8 @@ class RedshiftCluster(Evaluator):
         
         self.cluster = cluster
         self.rsClient = rsClient
+
+        self._resourceName = cluster['ClusterIdentifier']
         # print(self.cluster)
         return
     
@@ -128,7 +130,6 @@ class RedshiftCluster(Evaluator):
 
         # check if AZ Relocation is enabled
         try:
-            print(self.cluster['AvailabilityZoneRelocationStatus'])
             if not self.cluster['AvailabilityZoneRelocationStatus'] == 'enabled':
                 self.results['AZRelocation'] = [-1, "AZ Relocation is not enabled"]
 

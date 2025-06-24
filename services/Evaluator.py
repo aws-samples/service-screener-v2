@@ -159,42 +159,20 @@ class Evaluator():
         
         # print(classPrefix, Config.get(classPrefix))
         
-        if not driver in Config.SERVICES_IDENTIFIER_MAPPING:
-            _warn("driver: '{}' is not exists in Config.SERVICES_IDENTIFIER_MAPPING".format(driver))
-            return
+        hasError = '1'
+        for check, find in self.results.items():
+            if find[0] == -1:
+                hasError = '-1'
+                break
+        
+        name = ""
+        if hasattr(self, '_resourceName'):
+            name = self._resourceName
         else:
-            rule = Config.SERVICES_IDENTIFIER_MAPPING[driver]
-            if rule[0] == 'SKIP':
-                return 1
-            elif rule[0] == 'TEXT':
-                name = rule[1]
-            elif rule[0] in ['DICT', 'ATTR']:
-                var = eval('self.'+rule[1])
-                
-                if rule[0] == 'DICT':
-                    name = 'NOTFOUND*'
-                    
-                    if (type(rule[2]).__name__) == 'str':
-                        name = var[rule[2]]
-                    else:    
-                        for dictname in rule[2]:
-                            if dictname in var:
-                                name = var[dictname]
-                                break
-                else:
-                    name = var
-            
-            hasError = '1'
-            for check, find in self.results.items():
-                if find[0] == -1:
-                    hasError = '-1'
-                    break
-            
-            if name == None:
-                return
-            
-            scanned.append(';'.join([Config.get(classPrefix, ""), driver or "", name or "", hasError or ""]))
-            Config.set(ConfigKey, scanned)
+            _warn("driver: '{}' need to set self._resourceName".format(driver))
+
+        scanned.append(';'.join([Config.get(classPrefix, ""), driver or "", name or "", hasError or ""]))
+        Config.set(ConfigKey, scanned)
             
             
         ## Handle custom page requirement

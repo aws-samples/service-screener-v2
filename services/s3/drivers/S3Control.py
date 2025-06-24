@@ -12,6 +12,8 @@ class S3Control(Evaluator):
     def __init__(self, s3Control):
         super().__init__()
         self.s3Control = s3Control
+
+        self._resourceName = 'S3AccountLevel'
         
         self.init()
     

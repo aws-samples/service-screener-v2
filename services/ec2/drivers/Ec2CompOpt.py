@@ -10,6 +10,9 @@ class Ec2CompOpt(Evaluator):
     def __init__(self, compOptClient):
         super().__init__()
         self.compOptClient = compOptClient
+
+        self._resourceName = 'ComputeOptimizer'
+
         self.init()
     
     def _checkComputeOptimizerEnabled(self):

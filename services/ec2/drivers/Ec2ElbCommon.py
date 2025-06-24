@@ -13,6 +13,9 @@ class Ec2ElbCommon(Evaluator):
         self.sgList = sgList
         self.wafv2Client = wafv2Client
         self.elbClient = elbClient
+
+        self._resourceName = elb['LoadBalancerArn']
+
         self.init()
     
     # checks    

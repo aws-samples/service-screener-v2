@@ -159,6 +159,8 @@ class CloudwatchTrails(Evaluator):
         self.logClient = logClient
         self.log = log
         self.logname = logname
+
+        self._resourceName = logname
         
         self.metricsInfo = []
         

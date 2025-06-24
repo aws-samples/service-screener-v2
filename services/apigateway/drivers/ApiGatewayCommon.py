@@ -11,6 +11,9 @@ class ApiGatewayCommon(Evaluator):
         super().__init__()
         self.apiClient = apiClient
         self.api = api
+
+        self._resourceName = api['Name']
+
         return
     
     def _checkStage(self):

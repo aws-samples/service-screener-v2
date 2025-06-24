@@ -17,6 +17,8 @@ class RdsSecretsManager(Evaluator):
         self.smClient = smClient
         self.ctClient = ctClient
         
+        self._resourceName = secret['Name']
+
         self.init()
     
     def _checkHasRotation(self):

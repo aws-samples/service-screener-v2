@@ -35,6 +35,9 @@ class LambdaCommon(Evaluator):
         self.role_count = role_count
         self.lambda_client = lambda_client
         self.iam_client = iam_client
+
+        self._resourceName = self.function_name
+
         self.results = {}
         self.init()
     

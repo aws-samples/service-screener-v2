@@ -12,6 +12,9 @@ class Ec2EbsSnapshot(Evaluator):
         super().__init__()
         self.ebsVolumeIds = ebsVolumeIds
         self.ec2Client = ec2Client
+
+        self._resourceName = 'AllEC2Snapshots'
+
         self.init()
 
     def _checkSnapshotPublic(self):

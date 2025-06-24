@@ -31,6 +31,8 @@ class IamAccount(IamCommon):
         self.noOfUsers = len(users)
         self.roles = roles
         
+        self._resourceName = 'General'
+
         # self.__configPrefix = 'iam::settings::'
 
         # Assuming AWS Organization is disabled at first

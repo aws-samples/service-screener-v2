@@ -12,6 +12,9 @@ class ApiGatewayRest(Evaluator):
         super().__init__()
         self.apiClient = apiClient
         self.api = api
+
+        self._resourceName = api['name']
+
         return
 
     def _checkStage(self):

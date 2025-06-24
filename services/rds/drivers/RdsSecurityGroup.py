@@ -16,6 +16,7 @@ class RdsSecurityGroup(Evaluator):
         self.sg = sg
         self.rdsLists = rdsLists
         
+        self._resourceName = sg
         
         resp = self.ec2Client.describe_security_groups(GroupIds=[self.sg])
         self.sgSettings = resp.get('SecurityGroups')

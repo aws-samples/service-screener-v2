@@ -5,6 +5,7 @@ class ElasticacheMemcached(ElasticacheCommon):
     defaultPort = 11211
     def __init__(self, cluster, client, driver_info):
         super().__init__(cluster, client, driver_info)
+        self._resourceName = self.cluster['ARN']
         # self.init()
 
     def _checkDefaultPort(self):

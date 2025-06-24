@@ -20,6 +20,11 @@ class ServiceDriver(Evaluator):
     def __init__(self, resource):
         super().__init__()
         self.init()
+
+        ###### TO DO #####
+        ## Replace 'None' to unique identifer for this resource
+        ## It has to be a STRING
+        self._resourceName = None
         return
     
     ###### TO DO #####

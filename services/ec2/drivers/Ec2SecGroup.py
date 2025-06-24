@@ -62,6 +62,9 @@ class Ec2SecGroup(Evaluator):
         super().__init__()
         self.secGroup = secGroup
         self.ec2Client = ec2Client
+
+        self._resourceName = secGroup['GroupId']
+
         self.init()
     
     # supporint function
