@@ -1,0 +1,170 @@
+{
+	"sqsEncryptionAtRest": {
+		"category": "S",
+		"^description": "SQS queue does not have server-side encryption enabled. Server-side encryption (SSE) protects the contents of messages in Amazon SQS queues using keys managed in AWS Key Management Service (AWS KMS). SSE encrypts messages as soon as Amazon SQS receives them. The messages are stored in encrypted form and Amazon SQS decrypts messages only when they are sent to an authorized consumer.",
+		"shortDesc": "Enable server-side encryption",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Amazon SQS Server-Side Encryption]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-server-side-encryption.html>",
+			"[AWS Well-Architected Security Pillar]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/protecting-data-at-rest.html>"
+		]
+	},
+	"sqsEncryptionInTransit": {
+		"category": "S",
+		"^description": "SQS queue allows unencrypted connections. Amazon SQS supports HTTPS endpoints for secure communication. Enforcing HTTPS-only access ensures that data in transit is encrypted and protected from eavesdropping and man-in-the-middle attacks.",
+		"shortDesc": "Enforce HTTPS-only access",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Amazon SQS Security Best Practices]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-security-best-practices.html>",
+			"[AWS Well-Architected Security Pillar]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/protecting-data-in-transit.html>"
+		]
+	},
+	"sqsDeadLetterQueue": {
+		"category": "R",
+		"^description": "SQS queue does not have a dead letter queue configured. A dead letter queue (DLQ) is a queue that other queues can target for messages that can't be processed successfully. DLQs are useful for debugging your application or messaging system because they let you isolate problematic messages to determine why their processing doesn't succeed.",
+		"shortDesc": "Configure dead letter queue",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Amazon SQS Dead Letter Queues]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html>",
+			"[AWS Well-Architected Reliability Pillar]<https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/design-interactions-in-a-distributed-system-to-mitigate-or-withstand-failures.html>"
+		]
+	},
+	"sqsVisibilityTimeout": {
+		"category": "P",
+		"^description": "SQS queue has suboptimal visibility timeout configuration. The visibility timeout is the period of time during which Amazon SQS prevents other consumers from receiving and processing a message. Setting an appropriate visibility timeout helps prevent message duplication and ensures efficient message processing.",
+		"shortDesc": "Optimize visibility timeout",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 1,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Amazon SQS Visibility Timeout]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html>",
+			"[AWS Well-Architected Performance Efficiency Pillar]<https://docs.aws.amazon.com/wellarchitected/latest/performance-efficiency-pillar/selection.html>"
+		]
+	},
+	"sqsMessageRetention": {
+		"category": "R",
+		"^description": "SQS queue has inappropriate message retention period. The message retention period is the amount of time that Amazon SQS retains a message if it does not get deleted. Setting an appropriate retention period ensures messages are available long enough for processing while avoiding unnecessary storage costs.",
+		"shortDesc": "Review message retention period",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Amazon SQS Message Attributes]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-attributes.html>",
+			"[AWS Well-Architected Reliability Pillar]<https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/manage-service-quotas-and-constraints.html>"
+		]
+	},
+	"sqsAccessPolicy": {
+		"category": "S",
+		"^description": "SQS queue has overly permissive access policy. Queue access policies should follow the principle of least privilege, granting only the minimum permissions necessary for legitimate use cases. Overly permissive policies can lead to unauthorized access and potential data breaches.",
+		"shortDesc": "Review and restrict access policy",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Amazon SQS Access Control]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-overview-of-managing-access.html>",
+			"[AWS Well-Architected Security Pillar]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/permissions-management.html>"
+		]
+	},
+	"sqsCloudWatchMonitoring": {
+		"category": "O",
+		"^description": "SQS queue lacks comprehensive CloudWatch monitoring and alerting. Monitoring queue metrics such as message count, age of oldest message, and processing rates is essential for operational visibility and proactive issue detection. Setting up appropriate alarms helps ensure timely response to operational issues.",
+		"shortDesc": "Enable CloudWatch monitoring and alarms",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Amazon SQS CloudWatch Metrics]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-available-cloudwatch-metrics.html>",
+			"[AWS Well-Architected Operational Excellence Pillar]<https://docs.aws.amazon.com/wellarchitected/latest/operational-excellence-pillar/design-telemetry.html>"
+		]
+	},
+	"sqsUnusedQueues": {
+		"category": "C",
+		"^description": "SQS queue appears to be unused or has very low activity. Unused queues continue to incur costs and create unnecessary complexity in your environment. Regular review and cleanup of unused resources helps optimize costs and reduce operational overhead.",
+		"shortDesc": "Remove unused queues",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Amazon SQS Pricing]<https://aws.amazon.com/sqs/pricing/>",
+			"[AWS Well-Architected Cost Optimization Pillar]<https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/decommission-resources.html>"
+		]
+	},
+	"sqsFifoOptimization": {
+		"category": "P",
+		"^description": "FIFO queue configuration may not be optimized for throughput. FIFO queues support message groups and deduplication, but have lower throughput compared to standard queues. Review if FIFO ordering is truly required and consider optimizations like message grouping for better performance.",
+		"shortDesc": "Optimize FIFO queue configuration",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 1,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Amazon SQS FIFO Queues]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues.html>",
+			"[AWS Well-Architected Performance Efficiency Pillar]<https://docs.aws.amazon.com/wellarchitected/latest/performance-efficiency-pillar/selection.html>"
+		]
+	},
+	"sqsTagging": {
+		"category": "O",
+		"^description": "SQS queue lacks proper resource tagging. Consistent tagging strategy enables better resource management, cost allocation, access control, and automation. Tags help organize resources, track costs, and implement governance policies across your AWS environment.",
+		"shortDesc": "Implement consistent resource tagging",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Amazon SQS Tagging]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-queue-tags.html>",
+			"[AWS Well-Architected Operational Excellence Pillar]<https://docs.aws.amazon.com/wellarchitected/latest/operational-excellence-pillar/tagging.html>"
+		]
+	},
+	"sqsLongPolling": {
+		"category": "C",
+		"^description": "SQS queue is not configured for long polling. Long polling reduces the number of empty responses and false empty responses, which can reduce costs and improve efficiency. Short polling can result in higher costs due to more frequent API calls and increased latency.",
+		"shortDesc": "Enable long polling",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Amazon SQS Long Polling]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html>",
+			"[AWS Well-Architected Cost Optimization Pillar]<https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/expenditure-and-usage-awareness.html>"
+		]
+	},
+	"sqsRedundantQueues": {
+		"category": "C",
+		"^description": "Multiple SQS queues with similar naming patterns or configurations detected. Redundant or duplicate queues can indicate inefficient resource usage and increased operational complexity. Consider consolidating similar queues or implementing a more structured naming and usage strategy.",
+		"shortDesc": "Consolidate redundant queues",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Amazon SQS Best Practices]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-best-practices.html>",
+			"[AWS Well-Architected Cost Optimization Pillar]<https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/design-patterns.html>"
+		]
+	}
+}

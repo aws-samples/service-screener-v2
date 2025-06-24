@@ -1,6 +1,6 @@
 # Service Screener
 
-An open source guidance tool for the AWS environment. Click [here](https://dev.d11el1twchxpia.amplifyapp.com/769655955296/index.html) for sample report.
+An open source guidance tool for the AWS environment. Click [here](https://dev.d11el1twchxpia.amplifyapp.com/index.html) for sample report.
 
 ***Important note***: *The generated report has to be hosted locally and MUST NOT be internet accessible*
 
@@ -176,6 +176,9 @@ Besides the HTML report, you can also find two JSON files that record the findin
 
 ## Contributing to service-screener
 We encourage public contributions! Please review [CONTRIBUTING](./CONTRIBUTING.md) for details on our code of conduct and development process.
+
+## Development Guide
+A comprehensive development guide is available at [Development Guide](./docs/DevelopmentGuide.md).
 
 ## Contact
 Please review [CONTRIBUTING](./CONTRIBUTING.md) to raise any issues. 

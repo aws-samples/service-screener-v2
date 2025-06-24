@@ -58,7 +58,7 @@ class ArguParser:
         },
         "frameworks": {
             "required": False,
-            "default": 'MSR,FTR,SSB,WAFS,CIS,NIST,RMiT,SPIP'
+            "default": 'MSR,FTR,SSB,WAFS,CIS,NIST,RMiT,SPIP,RBI'
         },
         "others":{
             "required": False,

@@ -1,0 +1,52 @@
+{
+    "metadata": {
+        "originator": "RBI",
+        "shortname": "RBI Guidelines",
+        "fullname": "Reserve Bank of India (RBI) Cloud Computing Guidelines",
+        "description": "The Reserve Bank of India (RBI) has issued guidelines for regulated entities on cloud adoption and security. This framework maps AWS services and configurations to RBI compliance requirements, helping financial institutions in India ensure their cloud deployments meet regulatory standards.",
+        "_": "https://www.rbi.org.in/Scripts/NotificationUser.aspx?Id=11218",
+        "emptyCheckDefaultMsg": "<small><i>Please refer to the RBI Cloud Computing Guidelines section for further details. Kindly provide evidence or artifacts demonstrating compliance with the respective control.</i></small>"
+    },
+    "mapping": {
+        "Data Security and Privacy": {
+            "1.1": ["kms.KeyRotationEnabled", "kms.KeyInPendingDeletion"],
+            "1.2": ["s3.ServerSideEncrypted", "s3.SSEWithKMS", "ec2.EBSEncrypted", "rds.StorageEncrypted", "redshift.EncryptedAtRest", "opensearch.EncyptionAtRest"],
+            "1.3": ["s3.TlsEnforced", "apigateway.EncryptionInTransit", "opensearch.TLSEnforced", "opensearch.NodeToNodeEncryption", "redshift.EncryptedInTransit"],
+            "1.4": ["s3.PublicReadAccessBlock", "s3.PublicWriteAccessBlock", "s3.S3AccountPublicAccessBlock", "ec2.EBSSnapshotIsPublic", "rds.PubliclyAccessible", "rds.SnapshotRDSIsPublic", "redshift.PubliclyAccessible"],
+            "1.5": ["s3.BucketVersioning", "s3.BucketLogging"]
+        },
+        "Access Control": {
+            "2.1": ["iam.rootMfaActive", "iam.mfaActive"],
+            "2.2": ["iam.passwordPolicy", "iam.passwordPolicyWeak"],
+            "2.3": ["iam.FullAdminAccess", "iam.ManagedPolicyFullAccessOneServ"],
+            "2.4": ["iam.rootHasAccessKey"],
+            "2.5": ["iam.userNotUsingGroup", "iam.InlinePolicy"],
+            "2.6": ["iam.hasAccessKeyNoRotate90days", "iam.consoleLastAccess90"]
+        },
+        "Monitoring and Logging": {
+            "3.1": ["cloudtrail.NeedToEnableCloudTrail", "cloudtrail.EnableCloudTrailLogging", "cloudtrail.HasOneMultiRegionTrail", "cloudtrail.LogFileValidationEnabled", "cloudtrail.RequiresKmsKey"],
+            "3.2": ["cloudtrail.CloudWatchLogsLogGroupArn", "cloudwatch.SetRetentionDays"],
+            "3.3": ["ec2.VPCFlowLogEnabled"],
+            "3.4": ["apigateway.ExecutionLogging", "redshift.AuditLogging", "opensearch.ApplicationLogs"],
+            "3.5": ["iam.enableGuardDuty"]
+        },
+        "Network Security": {
+            "4.1": ["ec2.SGDefaultInUsed", "ec2.SGSensitivePortOpenToAll", "ec2.SGAllTCPOpen", "ec2.SGAllUDPOpen", "ec2.SGAllPortOpen", "ec2.SGAllPortOpenToAll"],
+            "4.2": ["ec2.EC2SubnetAutoPublicIP", "ec2.EC2InstancePublicIP"],
+            "4.3": ["opensearch.DomainWithinVPC", "redshift.EnhancedVpcRouting"],
+            "4.4": ["apigateway.WAFWACL", "ec2.ELBEnableWAF"]
+        },
+        "Resilience and Business Continuity": {
+            "5.1": ["rds.MultiAZ", "ec2.ELBCrossZone", "ec2.ASGELBHealthCheckEnabled"],
+            "5.2": ["rds.Backup", "dynamodb.disabledPointInTimeRecovery", "efs.AutomatedBackup", "redshift.AutomaticSnapshots"],
+            "5.3": ["rds.DeleteProtection"],
+            "5.4": ["dynamodb.autoScalingStatus", "lambda.lambdaReservedConcurrencyDisabled"]
+        },
+        "Compliance and Governance": {
+            "6.1": ["iam.hasOrganization"],
+            "6.2": ["cloudtrail.EnableTrailS3BucketLogging"],
+            "6.3": ["ec2.EC2DetailedMonitor", "rds.EnhancedMonitor"],
+            "6.4": ["redshift.AutomaticUpgrades"]
+        }
+    }
+}
