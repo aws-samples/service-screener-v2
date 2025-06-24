@@ -14,6 +14,8 @@ class RdsSecretsVsDB(Evaluator):
         super().__init__()
         self.noOfSecret = noOfSecret
         self.noOfDB = noOfDB
+
+        self._resourceName = 'SecretCount#'
         
         self.init()
 

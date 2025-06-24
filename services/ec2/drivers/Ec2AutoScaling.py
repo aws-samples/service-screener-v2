@@ -11,6 +11,9 @@ class Ec2AutoScaling(Evaluator):
         self.elbClient = elbClient
         self.elbClassicClient = elbClassicClient
         self.ec2Client = ec2Client
+
+        self._resourceName = asg['AutoScalingGroupName']
+
         self.init()
         
     def  _checkELBHealthCheckWithoutAssociation(self):

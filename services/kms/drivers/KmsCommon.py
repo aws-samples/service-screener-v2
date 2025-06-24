@@ -16,6 +16,9 @@ class KmsCommon(Evaluator):
         self.results = {}
         self.kms = kms
         self.kmsClient = kmsClient
+
+        self._resourceName = kms['Arn']
+
         # self.__configPrefix = 'kms::' +  + '::' + db['EngineVersion'] + '::'
         self.init()
 

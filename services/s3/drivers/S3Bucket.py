@@ -14,6 +14,8 @@ class S3Bucket(Evaluator):
         super().__init__()
         self.bucket = bucket
         self.s3Client = s3Client
+
+        self._resourceName = bucket
         
         self.init()
 

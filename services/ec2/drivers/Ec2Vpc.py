@@ -9,6 +9,9 @@ class Ec2Vpc(Evaluator):
         self.vpc = vpc
         self.flowLogs = flowLogs
         self.ec2Client = ec2Client
+
+        self._resourceName = vpc['VpcId']
+
         self.init()
         return
         

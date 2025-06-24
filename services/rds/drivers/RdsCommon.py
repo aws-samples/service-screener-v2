@@ -24,11 +24,15 @@ class RdsCommon(Evaluator):
         self.isCluster = True
         if 'DBInstanceIdentifier' in db:
             self.isCluster = False
+            self._resourceName = self.db['DBInstanceIdentifier']
+        else:
+            self._resourceName = self.db['DBClusterIdentifier']
             
         self.init()
         self.getInstInfo()
         self.getCAInfo()
         self.loadParameterInfo()
+
         
         
     def setEngine(self, engine):

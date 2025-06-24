@@ -16,8 +16,7 @@ DELIVERABLES:
 1. Main service class: services/[service]/[Service].py
 2. Driver classes: services/[service]/drivers/[Driver].py (one per resource type)
 3. Reporter config: services/[service]/[service].reporter.json
-4. Config.py updates: Add service mapping to SERVICES_IDENTIFIER_MAPPING
-5. Test script: test_[service].py
+4. Test script: test_[service].py
 
 IMPLEMENTATION REQUIREMENTS:
 - Follow exact naming conventions from development guide

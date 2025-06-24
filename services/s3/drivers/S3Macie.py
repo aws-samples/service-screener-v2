@@ -14,6 +14,8 @@ class S3Macie(Evaluator):
         super().__init__()
         self.macieV2Client = macieV2Client
         
+        self._resourceName = 'Macie'
+
         self.init()
     
     def _checkMacieEnable(self):

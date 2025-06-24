@@ -12,6 +12,8 @@ class CloudtrailCommon(Evaluator):
         self.snsClient = snsClient
         self.s3Client = s3Client
         
+        self._resourceName = trail['TrailARN']
+
         r = self.ctClient.describe_trails(
             trailNameList=[self.trail['TrailARN']]
         )

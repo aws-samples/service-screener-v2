@@ -201,6 +201,11 @@ class LogGroupDriver(Evaluator):
         self.addII('creationTime', log_group.get('creationTime'))
         self.addII('retentionInDays', log_group.get('retentionInDays'))
         
+        #### MUST CHANGE 
+        # self._resourceName is the unique identify for this resource being scanned
+        # this is a STRING
+        self._resourceName = log_group['logGroupName']
+
         self.init()
     
     def _checkRetentionPolicy(self):
@@ -338,19 +343,6 @@ Edit the generated `services/logs/logs.reporter.json` and replace the template w
             "[CloudWatch Logs pricing]<https://aws.amazon.com/cloudwatch/pricing/>"
         ]
     }
-}
-```
-
-#### Step 6: Register the Service
-
-# TODO: Update this section
-
-Add your service to `utils/Config.py` in the `SERVICES_IDENTIFIER_MAPPING`:
-
-```python
-SERVICES_IDENTIFIER_MAPPING = {
-    # ... existing mappings ...
-    'loggroupdriver': ['ATTR', 'log_group_name'],
 }
 ```
 

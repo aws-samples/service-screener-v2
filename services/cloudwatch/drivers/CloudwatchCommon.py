@@ -23,6 +23,9 @@ class CloudwatchCommon(Evaluator):
         
         self.log = log
         self.logClient = logClient
+
+        self._resourceName = log['logGroupName']
+
         return
     
     ###### TO DO #####

@@ -9,6 +9,9 @@ class EfsDriver(Evaluator):
         self.__config_prefix = 'efs::'
 
         self.results = {}
+
+        self._resourceName = efs['FileSystemId']
+
         self.init()
 
     def _checkEncrypted(self):

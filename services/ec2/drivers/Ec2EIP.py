@@ -10,6 +10,9 @@ class Ec2EIP(Evaluator):
     def __init__(self, eip):
         super().__init__()
         self.eip = eip
+
+        self._resourceName = eip['PublicIp']
+
         self.init()
         
     def _checkEIPInUse(self):

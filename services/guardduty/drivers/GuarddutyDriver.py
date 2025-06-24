@@ -15,6 +15,9 @@ class GuarddutyDriver(Evaluator):
         self.region = region
         self.detector_id = detector_id
         self.gd_client = guardduty_client
+
+        self._resourceName = detector_id
+
         self.init()
 
     def _checkFindings(self):

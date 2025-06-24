@@ -20,6 +20,8 @@ class EksCommon(Evaluator):
         self.eksClient = eksClient
         self.ec2Client = ec2Client
         self.iamClient = iamClient
+
+        self._resourceName = eksCluster
         
         self.init()
         

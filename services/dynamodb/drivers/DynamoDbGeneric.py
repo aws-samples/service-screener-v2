@@ -20,6 +20,8 @@ class DynamoDbGeneric(Evaluator):
         self.appScalingPolicyClient = appScalingPolicyClient
         self.backupClient = backupClient
         self.cloudTrailClient = cloudTrailClient
+
+        self._resourceName = 'General'
         
     # logic to check service limits Max table / region
     def _check_service_limits_max_table_region(self):

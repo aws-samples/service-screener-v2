@@ -8,6 +8,9 @@ class Ec2CostExplorerRecs(Evaluator):
     def __init__(self,ceClient):
         super().__init__()
         self.ceClient = ceClient
+
+        self._resourceName = 'ReservedInstance&SavingPlans'
+
         self.init()
 
    # checks

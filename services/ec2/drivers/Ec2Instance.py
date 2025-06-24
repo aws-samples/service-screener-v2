@@ -28,6 +28,9 @@ class Ec2Instance(Evaluator):
         self.cwClient = cwClient
         self.ec2InstanceData = ec2InstanceData
         self.setTimeDeltaInDays()
+
+        self._resourceName = ec2InstanceData['InstanceId']
+
         self.init()
         
         self.getImageInfo()

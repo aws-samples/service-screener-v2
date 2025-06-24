@@ -15,6 +15,9 @@ class Ec2EbsVolume(Evaluator):
         self.ec2Client = ec2Client
         self.ebsVolumeData = ebsVolumeData
         self.cwClient = cwClient
+
+        self._resourceName = ebsVolumeData['VolumeId']
+
         self.setCreateTimeDeltaInDays()
         self.init()
         

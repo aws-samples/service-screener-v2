@@ -9,6 +9,9 @@ class IamGroup(IamCommon):
         self.group = group
         self.iamClient = iamClient
         self.__configPrefix = 'iam::group::'
+
+        self._resourceName = group['GroupName']
+
         self.init()
         
     def _checkGroupHasUsers(self):

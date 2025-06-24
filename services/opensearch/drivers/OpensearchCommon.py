@@ -36,6 +36,9 @@ class OpensearchCommon(Evaluator):
             self.instance_type_list.append(details["InstanceType"])
     
         # Initialize the evaluator.
+
+        self._resourceName = domain
+
         self.init()
     
     def getCloudWatchData(self, metric, statistics=["Average"], time_ago=300, period=300):

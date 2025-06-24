@@ -68,7 +68,7 @@ class Elasticache(Service):
             return sorted([Version(v) for v in engine_versions], reverse=True)
 
         try:
-            for i in ['memcached', 'redis']:
+            for i in ['memcached', 'redis', 'valkey']:
                 lookup[i] = get_version(i)
         except botocore.exceptions.ClientError as e:
             # print out error to console for now
@@ -193,7 +193,7 @@ class Elasticache(Service):
             if cluster.get('Engine') == 'memcached':
                 obj = ElasticacheMemcached(
                     cluster, self.elasticacheClient, self.driverInfo)
-            if cluster.get('Engine') == 'redis':
+            if cluster.get('Engine') in ['redis', 'valkey']:
                 obj = ElasticacheRedis(
                     cluster, self.elasticacheClient, self.driverInfo)
 

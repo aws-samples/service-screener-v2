@@ -8,6 +8,9 @@ class Ec2NACL(Evaluator):
         super().__init__()
         self.nacl = nacl
         self.ec2Client = ec2Client
+
+        self._resourceName = nacl['NetworkAclId']
+
         self.init()
         return
     

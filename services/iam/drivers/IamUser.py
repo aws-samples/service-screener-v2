@@ -11,6 +11,8 @@ class IamUser(IamCommon):
         super().__init__()
         self.user = user
         self.iamClient = iamClient
+
+        self._resourceName = user['user']
         
         self.init()
 

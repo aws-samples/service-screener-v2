@@ -10,6 +10,9 @@ class Ec2ElbClassic(Evaluator):
         super().__init__()
         self.elb = elb
         self.elbClient = elbClient
+
+        self._resourceName = elb['LoadBalancerName']
+
         self.init()
         
     def _checkClassicLoadBalancer(self):
