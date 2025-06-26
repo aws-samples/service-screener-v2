@@ -8,7 +8,7 @@ Before you begin, please read the following document ./docs/ai-context.md if you
 This will give you an understanding of Service Screener.
 
 REQUIREMENTS:
-Define checks for service: [AWS_SERVICE_NAME]
+Define checks for service: `{AWS_SERVICE_NAME}`
 
 DELIVERABLES:
 Provide a structured list of checks in JSON format with the following fields.
