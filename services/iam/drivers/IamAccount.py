@@ -55,16 +55,18 @@ class IamAccount(IamCommon):
             if policy in ['AllowUsersToChangePassword', 'ExpirePasswords']:
                 continue
             
-            if policy == 'MinimumPasswordLength' and value >= 14:
-                score += 1
-                self.results['passwordPolicyReuse'] = [-1, value]
+            if policy == 'MinimumPasswordLength':
+                if value >= 12:
+                    score += 1
+                else:
+                    self.results['passwordPolicyLength'] = [-1, value]
                 continue
 
             if policy == 'MaxPasswordAge' and value <= 90:
                 score += 1
                 continue
 
-            if policy == 'PasswordReusePrevention' and value >= 24:
+            if policy == 'PasswordReusePrevention' and value >= 6:
                 score += 1
                 self.results['passwordPolicyReuse'] = [-1, value]
                 continue
