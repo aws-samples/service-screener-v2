@@ -1,0 +1,21 @@
+{
+ "metadata": {
+   "version": "1.0",
+   "description": "Example suppression configuration"
+ },
+ "suppressions": [
+   {
+     "service": "s3",
+     "rule": "BucketReplication"
+   },
+   {
+     "service": "s3",
+     "rule": "BucketLifecycle"
+   },
+   {
+     "service": "s3",
+     "rule": "BucketVersioning",
+     "resource_id": ["Bucket::jfnlewis-large-image-store"]
+   }
+ ]
+}

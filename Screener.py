@@ -26,7 +26,23 @@ class Screener:
     
     @staticmethod
     def scanByService(service, regions, filters):
+        """
+        Scans AWS resources for a specific service across regions and applies filters.
+        
+        Args:
+            service: AWS service to scan (e.g., 'ec2', 'iam')
+            regions: List of AWS regions to scan
+            filters: Optional filters to apply to the scan
+        """
         _cli_options = Config.get('_SS_PARAMS', {})
+        
+        # Re-initialize suppressions manager in worker process if needed
+        suppress_file = _cli_options.get('suppress_file')
+        if suppress_file and not Config.get('suppressions_manager'):
+            from utils.SuppressionsManager import SuppressionsManager
+            suppressions_manager = SuppressionsManager()
+            if suppressions_manager.load_suppressions(suppress_file):
+                Config.set('suppressions_manager', suppressions_manager)
         
         _zeroCount = {
             'resources': 0,
@@ -187,6 +203,15 @@ class Screener:
         
         stsInfo = Config.get('stsInfo')
 
+        # Re-initialize suppressions manager if needed in main process
+        _cli_options = Config.get('_SS_PARAMS', {})
+        suppress_file = _cli_options.get('suppress_file')
+        if suppress_file and not Config.get('suppressions_manager'):
+            from utils.SuppressionsManager import SuppressionsManager
+            suppressions_manager = SuppressionsManager()
+            if suppressions_manager.load_suppressions(suppress_file):
+                Config.set('suppressions_manager', suppressions_manager)
+
         # generate raw findings json file
         with open(htmlFolder + '/api-raw.json', 'w') as f:
             json.dump(contexts, f)
@@ -223,7 +248,8 @@ class Screener:
 
             ## <TODO>
             if service not in ['guardduty']:
-                excelObj.generateWorkSheet(service, reporter.cardSummary)
+                suppressedCardSummary = reporter.getSuppressedCardSummary()
+                excelObj.generateWorkSheet(service, reporter.cardSummary, suppressedCardSummary)
 
             if not service in apiResultArray:
                 apiResultArray[service] = {'summary': {}, 'detail': {}}

@@ -40,12 +40,17 @@ class ExcelBuilder:
         self.xlsxFormat['wrapText'] = self.obj.add_format().set_text_wrap()
         self.xlsxFormat['border'] = self.obj.add_format({'border': 1})
     
-    def generateWorkSheet(self, service, raw):
+    def generateWorkSheet(self, service, raw, suppressedRaw=None):
         service = service.upper()
         
         sh = self.obj.add_worksheet(service)
 
         data = self._formatReporterDataToArray(service, raw)
+        
+        # Add suppressed items if available
+        if suppressedRaw:
+            suppressedData = self._formatSuppressedReporterDataToArray(service, suppressedRaw)
+            data.extend(suppressedData)
         
         self.writeRowsInArray(sh, self.SHEET_HEADER, 0, 0)
         self.writeRowsInArray(sh, data, 1, 0)
@@ -205,6 +210,32 @@ class ExcelBuilder:
                         resource,
                         self._getCriticallyName(detail['criticality']),
                         'New'
+                    ])
+        return arr
+    
+    def _formatSuppressedReporterDataToArray(self, service, suppressedCardSummary):
+        """Format suppressed findings for Excel with 'Suppressed' status"""
+        arr = []
+        for check, detail in suppressedCardSummary.items():
+            if not detail.get('__links'):
+                detail['__links'] = ''
+            
+            if not service in self.recommendations:
+                self.recommendations[service] = {}
+                
+            # Add to recommendations if not already there
+            if check not in self.recommendations[service]:
+                self.recommendations[service][check] = [detail['shortDesc'], detail['__links']]
+                
+            for region, resources in detail['__affectedResources'].items():
+                for resource in resources:
+                    arr.append([
+                        region,
+                        check,
+                        self._getPillarName(detail['__categoryMain']),
+                        resource,
+                        self._getCriticallyName(detail['criticality']),
+                        'Suppressed'  # Set status to Suppressed
                     ])
         return arr
     

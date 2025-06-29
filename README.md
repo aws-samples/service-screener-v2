@@ -87,8 +87,37 @@ screener --regions ap-southeast-1 --tags env=prod%department=hr,coe
 screener --regions ALL
 ```
 
+**Example 7: Run with suppression file to ignore specific findings**
+``` bash
+screener --regions us-east-1 --services s3 --suppress_file ./suppressions.json
+```
 
 ## Other parameters
+
+### Suppression File
+To suppress specific findings, create a JSON file with the suppressions and use the `--suppress-file` parameter:
+
+```json
+{
+ "metadata": {
+   "version": "1.0",
+   "description": "Your suppression description"
+ },
+ "suppressions": [
+   {
+     "service": "s3",
+     "rule": "BucketReplication"
+   },
+   {
+     "service": "s3",
+     "rule": "BucketVersioning",
+     "resource_id": ["Bucket::my-bucket-name"]
+   }
+ ]
+}
+```
+
+For more details, see the [suppressions documentation](./docs/Suppressions.md).
 
 ### Migration Evaluation ID
 For AWS Partners conducting migration evaluations:

@@ -9,7 +9,8 @@ class ArguParser:
         "t": "test",
         "p": "profile",
         "b": "bucket",
-        "f": "filters"
+        "f": "filters",
+        "u": "suppress_file"
     }
     
     CLI_ARGUMENT_RULES = {
@@ -79,6 +80,11 @@ class ArguParser:
             "required": False,
             "default": False,
             "help": "Enable Beta features"
+        },
+        'suppress_file': {
+            "required": False,
+            "default": None,
+            "help": "Path to JSON file containing suppressions"
         }
     }
 
@@ -87,7 +93,17 @@ class ArguParser:
         parser = argparse.ArgumentParser(prog='Screener', description='Service-Screener, open-source to check your AWS environment against AWS Well-Architected Pillars')
     
         for k, v in ArguParser.CLI_ARGUMENT_RULES.items():
-            parser.add_argument('-' + k[:1], '--' + k, required=v['required'], default=v['default'], help=v.get('help', None))
+            # Get the short option from OPTLISTS if available, otherwise no short option
+            short_opt = None
+            for short, long in ArguParser.OPTLISTS.items():
+                if long == k:
+                    short_opt = short
+                    break
+            
+            if short_opt:
+                parser.add_argument('-' + short_opt, '--' + k, required=v['required'], default=v['default'], help=v.get('help', None))
+            else:
+                parser.add_argument('--' + k, required=v['required'], default=v['default'], help=v.get('help', None))
         
         parser.allow_abbrev = False
         args = vars(parser.parse_args())
