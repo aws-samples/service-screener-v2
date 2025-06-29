@@ -4,7 +4,7 @@ import re
 
 from utils.Config import Config
 import utils.Config as cfg
-from utils.Tools import _warn
+from utils.Tools import _warn, _info
 import constants as _C
 
 class Reporter:
@@ -19,6 +19,12 @@ class Reporter:
         self.warningList = []
         self.stats = {}
         self.findingsCount = 0
+        
+        # Track suppressed items for reporting
+        self.suppressedSummary = {}
+        self.suppressedSummaryRegion = {}
+        self.suppressedDetail = {}
+        self.suppressedCardSummary = {}
         
         folder = service
         if service in Config.KEYWORD_SERVICES:
@@ -60,9 +66,15 @@ class Reporter:
 
     def process(self, serviceObjs):
         dashboard = cfg.dashboard
+        total_suppressed = 0
+        
         for region, objs in serviceObjs.items():
+            region_suppressed = 0
+            
             for identifier, results in objs.items():
-                self._process(region, identifier, results)
+                suppressed = self._process(region, identifier, results)
+                region_suppressed += suppressed
+                total_suppressed += suppressed
                 
             if 'SERV' not in dashboard:
                 dashboard['SERV'] = {self.service: {region: {}}}
@@ -71,6 +83,13 @@ class Reporter:
                 dashboard['SERV'][self.service] = {region: {}}
                 
             dashboard['SERV'][self.service][region] = {'Total': len(objs), 'H': 0}
+            
+            if region_suppressed > 0:
+                print(f"[SUMMARY] Suppressed {region_suppressed} findings in region {region} for service {self.service}")
+        
+        if total_suppressed > 0:
+            print(f"[TOTAL] Suppressed {total_suppressed} findings for service {self.service}")
+            
         return self
         
     def getDetail(self):
@@ -79,8 +98,55 @@ class Reporter:
     def getCard(self):
         return self.cardSummary
     
+    def getSuppressedSummary(self):
+        """Get summary of suppressed findings for reporting"""
+        return self.suppressedSummary
+    
+    def getSuppressedDetail(self):
+        """Get detailed suppressed findings for reporting"""
+        return self.suppressedDetail
+    
+    def getSuppressedCardSummary(self):
+        """Get card summary for suppressed findings"""
+        return getattr(self, 'suppressedCardSummary', {})
+    
     def _process(self, region, identifier, results):
+        # Get suppressions manager if available
+        suppressions_manager = Config.get('suppressions_manager', None)
+        suppressed_count = 0
+        
         for key, info in results.items():
+            # Check if this finding should be suppressed BEFORE processing
+            if suppressions_manager:
+                if suppressions_manager.is_suppressed(self.service, key, identifier):
+                    # Track suppressed finding for reporting
+                    print(f"[SUPPRESSED] {self.service}:{key} for resource {identifier}")
+                    suppressed_count += 1
+                    
+                    # Only track suppressed findings that are failures (status -1)
+                    if info[0] == -1:
+                        # Register suppressed summary info
+                        if key not in self.suppressedSummaryRegion:
+                            self.suppressedSummaryRegion[key] = {}
+                            self.suppressedSummary[key] = []
+                            
+                        if region not in self.suppressedSummaryRegion[key]:
+                            self.suppressedSummaryRegion[key][region] = []
+                        
+                        self.suppressedSummaryRegion[key][region].append(identifier)
+                        self.suppressedSummary[key].append(identifier)
+                        
+                        if region not in self.suppressedDetail:
+                            self.suppressedDetail[region] = {}
+                        
+                        if identifier not in self.suppressedDetail[region]:
+                            self.suppressedDetail[region][identifier] = {}
+                            
+                        self.suppressedDetail[region][identifier][key] = info[1]
+                    
+                    continue
+            
+            # Only process findings that are failures (status -1)
             if info[0] == -1:
                 ## Register summary info
                 if key not in self.summaryRegion:
@@ -101,6 +167,8 @@ class Reporter:
                     
                 # print(identifier, key, info[1])
                 self.detail[region][identifier][key] = info[1]
+                
+        return suppressed_count
 
     def _getConfigValue(self, check, field):
         if check not in self.config:
@@ -255,9 +323,58 @@ class Reporter:
                 resourceByRegion[region] = insts
                 
             self.cardSummary[check]['__affectedResources'] = resourceByRegion
+        
+        # Generate suppressed card summary while config is still available
+        self.suppressedCardSummary = {}
+        for check, items in self.suppressedSummary.items():
+            if check not in self.config:
+                continue
+            
+            self.suppressedCardSummary[check] = self.config[check].copy()
+            
+            # Process Field by Field:
+            # Process description
+            desc = self._getConfigValue(check, '^description')
+            if desc:
+                COUNT = len(items)
+                COUNT = "<strong><u>{}</u></strong>".format(COUNT)
+                self.suppressedCardSummary[check]['^description'] = desc.replace('{$COUNT}', COUNT)
+            
+            # Process category
+            category = self._getConfigValue(check, 'category')
+            if category:
+                self.suppressedCardSummary[check]['__categoryMain'] = category[0]
+                if len(category) > 1:
+                    self.suppressedCardSummary[check]['__categorySub'] = category[1:]
+                
+                if 'category' in self.suppressedCardSummary[check]:
+                    del self.suppressedCardSummary[check]['category']
+            
+            # Process ref
+            ref = self._getConfigValue(check, 'ref')
+            if ref and isinstance(ref, list):
+                links = []
+                for link in ref:
+                    output = re.search(r'\[(.*)\]<(.*)>', link)
+                    if not output:
+                        continue
+                    
+                    links.append("<a href='{}'>{}</a>".format(output.group(2), output.group(1)))
+                
+                self.suppressedCardSummary[check]['__links'] = links
+                if 'ref' in self.suppressedCardSummary[check]:
+                    del self.suppressedCardSummary[check]['ref']
+                
+            resourceByRegion = {}
+            for region, insts in self.suppressedSummaryRegion[check].items():
+                resourceByRegion[region] = insts
+                
+            self.suppressedCardSummary[check]['__affectedResources'] = resourceByRegion
             
         del self.summaryRegion
         del self.summary
+        del self.suppressedSummaryRegion
+        del self.suppressedSummary
         
         return self
         
@@ -342,42 +459,3 @@ class Reporter:
 
         
         return self
-        
-if __name__ == "__main__":
-    from services.PageBuilder import PageBuilder
-    
-    regions = ['ap-southeast-1']
-    services = {'rds': 2, 'ec2': 3, 'iam': 20}
-    obj = {
-        'ap-southeast-1': {
-            'postgres::g2gtest': {
-                'MultiAZ': [-1, 'Off'],
-                'EngineVersionMajor': [1, 'On']
-            },
-            'mysql::mysql-5': {
-                'MultiAZ': [-1, 'Off'],
-                'EngineVersionMajor': [-1, 'Off']
-            },
-            'mysql::mysql-bad': {
-                'MultiAZ': [-1, 'Off'],
-                'EngineVersionMajor': [-1, 'Off']
-            }
-        },
-        'us-east-1': {
-            'oracle::oracletest': {
-                'MultiAZ': [-1, 'Off'],
-                'EngineVersionMajor': [1, 'On']
-            }
-        }
-    }
-    reporter = Reporter('rds')
-    reporter.process(obj).getSummary().getDetails()
-    
-    # o = reporter.getCard()
-    o = reporter.getDetail()
-    # o = reporter.getDashboard()
-    # o = dashboard
-    # print(json.dumps(o, indent=4))
-    
-    pb = PageBuilder('rds', reporter, services, regions)
-    pb.buildPage()

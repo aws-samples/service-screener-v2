@@ -117,11 +117,30 @@ class PageBuilder:
     
     def buildContentSummary(self):
         method = 'buildContentSummary_' + self.template
+        
+        # Check if suppressions are active
+        suppressions_manager = Config.get('suppressions_manager', None)
+        
+        # Create output array
+        output = []
+        
+        # Add suppression notice if suppressions are active
+        if suppressions_manager and suppressions_manager.is_loaded:
+            output.append("<div class='alert alert-info'>")
+            output.append("<h5><i class='icon fas fa-info'></i> Suppressions Active</h5>")
+            output.append("<p>Some findings have been suppressed based on your suppression configuration.</p>")
+            output.append("</div>")
+        
+        # Call the template method
         if hasattr(self, method):
-            return getattr(self, method)()
+            template_output = getattr(self, method)()
+            if template_output:
+                output.extend(template_output)
         else:
             cls = self.__class__.__name__
             print("[{}] Template for ContentSummary not found: {}".format(cls, method))
+        
+        return output
     
     def buildContentDetail(self):
         method = 'buildContentDetail_' + self.template
