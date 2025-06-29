@@ -124,13 +124,6 @@ class PageBuilder:
         # Create output array
         output = []
         
-        # Add suppression notice if suppressions are active
-        if suppressions_manager and suppressions_manager.is_loaded:
-            output.append("<div class='alert alert-info'>")
-            output.append("<h5><i class='icon fas fa-info'></i> Suppressions Active</h5>")
-            output.append("<p>Some findings have been suppressed based on your suppression configuration.</p>")
-            output.append("</div>")
-        
         # Call the template method
         if hasattr(self, method):
             template_output = getattr(self, method)()
@@ -139,6 +132,45 @@ class PageBuilder:
         else:
             cls = self.__class__.__name__
             print("[{}] Template for ContentSummary not found: {}".format(cls, method))
+        
+        # Add suppression modal if suppressions are active
+        if suppressions_manager and suppressions_manager.is_loaded:
+            modal_html = self.generateSuppressionModal(suppressions_manager)
+            output.append(modal_html)
+            
+            # Add JavaScript to handle modal
+            modal_js = '''
+// Handle suppression modal
+$(document).ready(function() {
+    $('#suppressionIndicator').click(function(e) {
+        e.preventDefault();
+        $('#suppressionModal').modal('show');
+    });
+    
+    // Ensure modal can be closed
+    $('#suppressionModalClose, #suppressionModalCloseBtn').click(function() {
+        $('#suppressionModal').modal('hide');
+    });
+    
+    // Handle backdrop click
+    $('#suppressionModal').on('click', function(e) {
+        if (e.target === this) {
+            $(this).modal('hide');
+        }
+    });
+    
+    // Fix for modal backdrop issues
+    $('#suppressionModal').on('shown.bs.modal', function() {
+        $('body').addClass('modal-open');
+    });
+    
+    $('#suppressionModal').on('hidden.bs.modal', function() {
+        $('body').removeClass('modal-open');
+        $('.modal-backdrop').remove();
+    });
+});
+'''
+            self.addJS(modal_js)
         
         return output
     
@@ -447,9 +479,14 @@ class PageBuilder:
 
         #file_get_post_css
         headerPostCSS = open(self._getTemplateByKey('header.postcss'), 'r').read()
+        
+        # Generate suppression indicator
+        suppression_indicator = self.generateSuppressionIndicator()
+        
         output.append(
             headerPostCSS.replace('{$ADVISOR_TITLE}', Config.ADVISOR['TITLE'])
                 .replace('{$OPTIONS_ACCOUNTS', self.accountListsHTML())
+                .replace('{$SUPPRESSION_INDICATOR}', suppression_indicator)
         )
         
         js = """
@@ -464,6 +501,126 @@ $('#changeAcctId').change(function(){
         self.addJS(js)
 
         return output
+    
+    def generateSuppressionIndicator(self):
+        """Generate the suppression indicator for the header"""
+        suppressions_manager = Config.get('suppressions_manager', None)
+        
+        if not suppressions_manager or not suppressions_manager.is_loaded:
+            return ""
+        
+        # Only return the indicator button, modal will be added separately
+        indicator_html = '''
+      <li class="nav-item">
+        <a class="nav-link" href="#" role="button" id="suppressionIndicator" title="View Suppression Configuration">
+          <i class="fas fa-eye-slash text-warning"></i>
+          <span class="d-none d-md-inline ml-1">Suppression Active</span>
+        </a>
+      </li>'''
+        
+        return indicator_html
+    
+    def generateSuppressionModal(self, suppressions_manager):
+        """Generate the suppression modal HTML"""
+        suppression_config_html = self.generateSuppressionConfigHTML(suppressions_manager)
+        
+        modal_html = f'''
+<!-- Suppression Configuration Modal -->
+<div class="modal fade" id="suppressionModal" tabindex="-1" role="dialog" aria-labelledby="suppressionModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header bg-warning">
+        <h5 class="modal-title" id="suppressionModalLabel">
+          <i class="fas fa-eye-slash"></i> Suppression Configuration
+        </h5>
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close" id="suppressionModalClose">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body">
+        {suppression_config_html}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-dismiss="modal" id="suppressionModalCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+</div>'''
+        
+        return modal_html
+    
+    def generateSuppressionConfigHTML(self, suppressions_manager):
+        """Generate human-readable HTML for suppression configuration"""
+        if not suppressions_manager or not suppressions_manager.is_loaded:
+            return "<p>No suppressions active.</p>"
+        
+        html_parts = []
+        
+        # Add summary
+        service_rule_count = len(suppressions_manager.suppressions.get('service_rules', {}))
+        resource_specific_count = sum(
+            len(resources) for service_rules in suppressions_manager.suppressions.get('resource_specific', {}).values() 
+            for resources in service_rules.values()
+        )
+        
+        html_parts.append(f'''
+        <div class="alert alert-info">
+          <h6><i class="fas fa-info-circle"></i> Summary</h6>
+          <p><strong>{service_rule_count}</strong> service-level suppressions and <strong>{resource_specific_count}</strong> resource-specific suppressions are active.</p>
+        </div>
+        ''')
+        
+        # Service-level suppressions
+        service_rules = suppressions_manager.suppressions.get('service_rules', {})
+        if service_rules:
+            html_parts.append('<h6><i class="fas fa-layer-group"></i> Service-Level Suppressions</h6>')
+            html_parts.append('<div class="table-responsive">')
+            html_parts.append('<table class="table table-sm table-striped">')
+            html_parts.append('<thead><tr><th>Service</th><th>Rule</th><th>Description</th></tr></thead>')
+            html_parts.append('<tbody>')
+            
+            for service, rules in service_rules.items():
+                for rule in rules:
+                    description = f"All {rule} findings for {service.upper()} service are suppressed"
+                    html_parts.append(f'''
+                    <tr>
+                      <td><span class="badge badge-primary">{service.upper()}</span></td>
+                      <td><code>{rule}</code></td>
+                      <td>{description}</td>
+                    </tr>
+                    ''')
+            
+            html_parts.append('</tbody></table></div>')
+        
+        # Resource-specific suppressions
+        resource_specific = suppressions_manager.suppressions.get('resource_specific', {})
+        if resource_specific:
+            html_parts.append('<h6><i class="fas fa-cube"></i> Resource-Specific Suppressions</h6>')
+            html_parts.append('<div class="table-responsive">')
+            html_parts.append('<table class="table table-sm table-striped">')
+            html_parts.append('<thead><tr><th>Service</th><th>Rule</th><th>Resources</th></tr></thead>')
+            html_parts.append('<tbody>')
+            
+            for service, service_rules in resource_specific.items():
+                for rule, resources in service_rules.items():
+                    resources_html = []
+                    for resource in resources:
+                        resources_html.append(f'<span class="badge badge-secondary mr-1">{resource}</span>')
+                    
+                    html_parts.append(f'''
+                    <tr>
+                      <td><span class="badge badge-primary">{service.upper()}</span></td>
+                      <td><code>{rule}</code></td>
+                      <td>{"".join(resources_html)}</td>
+                    </tr>
+                    ''')
+            
+            html_parts.append('</tbody></table></div>')
+        
+        if not service_rules and not resource_specific:
+            html_parts.append('<p class="text-muted">No suppression rules configured.</p>')
+        
+        return ''.join(html_parts)
     
     def accountListsHTML(self):
         accts = Config.get("ListOfAccounts", None)
@@ -634,11 +791,39 @@ $('#changeAcctId').change(function(){
         output.append(self._buildIndividualKpiCard(stats['rules'], 'rules'))
         
         output.append(self._buildIndividualKpiCard(stats['checksCount'], 'checksCount'))
-        output.append(self._buildIndividualKpiCard(stats['exceptions'], 'exceptions'))
+        
+        # Comment out exceptions and replace with suppressions
+        # output.append(self._buildIndividualKpiCard(stats['exceptions'], 'exceptions'))
+        
+        # Calculate suppression count
+        suppression_count = self._getSuppressionCount()
+        output.append(self._buildIndividualKpiCard(suppression_count, 'suppressions'))
         
         output.append(self._buildIndividualKpiCard(str(round(stats['timespent'], 3)) + 's', 'timespent'))
         
         return output
+        
+    def _getSuppressionCount(self):
+        """Calculate the total number of suppressions active"""
+        suppressions_manager = Config.get('suppressions_manager', None)
+        
+        if not suppressions_manager or not suppressions_manager.is_loaded:
+            return 0
+        
+        total_count = 0
+        
+        # Count service-level suppressions
+        service_rules = suppressions_manager.suppressions.get('service_rules', {})
+        for service, rules in service_rules.items():
+            total_count += len(rules)
+        
+        # Count resource-specific suppressions
+        resource_specific = suppressions_manager.suppressions.get('resource_specific', {})
+        for service, service_rules in resource_specific.items():
+            for rule, resources in service_rules.items():
+                total_count += len(resources)
+        
+        return total_count
         
     def _buildIndividualKpiCard(self, stat, cat):
         settings = {
@@ -662,9 +847,14 @@ $('#changeAcctId').change(function(){
                 'icon': 'check-double',
                 'bg': 'secondary'
             },
-            'exceptions': {
-                'description': 'Exception',
-                'icon': 'radiation-alt',
+            # 'exceptions': {
+            #     'description': 'Exception',
+            #     'icon': 'radiation-alt',
+            #     'bg': 'danger'
+            # },
+            'suppressions': {
+                'description': 'Suppressions',
+                'icon': 'eye-slash',
                 'bg': 'danger'
             },
             'timespent': {
