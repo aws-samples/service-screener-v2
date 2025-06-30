@@ -45,12 +45,6 @@ crossAccounts = True if crossAccounts in _C.CLI_TRUE_KEYWORD_ARRAY or crossAccou
 beta = True if beta in _C.CLI_TRUE_KEYWORD_ARRAY or beta is True else False
 _cli_options['crossAccounts'] = crossAccounts
 
-# Load suppressions if a file is provided
-if suppress_file:
-    suppressions_manager = SuppressionsManager()
-    if suppressions_manager.load_suppressions(suppress_file):
-        Config.set('suppressions_manager', suppressions_manager)
-
 # <TODO> analyse the impact profile switching
 _AWS_OPTIONS = {
     'signature_version': Config.AWS_SDK['signature_version']
@@ -59,6 +53,12 @@ _AWS_OPTIONS = {
 Config.init()
 Config.set('_AWS_OPTIONS', _AWS_OPTIONS)
 Config.set('DEBUG', DEBUG)
+
+# Load suppressions if a file is provided (AFTER Config.init())
+if suppress_file:
+    suppressions_manager = SuppressionsManager()
+    if suppressions_manager.load_suppressions(suppress_file):
+        Config.set('suppressions_manager', suppressions_manager)
 Config.set('beta', beta)
 
 _AWS_OPTIONS = {
@@ -229,10 +229,16 @@ for acctId, cred in rolesCred.items():
     if 'iam' in services:
         input_ranges['iam'] = ('iam', regions, filters)
 
-    input_ranges.update({service: (service, regions, filters) for service in services if service not in special_services})
+    # Get suppressions manager to pass to worker processes
+    suppressions_manager = Config.get('suppressions_manager')
+
+    input_ranges.update({service: (service, regions, filters, suppressions_manager) for service in services if service not in special_services})
 
     if 's3' in services:
-        input_ranges['s3'] = ('s3', regions, filters)
+        input_ranges['s3'] = ('s3', regions, filters, suppressions_manager)
+
+    if 'iam' in input_ranges:
+        input_ranges['iam'] = ('iam', regions, filters, suppressions_manager)
 
     input_ranges = list(input_ranges.values())
 

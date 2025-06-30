@@ -12,6 +12,14 @@ class SuppressionsManager:
         self.suppressions = {}
         self.is_loaded = False
         self.suppression_count = 0
+    
+    def __getstate__(self):
+        """Support for pickling (multiprocessing compatibility)."""
+        return self.__dict__
+    
+    def __setstate__(self, state):
+        """Support for unpickling (multiprocessing compatibility)."""
+        self.__dict__.update(state)
         
     def load_suppressions(self, file_path):
         """
