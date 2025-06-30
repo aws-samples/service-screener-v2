@@ -25,21 +25,8 @@ class Screener:
         pass
     
     @staticmethod
-    def scanByService(service, regions, filters, suppressions_manager=None):
-        """
-        Scans AWS resources for a specific service across regions and applies filters.
-        
-        Args:
-            service: AWS service to scan (e.g., 'ec2', 'iam')
-            regions: List of AWS regions to scan
-            filters: Optional filters to apply to the scan
-            suppressions_manager: Pre-initialized SuppressionsManager object
-        """
+    def scanByService(service, regions, filters):
         _cli_options = Config.get('_SS_PARAMS', {})
-        
-        # Set the suppressions manager directly if provided
-        if suppressions_manager and not Config.get('suppressions_manager'):
-            Config.set('suppressions_manager', suppressions_manager)
         
         _zeroCount = {
             'resources': 0,

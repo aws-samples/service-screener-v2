@@ -229,16 +229,13 @@ for acctId, cred in rolesCred.items():
     if 'iam' in services:
         input_ranges['iam'] = ('iam', regions, filters)
 
-    # Get suppressions manager to pass to worker processes
-    suppressions_manager = Config.get('suppressions_manager')
-
-    input_ranges.update({service: (service, regions, filters, suppressions_manager) for service in services if service not in special_services})
+    input_ranges.update({service: (service, regions, filters) for service in services if service not in special_services})
 
     if 's3' in services:
-        input_ranges['s3'] = ('s3', regions, filters, suppressions_manager)
+        input_ranges['s3'] = ('s3', regions, filters)
 
     if 'iam' in input_ranges:
-        input_ranges['iam'] = ('iam', regions, filters, suppressions_manager)
+        input_ranges['iam'] = ('iam', regions, filters)
 
     input_ranges = list(input_ranges.values())
 
