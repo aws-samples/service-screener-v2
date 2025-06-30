@@ -234,9 +234,6 @@ for acctId, cred in rolesCred.items():
     if 's3' in services:
         input_ranges['s3'] = ('s3', regions, filters)
 
-    if 'iam' in input_ranges:
-        input_ranges['iam'] = ('iam', regions, filters)
-
     input_ranges = list(input_ranges.values())
 
     pool = Pool(processes=int(workerCounts))
