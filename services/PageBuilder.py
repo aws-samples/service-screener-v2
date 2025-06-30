@@ -853,7 +853,7 @@ $('#changeAcctId').change(function(){
             #     'bg': 'danger'
             # },
             'suppressions': {
-                'description': 'Suppressions',
+                'description': 'Suppressed',
                 'icon': 'eye-slash',
                 'bg': 'danger'
             },
