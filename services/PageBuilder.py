@@ -795,35 +795,11 @@ $('#changeAcctId').change(function(){
         # Comment out exceptions and replace with suppressions
         # output.append(self._buildIndividualKpiCard(stats['exceptions'], 'exceptions'))
         
-        # Calculate suppression count
-        suppression_count = self._getSuppressionCount()
-        output.append(self._buildIndividualKpiCard(suppression_count, 'suppressions'))
+        output.append(self._buildIndividualKpiCard(self.reporter.suppressedCount, 'suppressions'))
         
         output.append(self._buildIndividualKpiCard(str(round(stats['timespent'], 3)) + 's', 'timespent'))
         
         return output
-        
-    def _getSuppressionCount(self):
-        """Calculate the total number of suppressions active"""
-        suppressions_manager = Config.get('suppressions_manager', None)
-        
-        if not suppressions_manager or not suppressions_manager.is_loaded:
-            return 0
-        
-        total_count = 0
-        
-        # Count service-level suppressions
-        service_rules = suppressions_manager.suppressions.get('service_rules', {})
-        for service, rules in service_rules.items():
-            total_count += len(rules)
-        
-        # Count resource-specific suppressions
-        resource_specific = suppressions_manager.suppressions.get('resource_specific', {})
-        for service, service_rules in resource_specific.items():
-            for rule, resources in service_rules.items():
-                total_count += len(resources)
-        
-        return total_count
         
     def _buildIndividualKpiCard(self, stat, cat):
         settings = {

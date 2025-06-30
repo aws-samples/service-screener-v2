@@ -19,6 +19,7 @@ class Reporter:
         self.warningList = []
         self.stats = {}
         self.findingsCount = 0
+        self.suppressedCount = 0
         
         # Track suppressed items for reporting
         self.suppressedSummary = {}
@@ -168,6 +169,9 @@ class Reporter:
                 # print(identifier, key, info[1])
                 self.detail[region][identifier][key] = info[1]
                 
+        # Store the total suppressed count for this service
+        self.suppressedCount = suppressed_count
+        
         return suppressed_count
 
     def _getConfigValue(self, check, field):
