@@ -16,6 +16,7 @@ from utils.Config import Config
 from utils.ArguParser import ArguParser
 from utils.CfnTrail import CfnTrail
 from utils.CrossAccountsValidator import CrossAccountsValidator
+from utils.SuppressionsManager import SuppressionsManager
 from utils.Tools import _info, _warn
 import constants as _C
 from utils.AwsRegionSelector import AwsRegionSelector
@@ -35,6 +36,7 @@ filters = _cli_options['tags']
 crossAccounts = _cli_options['crossAccounts']
 workerCounts = _cli_options['workerCounts']
 beta = _cli_options['beta']
+suppress_file = _cli_options['suppress_file']
 
 # print(crossAccounts)
 DEBUG = True if debugFlag in _C.CLI_TRUE_KEYWORD_ARRAY or debugFlag is True else False
@@ -42,7 +44,6 @@ testmode = True if testmode in _C.CLI_TRUE_KEYWORD_ARRAY or testmode is True els
 crossAccounts = True if crossAccounts in _C.CLI_TRUE_KEYWORD_ARRAY or crossAccounts is True else False
 beta = True if beta in _C.CLI_TRUE_KEYWORD_ARRAY or beta is True else False
 _cli_options['crossAccounts'] = crossAccounts
-
 
 # <TODO> analyse the impact profile switching
 _AWS_OPTIONS = {
@@ -52,6 +53,12 @@ _AWS_OPTIONS = {
 Config.init()
 Config.set('_AWS_OPTIONS', _AWS_OPTIONS)
 Config.set('DEBUG', DEBUG)
+
+# Load suppressions if a file is provided (AFTER Config.init())
+if suppress_file:
+    suppressions_manager = SuppressionsManager()
+    if suppressions_manager.load_suppressions(suppress_file):
+        Config.set('suppressions_manager', suppressions_manager)
 Config.set('beta', beta)
 
 _AWS_OPTIONS = {
@@ -209,8 +216,8 @@ for acctId, cred in rolesCred.items():
     files_in_directory = os.listdir(directory)
     filtered_files = [file for file in files_in_directory if (file.endswith(".json") or file=='all.csv')]
     for file in filtered_files:
-    	path_to_file = os.path.join(directory, file)
-    	os.remove(path_to_file)
+        path_to_file = os.path.join(directory, file)
+        os.remove(path_to_file)
     
     with open(directory + '/tail.txt', 'w') as fp:
         pass
@@ -298,8 +305,8 @@ for acctId, cred in rolesCred.items():
     files_in_directory = os.listdir(directory)
     filtered_folders = [folder for folder in files_in_directory if folder.endswith("XX")]
     for folder in filtered_folders:
-    	path_to_folder = os.path.join(directory, folder)
-    	shutil.rmtree(path_to_folder)
+        path_to_folder = os.path.join(directory, folder)
+        shutil.rmtree(path_to_folder)
 
     os.chdir(_C.ROOT_DIR)
     filetodel = _C.ROOT_DIR + '/output.zip'
