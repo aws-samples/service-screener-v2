@@ -187,7 +187,7 @@ screener --regions ap-southeast-1 --others '{"WA": {"region": "ap-southeast-1", 
 The output is generated as a ~/service-screener-v2/output.zip file. 
 You can [download the file](https://docs.aws.amazon.com/cloudshell/latest/userguide/working-with-cloudshell.html#files-storage) in the CloudShell console by clicking the *Download file* button under the *Actions* menu on the top right of the CloudShell console. 
 
-Once downloaded, unzip the file and open 'index.html' in your browser. You should see a page like [this](https://dev.d11el1twchxpia.amplifyapp.com/769655955296/index.html).
+Once downloaded, unzip the file and open 'index.html' in your browser. You should see a page like [this](https://dev.d11el1twchxpia.amplifyapp.com/961319563195/index.html).
 
 Ensure that you can see the service(s) run on listed on the left pane.
 You can navigate to the service(s) listed to see detailed findings on each service. 
