@@ -223,7 +223,8 @@ class Screener:
 
             ## <TODO>
             if service not in ['guardduty']:
-                excelObj.generateWorkSheet(service, reporter.cardSummary)
+                suppressedCardSummary = reporter.getSuppressedCardSummary()
+                excelObj.generateWorkSheet(service, reporter.cardSummary, suppressedCardSummary)
 
             if not service in apiResultArray:
                 apiResultArray[service] = {'summary': {}, 'detail': {}}
