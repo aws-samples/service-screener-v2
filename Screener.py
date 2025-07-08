@@ -254,7 +254,11 @@ class Screener:
 
         emsg = []
         try:
-            cp.buildPage()
+            _cli_options = Config.get('_SS_PARAMS', {})
+            if _cli_options['ztestmode'] == '1':
+                print('skip page build, testmode ON')
+            else:
+                cp.buildPage()
         except Exception:
             print(traceback.format_exc())
             emsg.append(traceback.format_exc())

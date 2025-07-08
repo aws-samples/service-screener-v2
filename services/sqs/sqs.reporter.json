@@ -1,0 +1,146 @@
+{
+    "EncryptionAtRest": {
+        "category": "S",
+        "^description": "You have {$COUNT} SQS queues without server-side encryption enabled. This leaves message data vulnerable to unauthorized access. Enable SSE-SQS or SSE-KMS to encrypt messages at rest.",
+        "shortDesc": "Enable server-side encryption",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Encryption at rest]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-server-side-encryption.html>"
+        ]
+    },
+    "EncryptionInTransit": {
+        "category": "S",
+        "^description": "You have {$COUNT} SQS queues without HTTPS-only access policies. This allows unencrypted data transmission. Add queue policies with aws:SecureTransport condition to enforce HTTPS.",
+        "shortDesc": "Enforce HTTPS-only access",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Enforce HTTPS]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-security-best-practices.html>"
+        ]
+    },
+    "DeadLetterQueue": {
+        "category": "R",
+        "^description": "You have {$COUNT} SQS queues without dead letter queue configuration. Failed messages may be lost permanently. Configure DLQs to capture and analyze failed messages.",
+        "shortDesc": "Configure dead letter queues",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Dead letter queues]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html>"
+        ]
+    },
+    "VisibilityTimeout": {
+        "category": "P",
+        "^description": "You have {$COUNT} SQS queues with default or inappropriate visibility timeout settings. This can cause duplicate message processing or delays. Adjust timeout based on your processing requirements.",
+        "shortDesc": "Optimize visibility timeout",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Visibility timeout]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-visibility-timeout.html>"
+        ]
+    },
+    "MessageRetention": {
+        "category": "C",
+        "^description": "You have {$COUNT} SQS queues with maximum message retention period (14 days). Consider reducing retention time if messages don't need to be stored that long to optimize costs.",
+        "shortDesc": "Optimize message retention period",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": -1,
+        "needFullTest": 1,
+        "ref": [
+            "[Message retention]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-message-metadata.html>"
+        ]
+    },
+    "QueueMonitoring": {
+        "category": "O",
+        "^description": "You have {$COUNT} SQS queues without CloudWatch alarms configured. This limits visibility into queue performance. Set up alarms for key metrics like message count and age.",
+        "shortDesc": "Configure CloudWatch monitoring",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[SQS Handling requests errors]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/handling-request-errors.html>",
+            "[SQS capture problematic messages]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/capturing-problematic-messages.html>"
+        ]
+    },
+    "FifoConfiguration": {
+        "category": "R",
+        "^description": "You have {$COUNT} FIFO queues with suboptimal configuration. Enable content-based deduplication where appropriate and ensure proper message group ID usage for optimal performance.",
+        "shortDesc": "Optimize FIFO queue configuration",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[FIFO queues]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues.html>"
+        ]
+    },
+    "AccessPolicy": {
+        "category": "S",
+        "^description": "You have {$COUNT} SQS queues with overly permissive access policies. This increases security risk. Review and restrict permissions to follow least privilege principle.",
+        "shortDesc": "Implement least privilege access",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Access control]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-security-best-practices.html>"
+        ]
+    },
+    "BatchOperations": {
+        "category": "P",
+        "^description": "Analysis suggests {$COUNT} SQS queues could benefit from batch operations. Consider using SendMessageBatch and ReceiveMessage with MaxNumberOfMessages > 1 to improve performance.",
+        "shortDesc": "Optimize with batch operations",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": -1,
+        "needFullTest": 1,
+        "ref": [
+            "[Batch operations]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-batch-api-actions.html>"
+        ]
+    },
+    "UnusedQueues": {
+        "category": "C",
+        "^description": "You have {$COUNT} SQS queues with no activity in the past 30 days. While SQS queues themselves don't incur charges, unused queues create operational overhead and potential security risks. Review and consider deleting if no longer needed.",
+        "shortDesc": "Remove unused queues",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": -1,
+        "needFullTest": 1,
+        "ref": [
+            "[Cost optimization]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-cost-optimization.html>"
+        ]
+    },
+    "TaggingStrategy": {
+        "category": "O",
+        "^description": "You have {$COUNT} SQS queues without proper tagging. This makes cost allocation and resource management difficult. Implement consistent tagging strategy.",
+        "shortDesc": "Implement proper tagging",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Tagging best practices]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>"
+        ]
+    }
+}
