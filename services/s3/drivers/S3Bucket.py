@@ -134,28 +134,19 @@ class S3Bucket(Evaluator):
             if e.response['Error']['Code'] == 'NoSuchPublicAccessBlockConfiguration':
                 return
 
-        # check ACL  
         public_acl_restricted = False
-        try:
-            resp = self.s3Client.get_bucket_acl(
-                Bucket=self.bucket
-            )
-            self.results['AccessControlList'] = [-1, 'Enabled']
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] ==  'NoSuchAcl':
-                public_acl_restricted = True
-                self.results['AccessControlList'] = [1, 'Disabled']
-
+        bucket_acl = None
         try:
             bucket_acl = self.s3Client.get_bucket_acl(
                 Bucket=self.bucket
             )
-        
+            self.results['AccessControlList'] = [-1, 'Enabled']
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == 'NoSuchAcl':
-                return None
+                public_acl_restricted = True
+                self.results['AccessControlList'] = [1, 'Disabled']
+                # Don't return - continue with public access checks
 
-        # check if S3 bucket has prohibited public reads 
         policy = self.getBucketPolicy()    
 
         if (public_policy_restricted or not self.policyAllowsPublicRead(policy)) and (public_acl_restricted or not self.aclAllowsPublicRead(bucket_acl)):
@@ -197,20 +188,29 @@ class S3Bucket(Evaluator):
 
     def _checkBucketReplication(self):
         try:
-            self.results['BucketReplication'] = [1, 'On']
-
             resp = self.s3Client.get_bucket_replication(
                 Bucket=self.bucket
             )
-            source_loc = self.s3Client.get_bucket_location(
-                Bucket=self.bucket
-            )
-            target_bucket = resp.get('ReplicationConfiguration').get('Rules')[0].get('Destination').get('Bucket').split(':')[-1]     
-            target_loc = self.s3Client.get_bucket_location(
-                Bucket=target_bucket
-            )
-            if source_loc.get('LocationConstraint') != target_loc.get('LocationConstraint'):
-                self.results['CrossRegionReplication'] = [1, 'On']
+            self.results['BucketReplication'] = [1, 'On']
+            
+            # Check if cross-region replication
+            rules = resp.get('ReplicationConfiguration', {}).get('Rules', [])
+            if rules:
+                target_bucket = rules[0].get('Destination', {}).get('Bucket', '').split(':')[-1]
+                if target_bucket:
+                    # Use cached bucket location if available
+                    source_region = Config.get(f's3::bucket_region::{self.bucket}')
+                    if not source_region:
+                        source_loc = self.s3Client.get_bucket_location(Bucket=self.bucket)
+                        source_region = source_loc.get('LocationConstraint') or 'us-east-1'
+                        Config.set(f's3::bucket_region::{self.bucket}', source_region)
+                    
+                    target_loc = self.s3Client.get_bucket_location(Bucket=target_bucket)
+                    target_region = target_loc.get('LocationConstraint') or 'us-east-1'
+                    
+                    if source_region != target_region:
+                        self.results['CrossRegionReplication'] = [1, 'On']
+                        
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == 'ReplicationConfigurationNotFoundError':
                 self.results['BucketReplication'] = [-1, 'Off']
@@ -248,43 +248,51 @@ class S3Bucket(Evaluator):
     
     def _checkIntelligentTiering(self): 
         try:
-            self.results['ObjectsInIntelligentTier'] = [1,'On'] 
-            resp = self.s3Client.list_objects(
-                Bucket = self.bucket,
-                MaxKeys = 1000
+            resp = self.s3Client.list_objects_v2(
+                Bucket=self.bucket,
+                MaxKeys=10  # Check only first 10 objects for performance
             )
-            if not resp.get('Contents'):
+            
+            contents = resp.get('Contents', [])
+            if not contents:
+                self.results['ObjectsInIntelligentTier'] = [1, 'No Objects']
                 return
-            for object in resp.get('Contents'):
-                if object['StorageClass'] != "INTELLIGENTTIERING":
-                    self.results['ObjectsInIntelligentTier'] = [-1,'Off']
-                    return 
+            
+            for obj in contents:
+                storage_class = obj.get('StorageClass', 'STANDARD')
+                if storage_class != 'INTELLIGENT_TIERING':
+                    self.results['ObjectsInIntelligentTier'] = [-1, f'Mixed storage classes (found {storage_class})']
+                    return
+            
+            self.results['ObjectsInIntelligentTier'] = [1, f'Sample of {len(contents)} objects in Intelligent Tiering']
+            
         except botocore.exceptions.ClientError as e:
-            print("[{}] Unable to get Tier Informaton, skip".format(self.bucket))
+            print("[{}] Unable to get Tier Information, skip".format(self.bucket))
+            self.results['ObjectsInIntelligentTier'] = [0, 'Unable to check']
             
     def _checkTls(self):
         self.results['TlsEnforced'] = [-1, 'Off']
+        
+        policy_str = self.getBucketPolicy()
+        if not policy_str:
+            return
+            
         try:
-            resp = self.s3Client.get_bucket_policy(
-                Bucket=self.bucket
-            )
-            policy = json.loads(resp.get('Policy'))
-            for obj in policy['Statement']: 
-                if 'Condition' not in obj:
+            policy = json.loads(policy_str)
+            for statement in policy['Statement']: 
+                condition = statement.get('Condition', {})
+                if not condition:
                     continue
 
-                cc = json.loads(json.dumps(obj['Condition']))
-
-                if obj['Effect'] == "Deny":
-                    for cond in cc:
-                        if 'aws:SecureTransport' in cond and cond['aws:SecureTransport'] == "false":
-                            self.results['TlsEnforced'] = [1, 'On']
-                            return
-
-                if obj['Effect'] == "Allow":
-                    for cond in cc:
-                        if 'aws:SecureTransport' in cond and cond['aws:SecureTransport'] == "true":
-                            self.results['TlsEnforced'] = [1, 'On']
-                            return
-        except botocore.exceptions.ClientError as e:
+                bool_conditions = condition.get('Bool', {})
+                secure_transport = bool_conditions.get('aws:SecureTransport')
+                
+                if statement['Effect'] == "Deny" and secure_transport == "false":
+                    self.results['TlsEnforced'] = [1, 'On']
+                    return
+                elif statement['Effect'] == "Allow" and secure_transport == "true":
+                    self.results['TlsEnforced'] = [1, 'On']
+                    return
+                    
+        except (json.JSONDecodeError, KeyError):
             return
