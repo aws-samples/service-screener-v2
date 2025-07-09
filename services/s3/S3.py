@@ -1,7 +1,6 @@
 import botocore
 import json
 import time
-import concurrent.futures
 
 from utils.Config import Config
 from utils.Tools import _pr, _warn
@@ -44,24 +43,21 @@ class S3(Service):
                     )    
                     arr = arr + results.get('Buckets')
                 
-                # Parallel bucket location fetching for better performance
-                def get_bucket_location_with_name(bucket):
+                # Sequential bucket location fetching (tool already uses multiprocessing)
+                for bucket in arr:
                     try:
                         loc = self.s3Client.get_bucket_location(Bucket=bucket['Name'])
                         reg = loc.get('LocationConstraint') or 'us-east-1'
-                        return bucket, reg
+                        
+                        if reg not in buckets:
+                            buckets[reg] = []
+                        buckets[reg].append(bucket)
                     except Exception as e:
                         print(f"Error getting location for {bucket['Name']}: {e}")
-                        return bucket, 'us-east-1'  # Default region
-                
-                # Use ThreadPoolExecutor for parallel location fetching
-                with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-                    location_results = list(executor.map(get_bucket_location_with_name, arr))
-                
-                for bucket, reg in location_results:
-                    if reg not in buckets:
-                        buckets[reg] = []
-                    buckets[reg].append(bucket)
+                        # Default to us-east-1 on error
+                        if 'us-east-1' not in buckets:
+                            buckets['us-east-1'] = []
+                        buckets['us-east-1'].append(bucket)
                 
             except botocore.exceptions.ClientError as e:
                 Config.set('s3::bucketUnableToList', True)
@@ -108,18 +104,14 @@ class S3(Service):
         objs = {}
         buckets = self.getResources()
         
-        # Process buckets in batches for better memory management
-        batch_size = 20  # Process 20 buckets at a time
-        for i in range(0, len(buckets), batch_size):
-            batch = buckets[i:i + batch_size]
+        # Sequential processing (tool already uses multiprocessing at service level)
+        for bucket in buckets:
+            _pi('S3Bucket', bucket['Name'])
+            obj = S3Bucket(bucket['Name'], self.s3Client)
+            obj.run(self.__class__)
             
-            for bucket in batch:
-                _pi('S3Bucket', bucket['Name'])
-                obj = S3Bucket(bucket['Name'], self.s3Client)
-                obj.run(self.__class__)
-                
-                objs["Bucket::" + bucket['Name']] = obj.getInfo()
-                del obj
+            objs["Bucket::" + bucket['Name']] = obj.getInfo()
+            del obj
         
         _pi('S3Macie')
         obj = S3Macie(self.macieV2Client)

@@ -122,6 +122,7 @@ class S3Bucket(Evaluator):
     def _checkAccess(self):
         self.results['PublicAccessBlock'] = [1, 'On']
         
+        public_policy_restricted = False
         try:
             resp = self.s3Client.get_public_access_block(
                 Bucket=self.bucket
@@ -149,13 +150,20 @@ class S3Bucket(Evaluator):
 
         policy = self.getBucketPolicy()    
 
-        if (public_policy_restricted or not self.policyAllowsPublicRead(policy)) and (public_acl_restricted or not self.aclAllowsPublicRead(bucket_acl)):
+        # Check public read access (handle None bucket_acl)
+        policy_blocks_read = not self.policyAllowsPublicRead(policy)
+        acl_blocks_read = public_acl_restricted or (bucket_acl and not self.aclAllowsPublicRead(bucket_acl))
+        
+        if (public_policy_restricted or policy_blocks_read) and acl_blocks_read:
             self.results['PublicReadAccessBlock'] = [1, 'Prohibited'] 
         else:
             self.results['PublicReadAccessBlock'] = [-1, 'NotProhibited'] 
         
-        # check if S3 bucket has prohibited public writes 
-        if (public_policy_restricted or not self.policyAllowsPublicWrite(policy)) and (public_acl_restricted or not self.aclAllowsPublicWrite(bucket_acl)):
+        # Check public write access (handle None bucket_acl)
+        policy_blocks_write = not self.policyAllowsPublicWrite(policy)
+        acl_blocks_write = public_acl_restricted or (bucket_acl and not self.aclAllowsPublicWrite(bucket_acl))
+        
+        if (public_policy_restricted or policy_blocks_write) and acl_blocks_write:
             self.results['PublicWriteAccessBlock'] = [1, 'Prohibited'] 
         else:
             self.results['PublicWriteAccessBlock'] = [-1, 'NotProhibited'] 
