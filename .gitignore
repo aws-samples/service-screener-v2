@@ -8,6 +8,7 @@ adminlte/aws/**/
 adminlte/aws/**/*.html
 adminlte/aws/**/*.xlsx
 adminlte/aws/**/error.txt
+suppressions.json
 .~c9_invoke*
 pyvenv.cfg
 

@@ -42,7 +42,7 @@ class SqsQueueDriver(Evaluator):
     
     def _checkEncryptionInTransit(self):
         """
-        Check if queue policy enforces HTTPS-only access.
+        Check if queue policy enforces HTTPS-only access or VPC endpoint usage.
         """
         policy_str = self.attributes.get('Policy')
         
@@ -56,19 +56,31 @@ class SqsQueueDriver(Evaluator):
             
             has_secure_transport = False
             has_deny_insecure = False
+            has_vpc_endpoint_only = False
             
             for statement in statements:
                 condition = statement.get('Condition', {})
                 effect = statement.get('Effect', '')
                 
+                # Check for HTTPS enforcement
                 if 'Bool' in condition and 'aws:SecureTransport' in condition['Bool']:
                     secure_transport = condition['Bool']['aws:SecureTransport']
                     if effect.upper() == 'ALLOW' and (secure_transport == 'true' or secure_transport is True):
                         has_secure_transport = True
                     elif effect.upper() == 'DENY' and (secure_transport == 'false' or secure_transport is False):
                         has_deny_insecure = True
+                
+                # Check for VPC endpoint only access
+                if 'StringEquals' in condition and 'aws:sourceVpce' in condition['StringEquals']:
+                    if effect.upper() == 'ALLOW':
+                        has_vpc_endpoint_only = True
+                elif 'StringNotEquals' in condition and 'aws:sourceVpce' in condition['StringNotEquals']:
+                    if effect.upper() == 'DENY':
+                        has_vpc_endpoint_only = True
             
-            if has_secure_transport and has_deny_insecure:
+            if has_vpc_endpoint_only:
+                self.results['EncryptionInTransit'] = [1, 'VPC Endpoint Only (Encrypted)']
+            elif has_secure_transport and has_deny_insecure:
                 self.results['EncryptionInTransit'] = [1, 'HTTPS Enforced (Allow HTTPS & Deny HTTP)']
             elif has_secure_transport:
                 self.results['EncryptionInTransit'] = [0, 'HTTPS Required but HTTP not explicitly denied']
@@ -116,10 +128,10 @@ class SqsQueueDriver(Evaluator):
         visibility_timeout = int(self.attributes.get('VisibilityTimeout', 30))
         
         if visibility_timeout == 30:
-            self.results['VisibilityTimeout'] = [-1, 'Default (30s) - Consider Optimization']
+            self.results['VisibilityTimeout'] = [0, 'Default (30s) - Consider Optimization']
         elif visibility_timeout < 30:
             self.results['VisibilityTimeout'] = [-1, f'{visibility_timeout}s (Too Short)']
-        elif visibility_timeout > 43200:  # 12 hours
+        elif visibility_timeout > 43199:  # 12 hours - 1 second
             self.results['VisibilityTimeout'] = [-1, f'{visibility_timeout}s (Too Long)']
         else:
             self.results['VisibilityTimeout'] = [1, f'{visibility_timeout}s']
@@ -140,23 +152,41 @@ class SqsQueueDriver(Evaluator):
     
     def _checkQueueMonitoring(self):
         """
-        Check if CloudWatch alarms are configured for the queue.
+        Check if CloudWatch alarms are configured for key SQS metrics.
         """
         try:
-            # Check for alarms related to this queue
-            response = self.cloudwatch_client.describe_alarms(
-                AlarmNamePrefix=f'SQS-{self.queue_name}'
-            )
+            # Key SQS metrics to monitor
+            key_metrics = [
+                'ApproximateNumberOfMessages',
+                'ApproximateAgeOfOldestMessage',
+                'NumberOfMessagesSent',
+                'NumberOfMessagesReceived'
+            ]
             
-            alarms = response.get('MetricAlarms', [])
-            queue_alarms = [alarm for alarm in alarms 
-                          if any(dim.get('Value') == self.queue_name 
-                                for dim in alarm.get('Dimensions', []))]
+            total_alarms = 0
+            monitored_metrics = []
             
-            if queue_alarms:
-                self.results['QueueMonitoring'] = [1, f'{len(queue_alarms)} Alarms Configured']
+            for metric_name in key_metrics:
+                response = self.cloudwatch_client.describe_alarms_for_metric(
+                    Namespace='AWS/SQS',
+                    MetricName=metric_name,
+                    Dimensions=[
+                        {
+                            'Name': 'QueueName',
+                            'Value': self.queue_name
+                        }
+                    ]
+                )
+                
+                alarms = response.get('MetricAlarms', [])
+                if alarms:
+                    total_alarms += len(alarms)
+                    monitored_metrics.append(metric_name)
+            
+            if total_alarms > 0:
+                self.results['QueueMonitoring'] = [1, f'{total_alarms} alarms on {len(monitored_metrics)} metrics']
             else:
-                self.results['QueueMonitoring'] = [-1, 'No Alarms Configured (prefix SQS-)']
+                self.results['QueueMonitoring'] = [-1, 'No alarms on key metrics']
                 
         except botocore.exceptions.ClientError:
             self.results['QueueMonitoring'] = [-1, 'Unable to Check Alarms']
@@ -171,19 +201,17 @@ class SqsQueueDriver(Evaluator):
         
         content_dedup = self.attributes.get('ContentBasedDeduplication', 'false')
         fifo_queue = self.attributes.get('FifoQueue', 'false')
-        
+
         issues = []
         if fifo_queue != 'true':
             issues.append('Not properly configured as FIFO')
         
-        if content_dedup == 'true':
-            self.results['FifoConfiguration'] = [1, 'Content-based Deduplication Enabled']
-        else:
+        if content_dedup == 'false':
             issues.append('Content-based deduplication disabled')
         
         if issues:
             self.results['FifoConfiguration'] = [-1, '; '.join(issues)]
-        elif not hasattr(self, 'results') or 'FifoConfiguration' not in self.results:
+        else:
             self.results['FifoConfiguration'] = [1, 'Properly Configured']
     
     def _checkAccessPolicy(self):
@@ -261,7 +289,7 @@ class SqsQueueDriver(Evaluator):
                     LookupAttributes=[
                         {
                             'AttributeKey': 'ResourceName',
-                            'AttributeValue': self.queue_name
+                            'AttributeValue': self.queue_url
                         },
                         {
                             'AttributeKey': 'EventName',

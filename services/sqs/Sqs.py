@@ -111,7 +111,6 @@ class Sqs(Service):
             
             # Store results
             objs[f"Queue::{queue_name}"] = obj.getInfo()
-            print(json.dumps(obj.getInfo(), indent=4))
             del obj
             
         return objs
