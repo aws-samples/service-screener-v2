@@ -28,7 +28,7 @@
     },
     "SEC03": {
       "BP01": ["iam.InlinePolicy"],
-      "BP02": ["eks.eksClusterRoleLeastPrivilege", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "iam.FullAdminAccess", "lambda.lambdaRoleReused", "ec2.EC2IamProfile", "iam.ManagedPolicyFullAccessOneServ"],
+      "BP02": ["eks.eksClusterRoleLeastPrivilege", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "iam.FullAdminAccess", "lambda.lambdaRoleReused", "ec2.EC2IamProfile", "iam.ManagedPolicyFullAccessOneServ", "sqs.AccessPolicy"],
       "BP03": ["iam.EnableConfigService" , "iam.SCPEnabled" , "iam.InlinePolicy"],
       "BP04": ["iam.groupEmptyUsers", "iam.userNoActivity90days", "cloudtrail.HasDataEventsCaptured"],
       "BP05": ["iam.SCPEnabled" , "cloudtrail.NeedToEnableCloudTrail"],
@@ -38,7 +38,7 @@
       "BP09": ["iam.EnableConfigService"]
     },
     "SEC04": {
-      "BP01": ["eks.eksClusterLogging" ,"ec2.VPCFlowLogEnabled" , "opensearch.ApplicationLogs" ,"redshift.AuditLogging" , "s3.BucketLogging", "apigateway.ExecutionLogging" , "cloudfront.accessLogging" , "cloudtrail.NeedToEnableCloudTrail", "cloudtrail.HasOneMultiRegionTrail", "cloudtrail.EnableTrailS3BucketLifecycle", "cloudtrail.HasInsightSelectors", "iam.enableGuardDuty"],
+      "BP01": ["eks.eksClusterLogging" ,"ec2.VPCFlowLogEnabled" , "opensearch.ApplicationLogs" ,"redshift.AuditLogging" , "s3.BucketLogging", "apigateway.ExecutionLogging" , "cloudfront.accessLogging" , "cloudtrail.NeedToEnableCloudTrail", "cloudtrail.HasOneMultiRegionTrail", "cloudtrail.EnableTrailS3BucketLifecycle", "cloudtrail.HasInsightSelectors", "iam.enableGuardDuty", "sqs.QueueMonitoring"],
       "BP02": [],
       "BP03": ["iam.EnableConfigService"],
       "BP04": ["iam.enableGuardDuty" ,"s3.MacieToEnable"]
@@ -65,13 +65,13 @@
     },
     "SEC08":{
       "BP01": [],
-      "BP02": ["cloudtrail.RequiresKmsKey", "eks.eksSecretsEncryption", "lambda.lambdaCMKEncryptionDisabled", "s3.ServerSideEncrypted" , "s3.SSEWithKMS" , "ec2.EBSEncrypted" , "efs.EncryptedAtRest" , "rds.StorageEncrypted" , "redshift.EncryptedAtRest" , "redshift.EncryptedWithKMS" , "cloudfront.fieldLevelEncryption" , "apigateway.EncryptionAtRest" , "apigateway.EncryptionInTransit"],
+      "BP02": ["cloudtrail.RequiresKmsKey", "eks.eksSecretsEncryption", "lambda.lambdaCMKEncryptionDisabled", "s3.ServerSideEncrypted" , "s3.SSEWithKMS" , "ec2.EBSEncrypted" , "efs.EncryptedAtRest" , "rds.StorageEncrypted" , "redshift.EncryptedAtRest" , "redshift.EncryptedWithKMS" , "cloudfront.fieldLevelEncryption" , "apigateway.EncryptionAtRest" , "apigateway.EncryptionInTransit", "sqs.EncryptionAtRest"],
       "BP03": [],
-      "BP04": ["eks.eksClusterRoleLeastPrivilege", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "iam.FullAdminAccess", "lambda.lambdaRoleReused", "ec2.EC2IamProfile", "s3.BucketVersioning", "s3.ObjectLock", "s3.PublicAccessBlock"]
+      "BP04": ["eks.eksClusterRoleLeastPrivilege", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "iam.FullAdminAccess", "lambda.lambdaRoleReused", "ec2.EC2IamProfile", "s3.BucketVersioning", "s3.ObjectLock", "s3.PublicAccessBlock", "sqs.DeadLetterQueue", "sqs.FifoConfiguration"]
     },
     "SEC09":{
       "BP01": [],
-      "BP02": ["cloudfront.viewerPolicyHttps", "cloudfront.DeprecatedSSLProtocol", "ec2.SGEncryptionInTransit", "ec2.ELBListenerInsecure" , "s3.TlsEnforced" , "redshift.EncryptedInTransit" , "rds.MSSQLorPG__TransportEncrpytionDisabled" , "opensearch.NodeToNodeEncryption" , "opensearch.TLSEnforced" , "elasticache.EncInTransitAndRest" , "cloudfront.viewerPolicyHttps"],
+      "BP02": ["cloudfront.viewerPolicyHttps", "cloudfront.DeprecatedSSLProtocol", "ec2.SGEncryptionInTransit", "ec2.ELBListenerInsecure" , "s3.TlsEnforced" , "redshift.EncryptedInTransit" , "rds.MSSQLorPG__TransportEncrpytionDisabled" , "opensearch.NodeToNodeEncryption" , "opensearch.TLSEnforced" , "elasticache.EncInTransitAndRest" , "cloudfront.viewerPolicyHttps", "sqs.EncryptionInTransit"],
       "BP03": [],
       "BP04": []
     },
