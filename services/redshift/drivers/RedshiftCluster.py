@@ -12,173 +12,122 @@ class RedshiftCluster(Evaluator):
         
         self.cluster = cluster
         self.rsClient = rsClient
-
         self._resourceName = cluster['ClusterIdentifier']
-        # print(self.cluster)
-        return
+        
+        # Cache parameter group data to avoid multiple API calls
+        self._parameter_cache = {}
+        self._preload_parameter_groups()
+        
+    def _preload_parameter_groups(self):
+        """Cache parameter group data for all cluster parameter groups"""
+        try:
+            for param_group in self.cluster.get('ClusterParameterGroups', []):
+                group_name = param_group['ParameterGroupName']
+                if group_name not in self._parameter_cache:
+                    resp = self.rsClient.describe_cluster_parameters(
+                        ParameterGroupName=group_name
+                    )
+                    # Create lookup dict for faster parameter access
+                    params = {p['ParameterName']: p['ParameterValue'] 
+                             for p in resp.get('Parameters', [])}
+                    self._parameter_cache[group_name] = params
+        except Exception as e:
+            print(f"Error preloading parameter groups: {e}")
+            self._parameter_cache = {}
+    
+    def _get_parameter_value(self, param_name):
+        """Get parameter value from cache"""
+        for group_name, params in self._parameter_cache.items():
+            if param_name in params:
+                return params[param_name]
+        return None
     
     def _checkCluster(self):
-
-        # check if publicly accessible
-        if self.cluster['PubliclyAccessible']:
+        """Check cluster configuration settings"""
+        # Check public accessibility
+        if self.cluster.get('PubliclyAccessible', False):
             self.results['PubliclyAccessible'] = [-1, "Redshift cluster is publicly accessible"]
         
-        # check if automated snapshot is enabled
-        try:
-            if self.cluster['AutomatedSnapshotRetentionPeriod'] < 7:
-                self.results['AutomaticSnapshots'] = [-1, "Automatic snapshot retention is < 7 days"]
+        # Check automated snapshot retention
+        retention_period = self.cluster.get('AutomatedSnapshotRetentionPeriod', 0)
+        if retention_period < 7:
+            self.results['AutomaticSnapshots'] = [-1, f"Automatic snapshot retention is {retention_period} days (< 7)"]
         
-        except Exception as e:
-            print(f"Error: {e}")
-            self.results['AutomaticSnapshots'] = [-1, "Automatic snapshots is disabled"]
+        # Check cross-region snapshot copy
+        snapshot_copy = self.cluster.get('ClusterSnapshotCopyStatus', {})
+        if not snapshot_copy.get('DestinationRegion'):
+            self.results['CrossRegionSnapshots'] = [-1, "Cross-region snapshots are not enabled"]
         
-        # Check if cross-region snapshot copy is configured
-        try:
-            if not self.cluster.get('ClusterSnapshotCopyStatus', {}).get('DestinationRegion'):
-                self.results['CrossRegionSnapshots'] = [-1, "Cross-region snapshots are not enabled"]
+        # Check maintenance window
+        if not self.cluster.get('PreferredMaintenanceWindow'):
+            self.results['MaintenanceWindow'] = [-1, "Maintenance window is not configured"]
 
-        except Exception as e:
-            print(f"Error: {e}")
-            self.results['CrossRegionSnapshots'] = [-1, "Error checking cross-region snapshots"]
+        # Check version upgrade setting
+        if not self.cluster.get('AllowVersionUpgrade', False):
+            self.results['AutomaticUpgrades'] = [-1, "AllowVersionUpgrade is disabled"]
         
-        # Check if cluster is running the latest version
-        # try:
-        #     # Get available cluster versions
-        #     versions = self.rsClient.describe_cluster_versions()
-        #     latest_version = versions['ClusterVersions'][-1]['ClusterVersion']
-        #     current_version = self.cluster['ClusterVersion']
+        # Check enhanced VPC routing
+        if not self.cluster.get('EnhancedVpcRouting', False):
+            self.results['EnhancedVpcRouting'] = [-1, "EnhancedVpcRouting is disabled"]
+        
+        # Check default master username
+        if self.cluster.get('MasterUsername') == 'awsuser':
+            self.results['DefaultAdminUsername'] = [-1, "Default master username is awsuser"]
+        
+        # Check default database name
+        if self.cluster.get('DBName') == 'dev':
+            self.results['DefaultDatabaseName'] = [-1, "Default DB name is dev"]
+        
+        # Check encryption at rest
+        if not self.cluster.get('Encrypted', False):
+            self.results['EncryptedAtRest'] = [-1, "Encryption is not enabled"]
+        
+        # Check KMS encryption
+        if not self.cluster.get('KmsKeyId'):
+            self.results['EncryptedWithKMS'] = [-1, "Encryption is not done with KMS"]
 
-        #     print(versions)
-            
-        #     if current_version < latest_version:
-        #         self.results['ClusterVersion'] = [-1, f"Cluster is not on latest version. Current: {current_version}, Latest: {latest_version}"]
-        # except Exception as e:
-        #     print(f"Error checking cluster version: {e}")
-        #     return None
-    
-        # Check if maintenance window is configured
-        try:
-            if not self.cluster.get('PreferredMaintenanceWindow'):
-                self.results['MaintenanceWindow'] = [-1, "Maintenance window is not configured"]
-        except Exception as e:
-            print(f"Error checking maintenance window: {e}")
-            return None
-
-        # check if allowversionupgrade is enabled
-        try:
-            if not self.cluster['AllowVersionUpgrade']:
-                self.results['AutomaticUpgrades'] = [-1, "AllowVersionUpgrade is disabled"]
-        
-        except Exception as e:
-            print(f"Error: {e}")
-            return None
-        
-        # check if enhancedvpcrouting is enabled
-        try:
-            if not self.cluster['EnhancedVpcRouting']:
-                self.results['EnhancedVpcRouting'] = [-1, "EnhancedVpcRouting is disabled"]
-        
-        except Exception as e:
-            print(f"Error: {e}")
-            return None
-        
-        # check if default masterusername is used
-        try:
-            if self.cluster['MasterUsername'] == 'awsuser':
-                self.results['DefaultAdminUsername'] = [-1, "Default master username is awsuser"]
-        
-        except Exception as e:
-            print(f"Error: {e}")
-            return None
-        
-        # check if default dbname is used
-        try:
-            if self.cluster['DBName'] == 'dev':
-                self.results['DefaultDatabaseName'] = [-1, "Default DB name is dev"]
-
-        except Exception as e:
-            print(f"Error: {e}")
-            return None
-        
-        # chech if encryption is enabled
-        try:
-            if not self.cluster['Encrypted']:
-                self.results['EncryptedAtRest'] = [-1, "Encryption is not enabled"]
-        
-        except Exception as e:
-            print(f"Error: {e}")
-            return None
-        
-        # check if encryption is done with KMS
-        try:
-            if self.cluster.get('KmsKeyId', '') == '':
-                self.results['EncryptedWithKMS'] = [-1, "Encryption is not done with KMS"]
-
-        except Exception as e:
-            print(f"Error: {e}")
-            return None
-
-
-        # # check if default port is used
-        # try:
-        #     if self.cluster['Endpoint']['Port'] == 5439:
-        #         self.results['DefaultPort'] = [-1, "Default port is 5439"]
-
-        # except Exception as e:
-        #     print(f"Error: {e}")
-        #     return None
-
-        # check if AZ Relocation is enabled
-        try:
-            if not self.cluster['AvailabilityZoneRelocationStatus'] == 'enabled':
-                self.results['AZRelocation'] = [-1, "AZ Relocation is not enabled"]
-
-        except Exception as e:
-            print(f"Error: {e}")
-            return None
+        # Check AZ relocation
+        az_status = self.cluster.get('AvailabilityZoneRelocationStatus', '')
+        if az_status != 'enabled':
+            self.results['AZRelocation'] = [-1, f"AZ Relocation is {az_status or 'not enabled'}"]
     
     def _checkParameterGroups(self):
+        """Check parameter group settings using cached data"""
         self.results['EncryptedInTransit'] = [-1, "Redshift cluster is not encrypted in transit"]
 
-        try:
-            resp = self.rsClient.describe_cluster_parameters(
-                ParameterGroupName=self.cluster['ClusterParameterGroups'][0]['ParameterGroupName']
-            )
-            for parameter in resp['Parameters']:
-                if(parameter['ParameterName'] == 'require_ssl' and parameter['ParameterValue'] == 'true'):
-                    self.results['EncryptedInTransit'] = [1, "Redshift cluster is encrypted in transit"]
-                    return
-                
-        except self.rsClient.exceptions.ClusterNotFoundFault:
-            print(f"Error: Cluster not found.")
-            return None
-        except Exception as e:
-            print(f"Error: {e}")
-            return None
+        # Use cached parameter data instead of API call
+        require_ssl = self._get_parameter_value('require_ssl')
+        if require_ssl == 'true':
+            self.results['EncryptedInTransit'] = [1, "Redshift cluster is encrypted in transit"]
     
     def _checkLoggingStatus(self):
-        
+        """Check audit logging status"""
         try:
             resp = self.rsClient.describe_logging_status(
                 ClusterIdentifier=self.cluster['ClusterIdentifier']
             )
-            if not resp['LoggingEnabled']:
+            if not resp.get('LoggingEnabled', False):
                 self.results['AuditLogging'] = [-1, "Audit Logging is not enabled"]
-            return
+            else:
+                # Check if logs are going to S3
+                bucket_name = resp.get('BucketName')
+                if bucket_name:
+                    self.results['AuditLogging'] = [1, f"Audit logging enabled to S3: {bucket_name}"]
+                else:
+                    self.results['AuditLogging'] = [0, "Audit logging enabled but no S3 bucket specified"]
+                    
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == 'ClusterNotFoundFault':
+                print(f"Cluster {self.cluster['ClusterIdentifier']} not found")
+            else:
+                print(f"Error checking logging status: {e}")
+            self.results['AuditLogging'] = [0, "Unable to check logging status"]
 
-        except self.rsClient.exceptions.ClusterNotFoundFault:
-            print(f"Error: Cluster not found.")
-            return None
-        except Exception as e:
-            print(f"Error: {e}")
-            return None
-
-    # Check if IAM Roles is enforced
     def _checkIAMRoles(self):
-        try:
-            roles_attached = self.cluster.get('IamRoles', [])
-            if not roles_attached:
-                self.results['IAMRoles'] = [-1, "No IAM roles attached."]
-        except Exception as e:
-            print(f"Error: {e}")
-            self.results['IAMRoles'] = [-1, "Error checking IAMRoles"]
+        """Check if IAM roles are attached to the cluster"""
+        roles_attached = self.cluster.get('IamRoles', [])
+        if not roles_attached:
+            self.results['IAMRoles'] = [-1, "No IAM roles attached"]
+        else:
+            role_count = len(roles_attached)
+            self.results['IAMRoles'] = [1, f"{role_count} IAM role(s) attached"]

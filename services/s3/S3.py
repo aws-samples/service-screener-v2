@@ -1,8 +1,6 @@
 import botocore
-
 import json
 import time
-
 
 from utils.Config import Config
 from utils.Tools import _pr, _warn
@@ -45,18 +43,21 @@ class S3(Service):
                     )    
                     arr = arr + results.get('Buckets')
                 
-                for ind, bucket in enumerate(arr):
-                    loc = self.s3Client.get_bucket_location(
-                        Bucket = bucket['Name']
-                    )
-                    reg = loc.get('LocationConstraint')
-                    
-                    if reg == None:
-                        reg = 'us-east-1'
+                # Sequential bucket location fetching (tool already uses multiprocessing)
+                for bucket in arr:
+                    try:
+                        loc = self.s3Client.get_bucket_location(Bucket=bucket['Name'])
+                        reg = loc.get('LocationConstraint') or 'us-east-1'
                         
-                    if not reg in buckets:
-                        buckets[reg] = []
-                    buckets[reg].append(arr[ind])
+                        if reg not in buckets:
+                            buckets[reg] = []
+                        buckets[reg].append(bucket)
+                    except Exception as e:
+                        print(f"Error getting location for {bucket['Name']}: {e}")
+                        # Default to us-east-1 on error
+                        if 'us-east-1' not in buckets:
+                            buckets['us-east-1'] = []
+                        buckets['us-east-1'].append(bucket)
                 
             except botocore.exceptions.ClientError as e:
                 Config.set('s3::bucketUnableToList', True)
@@ -102,6 +103,8 @@ class S3(Service):
         
         objs = {}
         buckets = self.getResources()
+        
+        # Sequential processing (tool already uses multiprocessing at service level)
         for bucket in buckets:
             _pi('S3Bucket', bucket['Name'])
             obj = S3Bucket(bucket['Name'], self.s3Client)

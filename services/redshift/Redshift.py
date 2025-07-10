@@ -20,36 +20,49 @@ class Redshift(Service):
     ## method to get resources for the services
     ## return the array of the resources
     def getClusterResources(self):
-        arr = []
-        
+        """Get all cluster resources with tag filtering"""
         self.getClusters()
-        '''
-        filters = []
-        if self.tags:
-            filters = self.tags
-        '''
-        return arr
         
-    def getClusters(self, Marker=None):
-        ###### TO DO #####
-        ## To implement TAGS later
-        args = {}
-        if Marker:
-            args['Marker'] = Marker
+        if not self.tags:
+            return self.redshifts
         
-        resp = self.rsClient.describe_clusters()
-        for cluster in resp.get('Clusters'):
-            self.redshifts.append(cluster)
+        # Filter clusters by tags
+        filtered_clusters = []
+        for cluster in self.redshifts:
+            try:
+                # Get cluster tags
+                resp = self.rsClient.describe_tags(
+                    ResourceName=cluster['ClusterIdentifier'],
+                    ResourceType='cluster'
+                )
+                tagged_resources = resp.get('TaggedResources', [])
+                tags = tagged_resources[0].get('Tags', []) if tagged_resources else []
+                
+                if self.resourceHasTags(tags):
+                    filtered_clusters.append(cluster)
+            except botocore.exceptions.ClientError:
+                # Skip clusters we can't access tags for
+                continue
         
-        if resp.get('Marker'):
-            self.getClusters(Marker=resp.get('Marker'))
+        return filtered_clusters
+        
+    def getClusters(self):
+        """Efficiently paginate through all clusters"""
+        try:
+            paginator = self.rsClient.get_paginator('describe_clusters')
+            for page in paginator.paginate():
+                clusters = page.get('Clusters', [])
+                self.redshifts.extend(clusters)
+        except botocore.exceptions.ClientError as e:
+            print(f"Error fetching Redshift clusters: {e}")
+            return
         
     
     def advise(self):
         objs = {}
         
-        self.getClusterResources()
-        for cluster in self.redshifts:
+        clusters = self.getClusterResources()
+        for cluster in clusters:
             _pi('Redshift', cluster['ClusterIdentifier'])
             obj = RedshiftCluster(cluster, self.rsClient)
             obj.run(self.__class__)
