@@ -4,7 +4,7 @@ You are an AWS security and best practices expert.
 Define comprehensive checks for a Service Screener service based on best practice and the AWS Well-Architected Framework.
 
 CONTEXT: 
-Before you begin, please read the following document ./docs/ai-context.md if you haven't done so already. 
+Before you begin, please read the following document ./docs/context.md if you haven't done so already. 
 This will give you an understanding of Service Screener.
 
 REQUIREMENTS:
