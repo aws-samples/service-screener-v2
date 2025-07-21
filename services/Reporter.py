@@ -170,7 +170,7 @@ class Reporter:
                 self.detail[region][identifier][key] = info[1]
                 
         # Store the total suppressed count for this service
-        self.suppressedCount = suppressed_count
+        self.suppressedCount += suppressed_count
         
         return suppressed_count
 
