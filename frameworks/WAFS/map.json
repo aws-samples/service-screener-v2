@@ -14,7 +14,7 @@
       "BP03": ["iam.SCPEnabled" , "iam.EnableConfigService"],
       "BP04": ["iam.enableGuardDuty"],
       "BP05": [],
-      "BP06": ["lambda.$length", "rds.$length", "ecs.$length", "eks.$length", "dynamodb.$length", "elasticache.$length"],
+      "BP06": ["lambda.$length", "rds.$length", "eks.$length", "dynamodb.$length", "elasticache.$length"],
       "BP07": ["iam.hasOrganization"],
       "BP08": []
     },
