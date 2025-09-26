@@ -485,7 +485,7 @@ $(document).ready(function() {
         
         output.append(
             headerPostCSS.replace('{$ADVISOR_TITLE}', Config.ADVISOR['TITLE'])
-                .replace('{$OPTIONS_ACCOUNTS', self.accountListsHTML())
+                .replace('{$OPTIONS_ACCOUNTS}', self.accountListsHTML())
                 .replace('{$SUPPRESSION_INDICATOR}', suppression_indicator)
         )
         
