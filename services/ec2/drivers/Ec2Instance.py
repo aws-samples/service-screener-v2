@@ -185,12 +185,14 @@ class Ec2Instance(Evaluator):
        
         try:
             results = self.ec2Client.describe_instance_types(
-                InstanceTypes=[newFamily + '.' + size],
-                MaxResults=1
+                InstanceTypes=[newFamily + '.' + size]
             )
         except Exception as e:
-            self.results['EC2NewGen'] = [1, self.ec2InstanceData['InstanceType']]
-            return
+            if type(e).__name__ == 'ClientError' and e.response['Error']['Code'] == 'InvalidInstanceType':
+                self.results['EC2NewGen'] = [1, self.ec2InstanceData['InstanceType']]
+                return
+            else:
+                raise
     
         self.results['EC2NewGen'] = [-1, self.ec2InstanceData['InstanceType']]
         return
@@ -480,7 +482,11 @@ class Ec2Instance(Evaluator):
         return
     
     
-    def _checkTags(self):
+    def _checkTags(self):    
+        ## Prevent error when 'Tags' not found in the dict
+        if 'Tags' not in self.ec2InstanceData:
+            return
+        
         tags = self.ec2InstanceData['Tags']
         
         keyTags = []
