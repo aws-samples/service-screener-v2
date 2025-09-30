@@ -480,7 +480,11 @@ class Ec2Instance(Evaluator):
         return
     
     
-    def _checkTags(self):
+    def _checkTags(self):    
+        ## Prevent error when 'Tags' not found in the dict
+        if 'Tags' not in self.ec2InstanceData:
+            return
+        
         tags = self.ec2InstanceData['Tags']
         
         keyTags = []
