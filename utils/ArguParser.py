@@ -85,6 +85,11 @@ class ArguParser:
             "required": False,
             "default": None,
             "help": "Path to JSON file containing suppressions"
+        },
+        'sequential': {
+            "required": False,
+            "default": False,
+            "help": "Run checks sequentially instead of parallel (fixes macOS hanging issues)"
         }
     }
 

@@ -37,6 +37,7 @@ crossAccounts = _cli_options['crossAccounts']
 workerCounts = _cli_options['workerCounts']
 beta = _cli_options['beta']
 suppress_file = _cli_options['suppress_file']
+sequential = _cli_options['sequential']
 
 # print(crossAccounts)
 DEBUG = True if debugFlag in _C.CLI_TRUE_KEYWORD_ARRAY or debugFlag is True else False
@@ -236,9 +237,15 @@ for acctId, cred in rolesCred.items():
 
     input_ranges = list(input_ranges.values())
 
-    pool = Pool(processes=int(workerCounts))
-    pool.starmap(Screener.scanByService, input_ranges)
-    pool.close()
+    if sequential:
+        # Run sequentially to avoid macOS hanging issues
+        for input_range in input_ranges:
+            Screener.scanByService(*input_range)
+    else:
+        # Run in parallel (default behavior)
+        pool = Pool(processes=int(workerCounts))
+        pool.starmap(Screener.scanByService, input_ranges)
+        pool.close()
 
     if testmode == False:
         CfnTrailObj.deleteStack()
