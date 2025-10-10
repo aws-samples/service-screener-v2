@@ -354,9 +354,9 @@ class RdsCommon(Evaluator):
                     compressedLists[temp[1][0]] = temp[1][1]
                 
                 Config.set(key + '::zip', compressedLists)
-            except self.rdsClient.exceptions as e:
+            except botocore.exceptions.ClientError as e:
                 _warn("Unable to identify potential latest engine version")
-                if e.getAwsErrorCode() == 'InvalidParameterCombination':
+                if e.response['Error']['Code'] == 'InvalidParameterCombination':
                     self.results['LatestInstanceGeneration'] = [-1, '**DEPRECIATED**' + self.db['DBInstanceClass']]
                 self.results['LatestInstanceGeneration'] = [-1, '_ERROR_']
                 return
@@ -403,6 +403,10 @@ class RdsCommon(Evaluator):
     
     def _checkHasPatches(self):
         if self.isServerless == True:
+            return
+        
+        # Fix for AttributeError: 'RdsMysql' object has no attribute 'enginePatches'
+        if not hasattr(self, 'enginePatches'):
             return
         
         engineVersion = self.db['EngineVersion']
