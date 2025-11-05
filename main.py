@@ -247,8 +247,8 @@ for acctId, cred in rolesCred.items():
         pool.starmap(Screener.scanByService, input_ranges)
         pool.close()
 
-    if testmode == False:
-        CfnTrailObj.deleteStack()
+    # if testmode == False:
+        # CfnTrailObj.deleteStack()
     
     ## <TODO>
     ## parallel logic to be implement in Python
