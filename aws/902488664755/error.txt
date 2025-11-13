@@ -1,7 +1,0 @@
-Traceback (most recent call last):
-  File "/Users/lhlily/Documents/custom-lens-prescriptive-guidance-sample/service-screener-v2/services/Evaluator.py", line 108, in run
-    getattr(self, method)()
-  File "/Users/lhlily/Documents/custom-lens-prescriptive-guidance-sample/service-screener-v2/services/iam/drivers/IamAccount.py", line 335, in _checkAWSBackupPlans
-    backupClient = self.ssBoto.client('backup', config=self.bConfig)
-                                                       ^^^^^^^^^^^^
-AttributeError: 'IamAccount' object has no attribute 'bConfig'
