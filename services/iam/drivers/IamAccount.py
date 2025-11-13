@@ -329,3 +329,23 @@ class IamAccount(IamCommon):
             except botocore.exceptions.ClientError as e:
                 ecode = e.response['Error']['Code']
     
+    def _checkAWSBackupPlans(self):
+        """Check if AWS Backup plans are configured (FTR BAR-001.1)"""
+        try:
+            backupClient = self.ssBoto.client('backup', config=self.bConfig)
+            resp = backupClient.list_backup_plans()
+            plans = resp.get('BackupPlansList', [])
+            
+            if len(plans) == 0:
+                self.results['noAWSBackupPlans'] = [-1, 'No AWS Backup plans configured']
+            else:
+                # Backup plans exist - compliant
+                pass
+                
+        except botocore.exceptions.ClientError as e:
+            ecode = e.response['Error']['Code']
+            if ecode == 'AccessDeniedException':
+                _warn('Unable to check AWS Backup plans. Insufficient permissions.')
+            else:
+                print(f'Error checking AWS Backup: {ecode}')
+    
