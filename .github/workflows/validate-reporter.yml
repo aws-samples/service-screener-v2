@@ -8,6 +8,10 @@ on:
     paths:
       - 'services/**/*.reporter.json'
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   validate:
     runs-on: ubuntu-latest
