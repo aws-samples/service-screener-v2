@@ -74,7 +74,7 @@
       "NETSEC-002.1": ["ec2.EC2InstancePublicIP"]
     },
     "Backups and recovery": {
-      "BAR-001.1": ["ec2.EBSSnapshot", "rds.Backup", "rds.BackupTooLow", "dynamodb.backupStatus", "dynamodb.enabledContinuousBackup", "iam.noAWSBackupPlans", "s3.BucketVersioning"],
+      "BAR-001.1": ["ec2.EBSSnapshot", "rds.Backup", "rds.BackupTooLow", "dynamodb.backupStatus", "dynamodb.enabledContinuousBackup", "iam.hasAWSBackupPlans", "s3.BucketVersioning"],
       "BAR-002.1": [],
       "BAR-002.2": []
     },

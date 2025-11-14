@@ -337,7 +337,7 @@ class IamAccount(IamCommon):
             plans = resp.get('BackupPlansList', [])
             
             if len(plans) == 0:
-                self.results['noAWSBackupPlans'] = [-1, 'No AWS Backup plans configured']
+                self.results['hasAWSBackupPlans'] = [-1, 'No AWS Backup plans configured']
                 
         except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']
