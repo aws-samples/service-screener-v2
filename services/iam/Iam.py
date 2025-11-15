@@ -28,7 +28,8 @@ class Iam(Service):
             # 'gdClient': ssBoto.client('guardduty', config=self.bConfig),
             'budgetClient': ssBoto.client('budgets', config=self.bConfig),
             'curClient': ssBoto.client('cur', config=self.bConfig),
-            'ctClient': ssBoto.client('cloudtrail', config=self.bConfig)
+            'ctClient': ssBoto.client('cloudtrail', config=self.bConfig),
+            'backupClient': ssBoto.client('backup', config=self.bConfig)
         }
     
     ## Groups has no TAG attribute

@@ -27,6 +27,7 @@ class IamAccount(IamCommon):
         
         self.curClient = awsClients['curClient']
         self.ctClient = awsClients['ctClient']
+        self.backupClient = awsClients['backupClient']
         
         self.noOfUsers = len(users)
         self.roles = roles
@@ -328,4 +329,20 @@ class IamAccount(IamCommon):
                                     
             except botocore.exceptions.ClientError as e:
                 ecode = e.response['Error']['Code']
+    
+    def _checkAWSBackupPlans(self):
+        """Check if AWS Backup plans are configured (FTR BAR-001.1)"""
+        try:
+            resp = self.backupClient.list_backup_plans()
+            plans = resp.get('BackupPlansList', [])
+            
+            if len(plans) == 0:
+                self.results['hasAWSBackupPlans'] = [-1, 'No AWS Backup plans configured']
+                
+        except botocore.exceptions.ClientError as e:
+            ecode = e.response['Error']['Code']
+            if ecode == 'AccessDeniedException':
+                _warn('Unable to check AWS Backup plans. Insufficient permissions.')
+            else:
+                print(f'Error checking AWS Backup: {ecode}')
     

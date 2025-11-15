@@ -513,5 +513,19 @@
 		"ref": [
 			"[Enable Service Control Policy (SCP)]<https://docs.aws.amazon.com/organizations/latest/userguide/enable-policy-type.html>"
 		]
+	},
+	"hasAWSBackupPlans": {
+		"category": "R",
+		"^description": "AWS Backup plans are not configured. AWS Backup provides centralized backup management across AWS services including RDS, DynamoDB, EBS, EFS, and more. Configure AWS Backup plans to ensure regular backups are taken automatically based on a periodic schedule. This ensures you have the ability to recover from administrative, logical, or physical error scenarios. AWS Backup simplifies backup management and provides a single place to configure and audit the backup-related activity of your AWS resources.",
+		"shortDesc": "Configure AWS Backup plans",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Backup]<https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html>",
+			"[Getting Started]<https://docs.aws.amazon.com/aws-backup/latest/devguide/getting-started.html>"
+		]
 	}
 }
