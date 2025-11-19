@@ -1328,7 +1328,7 @@ v3xQHd5DEc5WBneiV3iOznDFgup0VAMkIviVjVCkszaPSVEdK2NU7jtrh6Jfm7bU/3P6ZGCkyDLIa8MB
 yjTk5IifIwO/mDpGNUribg6TPxhzZ8b/XdZO1kS1gVgqjXyVCM+BRBh6C4H21w/eMzjCtDIpoxt5rGKL6Nu/
 IFMipoC4fgx6LIIHwtGYMG7SWQi7OsMAkiwZRg0n68/RqWgLzBt/4pfjSRYuk=",
 "Expiration": "2020-02-20T18:49:50Z",
-"AccessKeyId": "ASIAIOSFODNN7EXAMPLE"
+"AccessKeyId": "<Example_Of_Key_Id>"
 }
 }
 ```
