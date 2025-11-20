@@ -140,7 +140,7 @@ show_menu() {
 validate_directory() {
     local dir=$1
     if [ ! -d "$dir" ]; then
-        echo -e "${RED}✗ Error: Directory does not exist: $dir${NC}"
+        echo -e "${RED}✗ Error: Directory does not exist: $dir${NC}" >&2
         return 1
     fi
     return 0
@@ -227,6 +227,9 @@ get_screener_directory() {
             echo "" >&2
             continue
         fi
+
+        # Strip leading/trailing quotes if present
+        screener_dir=$(echo "$screener_dir" | sed -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//")
         
         # Expand tilde and validate
         screener_dir="${screener_dir/#\~/$HOME}"
