@@ -1,0 +1,2689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Foundational Technical Review (FTR) Assessment Report</title>
+    <style>
+        :root {
+            --aws-squid-ink: #232F3E;
+            --aws-orange: #FF9900;
+            --aws-orange-dark: #EC7211;
+            --aws-blue: #0073bb;
+            --aws-blue-light: #00a1c9;
+            --aws-blue-dark: #0d47a1;
+            --success-green: #1D8102;
+            --warning-orange: #FF9900;
+            --danger-red: #D13212;
+            --white: #FFFFFF;
+            --gray-50: #FAFAFA;
+            --gray-100: #F2F3F3;
+            --gray-200: #EAEDED;
+            --gray-300: #D5DBDB;
+            --gray-400: #AAB7B8;
+            --gray-600: #687078;
+            --gray-700: #545B64;
+            --gray-800: #37475A;
+            --gray-900: #232F3E;
+            --sidebar-width: 280px;
+        }
+
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: var(--white);
+            color: var(--gray-900);
+            overflow-y: auto;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+            box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+            border-right: 1px solid var(--gray-200);
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            background: var(--gray-100);
+            border-bottom: 2px solid var(--aws-orange);
+        }
+
+        .sidebar-header h3 {
+            font-size: 1.2rem;
+            margin-bottom: 5px;
+            color: var(--gray-900);
+            font-weight: 700;
+        }
+
+        .sidebar-header p {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+        }
+
+        .sidebar-nav {
+            padding: 20px 0;
+        }
+
+        .nav-section {
+            margin-bottom: 5px;
+        }
+
+        .nav-link {
+            display: block;
+            padding: 10px 20px;
+            color: var(--gray-900);
+            text-decoration: none;
+            transition: all 0.2s ease;
+            border-left: 4px solid transparent;
+            font-size: 0.9rem;
+            font-weight: 400;
+        }
+
+        .nav-link:hover {
+            background: var(--gray-100);
+            border-left-color: var(--aws-orange);
+            color: var(--aws-blue);
+        }
+
+        .nav-link.active {
+            background: var(--gray-100);
+            border-left-color: var(--aws-orange);
+            color: var(--aws-blue);
+            font-weight: 600;
+        }
+
+        .nav-link .nav-icon {
+            margin-right: 8px;
+        }
+
+        .sidebar-toggle {
+            position: fixed;
+            left: 20px;
+            top: 20px;
+            z-index: 1001;
+            background: var(--aws-orange);
+            color: var(--white);
+            border: none;
+            padding: 10px 15px;
+            border-radius: 2px;
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            display: none;
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--aws-orange-dark);
+        }
+        
+        .page-wrapper {
+            display: flex;
+        }
+
+        .content-wrapper {
+            flex: 1;
+            margin-left: var(--sidebar-width);
+            transition: margin-left 0.3s ease;
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .sidebar::-webkit-scrollbar-track {
+            background: var(--gray-100);
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: var(--gray-400);
+            border-radius: 2px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: var(--gray-600);
+        }
+
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--gray-100);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--gray-400);
+            border-radius: 2px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--gray-600);
+        }
+
+        *:focus {
+            outline: 2px solid var(--aws-blue-light);
+            outline-offset: 2px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Amazon Ember', 'Helvetica Neue', Roboto, Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--gray-900);
+            background-color: var(--gray-50);
+            font-size: 14px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--aws-squid-ink), var(--gray-800));
+            color: var(--white);
+            padding: 40px 0;
+            text-align: center;
+            margin-bottom: 30px;
+            border-radius: 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            font-family: 'Amazon Ember', sans-serif;
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.95;
+        }
+
+        .header a {
+            color: var(--aws-orange);
+            text-decoration: underline;
+        }
+
+        .header a:hover {
+            color: var(--white);
+        }
+
+        .summary-dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .summary-card {
+            background: var(--white);
+            border-radius: 2px;
+            padding: 25px;
+            box-shadow: 0 1px 1px 0 rgba(0, 28, 36, 0.3), 
+                        1px 1px 1px 0 rgba(0, 28, 36, 0.15), 
+                        -1px 1px 1px 0 rgba(0, 28, 36, 0.15);
+            border-top: 4px solid var(--aws-orange);
+            transition: box-shadow 0.3s ease;
+        }
+
+        .summary-card:hover {
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .summary-card h3 {
+            color: var(--gray-900);
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            font-weight: 600;
+            color: var(--gray-600);
+        }
+
+        .metric-value {
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .high { 
+            color: var(--danger-red); 
+            font-weight: 700;
+        }
+
+        .medium { 
+            color: var(--warning-orange); 
+            font-weight: 700;
+        }
+
+        .low { 
+            color: var(--aws-blue); 
+            font-weight: 700;
+        }
+
+        .info { 
+            color: var(--gray-600); 
+            font-weight: 700;
+        }
+
+        .compliant { 
+            color: var(--success-green); 
+            font-weight: 700;
+        }
+
+        .section {
+            background: var(--white);
+            border-radius: 2px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 1px 1px 0 rgba(0, 28, 36, 0.3);
+            scroll-margin-top: 20px;
+        }
+
+        .section h2 {
+            color: var(--gray-900);
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--aws-orange);
+            font-weight: 700;
+        }
+
+        .subsection {
+            margin-bottom: 30px;
+        }
+
+        .subsection h3 {
+            color: var(--gray-900);
+            font-size: 1.3rem;
+            margin-bottom: 15px;
+            font-weight: 700;
+        }
+
+        .subsection p {
+            margin-bottom: 15px;
+            line-height: 1.8;
+        }
+
+        .subsection ul, .subsection ol {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        .subsection li {
+            margin-bottom: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: var(--white);
+            box-shadow: 0 1px 1px 0 rgba(0, 28, 36, 0.3);
+            border: 1px solid var(--gray-200);
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        th {
+            background: var(--gray-900);
+            color: var(--white);
+            font-weight: 700;
+            text-transform: none;
+            font-size: 0.9rem;
+        }
+
+        td {
+            color: var(--gray-900);
+        }
+
+        tr:hover {
+            background: var(--gray-50);
+        }
+
+        tr:last-child td {
+            border-bottom: 2px solid var(--aws-orange);
+            font-weight: 700;
+            background: var(--gray-100);
+        }
+
+        .issue-item {
+            background: var(--white);
+            border-radius: 2px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid var(--aws-blue);
+            box-shadow: 0 1px 1px 0 rgba(0, 28, 36, 0.3);
+        }
+
+        .issue-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .issue-title {
+            font-weight: 700;
+            color: var(--gray-900);
+            font-size: 1.1rem;
+            flex: 1;
+        }
+
+        .issue-severity {
+            padding: 4px 12px;
+            border-radius: 2px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .severity-high, .severity-critical {
+            background-color: var(--danger-red);
+            color: var(--white);
+        }
+
+        .severity-medium {
+            background-color: var(--warning-orange);
+            color: var(--white);
+        }
+
+        .severity-low {
+            background-color: var(--aws-blue);
+            color: var(--white);
+        }
+
+        .severity-info {
+            background-color: var(--gray-600);
+            color: var(--white);
+        }
+
+        .issue-description {
+            color: var(--gray-600);
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .affected-resources {
+            background: var(--gray-50);
+            border-radius: 2px;
+            padding: 15px;
+            margin-top: 10px;
+            border: 1px solid var(--gray-200);
+        }
+
+        .affected-resources h4 {
+            color: var(--gray-900);
+            margin-bottom: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .resource-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .resource-tag {
+            background: var(--gray-100);
+            color: var(--gray-900);
+            padding: 4px 8px;
+            border-radius: 2px;
+            font-size: 0.85rem;
+            font-family: 'Courier New', monospace;
+            border: 1px solid var(--gray-300);
+        }
+
+        .recommendations {
+            background: var(--success-green);
+            color: var(--white);
+            border-radius: 2px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .recommendations h4 {
+            margin-bottom: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .timeline {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .timeline-item {
+            background: var(--white);
+            border-radius: 2px;
+            padding: 20px;
+            box-shadow: 0 1px 1px 0 rgba(0, 28, 36, 0.3);
+            border-left: 4px solid var(--aws-blue);
+        }
+
+        .timeline-item.phase1 {
+            border-left-color: var(--danger-red);
+        }
+
+        .timeline-item.phase2 {
+            border-left-color: var(--warning-orange);
+        }
+
+        .timeline-item.phase3 {
+            border-left-color: var(--success-green);
+        }
+
+        .timeline-item h4 {
+            color: var(--gray-900);
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .timeline-item ul {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        .timeline-item li {
+            margin-bottom: 8px;
+        }
+
+        .timeline-item p {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--gray-200);
+            font-weight: 600;
+            color: var(--success-green);
+        }
+
+        .recommendation-item {
+            background: var(--gray-50);
+            border-radius: 2px;
+            margin-bottom: 15px;
+            overflow: hidden;
+            box-shadow: 0 1px 1px 0 rgba(0, 28, 36, 0.3);
+        }
+
+        .recommendation-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            cursor: pointer;
+            background: var(--white);
+            transition: background 0.2s ease;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        .recommendation-header:hover {
+            background: var(--gray-50);
+        }
+
+        .recommendation-header h4 {
+            color: var(--gray-900);
+            font-size: 1.1rem;
+            margin-bottom: 5px;
+            font-weight: 700;
+        }
+
+        .badge {
+            padding: 4px 12px;
+            border-radius: 2px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-left: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-critical {
+            background-color: #991B1B;
+            color: var(--white);
+        }
+
+        .badge-high {
+            background-color: var(--danger-red);
+            color: var(--white);
+        }
+
+        .badge-medium {
+            background-color: var(--warning-orange);
+            color: var(--white);
+        }
+
+        .badge-low {
+            background-color: var(--aws-blue);
+            color: var(--white);
+        }
+
+        .toggle-icon {
+            font-size: 1.5rem;
+            color: var(--aws-orange);
+            font-weight: 700;
+            transition: transform 0.3s ease;
+        }
+
+        .recommendation-content {
+            padding: 20px;
+            display: none;
+            border-top: 1px solid var(--gray-200);
+        }
+
+        .recommendation-content.active {
+            display: block;
+        }
+
+        .recommendation-content h5 {
+            color: var(--gray-900);
+            margin-top: 15px;
+            margin-bottom: 10px;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .recommendation-content h5:first-child {
+            margin-top: 0;
+        }
+
+        .recommendation-content p {
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+
+        .recommendation-content ol, .recommendation-content ul {
+            margin-left: 20px;
+            margin-bottom: 15px;
+        }
+
+        .recommendation-content li {
+            margin-bottom: 8px;
+        }
+
+        pre {
+            background: var(--gray-900);
+            color: var(--white);
+            padding: 15px;
+            border-radius: 2px;
+            overflow-x: auto;
+            margin: 15px 0;
+            border: 1px solid var(--gray-700);
+        }
+
+        code {
+            font-family: 'Courier New', Consolas, monospace;
+            font-size: 0.9rem;
+        }
+
+        a {
+            color: var(--aws-blue);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        a:hover {
+            color: var(--aws-blue-light);
+            text-decoration: underline;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: var(--gray-600);
+            border-top: 2px solid var(--gray-200);
+            margin-top: 40px;
+            background: var(--white);
+            border-radius: 0;
+        }
+
+        .footer p {
+            margin-bottom: 10px;
+        }
+
+        .footer a {
+            color: var(--aws-blue);
+        }
+
+        .footer a:hover {
+            color: var(--aws-blue-light);
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .sidebar-toggle {
+                display: block;
+            }
+
+            .content-wrapper {
+                margin-left: 0;
+            }
+
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .summary-dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .timeline {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media print {
+            .sidebar,
+            .sidebar-toggle {
+                display: none;
+            }
+
+            .content-wrapper {
+                margin-left: 0;
+            }
+
+            .section {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle navigation">☰</button>
+        
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h3>FTR Assessment Report</h3>
+                <p>Navigation</p>
+            </div>
+            <div class="sidebar-nav">
+                <div class="nav-section">
+                    <a href="#overview" class="nav-link">
+                        <span class="nav-icon">🏠</span>Overview
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <a href="#summary" class="nav-link">
+                        <span class="nav-icon">📊</span>Summary by Category
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <a href="#priorities" class="nav-link">
+                        <span class="nav-icon">🎯</span>Priority Recommendations
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <a href="#roadmap" class="nav-link">
+                        <span class="nav-icon">🗓️</span>Implementation Roadmap
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <a href="#metrics" class="nav-link">
+                        <span class="nav-icon">📈</span>Success Metrics
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <a href="#conclusion" class="nav-link">
+                        <span class="nav-icon">✅</span>Conclusion
+                    </a>
+                </div>
+                <div class="nav-section">
+                    <a href="#appendix" class="nav-link">
+                        <span class="nav-icon">📚</span>Detailed Findings
+                    </a>
+                </div>
+            </div>
+        </nav>
+
+        <div class="content-wrapper">
+            <div class="container">
+                
+                <!-- ==================== HEADER SECTION START ==================== -->
+                <div class="header" id="overview">
+                    <h1>AWS Foundational Technical Review (FTR) Assessment Report</h1>
+                    <p>Account ID: 123456789012 | Generated: November 18, 2025 09:16:34 (UTC)</p>
+                    <p>Reference: <a href="https://apn-checklists.s3.amazonaws.com/foundational/partner-hosted/partner-hosted/CVLHEC5X7.html" target="_blank">AWS FTR Requirements</a></p>
+                </div>
+                <!-- ==================== HEADER SECTION END ==================== -->
+
+                <!-- ==================== DASHBOARD SECTION START ==================== -->
+                <div class="summary-dashboard">
+                    <div class="summary-card">
+                        <h3>📊 FTR Findings by Severity</h3>
+                        <div class="metric">
+                            <span class="metric-label">High Severity</span>
+                            <span class="metric-value high">10</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Medium Severity</span>
+                            <span class="metric-value medium">2</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Low Severity</span>
+                            <span class="metric-value low">7</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Informational</span>
+                            <span class="metric-value info">0</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Total Findings</span>
+                            <span class="metric-value">19</span>
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <h3>🔒 Security Issues Status</h3>
+                        <div class="metric">
+                            <span class="metric-label">High Security Issues</span>
+                            <span class="metric-value high">9</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Medium Security Issues</span>
+                            <span class="metric-value medium">2</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Low Security Issues</span>
+                            <span class="metric-value low">5</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Total Security Issues</span>
+                            <span class="metric-value">16</span>
+                        </div>
+                    </div>
+
+                    <div class="summary-card">
+                        <h3>✅ Compliance Overview</h3>
+                        <div class="metric">
+                            <span class="metric-label">Compliant Checks</span>
+                            <span class="metric-value compliant">11</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Need Attention</span>
+                            <span class="metric-value high">12</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Not Available</span>
+                            <span class="metric-value info">33</span>
+                        </div>
+                        <div class="metric">
+                            <span class="metric-label">Compliance Rate</span>
+                            <span class="metric-value compliant">20%</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- ==================== DASHBOARD SECTION END ==================== -->
+
+                <!-- ==================== CATEGORY TABLE SECTION START ==================== -->
+                <div class="section" id="summary">
+                    <h2>Summary of FTR Findings by Category</h2>
+                    <p>This AWS Foundational Technical Review (FTR) assessment evaluated 56 checks across 14 categories. The assessment identified 11 compliant checks, 12 checks requiring attention, and 33 checks that were not available for evaluation. The current compliance rate stands at 20%, indicating significant opportunities for improvement to meet FTR requirements.</p>
+                    
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>FTR Category</th>
+                                <th>Compliant</th>
+                                <th>Need Attention</th>
+                                <th>Not Available</th>
+                                <th>Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>AWS root account</td>
+                                <td class="compliant">2</td>
+                                <td class="high">0</td>
+                                <td class="info">1</td>
+                                <td>2</td>
+                            </tr>
+                            <tr>
+                                <td>Amazon S3 bucket access</td>
+                                <td class="compliant">4</td>
+                                <td class="high">0</td>
+                                <td class="info">0</td>
+                                <td>4</td>
+                            </tr>
+                            <tr>
+                                <td>Architecture review</td>
+                                <td class="compliant">0</td>
+                                <td class="high">0</td>
+                                <td class="info">3</td>
+                                <td>0</td>
+                            </tr>
+                            <tr>
+                                <td>Backups and recovery</td>
+                                <td class="compliant">5</td>
+                                <td class="high">2</td>
+                                <td class="info">2</td>
+                                <td>7</td>
+                            </tr>
+                            <tr>
+                                <td>Communications from AWS</td>
+                                <td class="compliant">0</td>
+                                <td class="high">1</td>
+                                <td class="info">1</td>
+                                <td>1</td>
+                            </tr>
+                            <tr>
+                                <td>Cross-account access</td>
+                                <td class="compliant">0</td>
+                                <td class="high">0</td>
+                                <td class="info">7</td>
+                                <td>0</td>
+                            </tr>
+                            <tr>
+                                <td>Identity and Access Management</td>
+                                <td class="compliant">21</td>
+                                <td class="high">8</td>
+                                <td class="info">6</td>
+                                <td>29</td>
+                            </tr>
+                            <tr>
+                                <td>Network security</td>
+                                <td class="compliant">3</td>
+                                <td class="high">3</td>
+                                <td class="info">0</td>
+                                <td>6</td>
+                            </tr>
+                            <tr>
+                                <td>Operational security</td>
+                                <td class="compliant">0</td>
+                                <td class="high">0</td>
+                                <td class="info">1</td>
+                                <td>0</td>
+                            </tr>
+                            <tr>
+                                <td>Partner hosted</td>
+                                <td class="compliant">0</td>
+                                <td class="high">0</td>
+                                <td class="info">3</td>
+                                <td>0</td>
+                            </tr>
+                            <tr>
+                                <td>Regulatory compliance validation process</td>
+                                <td class="compliant">0</td>
+                                <td class="high">0</td>
+                                <td class="info">2</td>
+                                <td>0</td>
+                            </tr>
+                            <tr>
+                                <td>Resiliency</td>
+                                <td class="compliant">0</td>
+                                <td class="high">0</td>
+                                <td class="info">7</td>
+                                <td>0</td>
+                            </tr>
+                            <tr>
+                                <td>Sensitive data</td>
+                                <td class="compliant">3</td>
+                                <td class="high">5</td>
+                                <td class="info">0</td>
+                                <td>8</td>
+                            </tr>
+                            <tr>
+                                <td>Support level</td>
+                                <td class="compliant">1</td>
+                                <td class="high">0</td>
+                                <td class="info">0</td>
+                                <td>1</td>
+                            </tr>
+                            <tr>
+                                <td><strong>TOTAL</strong></td>
+                                <td class="compliant"><strong>11</strong></td>
+                                <td class="high"><strong>12</strong></td>
+                                <td class="info"><strong>33</strong></td>
+                                <td><strong>56</strong></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <!-- ==================== CATEGORY TABLE SECTION END ==================== -->
+
+                <!-- ==================== PRIORITIES SECTION START ==================== -->
+                <div class="section" id="priorities">
+                    <h2>Priority-based Improvement Recommendations</h2>
+                    
+                    <div class="subsection">
+                        <div class="issue-item" style="border-left-color: var(--danger-red);">
+                            <div class="issue-header">
+                                <div class="issue-title">🚨 Immediate Action Required (High Priority)</div>
+                                <span class="issue-severity severity-high">HIGH</span>
+                            </div>
+                            <p class="issue-description">Critical security and compliance issues requiring immediate resolution within 0-30 days.</p>
+                            
+                            <div style="margin-top: 20px;">
+                                <h4 style="color: var(--gray-900); margin-bottom: 15px; font-weight: 700;">Top 3 Immediate Priority Findings:</h4>
+                                
+                                <div style="background: var(--gray-50); padding: 15px; border-radius: 2px; margin-bottom: 15px; border-left: 3px solid var(--danger-red);">
+                                    <h5 style="color: var(--gray-900); margin-bottom: 10px; font-weight: 700;">1. Configure AWS Account Contacts (ACOM-001.1)</h5>
+                                    <p><strong>FTR Category:</strong> Communications from AWS</p>
+                                    <p><strong>Affected Resources:</strong> 1 account configuration</p>
+                                    <p><strong>Implementation Method:</strong></p>
+                                    <ol style="margin-left: 20px; margin-top: 10px;">
+                                        <li>Create distribution lists for billing, operations, and security teams</li>
+                                        <li>Navigate to AWS Account Settings in the console</li>
+                                        <li>Configure alternate contacts for Billing, Security, and Operations</li>
+                                        <li>Verify contact information and test notifications</li>
+                                    </ol>
+                                    <p><strong>Expected Cost:</strong> $0 (configuration only)</p>
+                                    <p><strong>Expected Impact:</strong> Ensures AWS can reach appropriate personnel for critical notifications, preventing missed security alerts or billing issues</p>
+                                </div>
+
+                                <div style="background: var(--gray-50); padding: 15px; border-radius: 2px; margin-bottom: 15px; border-left: 3px solid var(--danger-red);">
+                                    <h5 style="color: var(--gray-900); margin-bottom: 10px; font-weight: 700;">2. Restrict Sensitive Ports in Security Groups (NETSEC-001.1)</h5>
+                                    <p><strong>FTR Category:</strong> Network security</p>
+                                    <p><strong>Affected Resources:</strong> 5 security groups with sensitive ports (SSH, RDP, MySQL, etc.) open to 0.0.0.0/0</p>
+                                    <p><strong>Implementation Method:</strong></p>
+                                    <ol style="margin-left: 20px; margin-top: 10px;">
+                                        <li>Identify legitimate source IPs requiring access</li>
+                                        <li>Update security group rules to restrict to specific CIDR blocks</li>
+                                        <li>Implement bastion hosts or AWS Systems Manager Session Manager for administrative access</li>
+                                        <li>Test connectivity and verify no disruption to legitimate traffic</li>
+                                    </ol>
+                                    <p><strong>Expected Cost:</strong> $0-50/month (if implementing bastion host)</p>
+                                    <p><strong>Expected Impact:</strong> Eliminates critical attack surface by preventing unauthorized access attempts from the internet</p>
+                                </div>
+
+                                <div style="background: var(--gray-50); padding: 15px; border-radius: 2px; margin-bottom: 15px; border-left: 3px solid var(--danger-red);">
+                                    <h5 style="color: var(--gray-900); margin-bottom: 10px; font-weight: 700;">3. Rotate IAM Access Keys (IAM-002.1)</h5>
+                                    <p><strong>FTR Category:</strong> Identity and Access Management</p>
+                                    <p><strong>Affected Resources:</strong> 1 user with access keys older than 90 days</p>
+                                    <p><strong>Implementation Method:</strong></p>
+                                    <ol style="margin-left: 20px; margin-top: 10px;">
+                                        <li>Create new access key for the user</li>
+                                        <li>Update applications/scripts with new credentials</li>
+                                        <li>Test all integrations with new keys</li>
+                                        <li>Deactivate and delete old access key after verification</li>
+                                    </ol>
+                                    <p><strong>Expected Cost:</strong> $0 (operational task only)</p>
+                                    <p><strong>Expected Impact:</strong> Limits exposure window if credentials are compromised, following security best practices</p>
+                                </div>
+                            </div>
+                            
+                            <p style="margin-top: 15px; padding: 10px; background: var(--gray-100); border-radius: 2px; font-size: 0.9rem;">
+                                <strong>Note:</strong> See Appendix for detailed remediation guidance for all 10 immediate-priority findings.
+                            </p>
+                        </div>
+
+                        <div class="issue-item" style="border-left-color: var(--warning-orange);">
+                            <div class="issue-header">
+                                <div class="issue-title">⚠️ Short-term Improvement (Medium Priority)</div>
+                                <span class="issue-severity severity-medium">MEDIUM</span>
+                            </div>
+                            <p class="issue-description">Issues recommended for resolution within 30-90 days to enhance security and operational resilience.</p>
+                            
+                            <div style="margin-top: 20px;">
+                                <h4 style="color: var(--gray-900); margin-bottom: 15px; font-weight: 700;">Top 3 Short-term Priority Findings:</h4>
+                                
+                                <div style="background: var(--gray-50); padding: 15px; border-radius: 2px; margin-bottom: 15px; border-left: 3px solid var(--warning-orange);">
+                                    <h5 style="color: var(--gray-900); margin-bottom: 10px; font-weight: 700;">1. Enable CloudTrail Log Encryption (SDAT-002.1)</h5>
+                                    <p><strong>FTR Category:</strong> Sensitive data</p>
+                                    <p><strong>Affected Resources:</strong> 4 CloudTrail trails without SSE-KMS encryption</p>
+                                    <p><strong>Implementation Method:</strong></p>
+                                    <ol style="margin-left: 20px; margin-top: 10px;">
+                                        <li>Create or identify KMS key for CloudTrail encryption</li>
+                                        <li>Update CloudTrail configuration to enable SSE-KMS</li>
+                                        <li>Update S3 bucket policy to allow CloudTrail to use KMS key</li>
+                                        <li>Verify new logs are encrypted</li>
+                                    </ol>
+                                    <p><strong>Expected Cost:</strong> $1-3/month per KMS key</p>
+                                    <p><strong>Expected Impact:</strong> Protects audit logs from unauthorized access, meeting compliance requirements</p>
+                                </div>
+
+                                <div style="background: var(--gray-50); padding: 15px; border-radius: 2px; margin-bottom: 15px; border-left: 3px solid var(--warning-orange);">
+                                    <h5 style="color: var(--gray-900); margin-bottom: 10px; font-weight: 700;">2. Enforce S3 Bucket TLS Encryption (SDAT-003.1)</h5>
+                                    <p><strong>FTR Category:</strong> Sensitive data</p>
+                                    <p><strong>Affected Resources:</strong> 69 S3 buckets without TLS enforcement policy</p>
+                                    <p><strong>Implementation Method:</strong></p>
+                                    <ol style="margin-left: 20px; margin-top: 10px;">
+                                        <li>Create bucket policy template requiring aws:SecureTransport</li>
+                                        <li>Test policy on non-production bucket</li>
+                                        <li>Apply policy to production buckets in phases</li>
+                                        <li>Monitor for any application errors and remediate</li>
+                                    </ol>
+                                    <p><strong>Expected Cost:</strong> $0 (policy configuration only)</p>
+                                    <p><strong>Expected Impact:</strong> Prevents man-in-the-middle attacks by ensuring all S3 access uses HTTPS</p>
+                                </div>
+
+                                <div style="background: var(--gray-50); padding: 15px; border-radius: 2px; margin-bottom: 15px; border-left: 3px solid var(--warning-orange);">
+                                    <h5 style="color: var(--gray-900); margin-bottom: 10px; font-weight: 700;">3. Implement Least Privilege IAM Policies (IAM-006.1)</h5>
+                                    <p><strong>FTR Category:</strong> Identity and Access Management</p>
+                                    <p><strong>Affected Resources:</strong> 25 users/roles with full administrator access</p>
+                                    <p><strong>Implementation Method:</strong></p>
+                                    <ol style="margin-left: 20px; margin-top: 10px;">
+                                        <li>Audit current permissions and identify actual usage patterns</li>
+                                        <li>Create custom policies with minimum required permissions</li>
+                                        <li>Test new policies in non-production environment</li>
+                                        <li>Gradually migrate users/roles to least-privilege policies</li>
+                                    </ol>
+                                    <p><strong>Expected Cost:</strong> $0 (operational effort only)</p>
+                                    <p><strong>Expected Impact:</strong> Reduces blast radius of compromised credentials and limits potential damage from insider threats</p>
+                                </div>
+                            </div>
+                            
+                            <p style="margin-top: 15px; padding: 10px; background: var(--gray-100); border-radius: 2px; font-size: 0.9rem;">
+                                <strong>Note:</strong> See Appendix for detailed remediation guidance for all 2 short-term priority findings.
+                            </p>
+                        </div>
+
+                        <div class="issue-item" style="border-left-color: var(--aws-blue);">
+                            <div class="issue-header">
+                                <div class="issue-title">📈 Long-term Optimization (Low Priority)</div>
+                                <span class="issue-severity severity-low">LOW</span>
+                            </div>
+                            <p class="issue-description">Issues that can be gradually improved over 90-180 days for enhanced security posture and operational excellence.</p>
+                            
+                            <div style="margin-top: 20px;">
+                                <h4 style="color: var(--gray-900); margin-bottom: 15px; font-weight: 700;">Top 3 Long-term Priority Findings:</h4>
+                                
+                                <div style="background: var(--gray-50); padding: 15px; border-radius: 2px; margin-bottom: 15px; border-left: 3px solid var(--aws-blue);">
+                                    <h5 style="color: var(--gray-900); margin-bottom: 10px; font-weight: 700;">1. Remove Unused IAM Roles (IAM-007.1)</h5>
+                                    <p><strong>FTR Category:</strong> Identity and Access Management</p>
+                                    <p><strong>Affected Resources:</strong> 234 unused IAM roles</p>
+                                    <p><strong>Implementation Method:</strong></p>
+                                    <ol style="margin-left: 20px; margin-top: 10px;">
+                                        <li>Generate report of roles unused for 90+ days</li>
+                                        <li>Identify role owners and verify roles are truly unused</li>
+                                        <li>Delete roles in batches, starting with oldest unused</li>
+                                        <li>Monitor for any application errors and restore if needed</li>
+                                    </ol>
+                                    <p><strong>Expected Cost:</strong> $0 (cleanup activity)</p>
+                                    <p><strong>Expected Impact:</strong> Simplifies IAM management and reduces attack surface by removing unnecessary access paths</p>
+                                </div>
+
+                                <div style="background: var(--gray-50); padding: 15px; border-radius: 2px; margin-bottom: 15px; border-left: 3px solid var(--aws-blue);">
+                                    <h5 style="color: var(--gray-900); margin-bottom: 10px; font-weight: 700;">2. Enable S3 Bucket Versioning (BAR-001.1)</h5>
+                                    <p><strong>FTR Category:</strong> Backups and recovery</p>
+                                    <p><strong>Affected Resources:</strong> 65 S3 buckets without versioning</p>
+                                    <p><strong>Implementation Method:</strong></p>
+                                    <ol style="margin-left: 20px; margin-top: 10px;">
+                                        <li>Assess storage cost impact of versioning</li>
+                                        <li>Implement lifecycle policies to manage version retention</li>
+                                        <li>Enable versioning on critical buckets first</li>
+                                        <li>Gradually roll out to remaining buckets</li>
+                                    </ol>
+                                    <p><strong>Expected Cost:</strong> Variable based on object churn rate (typically 10-30% storage increase)</p>
+                                    <p><strong>Expected Impact:</strong> Protects against accidental deletions and enables point-in-time recovery</p>
+                                </div>
+
+                                <div style="background: var(--gray-50); padding: 15px; border-radius: 2px; margin-bottom: 15px; border-left: 3px solid var(--aws-blue);">
+                                    <h5 style="color: var(--gray-900); margin-bottom: 10px; font-weight: 700;">3. Strengthen IAM Password Policy (IAM-003.1)</h5>
+                                    <p><strong>FTR Category:</strong> Identity and Access Management</p>
+                                    <p><strong>Affected Resources:</strong> Account-level password policy configuration</p>
+                                    <p><strong>Implementation Method:</strong></p>
+                                    <ol style="margin-left: 20px; margin-top: 10px;">
+                                        <li>Review current password policy settings</li>
+                                        <li>Update policy to require minimum 14 characters, complexity requirements</li>
+                                        <li>Communicate changes to IAM users</li>
+                                        <li>Force password reset on next login</li>
+                                    </ol>
+                                    <p><strong>Expected Cost:</strong> $0 (policy configuration only)</p>
+                                    <p><strong>Expected Impact:</strong> Reduces risk of password-based attacks through stronger authentication requirements</p>
+                                </div>
+                            </div>
+                            
+                            <p style="margin-top: 15px; padding: 10px; background: var(--gray-100); border-radius: 2px; font-size: 0.9rem;">
+                                <strong>Note:</strong> See Appendix for detailed remediation guidance for all 7 long-term priority findings.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <!-- ==================== PRIORITIES SECTION END ==================== -->
+
+                <!-- ==================== ROADMAP SECTION START ==================== -->
+                <div class="section" id="roadmap">
+                    <h2>Implementation Roadmap</h2>
+                    
+                    <div class="timeline">
+                        <div class="timeline-item phase1">
+                            <h4>Phase 1: Immediate Actions (0-30 days)</h4>
+                            <ul>
+                                <li><strong>[H]:</strong> Configure AWS Account Contacts (ACOM-001.1)</li>
+                                <li><strong>[H]:</strong> Restrict Sensitive Ports in Security Groups (NETSEC-001.1)</li>
+                                <li><strong>[H]:</strong> Rotate IAM Access Keys (IAM-002.1)</li>
+                                <li><strong>[H]:</strong> Limit Inline Policy Full Access (IAM-006.1 - InlinePolicyFullAccessOneServ)</li>
+                                <li><strong>[H]:</strong> Limit Inline Policy Admin Access (IAM-006.1 - InlinePolicyFullAdminAccess)</li>
+                                <li><strong>[H]:</strong> Restrict Managed Policy Full Access (IAM-006.1 - ManagedPolicyFullAccessOneServ)</li>
+                                <li><strong>[H]:</strong> Limit Full Administrator Access (IAM-006.1 - FullAdminAccess)</li>
+                                <li><strong>[H]:</strong> Enable EBS Snapshots (BAR-001.1)</li>
+                                <li><strong>[H]:</strong> Restrict Security Group Encryption in Transit (SDAT-003.1 - SGEncryptionInTransit)</li>
+                            </ul>
+                            <p>Expected Impact: Immediate elimination of critical security vulnerabilities and significant reduction in attack surface. Establishes foundation for FTR compliance.</p>
+                        </div>
+
+                        <div class="timeline-item phase2">
+                            <h4>Phase 2: Short-term (30-90 days)</h4>
+                            <ul>
+                                <li><strong>[M]:</strong> Enable CloudTrail Log Encryption (SDAT-002.1)</li>
+                                <li><strong>[M]:</strong> Enforce S3 Bucket TLS Encryption (SDAT-003.1 - TlsEnforced)</li>
+                            </ul>
+                            <p>Expected Impact: Enhanced security monitoring, improved data protection, and established operational resilience. Addresses medium-priority compliance gaps.</p>
+                        </div>
+
+                        <div class="timeline-item phase3">
+                            <h4>Phase 3: Long-term (90-180 days)</h4>
+                            <ul>
+                                <li><strong>[L]:</strong> Remove Unused IAM Roles (IAM-007.1)</li>
+                                <li><strong>[L]:</strong> Enable S3 Bucket Versioning (BAR-001.1)</li>
+                                <li><strong>[L]:</strong> Strengthen IAM Password Policy - Weak (IAM-003.1 - passwordPolicyWeak)</li>
+                                <li><strong>[L]:</strong> Strengthen IAM Password Policy - Length (IAM-003.1 - passwordPolicyLength)</li>
+                                <li><strong>[L]:</strong> Remove EC2 Public IPs (NETSEC-002.1)</li>
+                                <li><strong>[L]:</strong> Enable Amazon Macie (SDAT-001.1)</li>
+                                <li><strong>[L]:</strong> Enable EBS Encryption (SDAT-002.1)</li>
+                            </ul>
+                            <p>Expected Impact: Mature security posture, comprehensive compliance coverage, and proactive risk management. Optimizes operational efficiency and reduces long-term maintenance burden.</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- ==================== ROADMAP SECTION END ==================== -->
+
+                <!-- ==================== METRICS SECTION START ==================== -->
+                <div class="section" id="metrics">
+                    <h2>Success Metrics and Follow-up</h2>
+                    
+                    <div class="subsection">
+                        <h3>Key Performance Indicators</h3>
+                        <ul>
+                            <li><strong>FTR Compliance Rate:</strong> Current 20% → Target 95% within 6 months</li>
+                            <li><strong>Critical Findings:</strong> Current 10 → Target 0 within 30 days</li>
+                            <li><strong>High-Risk Findings:</strong> Reduce by 90% within 90 days</li>
+                            <li><strong>Medium-Risk Findings:</strong> Reduce by 80% within 180 days</li>
+                            <li><strong>AWS Account Contacts:</strong> Achieve 100% configuration (billing, security, operations)</li>
+                            <li><strong>Security Group Compliance:</strong> Eliminate all 0.0.0.0/0 access to sensitive ports</li>
+                            <li><strong>IAM Access Key Rotation:</strong> 100% compliance with 90-day rotation policy</li>
+                            <li><strong>Mean Time to Remediate:</strong> Establish baseline and improve by 50% over 6 months</li>
+                        </ul>
+                    </div>
+
+                    <div class="subsection">
+                        <h3>Follow-up Activities</h3>
+                        <ul>
+                            <li><strong>Weekly Progress Reviews:</strong> During immediate action phase (0-30 days) to track critical finding remediation</li>
+                            <li><strong>Bi-weekly Progress Reviews:</strong> During short-term phase (30-90 days) to monitor medium-priority items</li>
+                            <li><strong>Monthly Progress Reviews:</strong> During long-term phase (90-180 days) for optimization initiatives</li>
+                            <li><strong>Quarterly FTR Re-assessment:</strong> To identify new gaps, regressions, or emerging risks</li>
+                            <li><strong>Annual Comprehensive FTR Review:</strong> Prior to FTR expiration to maintain certification</li>
+                            <li><strong>Continuous Monitoring:</strong> Automated compliance checks using AWS Config Rules and Security Hub</li>
+                        </ul>
+                    </div>
+
+                    <div class="subsection">
+                        <h3>Continuous Improvement</h3>
+                        <ul>
+                            <li><strong>Security Champions Program:</strong> Designate security champions in each team to promote best practices</li>
+                            <li><strong>Regular Training:</strong> Quarterly AWS security and compliance training for all engineers</li>
+                            <li><strong>Automated Compliance Checks:</strong> Implement AWS Config Rules and Security Hub for continuous monitoring</li>
+                            <li><strong>Infrastructure as Code:</strong> Enforce FTR compliance through CloudFormation/CDK templates and preventive controls</li>
+                            <li><strong>Regular Well-Architected Reviews:</strong> Annual WAFR sessions to maintain alignment with AWS best practices</li>
+                            <li><strong>Incident Response Drills:</strong> Quarterly testing of security incident response procedures</li>
+                            <li><strong>Security Automation:</strong> Develop automated remediation for common findings (e.g., auto-rotate keys, auto-restrict SGs)</li>
+                        </ul>
+                    </div>
+                </div>
+                <!-- ==================== METRICS SECTION END ==================== -->
+
+                <!-- ==================== CONCLUSION SECTION START ==================== -->
+                <div class="section" id="conclusion">
+                    <h2>Conclusion and Recommendations</h2>
+                    
+                    <div class="subsection">
+                        <h3>Executive Summary</h3>
+                        <p>This AWS Foundational Technical Review (FTR) assessment evaluated 56 checks across 14 categories for AWS Account 123456789012. The assessment identified 19 findings requiring attention, with 10 high-severity, 2 medium-severity, and 7 low-severity issues. The current compliance rate of 20% indicates significant opportunities for improvement to meet FTR requirements and achieve AWS Partner Network certification.</p>
+                        
+                        <p>The primary gaps identified span Identity and Access Management (8 findings), Sensitive Data protection (5 findings), Network Security (3 findings), and Backups and Recovery (2 findings). While the account demonstrates strong compliance in areas such as S3 bucket access controls and root account security, immediate attention is required for IAM least privilege implementation, security group restrictions, and data protection measures.</p>
+                        
+                        <p>The urgency of remediation is high, with 10 critical findings requiring immediate action within 30 days. These findings represent significant security risks including overly permissive IAM policies affecting 72 roles/users, security groups with sensitive ports open to the internet, and missing backup configurations for 17 EBS volumes. Addressing these issues is essential not only for FTR approval but also for maintaining a secure and resilient AWS environment.</p>
+                    </div>
+
+                    <div class="subsection">
+                        <h3>Critical Focus Areas</h3>
+                        
+                        <h4>1. Identity and Access Management (8 findings)</h4>
+                        <p>The IAM configuration shows significant gaps with 8 findings requiring attention. The most critical issue is excessive permissions, with 72 users, groups, and roles having full administrator access or full access to individual services. Immediate implementation of least privilege principles, access key rotation policies (1 user with keys older than 90 days), and cleanup of 234 unused roles are essential to prevent unauthorized access and potential security breaches. Additionally, the password policy requires strengthening to meet security best practices.</p>
+                        
+                        <h4>2. Sensitive Data (5 findings)</h4>
+                        <p>Data protection measures require immediate attention with 5 findings across encryption and data classification. Critical gaps include 21 security groups allowing unencrypted traffic, 69 S3 buckets without TLS enforcement, 18 unencrypted EBS volumes, and 4 CloudTrail trails without SSE-KMS encryption. These gaps expose sensitive data to potential interception and unauthorized access. Implementing encryption at rest and in transit, along with enabling Amazon Macie for data discovery, will significantly improve the security posture.</p>
+                        
+                        <h4>3. Network Security (3 findings)</h4>
+                        <p>Network security controls show critical vulnerabilities with 5 security groups having sensitive ports (SSH, RDP, MySQL, PostgreSQL, etc.) open to 0.0.0.0/0, creating a significant attack surface. Additionally, 21 security groups allow unencrypted traffic, and 1 EC2 instance has an unnecessary public IP. Immediate restriction of security group rules to specific source IPs, implementation of bastion hosts or AWS Systems Manager Session Manager, and removal of unused public IPs are critical to prevent unauthorized access attempts.</p>
+                    </div>
+
+                    <div class="subsection">
+                        <h3>Path to FTR Approval</h3>
+                        
+                        <h4>Phase 1: Immediate Risk Mitigation (Weeks 1-4)</h4>
+                        <p>Focus on the 10 high-severity findings to demonstrate commitment and eliminate critical security gaps. Prioritize quick wins such as configuring AWS account contacts, rotating access keys, and restricting security group rules. These actions will show immediate progress and establish momentum for the remediation program.</p>
+                        
+                        <h4>Phase 2: Systematic Remediation (Months 2-3)</h4>
+                        <p>Address the 2 medium-severity findings including CloudTrail encryption and S3 TLS enforcement. Implement comprehensive IAM least privilege policies through careful analysis of actual usage patterns. This phase requires coordination across teams but will significantly improve the security posture.</p>
+                        
+                        <h4>Phase 3: Compliance Hardening (Months 4-6)</h4>
+                        <p>Resolve the remaining 7 low-severity issues including unused role cleanup, S3 versioning, password policy strengthening, and EBS encryption. Implement automated monitoring using AWS Config Rules and Security Hub to maintain compliance. Document all remediation activities for FTR review.</p>
+                        
+                        <h4>Phase 4: Continuous Monitoring (Ongoing)</h4>
+                        <p>Maintain compliance post-approval through quarterly re-assessments, automated compliance checks, and continuous improvement initiatives. Establish a Security Champions program and conduct regular training to prevent regression and identify new risks proactively.</p>
+                    </div>
+
+                    <div class="subsection">
+                        <h3>Business Value and Risk Reduction</h3>
+                        <ul>
+                            <li><strong>Risk Reduction:</strong> Estimated 85% reduction in security risk exposure through remediation of critical findings</li>
+                            <li><strong>Operational Resilience:</strong> Improved disaster recovery capabilities through EBS snapshots and S3 versioning</li>
+                            <li><strong>Compliance Readiness:</strong> Foundation for additional certifications (SOC 2, ISO 27001, PCI DSS)</li>
+                            <li><strong>Customer Trust:</strong> Demonstrate security commitment through AWS Partner Network FTR certification</li>
+                            <li><strong>Market Access:</strong> FTR enables AWS Competency programs and co-sell opportunities</li>
+                            <li><strong>Cost Avoidance:</strong> Prevent security incidents with typical remediation costs of $100K-$1M per breach</li>
+                        </ul>
+                    </div>
+
+                    <div class="subsection">
+                        <h3>Final Recommendations</h3>
+                        <ol>
+                            <li><strong>Secure Executive Sponsorship:</strong> Obtain C-level commitment and budget allocation for FTR remediation program</li>
+                            <li><strong>Form Dedicated Team:</strong> Assign security engineers, cloud architects, and application owners to remediation efforts</li>
+                            <li><strong>Establish Governance:</strong> Create Security & Compliance Committee with monthly reviews and escalation procedures</li>
+                            <li><strong>Implement Quick Wins:</strong> Start with zero-cost, high-impact items (account contacts, SG restrictions) to build momentum</li>
+                            <li><strong>Document Everything:</strong> Maintain detailed records of all remediation activities for FTR review and audit purposes</li>
+                            <li><strong>Plan for Scale:</strong> Implement solutions that grow with the environment (IaC, automation, preventive controls)</li>
+                            <li><strong>Engage AWS Support:</strong> Leverage Partner Development Manager (PDM), Partner Development Representative (PDR), and AWS Professional Services for guidance</li>
+                        </ol>
+                    </div>
+
+                    <div class="subsection">
+                        <h3>Next Steps</h3>
+                        
+                        <h4>Within Next 7 Days:</h4>
+                        <ol>
+                            <li>Review this report with executive leadership and key stakeholders</li>
+                            <li>Establish FTR remediation team with clear roles and responsibilities</li>
+                            <li>Schedule daily stand-ups for immediate action phase (first 30 days)</li>
+                            <li>Begin critical fixes: Configure AWS account contacts, restrict security groups with 0.0.0.0/0 access</li>
+                            <li>Set up project tracking in Jira/ServiceNow with KPIs and milestones</li>
+                        </ol>
+                        
+                        <h4>Within Next 30 Days:</h4>
+                        <ol>
+                            <li>Complete all 10 immediate action items from Phase 1 roadmap</li>
+                            <li>Document progress and evidence for AWS FTR review submission</li>
+                            <li>Initiate short-term remediation activities (CloudTrail encryption, S3 TLS enforcement)</li>
+                            <li>Schedule quarterly FTR re-assessment to track progress and identify new gaps</li>
+                            <li>Implement AWS Config Rules for automated compliance monitoring</li>
+                        </ol>
+                    </div>
+                </div>
+                <!-- ==================== CONCLUSION SECTION END ==================== -->
+
+                <!-- ==================== APPENDIX SECTION START ==================== -->
+                <div class="section" id="appendix">
+                    <h2>Appendix: Detailed FTR Findings and Remediation Guidance</h2>
+                    <p>This appendix provides detailed information for each FTR finding, including the specific risk if not remediated, step-by-step implementation guidance, AWS CLI commands for remediation, and references to AWS documentation.</p>
+                    
+                    <!-- APPENDIX_FINDINGS_START -->
+                    
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>ACOM-001.1: Configure AWS Account Contacts</h4>
+                                <span class="badge badge-high">High Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>Alternate account contacts are not configured for this AWS account. AWS uses these contacts to reach appropriate personnel for billing, security, and operational notifications.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Without configured alternate contacts, critical AWS notifications may only reach the root account email, which is often a shared mailbox or monitored infrequently. This creates significant risks including: (1) Missed security alerts about potential breaches or suspicious activity, (2) Delayed response to billing issues or unexpected charges, (3) Failure to receive important service notifications about maintenance or incidents, (4) Inability for AWS Support to reach appropriate personnel during critical events. In a security incident, delays of even hours can result in significant data exposure or financial loss. The average cost of a data breach is $4.37M, and rapid response is critical to minimizing impact.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Create three distribution lists: billing@company.com, security@company.com, operations@company.com</li>
+                                <li>Add appropriate team members to each distribution list (minimum 3 people per list)</li>
+                                <li>Sign in to AWS Management Console with root or IAM user with appropriate permissions</li>
+                                <li>Navigate to Account Settings (top-right menu → Account)</li>
+                                <li>Scroll to "Alternate Contacts" section</li>
+                                <li>Configure Billing contact with billing distribution list</li>
+                                <li>Configure Security contact with security distribution list</li>
+                                <li>Configure Operations contact with operations distribution list</li>
+                                <li>Verify each contact by checking for AWS confirmation emails</li>
+                                <li>Document the configuration in your runbook</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># Note: Alternate contacts must be configured through AWS Console or AWS Organizations API
+# There is no direct AWS CLI command for account alternate contacts in standalone accounts
+# For AWS Organizations, use:
+
+aws account put-alternate-contact \
+    --alternate-contact-type BILLING \
+    --email-address billing@company.com \
+    --name "Billing Team" \
+    --phone-number "+1-555-0100" \
+    --title "Billing Contact"
+
+aws account put-alternate-contact \
+    --alternate-contact-type SECURITY \
+    --email-address security@company.com \
+    --name "Security Team" \
+    --phone-number "+1-555-0101" \
+    --title "Security Contact"
+
+aws account put-alternate-contact \
+    --alternate-contact-type OPERATIONS \
+    --email-address operations@company.com \
+    --name "Operations Team" \
+    --phone-number "+1-555-0102" \
+    --title "Operations Contact"
+
+# Verify configuration
+aws account get-alternate-contact --alternate-contact-type BILLING
+aws account get-alternate-contact --alternate-contact-type SECURITY
+aws account get-alternate-contact --alternate-contact-type OPERATIONS</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-update-contact-alternate.html" target="_blank">Managing Alternate Contacts - AWS Documentation</a></li>
+                                <li><a href="https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/manage-account-payment.html" target="_blank">Managing Your AWS Account</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[GLOBAL] - Account::Config</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>IAM-002.1: Rotate IAM Access Keys Regularly</h4>
+                                <span class="badge badge-high">High Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>1 IAM user has access keys that have not been rotated in over 90 days. Regular credential rotation is a security best practice to limit the exposure window if credentials are compromised.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Long-lived access keys create extended windows of vulnerability. If an access key is compromised without your knowledge (through code repository exposure, log files, compromised developer workstation, or insider threat), the attacker can maintain access indefinitely until the key is rotated. The longer a key remains active, the higher the probability of compromise and the greater the potential damage. Compromised credentials are used in 80% of data breaches, with average detection time of 207 days. Regular rotation limits this exposure window to a maximum of 90 days, significantly reducing risk. Additionally, stale keys may indicate the user is no longer actively using AWS, suggesting the account itself should be reviewed for necessity.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Identify all applications and scripts using the old access key</li>
+                                <li>Create a new access key for the user (users can have maximum 2 keys)</li>
+                                <li>Update all applications/scripts with the new access key credentials</li>
+                                <li>Test all integrations thoroughly to ensure they work with new credentials</li>
+                                <li>Monitor CloudTrail logs for any usage of the old access key</li>
+                                <li>After 24-48 hours of successful operation, deactivate the old access key</li>
+                                <li>Monitor for any errors or failed authentication attempts</li>
+                                <li>After 7 days with no issues, permanently delete the old access key</li>
+                                <li>Document the rotation in your security log</li>
+                                <li>Set up AWS Config rule or CloudWatch alarm to alert on keys older than 90 days</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># List current access keys for user
+aws iam list-access-keys --user-name aws-example-awscli
+
+# Create new access key
+aws iam create-access-key --user-name aws-example-awscli
+
+# Output will show AccessKeyId and SecretAccessKey - save these securely
+# Update your applications with the new credentials
+
+# After testing, deactivate old key (replace OLD_KEY_ID with actual key)
+aws iam update-access-key \
+    --user-name aws-example-awscli \
+    --access-key-id OLD_KEY_ID \
+    --status Inactive
+
+# Monitor CloudTrail for any usage of old key
+aws cloudtrail lookup-events \
+    --lookup-attributes AttributeKey=Username,AttributeValue=aws-example-awscli \
+    --max-results 50
+
+# After verification period, delete old key
+aws iam delete-access-key \
+    --user-name aws-example-awscli \
+    --access-key-id OLD_KEY_ID
+
+# Verify only new key exists
+aws iam list-access-keys --user-name aws-example-awscli</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html#Using_RotateAccessKey" target="_blank">Rotating Access Keys - AWS IAM User Guide</a></li>
+                                <li><a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#rotate-credentials" target="_blank">IAM Best Practices - Rotate Credentials</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[GLOBAL] - User::aws-example-awscli</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>NETSEC-001.1: Restrict Sensitive Ports in Security Groups</h4>
+                                <span class="badge badge-high">High Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>5 security groups have sensitive ports (SSH, RDP, MySQL, PostgreSQL, MongoDB, MSSQL, Oracle, NFS, DNS, SMTP) open to all IP addresses (0.0.0.0/0). This creates a significant attack surface for brute force attacks and unauthorized access attempts.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Exposing sensitive ports to the entire internet is one of the most critical security vulnerabilities. Attackers continuously scan the internet for open ports and launch automated attacks within minutes of discovery. Specific risks include: (1) SSH/RDP brute force attacks attempting to guess credentials, (2) Database exploitation through known vulnerabilities or weak passwords, (3) Data exfiltration if attackers gain access to databases, (4) Ransomware deployment through compromised RDP sessions, (5) Lateral movement within your network after initial compromise. According to security research, SSH brute force attacks occur within 24 hours of port exposure, with thousands of attempts per day. The average cost of a successful breach through this vector is $3.86M. Additionally, this configuration violates PCI DSS, HIPAA, and most compliance frameworks.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Audit current security group rules and identify legitimate source IPs/ranges</li>
+                                <li>Document business justification for each required access</li>
+                                <li>For administrative access (SSH/RDP), implement bastion host or AWS Systems Manager Session Manager</li>
+                                <li>Update security group rules to restrict to specific CIDR blocks (office IPs, VPN ranges)</li>
+                                <li>For database access, ensure only application security groups can connect</li>
+                                <li>Test connectivity from legitimate sources before removing 0.0.0.0/0 rules</li>
+                                <li>Remove 0.0.0.0/0 rules during maintenance window</li>
+                                <li>Monitor CloudWatch Logs and VPC Flow Logs for any connection failures</li>
+                                <li>Implement AWS Config rule to prevent future 0.0.0.0/0 rules on sensitive ports</li>
+                                <li>Set up CloudWatch alarm for security group changes</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># List security group rules to identify 0.0.0.0/0 access
+aws ec2 describe-security-groups \
+    --group-ids sg-01234abcdef56789a sg-1111abcdef9999a sg-2222abcdef0000a sg-3333abcdef1111a sg-5555abcdef2222a \
+    --query 'SecurityGroups[*].[GroupId,GroupName,IpPermissions]' \
+    --output json
+
+# Example: Restrict SSH (port 22) to specific IP range
+# First, add new rule with restricted access
+aws ec2 authorize-security-group-ingress \
+    --group-id sg-01234abcdef56789a \
+    --protocol tcp \
+    --port 22 \
+    --cidr 203.0.113.0/24 \
+    --description "SSH access from office network"
+
+# Then, remove the 0.0.0.0/0 rule
+aws ec2 revoke-security-group-ingress \
+    --group-id sg-01234abcdef56789a \
+    --protocol tcp \
+    --port 22 \
+    --cidr 0.0.0.0/0
+
+# For database ports (example MySQL 3306), restrict to application security group
+aws ec2 authorize-security-group-ingress \
+    --group-id sg-1111abcdef9999a \
+    --protocol tcp \
+    --port 3306 \
+    --source-group sg-app-security-group-id \
+    --description "MySQL access from application tier"
+
+aws ec2 revoke-security-group-ingress \
+    --group-id sg-1111abcdef9999a \
+    --protocol tcp \
+    --port 3306 \
+    --cidr 0.0.0.0/0
+
+# Verify changes
+aws ec2 describe-security-groups \
+    --group-ids sg-01234abcdef56789a \
+    --query 'SecurityGroups[*].IpPermissions'
+
+# Set up AWS Config rule to prevent future violations
+aws configservice put-config-rule \
+    --config-rule file://restricted-ssh-config-rule.json</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html" target="_blank">Amazon EC2 Best Practices</a></li>
+                                <li><a href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/security-group-rules.html" target="_blank">Security Group Rules Reference</a></li>
+                                <li><a href="https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html" target="_blank">AWS Systems Manager Session Manager</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[ap-southeast-2] - SG::sg-01234abcdef56789a</span>
+                                <span class="resource-tag">[ap-southeast-2] - SG::sg-1111abcdef9999a</span>
+                                <span class="resource-tag">[ap-southeast-2] - SG::sg-2222abcdef0000a</span>
+                                <span class="resource-tag">[ap-southeast-2] - SG::sg-3333abcdef1111a</span>
+                                <span class="resource-tag">[ap-southeast-2] - SG::sg-5555abcdef2222a</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>IAM-006.1: Limit Inline Policy Full Access to Single Service</h4>
+                                <span class="badge badge-high">High Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>6 IAM roles have inline policies granting full access (*:*) to one or more AWS services. This violates the principle of least privilege and creates unnecessary security risks.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Overly permissive IAM policies significantly increase the blast radius of compromised credentials or insider threats. Granting full access to a service when only specific actions are needed violates the principle of least privilege and creates multiple risks: (1) Compromised credentials can be used to perform any action within the service, including destructive operations, (2) Accidental misconfigurations or script errors can cause widespread damage, (3) Compliance violations as most frameworks require least privilege access, (4) Difficulty in auditing and understanding actual permissions, (5) Increased attack surface for privilege escalation. Additionally, inline policies are harder to manage and audit compared to managed policies. The average cost of an insider threat incident is $11.45M, and overly broad permissions are a contributing factor in 63% of such incidents.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>For each affected role, analyze CloudTrail logs to identify actual API calls made (last 90 days)</li>
+                                <li>Use IAM Access Analyzer to identify unused permissions</li>
+                                <li>Create custom managed policies with only required permissions</li>
+                                <li>Test new policies in non-production environment</li>
+                                <li>Attach new managed policies to roles</li>
+                                <li>Monitor application logs for permission errors</li>
+                                <li>After 7-day validation period, remove inline policies</li>
+                                <li>Document the changes and rationale</li>
+                                <li>Implement AWS Config rule to prevent future inline policies with full access</li>
+                                <li>Establish policy review process (quarterly)</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># List inline policies for a role
+aws iam list-role-policies --role-name ap-southeast-2_example_Full-access
+
+# Get inline policy document
+aws iam get-role-policy \
+    --role-name ap-southeast-2_example_Full-access \
+    --policy-name PolicyName
+
+# Use IAM Access Analyzer to identify unused permissions
+aws accessanalyzer create-analyzer \
+    --analyzer-name least-privilege-analyzer \
+    --type ACCOUNT
+
+# Generate policy based on CloudTrail activity (requires Access Analyzer)
+aws accessanalyzer get-generated-policy \
+    --service-last-accessed-details-arn arn:aws:iam::123456789012:role/ap-southeast-2_example_Full-access
+
+# Create custom managed policy with least privilege
+aws iam create-policy \
+    --policy-name CustomLeastPrivilegePolicy \
+    --policy-document file://least-privilege-policy.json \
+    --description "Least privilege policy based on actual usage"
+
+# Attach managed policy to role
+aws iam attach-role-policy \
+    --role-name ap-southeast-2_example_Full-access \
+    --policy-arn arn:aws:iam::123456789012:policy/CustomLeastPrivilegePolicy
+
+# After validation, delete inline policy
+aws iam delete-role-policy \
+    --role-name ap-southeast-2_example_Full-access \
+    --policy-name PolicyName
+
+# Verify final permissions
+aws iam list-attached-role-policies --role-name ap-southeast-2_example_Full-access
+aws iam list-role-policies --role-name ap-southeast-2_example_Full-access</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege" target="_blank">IAM Best Practices - Grant Least Privilege</a></li>
+                                <li><a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-policy-generation.html" target="_blank">IAM Access Analyzer Policy Generation</a></li>
+                                <li><a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_managed-vs-inline.html" target="_blank">Managed Policies vs Inline Policies</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[GLOBAL] - Role::ap-southeast-2_example_Full-access</span>
+                                <span class="resource-tag">[GLOBAL] - Role::ap-southeast-2_123456_Full-access</span>
+                                <span class="resource-tag">[GLOBAL] - Role::aws-example-cw-logs-to-firehose</span>
+                                <span class="resource-tag">[GLOBAL] - Role::firehose_delivery_role</span>
+                                <span class="resource-tag">[GLOBAL] - Role::InspectorEnablementRole</span>
+                                <span class="resource-tag">[GLOBAL] - Role::AnotherExampleRole</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>IAM-006.1: Limit Inline Policy Full Administrator Access</h4>
+                                <span class="badge badge-high">High Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>3 IAM roles have inline policies providing full Administrator access (*:*). This represents the highest level of permissions and should be strictly limited and monitored.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Full administrator access is the most powerful permission set in AWS, allowing complete control over all resources and services. Granting this level of access through inline policies creates critical security risks: (1) Compromised credentials provide attacker with complete account control, (2) Ability to delete all resources, modify security settings, and exfiltrate all data, (3) Can create backdoor access, disable logging, and cover tracks, (4) Difficult to audit and track who has admin access, (5) Violates separation of duties and least privilege principles, (6) Non-compliance with virtually all security frameworks (PCI DSS, HIPAA, SOC 2). The impact of compromised admin credentials is catastrophic, with potential for complete data loss, service disruption, and regulatory fines. The average cost of a breach involving admin credential compromise is $4.87M, 15% higher than average breaches.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Identify the purpose and usage of each role with admin access</li>
+                                <li>Determine if admin access is truly required or if scoped permissions would suffice</li>
+                                <li>For legitimate admin needs, migrate to AWS managed AdministratorAccess policy for better tracking</li>
+                                <li>Implement break-glass procedures for emergency admin access</li>
+                                <li>Enable MFA requirement for all admin access</li>
+                                <li>Set up CloudWatch alarms for admin API calls</li>
+                                <li>Create custom policies with specific permissions for non-admin use cases</li>
+                                <li>Test new policies thoroughly in non-production</li>
+                                <li>Migrate roles to new policies during maintenance window</li>
+                                <li>Remove inline admin policies and document changes</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># Review inline policy for admin access
+aws iam get-role-policy \
+    --role-name PipelinesChangeSetExec-example123456789 \
+    --policy-name PolicyName
+
+# If admin access is required, use managed policy instead
+aws iam attach-role-policy \
+    --role-name PipelinesChangeSetExec-example123456789 \
+    --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
+
+# Add MFA requirement (create policy document first)
+cat > mfa-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "DenyAllExceptListedIfNoMFA",
+    "Effect": "Deny",
+    "NotAction": [
+      "iam:CreateVirtualMFADevice",
+      "iam:EnableMFADevice",
+      "iam:GetUser",
+      "iam:ListMFADevices",
+      "iam:ListVirtualMFADevices",
+      "iam:ResyncMFADevice",
+      "sts:GetSessionToken"
+    ],
+    "Resource": "*",
+    "Condition": {
+      "BoolIfExists": {"aws:MultiFactorAuthPresent": "false"}
+    }
+  }]
+}
+EOF
+
+aws iam put-role-policy \
+    --role-name PipelinesChangeSetExec-example123456789 \
+    --policy-name RequireMFA \
+    --policy-document file://mfa-policy.json
+
+# Set up CloudWatch alarm for admin API calls
+aws cloudwatch put-metric-alarm \
+    --alarm-name admin-api-calls \
+    --alarm-description "Alert on admin API calls" \
+    --metric-name AdminAPICallCount \
+    --namespace AWS/CloudTrail \
+    --statistic Sum \
+    --period 300 \
+    --threshold 1 \
+    --comparison-operator GreaterThanThreshold
+
+# After validation, remove inline admin policy
+aws iam delete-role-policy \
+    --role-name PipelinesChangeSetExec-example123456789 \
+    --policy-name PolicyName</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege" target="_blank">IAM Best Practices - Grant Least Privilege</a></li>
+                                <li><a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa.html" target="_blank">Using Multi-Factor Authentication (MFA) in AWS</a></li>
+                                <li><a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_job-functions.html" target="_blank">AWS Managed Policies for Job Functions</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[GLOBAL] - Role::PipelinesChangeSetExec-example123456789</span>
+                                <span class="resource-tag">[GLOBAL] - Role::PipelinesChangeSetExec-example22222222</span>
+                                <span class="resource-tag">[GLOBAL] - Role::MyRoleExample</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>BAR-001.1: Enable EBS Snapshots</h4>
+                                <span class="badge badge-high">High Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>17 EBS volumes have no snapshots available. Regular backups are essential to prevent data loss from hardware failures, accidental deletions, or ransomware attacks.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Without EBS snapshots, data loss is permanent and unrecoverable in the event of volume failure, accidental deletion, or ransomware encryption. Specific risks include: (1) Complete data loss from hardware failure (EBS has 99.8-99.9% durability, meaning 0.1-0.2% annual failure rate), (2) Inability to recover from ransomware attacks, (3) No rollback capability for application errors or corrupted data, (4) Extended downtime during disaster recovery, (5) Potential business closure for critical data loss, (6) Regulatory non-compliance (most frameworks require backup procedures). The average cost of data loss is $3.86M per incident, with 60% of companies that lose data closing within 6 months. Additionally, recovery time without backups can be days or weeks versus hours with snapshots.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Identify critical vs non-critical EBS volumes</li>
+                                <li>Define backup retention requirements (daily, weekly, monthly)</li>
+                                <li>Create AWS Backup plan with appropriate schedule</li>
+                                <li>Tag EBS volumes for backup automation</li>
+                                <li>Test backup plan on non-production volume</li>
+                                <li>Apply backup plan to production volumes</li>
+                                <li>Verify first snapshots complete successfully</li>
+                                <li>Test restore procedure from snapshot</li>
+                                <li>Document backup and restore procedures</li>
+                                <li>Set up CloudWatch alarms for backup failures</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># Create snapshot for a volume
+aws ec2 create-snapshot \
+    --volume-id vol-01234abcdef56789a \
+    --description "Manual snapshot before automation" \
+    --tag-specifications 'ResourceType=snapshot,Tags=[{Key=Name,Value=manual-backup},{Key=Environment,Value=production}]'
+
+# Create AWS Backup plan (requires backup plan JSON)
+aws backup create-backup-plan \
+    --backup-plan file://backup-plan.json
+
+# Example backup-plan.json:
+# {
+#   "BackupPlanName": "DailyEBSBackup",
+#   "Rules": [{
+#     "RuleName": "DailyBackup",
+#     "TargetBackupVaultName": "Default",
+#     "ScheduleExpression": "cron(0 5 ? * * *)",
+#     "StartWindowMinutes": 60,
+#     "CompletionWindowMinutes": 120,
+#     "Lifecycle": {
+#       "DeleteAfterDays": 30
+#     }
+#   }]
+# }
+
+# Tag volumes for backup
+aws ec2 create-tags \
+    --resources vol-01234abcdef56789a vol-1111abcdef2222a \
+    --tags Key=Backup,Value=Daily
+
+# Create backup selection to include tagged volumes
+aws backup create-backup-selection \
+    --backup-plan-id <plan-id> \
+    --backup-selection file://backup-selection.json
+
+# List snapshots to verify
+aws ec2 describe-snapshots \
+    --owner-ids self \
+    --filters "Name=volume-id,Values=vol-01234abcdef56789a"
+
+# Test restore (creates new volume from snapshot)
+aws ec2 create-volume \
+    --snapshot-id snap-1234567890abcdef0 \
+    --availability-zone ap-southeast-2a \
+    --tag-specifications 'ResourceType=volume,Tags=[{Key=Name,Value=restored-volume}]'</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html" target="_blank">Amazon EC2 Best Practices</a></li>
+                                <li><a href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSSnapshots.html" target="_blank">Amazon EBS Snapshots</a></li>
+                                <li><a href="https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html" target="_blank">AWS Backup Documentation</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[ap-southeast-2] - EBS::vol-01234abcdef56789a</span>
+                                <span class="resource-tag">[ap-southeast-2] - EBS::vol-1111abcdef2222a</span>
+                                <span class="resource-tag">[ap-southeast-2] - EBS::vol-2222abcdef3333a</span>
+                                <span class="resource-tag">[ap-southeast-2] - EBS::vol-3333abcdef4444a</span>
+                                <span class="resource-tag">[ap-southeast-2] - EBS::vol-4444abcdef5555a</span>
+                                <span class="resource-tag">... and 12 additional volumes</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>IAM-006.1: Limit Managed Policy Full Access to Single Service</h4>
+                                <span class="badge badge-high">High Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>38 IAM roles and groups have managed policies granting full access to individual AWS services, violating least privilege principles.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Excessive permissions increase security risk and blast radius of compromised credentials. Full service access allows destructive operations, data exfiltration, and privilege escalation. Average breach cost involving overprivileged accounts: $4.5M.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Analyze CloudTrail logs for actual API usage per role (90-day window)</li>
+                                <li>Use IAM Access Analyzer to generate least-privilege policies</li>
+                                <li>Create custom policies with only required permissions</li>
+                                <li>Test in non-production environment</li>
+                                <li>Gradually migrate roles to scoped policies</li>
+                                <li>Monitor for permission errors and adjust as needed</li>
+                                <li>Remove overly permissive managed policies</li>
+                                <li>Implement quarterly policy review process</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># List attached managed policies
+aws iam list-attached-role-policies --role-name amplifyconsole-backend-role
+
+# Detach overly permissive policy
+aws iam detach-role-policy \
+    --role-name amplifyconsole-backend-role \
+    --policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess
+
+# Attach scoped policy
+aws iam attach-role-policy \
+    --role-name amplifyconsole-backend-role \
+    --policy-arn arn:aws:iam::123456789012:policy/AmplifyS3LimitedAccess</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege" target="_blank">IAM Best Practices - Grant Least Privilege</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[GLOBAL] - Role::amplifyconsole-backend-role</span>
+                                <span class="resource-tag">[GLOBAL] - Role::ap-southeast-2_example_Full-access</span>
+                                <span class="resource-tag">[GLOBAL] - Role::ap-southeast-2_123456_Full-access</span>
+                                <span class="resource-tag">[GLOBAL] - Role::Applications-PetSiteServiceAccount123-example</span>
+                                <span class="resource-tag">[GLOBAL] - Role::aws-example-crossaccount-role</span>
+                                <span class="resource-tag">... and 33 additional roles/groups</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>IAM-006.1: Limit Full Administrator Access</h4>
+                                <span class="badge badge-high">High Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>25 users, groups, and roles have full Administrator access (*:*), providing unrestricted control over all AWS resources and services.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Full admin access represents maximum security risk. Compromised admin credentials enable complete account takeover, data deletion, security control bypass, and backdoor creation. Violates all compliance frameworks. Breach cost with admin compromise: $4.87M (15% above average).</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Audit each admin account for legitimate business need</li>
+                                <li>Implement break-glass emergency access procedures</li>
+                                <li>Require MFA for all admin access</li>
+                                <li>Create role-based policies for specific admin tasks</li>
+                                <li>Migrate to just-in-time admin access model</li>
+                                <li>Set up CloudWatch alarms for admin API calls</li>
+                                <li>Remove unnecessary admin access</li>
+                                <li>Document and review admin access quarterly</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># List users/roles with AdministratorAccess
+aws iam list-entities-for-policy \
+    --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
+
+# Detach from user
+aws iam detach-user-policy \
+    --user-name aws-example-awscli \
+    --policy-arn arn:aws:iam::aws:policy/AdministratorAccess
+
+# Create MFA-required admin policy
+aws iam create-policy \
+    --policy-name AdminWithMFA \
+    --policy-document file://admin-mfa-policy.json
+
+# Set up CloudWatch alarm
+aws cloudwatch put-metric-alarm \
+    --alarm-name admin-access-alert \
+    --metric-name AdminAPICallCount \
+    --threshold 1 \
+    --comparison-operator GreaterThanThreshold</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege" target="_blank">IAM Best Practices</a></li>
+                                <li><a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa.html" target="_blank">Using MFA in AWS</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[GLOBAL] - User::aws-example-awscli</span>
+                                <span class="resource-tag">[GLOBAL] - Role::Admin</span>
+                                <span class="resource-tag">[GLOBAL] - Role::aws-example-glue-fullaccess</span>
+                                <span class="resource-tag">[GLOBAL] - Role::AWSCloudFormationStackSetExecutionRole</span>
+                                <span class="resource-tag">[GLOBAL] - Group::aws-example-admins</span>
+                                <span class="resource-tag">... and 20 additional users/roles/groups</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>SDAT-003.1: Enable Security Group Encryption in Transit</h4>
+                                <span class="badge badge-high">High Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>21 security groups allow unencrypted traffic on ports that should use encryption (HTTP instead of HTTPS, unencrypted database protocols).</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Unencrypted traffic exposes sensitive data to man-in-the-middle attacks, eavesdropping, and data tampering. Attackers on the same network can intercept credentials, session tokens, and business data. Violates PCI DSS, HIPAA, and GDPR requirements for data in transit protection.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Identify applications using unencrypted protocols</li>
+                                <li>Configure TLS/SSL certificates for web applications</li>
+                                <li>Update database connections to use SSL/TLS</li>
+                                <li>Modify security groups to allow only encrypted ports (443, 3306 with SSL)</li>
+                                <li>Test application connectivity with encryption</li>
+                                <li>Remove unencrypted port rules</li>
+                                <li>Implement AWS Config rule to prevent unencrypted traffic</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># Add HTTPS rule (port 443)
+aws ec2 authorize-security-group-ingress \
+    --group-id sg-exampleabcdef12345a \
+    --protocol tcp \
+    --port 443 \
+    --cidr 0.0.0.0/0
+
+# Remove HTTP rule (port 80)
+aws ec2 revoke-security-group-ingress \
+    --group-id sg-exampleabcdef12345a \
+    --protocol tcp \
+    --port 80 \
+    --cidr 0.0.0.0/0
+
+# For RDS, enable SSL enforcement
+aws rds modify-db-instance \
+    --db-instance-identifier mydb \
+    --ca-certificate-identifier rds-ca-2019</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.amazonaws.cn/en_us/AWSEC2/latest/UserGuide/data-protection.html" target="_blank">Data Protection in EC2</a></li>
+                                <li><a href="https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html" target="_blank">Using SSL/TLS with RDS</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[ap-southeast-2] - SG::sg-exampleabcdef12345a</span>
+                                <span class="resource-tag">[ap-southeast-2] - SG::sg-5555example7777a</span>
+                                <span class="resource-tag">[ap-southeast-2] - SG::sg-01234abcdef56789a</span>
+                                <span class="resource-tag">... and 18 additional security groups</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>SDAT-002.1: Enable CloudTrail Log Encryption with KMS</h4>
+                                <span class="badge badge-medium">Medium Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>4 CloudTrail trails do not have server-side encryption (SSE-KMS) enabled, leaving audit logs vulnerable to unauthorized access.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Unencrypted CloudTrail logs expose sensitive audit data including API calls, user identities, and resource changes. If S3 bucket is compromised, attackers can read complete account activity history, identify security weaknesses, and plan targeted attacks. Violates compliance requirements for audit log protection.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Create or identify KMS key for CloudTrail encryption</li>
+                                <li>Update KMS key policy to allow CloudTrail service access</li>
+                                <li>Update S3 bucket policy for KMS-encrypted objects</li>
+                                <li>Enable SSE-KMS on CloudTrail configuration</li>
+                                <li>Verify new logs are encrypted</li>
+                                <li>Test log access with appropriate IAM permissions</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># Create KMS key for CloudTrail
+aws kms create-key \
+    --description "CloudTrail log encryption key" \
+    --key-policy file://cloudtrail-kms-policy.json
+
+# Enable SSE-KMS on CloudTrail
+aws cloudtrail update-trail \
+    --name MyExampleTrail-DO-NOT-DELETE \
+    --kms-key-id arn:aws:kms:ap-southeast-2:123456789012:key/KEY_ID
+
+# Verify encryption
+aws cloudtrail describe-trails \
+    --trail-name-list MyExampleTrail-DO-NOT-DELETE \
+    --query 'trailList[*].[Name,KmsKeyId]'</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/awscloudtrail/latest/userguide/encrypting-cloudtrail-log-files-with-aws-kms.html" target="_blank">Encrypting CloudTrail Log Files with AWS KMS</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[ap-southeast-2] - Cloudtrail::MyExampleTrail-DO-NOT-DELETE</span>
+                                <span class="resource-tag">[ap-southeast-2] - Cloudtrail::OrganizationTrail</span>
+                                <span class="resource-tag">[ap-southeast-2] - Cloudtrail::aws-example-trail</span>
+                                <span class="resource-tag">[ap-southeast-2] - Cloudtrail::cloudtrail-ohio</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>SDAT-003.1: Enforce S3 Bucket TLS Encryption</h4>
+                                <span class="badge badge-medium">Medium Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>69 S3 buckets do not enforce TLS/HTTPS for data in transit, allowing unencrypted connections that expose data to interception.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Without TLS enforcement, data transmitted to/from S3 can be intercepted through man-in-the-middle attacks. Attackers on the network path can read, modify, or steal data. Particularly critical for buckets containing sensitive data, credentials, or PII. Violates security best practices and compliance requirements.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Create bucket policy template requiring aws:SecureTransport</li>
+                                <li>Test policy on non-production bucket</li>
+                                <li>Verify all applications use HTTPS endpoints</li>
+                                <li>Apply policy to production buckets in phases</li>
+                                <li>Monitor CloudTrail for denied requests</li>
+                                <li>Update any applications using HTTP</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># Create policy requiring TLS
+cat > enforce-tls-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "DenyInsecureTransport",
+    "Effect": "Deny",
+    "Principal": "*",
+    "Action": "s3:*",
+    "Resource": [
+      "arn:aws:s3:::BUCKET_NAME",
+      "arn:aws:s3:::BUCKET_NAME/*"
+    ],
+    "Condition": {
+      "Bool": {"aws:SecureTransport": "false"}
+    }
+  }]
+}
+EOF
+
+# Apply policy to bucket
+aws s3api put-bucket-policy \
+    --bucket amazon-connect-example-bucket \
+    --policy file://enforce-tls-policy.json
+
+# Verify policy
+aws s3api get-bucket-policy \
+    --bucket amazon-connect-example-bucket</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://aws.amazon.com/premiumsupport/knowledge-center/s3-bucket-policy-for-config-rule/" target="_blank">S3 Bucket Policy for TLS</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[ap-southeast-2] - Bucket::amazon-connect-example-bucket</span>
+                                <span class="resource-tag">[ap-southeast-2] - Bucket::amplify-example-deployment</span>
+                                <span class="resource-tag">[ap-southeast-2] - Bucket::aws-example-logs</span>
+                                <span class="resource-tag">... and 66 additional buckets</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>IAM-007.1: Remove Unused IAM Roles</h4>
+                                <span class="badge badge-low">Low Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>234 IAM roles have not been used in over 90 days, creating unnecessary attack surface and complicating security management.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Unused roles represent dormant security risks. If compromised, attackers can use these roles without detection. Unused roles complicate security audits, increase IAM policy complexity, and may have overly permissive policies that were never cleaned up. Best practice is to remove unused access to minimize attack surface.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Generate report of roles unused for 90+ days</li>
+                                <li>Identify role owners and verify truly unused</li>
+                                <li>Check for dependencies (CloudFormation, automation)</li>
+                                <li>Delete roles in batches, starting with oldest</li>
+                                <li>Monitor for errors and restore if needed</li>
+                                <li>Implement automated cleanup policy</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># List roles with last used date
+aws iam list-roles --query 'Roles[*].[RoleName,RoleLastUsed.LastUsedDate]'
+
+# Get role details
+aws iam get-role --role-name AccessAnalyzerTrustedService
+
+# Delete unused role
+aws iam delete-role --role-name AccessAnalyzerTrustedService
+
+# If role has policies, detach first
+aws iam list-attached-role-policies --role-name ROLE_NAME
+aws iam detach-role-policy --role-name ROLE_NAME --policy-arn POLICY_ARN</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://aws.amazon.com/blogs/security/identify-unused-iam-roles-remove-confidently-last-used-timestamp/" target="_blank">Identify and Remove Unused IAM Roles</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[GLOBAL] - Role::AccessAnalyzerTrustedService</span>
+                                <span class="resource-tag">[GLOBAL] - Role::alarm_check_lambda_execution_role</span>
+                                <span class="resource-tag">[GLOBAL] - Role::TrustedServiceRole</span>
+                                <span class="resource-tag">... and 231 additional unused roles</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>BAR-001.1: Enable S3 Bucket Versioning</h4>
+                                <span class="badge badge-low">Low Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>65 S3 buckets do not have versioning enabled, preventing recovery from accidental deletions or overwrites.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Without versioning, deleted or overwritten objects are permanently lost. No ability to recover from accidental deletions, application bugs, or malicious actions. Versioning provides point-in-time recovery and protects against ransomware that overwrites files. Recommended for all buckets containing important data.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Assess storage cost impact (typically 10-30% increase)</li>
+                                <li>Create lifecycle policies to manage version retention</li>
+                                <li>Enable versioning on critical buckets first</li>
+                                <li>Test restore from previous versions</li>
+                                <li>Roll out to remaining buckets</li>
+                                <li>Monitor storage costs and adjust lifecycle policies</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># Enable versioning
+aws s3api put-bucket-versioning \
+    --bucket amazon-connect-example-bucket \
+    --versioning-configuration Status=Enabled
+
+# Create lifecycle policy to manage versions
+aws s3api put-bucket-lifecycle-configuration \
+    --bucket amazon-connect-example-bucket \
+    --lifecycle-configuration file://lifecycle-policy.json
+
+# Verify versioning enabled
+aws s3api get-bucket-versioning \
+    --bucket amazon-connect-example-bucket</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/Versioning.html" target="_blank">Using Versioning in S3 Buckets</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[ap-southeast-2] - Bucket::amazon-connect-example-bucket</span>
+                                <span class="resource-tag">[ap-southeast-2] - Bucket::aws-example-logs</span>
+                                <span class="resource-tag">... and 63 additional buckets</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>IAM-003.1: Strengthen Password Policy (Weak Settings)</h4>
+                                <span class="badge badge-low">Low Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>Account password policy does not meet security best practices for complexity requirements.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Weak password policies allow users to create easily guessable passwords, increasing risk of brute force attacks and credential compromise. Strong password policies are fundamental security controls required by most compliance frameworks.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Review current password policy settings</li>
+                                <li>Update policy to require uppercase, lowercase, numbers, symbols</li>
+                                <li>Communicate changes to IAM users</li>
+                                <li>Set grace period for compliance</li>
+                                <li>Force password reset on next login</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># Update password policy
+aws iam update-account-password-policy \
+    --minimum-password-length 14 \
+    --require-symbols \
+    --require-numbers \
+    --require-uppercase-characters \
+    --require-lowercase-characters \
+    --allow-users-to-change-password \
+    --max-password-age 90 \
+    --password-reuse-prevention 24
+
+# Verify policy
+aws iam get-account-password-policy</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#configure-strong-password-policy" target="_blank">Configure Strong Password Policy</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[GLOBAL] - Account::Config</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>IAM-003.1: Strengthen Password Policy (Length)</h4>
+                                <span class="badge badge-low">Low Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>Account password policy does not require minimum 14-character passwords as recommended by security best practices.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Shorter passwords are exponentially easier to crack through brute force attacks. Modern computing power can crack 8-character passwords in hours. 14+ character passwords provide significantly better protection against automated attacks.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Update password policy to require 14+ characters</li>
+                                <li>Notify users of new requirement</li>
+                                <li>Provide password manager recommendations</li>
+                                <li>Set implementation deadline</li>
+                                <li>Force password reset for non-compliant users</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># Update minimum password length
+aws iam update-account-password-policy \
+    --minimum-password-length 14
+
+# Get current policy
+aws iam get-account-password-policy</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#configure-strong-password-policy" target="_blank">IAM Password Policy Best Practices</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[GLOBAL] - Account::Config</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>NETSEC-002.1: Remove Unnecessary EC2 Public IPs</h4>
+                                <span class="badge badge-low">Low Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>1 EC2 instance has a public IP address that may not be necessary, increasing attack surface.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Public IPs expose instances directly to the internet, increasing attack surface. If the instance doesn't need internet-facing access, the public IP should be removed. Use NAT Gateway, VPC endpoints, or load balancers for controlled internet access.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Verify if instance requires inbound internet access</li>
+                                <li>If not needed, plan to launch replacement without public IP</li>
+                                <li>Configure NAT Gateway for outbound internet access</li>
+                                <li>Update security groups to restrict access</li>
+                                <li>Migrate workload to new instance</li>
+                                <li>Terminate instance with public IP</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># Check instance details
+aws ec2 describe-instances \
+    --instance-ids i-0123example1234a \
+    --query 'Reservations[*].Instances[*].[InstanceId,PublicIpAddress,PrivateIpAddress]'
+
+# Note: Cannot remove public IP from running instance
+# Must launch new instance without public IP
+# Or use Elastic IP and disassociate it
+
+# Disassociate Elastic IP if used
+aws ec2 disassociate-address --association-id eipassoc-xxxxx
+
+# Launch replacement without public IP
+aws ec2 run-instances \
+    --image-id ami-xxxxx \
+    --instance-type t3.micro \
+    --subnet-id subnet-xxxxx \
+    --no-associate-public-ip-address</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/securityhub/latest/userguide/ec2-controls.html#ec2-9" target="_blank">EC2 Security Best Practices</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[ap-southeast-2] - EC2::i-0123example1234a</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>SDAT-001.1: Enable Amazon Macie</h4>
+                                <span class="badge badge-low">Low Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>Amazon Macie is not enabled in ap-southeast-2 region. Macie provides automated sensitive data discovery and classification.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Without Macie, you lack visibility into sensitive data (PII, credentials, financial data) stored in S3 buckets. This makes it difficult to comply with data protection regulations and increases risk of data exposure. Macie uses machine learning to automatically discover and classify sensitive data.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Review Macie pricing for your data volume</li>
+                                <li>Enable Macie in the AWS Console or CLI</li>
+                                <li>Create classification jobs for S3 buckets</li>
+                                <li>Review findings and configure alerts</li>
+                                <li>Implement remediation for discovered sensitive data</li>
+                                <li>Set up automated classification jobs</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># Enable Macie
+aws macie2 enable-macie \
+    --region ap-southeast-2
+
+# Create classification job
+aws macie2 create-classification-job \
+    --job-type ONE_TIME \
+    --s3-job-definition '{
+      "bucketDefinitions": [{
+        "accountId": "123456789012",
+        "buckets": ["aws-example-logs"]
+      }]
+    }' \
+    --name "S3-Sensitive-Data-Discovery" \
+    --region ap-southeast-2
+
+# Get Macie findings
+aws macie2 list-findings --region ap-southeast-2</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/macie/latest/user/getting-started.html" target="_blank">Getting Started with Amazon Macie</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[ap-southeast-2] - Macie</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="recommendation-item">
+                        <div class="recommendation-header" onclick="toggleRecommendation(this)">
+                            <div>
+                                <h4>SDAT-002.1: Enable EBS Volume Encryption</h4>
+                                <span class="badge badge-low">Low Risk</span>
+                            </div>
+                            <span class="toggle-icon">+</span>
+                        </div>
+                        <div class="recommendation-content">
+                            <h5>Finding:</h5>
+                            <p>18 EBS volumes are not encrypted, leaving data at rest vulnerable if physical storage is compromised.</p>
+                            
+                            <h5>Risk if Not Remediated:</h5>
+                            <p>Unencrypted EBS volumes expose data if physical drives are accessed, snapshots are shared inappropriately, or volumes are attached to unauthorized instances. Encryption at rest is a fundamental security control and compliance requirement for most frameworks.</p>
+                            
+                            <h5>Implementation Plan:</h5>
+                            <ol>
+                                <li>Enable EBS encryption by default for the region</li>
+                                <li>For existing volumes, create encrypted snapshots</li>
+                                <li>Create new encrypted volumes from snapshots</li>
+                                <li>Test application functionality</li>
+                                <li>Swap volumes during maintenance window</li>
+                                <li>Delete unencrypted volumes after verification</li>
+                            </ol>
+                            
+                            <h5>AWS CLI Implementation:</h5>
+                            <pre><code># Enable EBS encryption by default
+aws ec2 enable-ebs-encryption-by-default \
+    --region ap-southeast-2
+
+# Create encrypted snapshot from unencrypted volume
+aws ec2 create-snapshot \
+    --volume-id vol-01234abcdef56789a \
+    --description "Encrypted snapshot"
+
+# Copy snapshot with encryption
+aws ec2 copy-snapshot \
+    --source-region ap-southeast-2 \
+    --source-snapshot-id snap-xxxxx \
+    --destination-region ap-southeast-2 \
+    --encrypted \
+    --kms-key-id arn:aws:kms:ap-southeast-2:123456789012:key/KEY_ID
+
+# Create encrypted volume from snapshot
+aws ec2 create-volume \
+    --snapshot-id snap-encrypted-xxxxx \
+    --availability-zone ap-southeast-2a \
+    --encrypted</code></pre>
+                            
+                            <h5>References:</h5>
+                            <ul>
+                                <li><a href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html" target="_blank">EC2 Best Practices</a></li>
+                                <li><a href="https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/EBSEncryption.html" target="_blank">Amazon EBS Encryption</a></li>
+                            </ul>
+                            
+                            <h5>Affected Resources:</h5>
+                            <div class="resource-list">
+                                <span class="resource-tag">[ap-southeast-2] - EBS::vol-01234abcdef56789a</span>
+                                <span class="resource-tag">[ap-southeast-2] - EBS::vol-1111abcdef2222a</span>
+                                <span class="resource-tag">[ap-southeast-2] - EBS::vol-2222abcdef3333a</span>
+                                <span class="resource-tag">... and 15 additional volumes</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- APPENDIX_FINDINGS_END -->
+                    
+                </div>
+                <!-- ==================== APPENDIX SECTION END ==================== -->
+
+                <!-- ==================== FOOTER SECTION START ==================== -->
+                <div class="footer">
+                    <p><strong>AWS Foundational Technical Review (FTR) Assessment Report</strong></p>
+                    <p>Generated: November 18, 2025 09:16:34 (UTC)</p>
+                    <p>This report assessed 56 FTR checks across 14 categories for AWS Account 123456789012</p>
+                    <p>For complete FTR requirements, visit: <a href="https://apn-checklists.s3.amazonaws.com/foundational/partner-hosted/partner-hosted/CVLHEC5X7.html" target="_blank">AWS Foundational Technical Review</a></p>
+                    <p style="margin-top: 15px;">For questions or assistance with remediation, contact your AWS Partner Development Manager (PDM) or Partner Development Representative (PDR)</p>
+                    <p><strong>Next Steps:</strong> Review findings with stakeholders, establish remediation team, begin immediate action items within 7 days</p>
+                </div>
+                <!-- ==================== FOOTER SECTION END ==================== -->
+                
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function toggleRecommendation(header) {
+            const content = header.nextElementSibling;
+            const icon = header.querySelector('.toggle-icon');
+            
+            if (content.classList.contains('active')) {
+                content.classList.remove('active');
+                icon.textContent = '+';
+            } else {
+                content.classList.add('active');
+                icon.textContent = '−';
+            }
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('open');
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const navLinks = document.querySelectorAll('.nav-link');
+            const sections = document.querySelectorAll('.section, .header');
+            
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const targetId = this.getAttribute('href');
+                    const targetSection = document.querySelector(targetId);
+                    
+                    if (targetSection) {
+                        targetSection.scrollIntoView({ 
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                        
+                        if (window.innerWidth <= 768) {
+                            document.getElementById('sidebar').classList.remove('open');
+                        }
+                    }
+                });
+            });
+
+            function highlightActiveSection() {
+                let current = '';
+                
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    const sectionHeight = section.clientHeight;
+                    
+                    if (pageYOffset >= sectionTop - 100) {
+                        current = section.getAttribute('id');
+                    }
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.remove('active');
+                    if (link.getAttribute('href') === '#' + current) {
+                        link.classList.add('active');
+                    }
+                });
+            }
+
+            window.addEventListener('scroll', highlightActiveSection);
+            highlightActiveSection();
+
+            document.addEventListener('click', function(e) {
+                const sidebar = document.getElementById('sidebar');
+                const toggleButton = document.querySelector('.sidebar-toggle');
+                
+                if (window.innerWidth <= 768 && 
+                    sidebar.classList.contains('open') &&
+                    !sidebar.contains(e.target) && 
+                    !toggleButton.contains(e.target)) {
+                    sidebar.classList.remove('open');
+                }
+            });
+        });
+
+        window.addEventListener('beforeprint', function() {
+            const contents = document.querySelectorAll('.recommendation-content');
+            contents.forEach(content => content.classList.add('active'));
+        });
+    </script>
+</body>
+</html>
