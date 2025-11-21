@@ -157,7 +157,7 @@ main() {
     echo ""
 
     # Check for Kiro CLI
-    if ! command -v q &> /dev/null; then
+    if ! command -v kiro-cli --version &> /dev/null; then
         echo -e "${RED}❌ Kiro CLI is not installed.${NC}"
         echo -e "${YELLOW}ℹ️ Please install Kiro CLI before running this tool.${NC}"
         exit 1
