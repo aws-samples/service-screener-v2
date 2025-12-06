@@ -1,4 +1,4 @@
-import boto3 
+import boto3
 import json
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -22,6 +22,139 @@ previousResults = {}
 accounts = {}
 
 SHEETS_TO_SKIP = ['Info', 'Appendix']
+
+# ▼ ここから追加：日本語表示用のマッピングとヘルパー類 ▼
+
+# 重大度の日本語マッピング
+SEVERITY_JA = {
+    "High": "高",
+    "Medium": "中",
+    "Low": "低",
+    "Informational": "情報",
+}
+
+# カテゴリ（Well-Architected Pillar）の日本語マッピング
+PILLAR_JA = {
+    "Security": "セキュリティ",
+    "Cost Optimization": "コスト最適化",
+    "Performance Efficiency": "パフォーマンス効率",
+    "Reliability": "信頼性",
+    "Operation Excellence": "運用上の優秀性",
+}
+
+# リソース種別の日本語マッピング（必要に応じて拡張）
+RESOURCE_TYPE_JA = {
+    "EC2": "EC2インスタンス",
+    "EBS": "EBSボリューム",
+    "ELB": "ロードバランサー",
+    "SG": "セキュリティグループ",
+    "User": "IAMユーザー",
+    "Role": "IAMロール",
+    "Lambda": "Lambda関数",
+    "Bucket": "S3バケット",
+    "mysql": "RDS（MySQL）",
+}
+
+
+def parse_finding_line(raw_line: str) -> dict:
+    """
+    1 行の検知文字列を分解して dict にする。
+    例:
+      'ap-northeast-1::EC2DiskMonitor::Performance Efficiency::EC2::i-xxx::Medium'
+    """
+    line = raw_line.strip()
+    if line.startswith("--"):
+        line = line[2:].strip()
+
+    parts = line.split("::")
+    if len(parts) < 6:
+        # 想定外形式の場合は生文字列だけ返す
+        return {"raw": raw_line}
+
+    region, rule_name, pillar, resource_type, resource_id, severity = parts[:6]
+
+    return {
+        "region": region,
+        "rule_name": rule_name,
+        "pillar": pillar,
+        "pillar_ja": PILLAR_JA.get(pillar, pillar),
+        "resource_type": resource_type,
+        "resource_type_ja": RESOURCE_TYPE_JA.get(resource_type, resource_type),
+        "resource_id": resource_id,
+        "severity": severity,
+        "severity_ja": SEVERITY_JA.get(severity, severity),
+        "raw": raw_line,
+    }
+
+
+def auto_generic_description(finding: dict) -> str:
+    """
+    カテゴリ（pillar）に応じた汎用的な日本語説明を返す。
+    ルールごとの詳細辞書は作らず、「新しいルールにも柔軟に対応する」方針。
+    """
+    pillar = finding.get("pillar")
+    if pillar == "Security":
+        return "セキュリティに関する検知です。関連する設定やアクセス制御を確認してください。"
+    if pillar == "Cost Optimization":
+        return "コスト最適化に関する検知です。不要なリソースや設定がないか確認し、コスト削減を検討してください。"
+    if pillar == "Performance Efficiency":
+        return "パフォーマンス効率に関する検知です。リソースの性能やスケーリング設定を確認してください。"
+    if pillar == "Reliability":
+        return "信頼性に関する検知です。冗長化やバックアップ、障害時の挙動を確認してください。"
+    if pillar == "Operation Excellence":
+        return "運用性に関する検知です。監視・運用プロセスやオペレーションの改善を検討してください。"
+
+    # 未分類の場合のフォールバック
+    return "この検知の詳細はルール名とリソース情報を参考に確認してください。"
+
+
+def render_findings_block(blocks):
+    """
+    compareXlsx の trow[5] / trow[6] に入っている " -- ...\n -- ..." の
+    ブロック群から、日本語を交えた箇条書きリストを生成する。
+    """
+    results = []
+
+    for b in blocks:
+        if not b:
+            continue
+
+        for line in b.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+
+            f = parse_finding_line(line)
+
+            # 想定フォーマットでパースできない場合は、そのまま表示
+            if "rule_name" not in f:
+                results.append(f"- {f['raw'].strip()}")
+                continue
+
+            desc = auto_generic_description(f)
+
+            # 1件分を複数行で出力（プレーンテキスト SNS メール前提）
+            results.append(
+                f"- [{f['severity']}/{f['severity_ja']}] {f['rule_name']}"
+            )
+            results.append(
+                f"  カテゴリ: {f['pillar_ja']} ({f['pillar']})"
+            )
+            results.append(
+                f"  リソース: {f['resource_type_ja']} ({f['resource_type']})"
+            )
+            results.append(
+                f"  対象: {f['resource_id']} / リージョン: {f['region']}"
+            )
+            results.append(
+                f"  概要: {desc}"
+            )
+            results.append("")  # 各検知の間を 1 行空ける
+
+    return results
+
+# ▲ ここまで追加ヘルパー類 ▲
+
 
 def lambda_handler(event, context):
     record = event['detail']
@@ -171,35 +304,102 @@ def compareXlsx(hasPreviousObj):
     return data
 
 def formatCompared(compared, hasPreviousObj):
-    row = []
-    news = []
-    resolved = []
+    """
+    Service Screener の比較結果をテキストメール用に整形する。
+    サマリは表形式、New / Resolved は日本語を交えた箇条書き。
+    """
+    def _fmt_diff(v):
+        if v > 0:
+            return f"+{v}"
+        if v < 0:
+            return str(v)
+        return "0"
+
+    lines = []
+
+    # ===== サマリテーブル =====
+    lines.append("Summary by service")
+    lines.append("------------------")
+
+    if hasPreviousObj:
+        header = "{:<15} {:>6} {:>7} {:>8} {:>10}".format(
+            "SERVICE", "HIGH", "TOTAL", "ΔHIGH", "ΔTOTAL"
+        )
+    else:
+        header = "{:<15} {:>6} {:>7}".format(
+            "SERVICE", "HIGH", "TOTAL"
+        )
+
+    lines.append(header)
+    lines.append("-" * len(header))
+
     totalNew = 0
     totalResolved = 0
+    new_blocks = []
+    resolved_blocks = []
+
     for trow in compared:
-        tmsg = ""
-        tmsg = "{}: HIGH={} | TOTAL={}".format(trow[0], trow[1], trow[2])
+        service = trow[0]
+        high = trow[1]
+        total = trow[2]
+        diffHigh = trow[3]
+        diffTotal = trow[4]
+        newStr = trow[5]
+        resolvedStr = trow[6]
+        newCount = trow[7]
+        resolvedCount = trow[8]
+
         if hasPreviousObj:
-            tmsg  = tmsg + " | DIFFHIGH={} | TOTALDIFF={}".format(trow[3], trow[4])
-            if len(trow[5]):
-                totalNew = totalNew + trow[7]
-                news = news + [trow[5]]
-            
-            if len(trow[6]):
-                totalResolved = totalResolved + trow[8]
-                resolved = resolved + [trow[6]]
+            line = "{:<15} {:>6} {:>7} {:>8} {:>10}".format(
+                service,
+                high,
+                total,
+                _fmt_diff(diffHigh),
+                _fmt_diff(diffTotal)
+            )
+            if newCount:
+                totalNew += newCount
+                new_blocks.append(newStr)
+            if resolvedCount:
+                totalResolved += resolvedCount
+                resolved_blocks.append(resolvedStr)
+        else:
+            line = "{:<15} {:>6} {:>7}".format(
+                service,
+                high,
+                total
+            )
 
-        row.append(tmsg)
+        lines.append(line)
 
-    html = "\n".join(row)
-    html = html + "\n\n"
-    html = html + "\nNew Findings ({}):\n".format(totalNew)
-    html = html + ''.join(news)
-    html = html + "\n\n"
-    html = html + "\nResolved ({}):\n".format(totalResolved)
-    html = html + "\n -- ".join(resolved)
+    lines.append("")
+    lines.append("")
 
-    return html
+    # ===== New Findings =====
+    if hasPreviousObj:
+        lines.append(f"New Findings (新規検知 {totalNew} 件):")
+        lines.append("--------------------------------------")
+        new_list = render_findings_block(new_blocks)
+
+        if new_list:
+            lines.extend(new_list)
+        else:
+            lines.append("  (なし)")
+        lines.append("")
+        lines.append("")
+
+        # ===== Resolved =====
+        lines.append(f"Resolved (解消 {totalResolved} 件):")
+        lines.append("--------------------------------------")
+        resolved_list = render_findings_block(resolved_blocks)
+
+        if resolved_list:
+            lines.extend(resolved_list)
+        else:
+            lines.append("  (なし)")
+        lines.append("")
+
+    return "\n".join(lines)
 
 
 # Not in used, SNS does not support HTML unless pairing it with SES

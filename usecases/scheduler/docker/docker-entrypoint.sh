@@ -49,5 +49,12 @@ done
 # Upload the workItems to S3 with file name as current date
 aws s3 cp "$CURRENT_DATE" s3://$S3_OUTPUT_BUCKET/$CONFIG_ID/$CURRENT_DATE --recursive
 
-# Upload output.zip to S3
-aws s3 cp output.zip s3://$S3_OUTPUT_BUCKET/$CONFIG_ID/$CURRENT_DATE/$CURRENT_DATE.output.zip
+# ------------------------------------------------------------
+# output.zip をやめて、展開済み output/ フォルダをそのまま S3 に格納
+# ------------------------------------------------------------
+if [ -d "output" ]; then
+    echo "Uploading expanded output/ directory to S3..."
+    aws s3 cp output s3://$S3_OUTPUT_BUCKET/$CONFIG_ID/$CURRENT_DATE/output --recursive
+else
+    echo "Warning: output directory not found. Skipping upload."
+fi
