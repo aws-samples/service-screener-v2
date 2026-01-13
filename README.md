@@ -1,6 +1,6 @@
 # Service Screener
 
-An open source guidance tool for the AWS environment. Click [here](https://dev.d11el1twchxpia.amplifyapp.com/index.html) for sample report.
+An open source guidance tool for the AWS environment. Click [here](https://d3si63niga8mq9.cloudfront.net/961319563195/index.html) for sample report.
 
 ***Important note***: *The generated report has to be hosted locally and MUST NOT be internet accessible*
 
