@@ -186,14 +186,14 @@ class OpensearchCommon(Evaluator):
         if 'DomainStatus' in self.attribute:
             if 'LogPublishingOptions' in self.attribute['DomainStatus']:
                 if 'ES_APPLICATION_LOGS' in self.attribute['DomainStatus']['LogPublishingOptions']:
-                    self.results["SearchSlowLogs"] = [1, "Enabled"]
+                    self.results["ApplicationLogs"] = [1, "Enabled"]
 
     def _checkAuditLogs(self):
         self.results["AuditLogs"] = [-1, "Disabled"]
         if 'DomainStatus' in self.attribute:
             if 'LogPublishingOptions' in self.attribute['DomainStatus']:
-                if 'SEARCH_SLOW_LOGS' in self.attribute['DomainStatus']['LogPublishingOptions']:
-                    self.results["AUDIT_LOGS"] = [1, "Enabled"]
+                if 'AUDIT_LOGS' in self.attribute['DomainStatus']['LogPublishingOptions']:
+                    self.results["AuditLogs"] = [1, "Enabled"]
 
     def _checkAutoTune(self):
         self.results["AutoTune"] = [-1, "Disabled"]
@@ -210,7 +210,7 @@ class OpensearchCommon(Evaluator):
 
     def _checkColdStorage(self):
         self.results["ColdStorage"] = [-1, "Disabled"]
-        if self.cluster_config["ColdStorageOptions"]:
+        if self.cluster_config.get("ColdStorageOptions", {}).get("Enabled", False):
             self.results["ColdStorage"] = [1, "Enabled"]
             
     def _checkEbsStorageUtilisation(self):
@@ -268,6 +268,63 @@ class OpensearchCommon(Evaluator):
 
         if dp_active - dp_primary:
             self.results["ReplicaShard"] = [1, "Enabled"]
+
+    def _checkCloudWatchAlarms(self):
+        """
+        Validates presence of recommended CloudWatch alarms for OpenSearch domain.
+
+        Checks for critical alarms:
+        - ClusterStatus.red (cluster health)
+        - ClusterStatus.yellow (replica issues)
+        - FreeStorageSpace (storage capacity)
+        - ClusterIndexWritesBlocked (write capacity)
+        """
+        # Define critical metrics that should have alarms
+        critical_metrics = [
+            "ClusterStatus.red",
+            "ClusterStatus.yellow",
+            "FreeStorageSpace",
+            "ClusterIndexWritesBlocked"
+        ]
+
+        # Get STS info for account ID
+        sts_info = Config.get("stsInfo")
+        client_id = sts_info["Account"]
+
+        # Check for alarms on each critical metric
+        missing_alarms = []
+        configured_alarms = []
+
+        for metric in critical_metrics:
+            try:
+                # Check if alarms exist for this metric
+                response = self.cwClient.describe_alarms_for_metric(
+                    MetricName=metric,
+                    Namespace="AWS/ES",
+                    Dimensions=[
+                        {"Name": "ClientId", "Value": client_id},
+                        {"Name": "DomainName", "Value": self.domain}
+                    ]
+                )
+
+                # Check if any alarms are configured
+                if response.get("MetricAlarms"):
+                    configured_alarms.append(metric)
+                else:
+                    missing_alarms.append(metric)
+
+            except Exception as e:
+                # If we can't check, assume missing
+                missing_alarms.append(metric)
+
+        # Evaluate results
+        if len(missing_alarms) == 0:
+            self.results["CloudWatchAlarms"] = [1, "All critical alarms configured"]
+        elif len(missing_alarms) < len(critical_metrics):
+            self.results["CloudWatchAlarms"] = [-1, f"Missing alarms: {', '.join(missing_alarms)}"]
+        else:
+            self.results["CloudWatchAlarms"] = [-1, "No CloudWatch alarms configured"]
+
             
     def __checkMasterNodeType(self):
         xmap = [
