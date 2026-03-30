@@ -142,5 +142,47 @@
         "ref": [
             "[Tagging best practices]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>"
         ]
+    },
+    "LongPollingConfiguration": {
+        "category": "C",
+        "^description": "You have {$COUNT} SQS queues using short polling (ReceiveMessageWaitTimeSeconds = 0). This increases API request costs by up to 90%. Enable long polling by setting ReceiveMessageWaitTimeSeconds to 10-20 seconds for cost optimization.",
+        "shortDesc": "Enable long polling for cost optimization",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": -1,
+        "needFullTest": 0,
+        "ref": [
+            "[Long polling]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html>",
+            "[Cost optimization]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-cost-optimization.html>"
+        ]
+    },
+    "WildcardPrincipalDetection": {
+        "category": "S",
+        "^description": "You have {$COUNT} SQS queues with wildcard principals ('*') in their access policies. This is a critical security vulnerability that allows unauthorized access. Replace wildcard principals with specific IAM principals.",
+        "shortDesc": "Remove wildcard principals from policies",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Security best practices]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-security-best-practices.html>",
+            "[Access control]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-basic-examples-of-iam-policies.html>"
+        ]
+    },
+    "MaxReceiveCountDetection": {
+        "category": "R",
+        "^description": "You have {$COUNT} SQS queues with maxReceiveCount=1 in their DLQ configuration. This is an anti-pattern that causes messages to be dead-lettered on first failure, preventing recovery from transient errors. Set maxReceiveCount to 3-5 for better resilience.",
+        "shortDesc": "Increase maxReceiveCount for transient failure tolerance",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Dead letter queues]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-dead-letter-queues.html>",
+            "[Reliability best practices]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-best-practices.html>"
+        ]
     }
 }

@@ -370,3 +370,123 @@ class SqsQueueDriver(Evaluator):
                 
         except botocore.exceptions.ClientError:
             self.results['TaggingStrategy'] = [0, 'Unable to Check Tags']
+    
+    def _checkLongPollingConfiguration(self):
+        """
+        Check if queue is using long polling for cost optimization.
+        Long polling reduces API request costs by up to 90%.
+        """
+        wait_time = int(self.attributes.get('ReceiveMessageWaitTimeSeconds', 0))
+        
+        if wait_time == 0:
+            self.results['LongPollingConfiguration'] = [-1, 'Short Polling (0s) - Enable Long Polling']
+        elif wait_time < 5:
+            self.results['LongPollingConfiguration'] = [0, f'Suboptimal ({wait_time}s) - Increase to 10-20s']
+        else:
+            self.results['LongPollingConfiguration'] = [1, f'Long Polling Enabled ({wait_time}s)']
+    
+    def _checkWildcardPrincipalDetection(self):
+        """
+        Check for wildcard principals in queue access policy.
+        Wildcard principals ("*") are a critical security vulnerability.
+        """
+        policy_str = self.attributes.get('Policy')
+        
+        if not policy_str:
+            self.results['WildcardPrincipalDetection'] = [1, 'No Policy (Default Permissions)']
+            return
+        
+        try:
+            policy = json.loads(policy_str)
+            statements = policy.get('Statement', [])
+            
+            wildcard_issues = []
+            for idx, statement in enumerate(statements):
+                principal = statement.get('Principal', {})
+                effect = statement.get('Effect', '')
+                
+                # Check for various wildcard principal patterns
+                has_wildcard = False
+                
+                # Pattern 1: Principal: "*"
+                if principal == '*':
+                    has_wildcard = True
+                    wildcard_issues.append(f'Statement {idx+1}: Principal="*"')
+                
+                # Pattern 2: Principal: {"AWS": "*"}
+                elif isinstance(principal, dict):
+                    if principal.get('AWS') == '*':
+                        has_wildcard = True
+                        wildcard_issues.append(f'Statement {idx+1}: Principal.AWS="*"')
+                    # Check for list of principals containing wildcard
+                    elif isinstance(principal.get('AWS'), list) and '*' in principal.get('AWS'):
+                        has_wildcard = True
+                        wildcard_issues.append(f'Statement {idx+1}: Principal.AWS contains "*"')
+                
+                # Pattern 3: Empty principal (treated as wildcard in some contexts)
+                elif principal == '':
+                    has_wildcard = True
+                    wildcard_issues.append(f'Statement {idx+1}: Empty Principal')
+                
+                # Only flag as critical if it's an Allow statement with wildcard
+                if has_wildcard and effect.upper() == 'ALLOW':
+                    # Check if there are restrictive conditions that might mitigate the risk
+                    condition = statement.get('Condition', {})
+                    if condition:
+                        # Has conditions, so it's not completely open - warning instead of fail
+                        wildcard_issues[-1] += ' (with conditions)'
+            
+            if wildcard_issues:
+                # Separate issues with and without conditions
+                critical_issues = [i for i in wildcard_issues if '(with conditions)' not in i]
+                warning_issues = [i for i in wildcard_issues if '(with conditions)' in i]
+                
+                if critical_issues:
+                    self.results['WildcardPrincipalDetection'] = [-1, f'Wildcard Principal: {"; ".join(critical_issues)}']
+                else:
+                    self.results['WildcardPrincipalDetection'] = [0, f'Wildcard with Conditions: {"; ".join(warning_issues)}']
+            else:
+                self.results['WildcardPrincipalDetection'] = [1, 'No Wildcard Principals']
+                
+        except json.JSONDecodeError:
+            self.results['WildcardPrincipalDetection'] = [-1, 'Invalid Policy JSON']
+    
+    def _checkMaxReceiveCountDetection(self):
+        """
+        Check for maxReceiveCount=1 in DLQ configuration.
+        maxReceiveCount=1 is an anti-pattern that prevents recovery from transient failures.
+        """
+        # Skip if this queue is used as a DLQ by other queues
+        dlq_used_by = self.queue.get('DlqUsedBy', [])
+        if dlq_used_by:
+            # This is a DLQ itself, skip the check
+            return
+        
+        redrive_policy = self.attributes.get('RedrivePolicy')
+        
+        if not redrive_policy:
+            # No DLQ configured, skip this check
+            return
+        
+        try:
+            policy = json.loads(redrive_policy)
+            max_receive_count = policy.get('maxReceiveCount')
+            
+            if max_receive_count is None:
+                self.results['MaxReceiveCountDetection'] = [-1, 'Invalid RedrivePolicy (missing maxReceiveCount)']
+                return
+            
+            max_receive_count = int(max_receive_count)
+            
+            if max_receive_count == 1:
+                self.results['MaxReceiveCountDetection'] = [-1, 'maxReceiveCount=1 (Anti-pattern)']
+            elif max_receive_count == 2:
+                self.results['MaxReceiveCountDetection'] = [0, f'maxReceiveCount={max_receive_count} (Consider 3-5)']
+            elif max_receive_count >= 3:
+                self.results['MaxReceiveCountDetection'] = [1, f'maxReceiveCount={max_receive_count}']
+            else:
+                # Should not happen, but handle edge case
+                self.results['MaxReceiveCountDetection'] = [-1, f'Invalid maxReceiveCount={max_receive_count}']
+                
+        except (json.JSONDecodeError, ValueError, TypeError):
+            self.results['MaxReceiveCountDetection'] = [-1, 'Invalid RedrivePolicy JSON']
