@@ -82,6 +82,7 @@ class Cloudtrail(Service):
         
         _pi('CloudTrail:Common')
         obj = CloudtrailAccount(self.ctClient, len(trails))
+        obj.run(self.__class__)
         objs['Cloudtrail::General'] = obj.getInfo()
         del obj
         

@@ -144,3 +144,111 @@ class CloudtrailCommon(Evaluator):
             except botocore.exceptions.ClientError as e:
                 if e.response['Error']['Code'] ==  'NoSuchLifecycleConfiguration':
                     self.results['EnableTrailS3BucketLifecycle'] = [-1, 'Off']
+
+    def _checkKMSPolicySourceArn(self):
+        """
+        Validates that KMS key policies include aws:SourceArn condition
+        to ensure keys are only used by specific CloudTrail trails
+        """
+        # Skip if trail doesn't use KMS encryption
+        if 'KmsKeyId' not in self.trailInfo:
+            return
+        
+        kmsKeyId = self.trailInfo['KmsKeyId']
+        trailArn = self.trail['TrailARN']
+        
+        try:
+            # Get KMS key policy
+            kmsClient = boto3.client('kms')
+            response = kmsClient.get_key_policy(
+                KeyId=kmsKeyId,
+                PolicyName='default'
+            )
+            
+            import json
+            policy = json.loads(response['Policy'])
+            
+            # Check if any statement includes aws:SourceArn condition for this trail
+            hasSourceArnCondition = False
+            for statement in policy.get('Statement', []):
+                conditions = statement.get('Condition', {})
+                
+                # Check for StringEquals or StringLike conditions
+                for conditionType in ['StringEquals', 'StringLike']:
+                    if conditionType in conditions:
+                        sourceArn = conditions[conditionType].get('aws:SourceArn', '')
+                        # Check if condition references this trail or uses wildcard
+                        if sourceArn == trailArn or (isinstance(sourceArn, list) and trailArn in sourceArn):
+                            hasSourceArnCondition = True
+                            break
+                        # Also accept wildcard patterns that include trail ARN
+                        if isinstance(sourceArn, str) and 'cloudtrail' in sourceArn.lower():
+                            hasSourceArnCondition = True
+                            break
+                
+                if hasSourceArnCondition:
+                    break
+            
+            if not hasSourceArnCondition:
+                self.results['KMSPolicySourceArn'] = [-1, f'KMS key {kmsKeyId} lacks aws:SourceArn condition']
+                
+        except botocore.exceptions.ClientError as e:
+            print(f'-- Unable to check KMS key policy: {e.response["Error"]["Code"]}')
+    
+    def _checkCloudWatchAlarmsConfigured(self):
+        """
+        Validates that CloudWatch metric filters and alarms are configured
+        for critical security events in CloudTrail logs
+        """
+        # Skip if trail doesn't have CloudWatch Logs integration
+        if 'CloudWatchLogsLogGroupArn' not in self.trailInfo or not self.trailInfo['CloudWatchLogsLogGroupArn']:
+            return
+        
+        logGroupArn = self.trailInfo['CloudWatchLogsLogGroupArn']
+        # Extract log group name from ARN: arn:aws:logs:region:account:log-group:name:*
+        logGroupName = logGroupArn.split(':log-group:')[1].rstrip(':*') if ':log-group:' in logGroupArn else None
+        
+        if not logGroupName:
+            return
+        
+        try:
+            logsClient = boto3.client('logs')
+            cwClient = boto3.client('cloudwatch')
+            
+            # Get metric filters for this log group
+            response = logsClient.describe_metric_filters(
+                logGroupName=logGroupName
+            )
+            
+            metricFilters = response.get('metricFilters', [])
+            
+            if len(metricFilters) == 0:
+                self.results['CloudWatchAlarmsConfigured'] = [-1, 'No metric filters configured']
+                return
+            
+            # Check if alarms exist for the metric filters
+            alarmsExist = False
+            for metricFilter in metricFilters:
+                for transformation in metricFilter.get('metricTransformations', []):
+                    metricName = transformation.get('metricName')
+                    metricNamespace = transformation.get('metricNamespace')
+                    
+                    if metricName and metricNamespace:
+                        # Check if alarms exist for this metric
+                        alarmResponse = cwClient.describe_alarms_for_metric(
+                            MetricName=metricName,
+                            Namespace=metricNamespace
+                        )
+                        
+                        if len(alarmResponse.get('MetricAlarms', [])) > 0:
+                            alarmsExist = True
+                            break
+                
+                if alarmsExist:
+                    break
+            
+            if not alarmsExist:
+                self.results['CloudWatchAlarmsConfigured'] = [0, f'{len(metricFilters)} metric filters exist but no alarms configured']
+            
+        except botocore.exceptions.ClientError as e:
+            print(f'-- Unable to check CloudWatch alarms: {e.response["Error"]["Code"]}')
