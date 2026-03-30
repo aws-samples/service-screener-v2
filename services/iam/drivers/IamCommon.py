@@ -24,6 +24,8 @@ class IamCommon(Evaluator):
         cachePrefix = 'iam::mpolicy::'
         
         policyWithFullAccess = []
+        policyWithWildcards = []
+        
         if policies:
             hasFullAccess = -1 # instead of false/true, easier handling on cache checking using !empty
             for policy in policies:
@@ -55,10 +57,18 @@ class IamCommon(Evaluator):
                         hasFullAccess = 1
                         policyWithFullAccess.append(policy['PolicyName'])
                     
+                    # Check for wildcard actions (excluding full admin)
+                    if pObj.hasWildcardActions() == True:
+                        wildcards = pObj.getWildcardActions()
+                        policyWithWildcards.append(f"{policy['PolicyName']} ({', '.join(wildcards)})")
+                    
             Config.set(cachePrefix + policy['PolicyArn'], hasFullAccess)
 
         if policyWithFullAccess:
             self.results['ManagedPolicyFullAccessOneServ'] = [-1, '<br>'.join(policyWithFullAccess)]
+        
+        if policyWithWildcards:
+            self.results['wildcardActionsDetection'] = [-1, '<br>'.join(policyWithWildcards)]
             
     def evaluateInlinePolicy(self, inlinePolicies, identifier, entityType):
         if inlinePolicies is None or not inlinePolicies:
@@ -67,6 +77,8 @@ class IamCommon(Evaluator):
         self.results['InlinePolicy'] = [-1, '<br>'.join(inlinePolicies)]
         inlinePoliciesWithAdminAccess = []
         inlinePoliciesWithFullAccess = []
+        inlinePoliciesWithWildcards = []
+        
         for policy in inlinePolicies:
             if entityType == 'user':
                 resp = self.iamClient.get_user_policy(PolicyName=policy, UserName=identifier)
@@ -86,8 +98,16 @@ class IamCommon(Evaluator):
             if pObj.hasFullAccessAdmin() == True:
                 inlinePoliciesWithAdminAccess.append(policy)
             
+            # Check for wildcard actions (excluding full admin)
+            if pObj.hasWildcardActions() == True:
+                wildcards = pObj.getWildcardActions()
+                inlinePoliciesWithWildcards.append(f"{policy} ({', '.join(wildcards)})")
+            
         if inlinePoliciesWithFullAccess:
             self.results['InlinePolicyFullAccessOneServ'] = [-1, '<br>'.join(inlinePoliciesWithFullAccess)]
         
         if inlinePoliciesWithAdminAccess:
             self.results['InlinePolicyFullAdminAccess'] = [-1, '<br>'.join(inlinePoliciesWithAdminAccess)]
+        
+        if inlinePoliciesWithWildcards:
+            self.results['wildcardActionsDetection'] = [-1, '<br>'.join(inlinePoliciesWithWildcards)]
