@@ -336,5 +336,47 @@
 		"ref":[
 			"[DDB PITR]<https://docs.aws.amazon.com/securityhub/latest/userguide/dynamodb-controls.html#dynamodb-2>"
 		]
+	},
+	"encryptionAtRest":{
+		"category":"S",
+		"^description":"Encryption at rest helps protect your data from unauthorized access by encrypting it when stored. DynamoDB supports encryption at rest using AWS KMS keys. You can choose between AWS owned keys (default), AWS managed keys, or customer managed keys based on your compliance requirements. Customer-managed KMS keys provide additional control and audit capabilities for sensitive data.",
+		"shortDesc":"Encryption at rest is not enabled or not using KMS",
+		"criticality":"H",
+		"downtime":0,
+		"slowness":0,
+		"additionalCost":1,
+		"needFullTest":0,
+		"ref":[
+			"[DynamoDB Encryption at Rest]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/EncryptionAtRest.html>",
+			"[Using AWS KMS with DynamoDB]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/encryption.tutorial.html>"
+		]
+	},
+	"globalTableVersion":{
+		"category":"R",
+		"^description":"Global tables version 2019.11.21 (Current) provides improved reliability, performance, and features compared to the legacy version 2017.11.29. The current version offers better conflict resolution, lower replication latency, and support for additional features like global secondary indexes and streams. The legacy version is not recommended for new deployments and should be upgraded.",
+		"shortDesc":"Global table using legacy version (2017.11.29)",
+		"criticality":"M",
+		"downtime":0,
+		"slowness":0,
+		"additionalCost":0,
+		"needFullTest":0,
+		"ref":[
+			"[Global Tables Version Comparison]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V2.html>",
+			"[Upgrading Global Tables]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_upgrade.html>"
+		]
+	},
+	"tableClassOptimization":{
+		"category":"C",
+		"^description":"DynamoDB offers two table classes: Standard and Standard-IA (Infrequent Access). Standard-IA is optimized for tables that store data accessed less than once per hour, reducing storage costs by up to 60% compared to Standard class. Consider using Standard-IA for tables with infrequent access patterns to optimize costs while maintaining the same performance, durability, and availability.",
+		"shortDesc":"Table may benefit from Standard-IA table class",
+		"criticality":"L",
+		"downtime":0,
+		"slowness":0,
+		"additionalCost":-1,
+		"needFullTest":0,
+		"ref":[
+			"[DynamoDB Table Classes]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.TableClasses.html>",
+			"[Optimizing Costs with Table Classes]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/CostOptimization_TableClass.html>"
+		]
 	}
 }
