@@ -504,3 +504,149 @@ class Ec2Instance(Evaluator):
             
         return
     
+
+    def _checkEC2EbsOptimized(self):
+        """Check if EBS optimization is available but not enabled"""
+        instance = self.ec2InstanceData
+        instanceType = instance['InstanceType']
+        
+        # Check if instance type supports EBS optimization
+        try:
+            resp = self.ec2Client.describe_instance_types(
+                InstanceTypes=[instanceType]
+            )
+            
+            if not resp['InstanceTypes']:
+                return
+            
+            instanceTypeInfo = resp['InstanceTypes'][0]
+            ebsInfo = instanceTypeInfo.get('EbsInfo', {})
+            
+            # Check if EBS optimization is supported
+            ebsOptimizedSupport = ebsInfo.get('EbsOptimizedSupport')
+            
+            if ebsOptimizedSupport == 'unsupported':
+                # Instance type doesn't support EBS optimization
+                return
+            
+            # Check if EBS optimization is enabled on the instance
+            ebsOptimized = instance.get('EbsOptimized', False)
+            
+            if not ebsOptimized:
+                # EBS optimization is supported but not enabled
+                self.results['EC2EbsOptimized'] = [-1, instanceType]
+        
+        except Exception as e:
+            # If we can't determine, skip the check
+            return
+    
+    def _checkEC2RootVolumeImplications(self):
+        """Check root volume backup strategy"""
+        instance = self.ec2InstanceData
+        
+        # Get root device name
+        rootDeviceName = instance.get('RootDeviceName')
+        if not rootDeviceName:
+            return
+        
+        # Find root volume in block device mappings
+        blockDeviceMappings = instance.get('BlockDeviceMappings', [])
+        rootVolume = None
+        
+        for mapping in blockDeviceMappings:
+            if mapping.get('DeviceName') == rootDeviceName:
+                rootVolume = mapping
+                break
+        
+        if not rootVolume or 'Ebs' not in rootVolume:
+            return
+        
+        # Check if DeleteOnTermination is enabled
+        deleteOnTermination = rootVolume['Ebs'].get('DeleteOnTermination', True)
+        
+        if not deleteOnTermination:
+            # Root volume persists after termination, no issue
+            return
+        
+        # Root volume will be deleted on termination, check for recent snapshots
+        volumeId = rootVolume['Ebs'].get('VolumeId')
+        if not volumeId:
+            return
+        
+        try:
+            # Check for snapshots of this volume
+            snapshotResp = self.ec2Client.describe_snapshots(
+                Filters=[
+                    {
+                        'Name': 'volume-id',
+                        'Values': [volumeId]
+                    }
+                ]
+            )
+            
+            snapshots = snapshotResp.get('Snapshots', [])
+            
+            if not snapshots:
+                # No snapshots exist for root volume with DeleteOnTermination=True
+                self.results['EC2RootVolumeImplications'] = [-1, volumeId]
+                return
+            
+            # Check if most recent snapshot is within 7 days
+            latestSnapshot = max(snapshots, key=lambda x: x['StartTime'])
+            timeDelta = datetime.datetime.now(datetime.timezone.utc) - latestSnapshot['StartTime']
+            daysSinceSnapshot = timeDelta.days
+            
+            if daysSinceSnapshot > 7:
+                # Latest snapshot is outdated
+                self.results['EC2RootVolumeImplications'] = [-1, volumeId]
+        
+        except Exception as e:
+            # If we can't check snapshots, skip
+            return
+    def _checkSeparateOSDataVolumes(self):
+        """Check if instance has separate OS and data volumes"""
+        instance = self.ec2InstanceData
+        blockDeviceMappings = instance.get('BlockDeviceMappings', [])
+
+        # Only flag if instance has exactly 1 block device (root only) or none
+        if len(blockDeviceMappings) <= 1:
+            self.results['EC2SeparateOSDataVolumes'] = [-1, f"{len(blockDeviceMappings)} volume(s)"]
+        return
+
+    def _checkInstanceStoreUsage(self):
+        """Check if instance type has instance store and validate usage"""
+        instance = self.ec2InstanceData
+        instanceType = instance.get('InstanceType', '')
+
+        try:
+            resp = self.ec2Client.describe_instance_types(
+                InstanceTypes=[instanceType]
+            )
+
+            instanceTypes = resp.get('InstanceTypes', [])
+            if not instanceTypes:
+                return
+
+            instanceTypeInfo = instanceTypes[0]
+            instanceStorageInfo = instanceTypeInfo.get('InstanceStorageInfo')
+
+            if not instanceStorageInfo:
+                # Instance type doesn't support instance store, nothing to check
+                return
+
+            # Instance type supports instance store - check if ephemeral mappings exist
+            blockDeviceMappings = instance.get('BlockDeviceMappings', [])
+            hasEphemeral = False
+            for mapping in blockDeviceMappings:
+                if 'Ebs' not in mapping:
+                    # Non-EBS mapping = ephemeral/instance store
+                    hasEphemeral = True
+                    break
+
+            if not hasEphemeral:
+                totalSizeGb = instanceStorageInfo.get('TotalSizeInGB', 0)
+                self.results['EC2InstanceStoreUsage'] = [-1, f"{totalSizeGb}GB available"]
+
+        except Exception:
+            return
+

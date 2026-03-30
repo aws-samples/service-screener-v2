@@ -97,3 +97,28 @@ class Ec2ElbCommon(Evaluator):
             self.results['ELBSGRulesMatch'] = [-1, ', '.join(flaggedSGs)]
         
         return
+
+    def _checkELBMultiAZ(self):
+        """Check if load balancer is configured with multiple availability zones"""
+        elb = self.elb
+        
+        # Get availability zones for the load balancer
+        availabilityZones = elb.get('AvailabilityZones', [])
+        
+        # Count unique AZs
+        uniqueAZs = set()
+        for az in availabilityZones:
+            if isinstance(az, dict):
+                # For ALB/NLB, AvailabilityZones is a list of dicts with 'ZoneName'
+                zoneName = az.get('ZoneName')
+                if zoneName:
+                    uniqueAZs.add(zoneName)
+            else:
+                # For Classic LB, it might be a simple list
+                uniqueAZs.add(az)
+        
+        # Flag if fewer than 2 AZs
+        if len(uniqueAZs) < 2:
+            self.results['ELBMultiAZ'] = [-1, f"{len(uniqueAZs)} AZ"]
+        
+        return

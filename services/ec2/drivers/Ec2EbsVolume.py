@@ -236,3 +236,35 @@ class Ec2EbsVolume(Evaluator):
         #if read nor write exit due to decent utilization, then flag this
         self.results['EBSLowUtilization'] = [-1, '']
         return
+
+    def _checkEBSVolumeDataClassification(self):
+        """Check if EBS volumes have data classification tags"""
+        tags = self.ebsVolumeData.get('Tags', [])
+        
+        if not tags:
+            # No tags at all
+            self.results['EBSVolumeDataClassification'] = [-1, '']
+            return
+        
+        # Check for common data classification tag keys
+        classificationTagKeys = [
+            'dataclassification',
+            'data-classification', 
+            'classification',
+            'sensitivity',
+            'data-sensitivity',
+            'datasensitivity',
+            'confidentiality'
+        ]
+        
+        hasClassificationTag = False
+        for tag in tags:
+            tagKey = tag.get('Key', '').lower()
+            if tagKey in classificationTagKeys:
+                hasClassificationTag = True
+                break
+        
+        if not hasClassificationTag:
+            self.results['EBSVolumeDataClassification'] = [-1, '']
+        
+        return

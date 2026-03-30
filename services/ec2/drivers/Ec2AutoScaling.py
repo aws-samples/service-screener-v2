@@ -126,3 +126,60 @@ class Ec2AutoScaling(Evaluator):
             
         
         return
+
+    def _checkASGMultiAZ(self):
+        """Check if Auto Scaling Group is distributed across multiple availability zones"""
+        asg = self.asg
+        
+        # Get availability zones for the ASG
+        availabilityZones = asg.get('AvailabilityZones', [])
+        
+        # Flag if fewer than 2 AZs
+        if len(availabilityZones) < 2:
+            self.results['ASGMultiAZ'] = [-1, f"{len(availabilityZones)} AZ"]
+        
+        return
+    
+    def _checkASGTargetTrackingPolicy(self):
+        """Check if Auto Scaling Group uses target tracking scaling policies"""
+        asg = self.asg
+        asgName = asg['AutoScalingGroupName']
+        
+        try:
+            # Get scaling policies for this ASG
+            policiesResp = self.asgClient.describe_policies(
+                AutoScalingGroupName=asgName
+            )
+            
+            policies = policiesResp.get('ScalingPolicies', [])
+            
+            if not policies:
+                # No scaling policies at all
+                self.results['ASGTargetTrackingPolicy'] = [-1, 'No policies']
+                return
+            
+            # Check if any policy is target tracking
+            hasTargetTracking = False
+            for policy in policies:
+                policyType = policy.get('PolicyType', '')
+                if policyType == 'TargetTrackingScaling':
+                    hasTargetTracking = True
+                    break
+            
+            if not hasTargetTracking:
+                # Has policies but none are target tracking
+                self.results['ASGTargetTrackingPolicy'] = [-1, 'No target tracking']
+        
+        except Exception as e:
+            # If we can't check policies, skip
+            return
+
+    def _checkASGScalingCooldowns(self):
+        """Check if Auto Scaling Group has appropriate scaling cooldown period"""
+        asg = self.asg
+        defaultCooldown = asg.get('DefaultCooldown', 0)
+        # Flag if cooldown is less than 60 seconds (too short or disabled)
+        if defaultCooldown < 60:
+            self.results['ASGScalingCooldowns'] = [-1, f"{defaultCooldown}s"]
+        return
+
