@@ -60,14 +60,27 @@ def getCntSummary(reporterPath, cntType):
 
     rules = getRulesFromJSON(reporterPath)
     for ruleName in rules:
-        if cntType == 'PILLAR':
-            allCategory = rules[ruleName]['category']
-            category = allCategory[0]
-            
-        else:
-            category = rules[ruleName]['criticality']
+        try:
+            if cntType == 'PILLAR':
+                allCategory = rules[ruleName]['category']
+                category = allCategory[0]
+            else:
+                category = rules[ruleName]['criticality']
 
-        cntTable[category] += 1
+            if category not in cntTable:
+                print(f"ERROR: Unexpected category '{category}' found in rule '{ruleName}' from file '{reporterPath}'")
+                print(f"Expected categories for {cntType}: {list(cntTable.keys())}")
+                continue
+                
+            cntTable[category] += 1
+        except KeyError as e:
+            print(f"ERROR: Missing key {e} in rule '{ruleName}' from file '{reporterPath}'")
+            print(f"Rule data: {rules[ruleName]}")
+            continue
+        except Exception as e:
+            print(f"ERROR: Unexpected error processing rule '{ruleName}' from file '{reporterPath}': {e}")
+            continue
+            
     return cntTable
 
 def formSummaryPrettyTable(tableType):
@@ -82,25 +95,29 @@ def formSummaryPrettyTable(tableType):
     info = {}
     for service in reporterPaths:
         path = reporterPaths[service]
-        cntResult = getCntSummary(path, tableType)
-        serviceRow = [service]
-        totalPerService = 0
-        
-        for category in cntResult:
-            serviceRow.append(cntResult[category])
-            totalPerService = totalPerService + cntResult[category]
-            totalCategoryTable[category] = totalCategoryTable[category] + cntResult[category]
-        serviceRow.append(totalPerService)
-        table.append(serviceRow)
+        try:
+            cntResult = getCntSummary(path, tableType)
+            serviceRow = [service]
+            totalPerService = 0
+            
+            for category in cntResult:
+                serviceRow.append(cntResult[category])
+                totalPerService = totalPerService + cntResult[category]
+                totalCategoryTable[category] = totalCategoryTable[category] + cntResult[category]
+            serviceRow.append(totalPerService)
+            table.append(serviceRow)
 
-        totalRules = totalRules + totalPerService
-        
-        ## Does not matter, just need it to run once
-        sname = service
-        if(tableType == 'PILLAR'):
-            if sname == 'lambda_':
-                sname = 'lambda'
-            info[sname] = totalPerService
+            totalRules = totalRules + totalPerService
+            
+            ## Does not matter, just need it to run once
+            sname = service
+            if(tableType == 'PILLAR'):
+                if sname == 'lambda_':
+                    sname = 'lambda'
+                info[sname] = totalPerService
+        except Exception as e:
+            print(f"ERROR: Failed to process service '{service}' from file '{path}': {e}")
+            continue
 
     if len(info) > 0:
         f = open("info.json", "w+")

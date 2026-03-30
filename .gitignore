@@ -12,6 +12,7 @@ suppressions.json
 .~c9_invoke*
 pyvenv.cfg
 .cache/
+logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
