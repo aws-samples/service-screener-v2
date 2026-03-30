@@ -140,5 +140,89 @@
         "ref": [
             "[ElastiCache Redis Log Delivery]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Log_Delivery.html>"
         ]
+    },
+    "ClusterModeEnabled": {
+        "category": "R",
+        "^description": "Cluster Mode Disabled: {$COUNT} Redis replication groups do not have cluster mode enabled. Cluster mode provides horizontal scaling, improved throughput, and better data distribution across multiple shards.",
+        "shortDesc": "Enable cluster mode for Redis",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Scaling Redis Clusters]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Scaling.RedisReplGrps.html>",
+            "[Redis Cluster Mode]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Replication.Redis-RedisCluster.html>"
+        ]
+    },
+    "MultiAZEnabled": {
+        "category": "R",
+        "^description": "Multi-AZ Not Enabled: {$COUNT} Redis replication groups do not have Multi-AZ with automatic failover enabled. Multi-AZ provides high availability and automatic failover to a replica in case of primary node failure.",
+        "shortDesc": "Enable Multi-AZ with automatic failover",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Multi-AZ with Automatic Failover]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/AutoFailover.html>",
+            "[High Availability Using Replication Groups]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Replication.html>"
+        ]
+    },
+    "BackupEnabled": {
+        "category": "R",
+        "^description": "Automatic Backups Not Configured: {$COUNT} Redis replication groups do not have automatic backups enabled with appropriate retention. Backups are essential for disaster recovery and data protection.",
+        "shortDesc": "Enable automatic backups with retention",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Backup and Restore for ElastiCache Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/backups.html>",
+            "[Scheduling Automatic Backups]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/backups-automatic.html>"
+        ]
+    },
+    "IdleTimeout": {
+        "category": "O",
+        "^description": "Idle Timeout Not Configured: {$COUNT} Redis clusters do not have server-side idle timeout (timeout parameter) properly configured. Setting an appropriate timeout helps manage connections and prevent resource exhaustion.",
+        "shortDesc": "Configure server-side idle timeout",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Redis timeout Parameter]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/ParameterGroups.Redis.html>",
+            "[Managing ElastiCache Parameter Groups]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/ParameterGroups.html>"
+        ]
+    },
+    "ServerlessReadReplica": {
+        "category": "P",
+        "^description": "Serverless Reader Endpoint Not Configured: {$COUNT} ElastiCache Serverless caches do not have reader endpoints configured. Reader endpoints improve read performance by distributing read traffic across replicas.",
+        "shortDesc": "Configure reader endpoints for serverless",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[ElastiCache Serverless]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/serverless.html>",
+            "[Serverless Cache Endpoints]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/serverless-endpoints.html>"
+        ]
+    },
+    "GlobalDatastoreConfig": {
+        "category": "R",
+        "^description": "Global Datastore Not Configured: {$COUNT} Redis replication groups are part of a global datastore but do not have proper multi-region configuration. Global datastores provide cross-region disaster recovery and low-latency reads for globally distributed applications.",
+        "shortDesc": "Configure global datastore with multiple regions",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[ElastiCache Global Datastore]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Redis-Global-Datastore.html>",
+            "[Creating a Global Datastore]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Redis-Global-Datastore-Creating.html>"
+        ]
     }
 }
