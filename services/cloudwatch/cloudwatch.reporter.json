@@ -232,5 +232,205 @@
 		"ref": [
 			"[CIS Cloudwatch Guide 16]<https://docs.aws.amazon.com/securityhub/latest/userguide/cloudwatch-controls.html#cloudwatch-16>"
 		]
+	},
+	"alarmsWithoutSNS": {
+		"category": "O",
+		"^description": "CloudWatch alarms without SNS topic actions configured provide no value for operational awareness and incident response. Alarms must have SNS notifications configured to alert teams when thresholds are breached. Without notifications, alarms cannot trigger automated responses or notify on-call personnel, defeating their purpose as a monitoring tool.",
+		"shortDesc": "Configure SNS notifications for alarms",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Best practice alarm recommendations]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Best-Practice-Alarms.html>"
+		]
+	},
+	"missingBillingAlarms": {
+		"category": "C",
+		"^description": "Billing alarms prevent unexpected cost overruns and provide early warning of cost anomalies. Without billing alarms configured, organizations risk unexpected charges and lack visibility into spending patterns. Billing alarms should be configured to monitor AWS costs and alert when spending exceeds defined thresholds. Note that billing metrics are only available in the us-east-1 region.",
+		"shortDesc": "Configure billing alarms",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Monitor billing with CloudWatch]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/WhatIsCloudWatch.html>"
+		]
+	},
+	"missingServiceQuotaAlarms": {
+		"category": "R",
+		"^description": "Service quotas are critical limits that can cause service disruptions if exceeded. Alarms should monitor AWS/Usage namespace metrics for critical services (VPC, EC2, Lambda, RDS, ECS) to provide early warning before hitting quota limits. Without service quota alarms, you risk unexpected service failures when quotas are reached.",
+		"shortDesc": "Configure service quota alarms",
+		"criticality": "H",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Service Quotas and CloudWatch]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Service-Quota-Integration.html>",
+			"[Visualizing Service Quotas]<https://aws.amazon.com/blogs/mt/visualizing-service-quotas-and-setting-up-alarms-using-aws-service-quotas-and-amazon-cloudwatch/>"
+		]
+	},
+	"cloudwatchResourcesWithoutTags": {
+		"category": "C",
+		"^description": "CloudWatch resources (log groups, alarms) should have required cost allocation tags (Environment, Project, CostCenter) for proper cost tracking and resource management. Without proper tagging, it becomes difficult to allocate costs, identify resource ownership, and manage resources at scale.",
+		"shortDesc": "Add required tags to CloudWatch resources",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Tagging CloudWatch Resources]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Tagging.html>",
+			"[AWS Tagging Best Practices]<https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/tagging-best-practices.html>"
+		]
+	},
+	"logGroupsWithoutLogInsightsUsage": {
+		"category": "O",
+		"^description": "CloudWatch Logs Insights provides powerful query capabilities for analyzing log data. Log groups without recent query activity (30 days) may indicate underutilization of available analysis tools. Regular use of Logs Insights helps identify patterns, troubleshoot issues, and gain operational insights from log data.",
+		"shortDesc": "Use Log Insights for log analysis",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CloudWatch Logs Insights]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/AnalyzingLogData.html>",
+			"[Logs Insights Query Syntax]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CWL_QuerySyntax.html>"
+		]
+	},
+	"missingCrossAccountDashboards": {
+		"category": "O",
+		"^description": "Cross-account CloudWatch dashboards provide centralized visibility across multiple AWS accounts, essential for multi-account environments. Dashboards without cross-account metrics miss opportunities for unified monitoring and operational awareness across your organization.",
+		"shortDesc": "Configure cross-account dashboards",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Cross-account cross-region dashboards]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_xaxr_dashboard.html>"
+		]
+	},
+	"alarmsWithoutAutoScalingActions": {
+		"category": "O",
+		"^description": "Alarms monitoring Auto Scaling-related metrics (AWS/EC2, AWS/ECS, AWS/ApplicationAutoScaling) should trigger Auto Scaling policies to automatically adjust capacity. Without Auto Scaling actions, alarms provide alerts but miss opportunities for automatic remediation and cost optimization.",
+		"shortDesc": "Add Auto Scaling actions to alarms",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 1,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[CloudWatch alarms for Auto Scaling]<https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-instance-monitoring.html>",
+			"[Dynamic scaling for Amazon EC2 Auto Scaling]<https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-scale-based-on-demand.html>"
+		]
+	},
+	"missingApplicationSignals": {
+		"category": "O",
+		"^description": "CloudWatch Application Signals provides automatic application topology discovery, service level objective (SLO) monitoring, and dependency mapping for microservices. Without Application Signals, you lack visibility into application health, service dependencies, and SLO compliance.",
+		"shortDesc": "Enable Application Signals",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[CloudWatch Application Signals]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Application-Signals.html>"
+		]
+	},
+	"missingXRayIntegration": {
+		"category": "O",
+		"^description": "AWS X-Ray provides distributed tracing for microservices, enabling performance bottleneck identification, service dependency mapping, and request flow visualization. Without X-Ray sampling rules configured, you lack detailed tracing capabilities for troubleshooting and performance optimization.",
+		"shortDesc": "Configure X-Ray tracing",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS X-Ray]<https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html>",
+			"[X-Ray sampling rules]<https://docs.aws.amazon.com/xray/latest/devguide/xray-console-sampling.html>"
+		]
+	},
+	"missingCloudWatchDashboards": {
+		"category": "O",
+		"^description": "CloudWatch dashboards provide customizable visualization of metrics and logs, essential for operational awareness and monitoring. Without dashboards configured, teams lack centralized views of system health and performance metrics.",
+		"shortDesc": "Create CloudWatch dashboards",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[CloudWatch dashboards]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Dashboards.html>"
+		]
+	},
+	"missingCustomMetrics": {
+		"category": "O",
+		"^description": "Custom metrics enable monitoring of application-specific KPIs and business metrics beyond AWS-provided metrics. Without custom metrics, you lack visibility into application behavior, business metrics, and custom error rates that are critical for application monitoring.",
+		"shortDesc": "Publish custom metrics",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Publish custom metrics]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/publishingMetrics.html>"
+		]
+	},
+	"alarmsWithoutMetricMath": {
+		"category": "O",
+		"^description": "Metric math allows combining multiple metrics using mathematical expressions, enabling more sophisticated monitoring scenarios. Alarms without metric math may miss opportunities for advanced monitoring patterns like rate calculations, anomaly detection, and multi-metric correlations.",
+		"shortDesc": "Use metric math in alarms",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Use metric math]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/using-metric-math.html>"
+		]
+	},
+	"missingCompositeAlarms": {
+		"category": "R",
+		"^description": "Composite alarms combine multiple alarms using boolean logic (AND, OR, NOT) to reduce alarm noise and create higher-level monitoring conditions. Without composite alarms, you may experience alarm fatigue from too many individual alarms and miss complex failure scenarios that require multiple conditions.",
+		"shortDesc": "Configure composite alarms",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Composite alarms]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Create_Composite_Alarm.html>"
+		]
+	},
+	"failedScheduledQueries": {
+		"category": "R",
+		"^description": "Failed or cancelled CloudWatch Logs Insights scheduled queries indicate issues with automated log analysis. Query failures can result from permission issues, syntax errors, or resource constraints, preventing automated monitoring and alerting from functioning properly.",
+		"shortDesc": "Fix failed scheduled queries",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[CloudWatch Logs Insights queries]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CWL_AnalyzeLogData_RunSampleQuery.html>"
+		]
+	},
+	"missingVendedDashboards": {
+		"category": "O",
+		"^description": "Vended dashboards are pre-built CloudWatch dashboards automatically generated for specific log types (VPC Flow Logs, CloudTrail, WAF). These dashboards provide immediate visualization value without manual configuration. Missing vended dashboards represents missed opportunities for quick operational insights.",
+		"shortDesc": "Enable vended dashboards",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Vended log dashboards]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatchLogsDashboards.html>"
+		]
 	}
 }
