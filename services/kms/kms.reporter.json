@@ -50,5 +50,174 @@
       "ref": [
           "[KMS Key State Explanation]<https://docs.aws.amazon.com/kms/latest/developerguide/key-state.html>"
       ]
+  },
+  "GrantOverlyPermissive": {
+    "category": "S",
+    "^description": "{$COUNT} KMS key has grants with overly broad permissions. Grants should follow the principle of least privilege and only include the specific operations required by the grantee principal. Overly permissive grants increase security risk.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "H",
+    "shortDesc": "Limit grant permissions to minimum required",
+    "ref": [
+      "[Best practices for AWS KMS grants]<https://docs.aws.amazon.com/kms/latest/developerguide/grant-best-practices.html>"
+    ]
+  },
+  "GrantWildcardPrincipal": {
+    "category": "S",
+    "^description": "{$COUNT} KMS key has grants with wildcard or overly broad grantee principals. Use specific IAM roles or users as grantee principals instead of account-level principals or wildcards to improve security and auditability.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "H",
+    "shortDesc": "Use specific grantee principals in grants",
+    "ref": [
+      "[Best practices for AWS KMS grants]<https://docs.aws.amazon.com/kms/latest/developerguide/grant-best-practices.html>"
+    ]
+  },
+  "GrantDuplicate": {
+    "category": "O",
+    "^description": "{$COUNT} KMS key has duplicate grants that should be cleaned up. Duplicate grants add unnecessary complexity and should be retired or revoked. Use the Name parameter when creating grants to avoid duplicates.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Remove duplicate grants",
+    "ref": [
+      "[Best practices for AWS KMS grants]<https://docs.aws.amazon.com/kms/latest/developerguide/grant-best-practices.html>"
+    ]
+  },
+  "KeyPolicyCrossAccount": {
+    "category": "S",
+    "^description": "{$COUNT} KMS key has cross-account access in key policy. Review cross-account principals to ensure they are intentional and necessary. Unintended cross-account access can lead to security risks.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "H",
+    "shortDesc": "Review cross-account key access",
+    "ref": [
+      "[Cross-account access to KMS keys]<https://docs.aws.amazon.com/kms/latest/developerguide/key-policy-modifying-external-accounts.html>"
+    ]
+  },
+  "KeyPolicyWildcardPrincipal": {
+    "category": "S",
+    "^description": "{$COUNT} KMS key has wildcard principal in key policy, making the key publicly accessible. This is a critical security risk. Update the key policy to specify explicit principals instead of using wildcards.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "H",
+    "shortDesc": "Remove wildcard principals from key policy",
+    "ref": [
+      "[Key policies in AWS KMS]<https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html>"
+    ]
+  },
+  "KeyPolicyWildcardAction": {
+    "category": "S",
+    "^description": "{$COUNT} KMS key has wildcard actions (kms:* or *) in key policy without appropriate conditions. Wildcard actions grant overly broad permissions. Use specific actions and add conditions to limit permissions.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "H",
+    "shortDesc": "Use specific actions instead of wildcards",
+    "ref": [
+      "[Best practices for IAM policies]<https://docs.aws.amazon.com/kms/latest/developerguide/iam-policies-best-practices.html>"
+    ]
+  },
+  "KeyPolicyMissingRootAccess": {
+    "category": "S",
+    "^description": "{$COUNT} KMS key policy does not include root account access. AWS requires root account access in key policies for key recovery and management. Add a statement granting the root account key management permissions.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Add root account access to key policy",
+    "ref": [
+      "[Key policies in AWS KMS]<https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html>"
+    ]
+  },
+  "GrantMissingEncryptionContext": {
+    "category": "S",
+    "^description": "[Informational] {$COUNT} KMS key has grants without encryption context constraints. Consider using encryption context constraints to ensure the key is used only for its intended purpose. Use EncryptionContextEquals when possible.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Apply encryption context constraints to grants",
+    "ref": [
+      "[Best practices for AWS KMS grants]<https://docs.aws.amazon.com/kms/latest/developerguide/grant-best-practices.html>"
+    ]
+  },
+  "GrantOldAge": {
+    "category": "O",
+    "^description": "[Informational] {$COUNT} KMS key has grants older than 180 days. Review old grants to determine if they are still needed. Retire or revoke grants that are no longer required to reduce security risk.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "L",
+    "shortDesc": "Review and retire old grants",
+    "ref": [
+      "[Best practices for AWS KMS grants]<https://docs.aws.amazon.com/kms/latest/developerguide/grant-best-practices.html>"
+    ]
+  },
+  "KeyPolicySensitiveActionsNotRestricted": {
+    "category": "S",
+    "^description": "{$COUNT} KMS key policy does not properly restrict sensitive actions (PutKeyPolicy, ScheduleKeyDeletion). These actions should be defined in the key policy with appropriate conditions, not delegated to IAM policies.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "H",
+    "shortDesc": "Restrict sensitive key policy actions",
+    "ref": [
+      "[Best practices for IAM policies]<https://docs.aws.amazon.com/kms/latest/developerguide/iam-policies-best-practices.html>"
+    ]
+  },
+  "KeyPolicyNoConditions": {
+    "category": "S",
+    "^description": "{$COUNT} KMS key has policy statements without conditions. Consider adding conditions to policy statements to limit permissions based on context (e.g., source IP, MFA, encryption context).",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Add conditions to key policy statements",
+    "ref": [
+      "[Best practices for IAM policies]<https://docs.aws.amazon.com/kms/latest/developerguide/iam-policies-best-practices.html>"
+    ]
+  },
+  "KeyUnused": {
+    "category": "C",
+    "^description": "[Informational] {$COUNT} KMS key appears to be unused based on heuristics (disabled state, no grants, minimal policy, old age). Review the key to determine if it can be deleted to reduce costs ($1/month per key).",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "L",
+    "shortDesc": "Consider deleting unused keys",
+    "ref": [
+      "[Cost and billing management best practices]<https://docs.aws.amazon.com/prescriptive-guidance/latest/aws-kms-best-practices/cost.html>"
+    ]
+  },
+  "KeyCentralizedManagement": {
+    "category": "O",
+    "^description": "[Informational] {$COUNT} KMS key shows cross-account usage patterns indicating centralized key management. Review if this aligns with your organizational key management strategy (centralized vs decentralized).",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "I",
+    "shortDesc": "Review key management model",
+    "ref": [
+      "[Key management best practices]<https://docs.aws.amazon.com/prescriptive-guidance/latest/aws-kms-best-practices/key-management.html>"
+    ]
   }
 }
