@@ -207,5 +207,70 @@
 		"ref": [
 			"[Relocate cluster to new AZ]<https://docs.aws.amazon.com/redshift/latest/mgmt/managing-cluster-recovery.html>"
 		]
+	},
+	"VpcDeployment": {
+		"category": "S",
+		"^description": "Validate cluster is deployed in VPC for network isolation. AWS recommends launching all Redshift clusters in Amazon VPC for enhanced security and network isolation. Clusters deployed in EC2-Classic lack the security features provided by VPC, such as security groups, network ACLs, and VPC Flow Logs.",
+		"shortDesc": "Cluster should be in VPC",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Amazon VPC]<https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-clusters.html#working-with-clusters-overview>"
+		]
+	},
+	"AdvisorRecommendations": {
+		"category": "P",
+		"^description": "Check for unaddressed Redshift Advisor recommendations for performance optimization. Amazon Redshift Advisor provides automated recommendations to help you optimize your cluster for better performance and lower costs. Advisor analyzes your workload and provides specific recommendations for table design, compression, query patterns, and cluster configuration. Addressing high-impact recommendations can significantly improve query performance and reduce operational costs.",
+		"shortDesc": "Review Advisor recommendations",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Amazon Redshift Advisor]<https://docs.aws.amazon.com/redshift/latest/dg/advisor.html>"
+		]
+	},
+	"EventNotifications": {
+		"category": "O",
+		"^description": "Validate SNS event notifications are configured for cluster events. Amazon SNS notifications help you stay informed about important cluster events such as maintenance windows, failures, configuration changes, and snapshot operations. Configuring event notifications enables proactive monitoring and faster incident response, improving operational visibility and reducing downtime.",
+		"shortDesc": "Configure event notifications",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Amazon Redshift Event Notifications]<https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-event-notifications.html>"
+		]
+	},
+	"QueryMonitoringRules": {
+		"category": "P",
+		"^description": "Validate Query Monitoring Rules are configured in WLM for query performance tracking. Query Monitoring Rules (QMR) allow you to automatically log or abort queries that exceed defined thresholds for metrics like execution time, rows returned, or disk usage. Implementing QMR helps identify problematic queries, prevent resource exhaustion, and maintain consistent cluster performance.",
+		"shortDesc": "Configure query monitoring rules",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[WLM Query Monitoring Rules]<https://docs.aws.amazon.com/redshift/latest/dg/cm-c-wlm-query-monitoring-rules.html>"
+		]
+	},
+	"SecurityGroups": {
+		"category": "S",
+		"^description": "Validate VPC security groups are attached to cluster. VPC security groups act as virtual firewalls to control inbound and outbound traffic to your Redshift cluster. Attaching security groups is essential for network access control and helps restrict connections to trusted sources. Note: This check validates security group attachment only; it does not inspect security group rules (which would require EC2 API access).",
+		"shortDesc": "Attach VPC security groups",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Amazon Redshift Cluster Security Groups]<https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-security-groups.html>"
+		]
 	}
 }
