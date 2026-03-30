@@ -23,12 +23,12 @@ class RdsMysql(RdsCommon):
     
     def _checkParamInnoDbFlushTrxCommit(self):
         flushCommit = self.dbParams.get('innodb_flush_log_at_trx_commit', False)
-        if flushCommit == 0 or flushCommit == 2:
+        if flushCommit in (False, '0', '2', 0, 2):
             self.results['MYSQL__param_innodbFlushTrxCommit'] = [-1, 'null' if flushCommit is False else flushCommit]
     
     def _checkParamPerfSchema(self):
         ps = self.dbParams.get('performance_schema', False)
-        if not ps:
+        if ps in (False, '0', 0):
             self.results['MYSQL__PerfSchema'] = [-1, ps]
             
     def _checkParamQueryCacheType(self):
@@ -60,6 +60,6 @@ class RdsMysql(RdsCommon):
         if not cb in ('False', 'off', 0):
             self.results['MYSQL__innodb_change_buffering'] = [-1, "Configured: {}, Recommended: {}".format(cb, 0)]
             
-        of = self.dbParams.get('innodb_open_files', 0)
+        of = int(self.dbParams.get('innodb_open_files', 0))
         if of < 65:
             self.results['MYSQL__innodb_open_files'] = [-1, "Configured: {}, Recommended: {}".format(of, 65)]

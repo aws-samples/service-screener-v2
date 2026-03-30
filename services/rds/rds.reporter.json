@@ -1021,6 +1021,20 @@
       "[RDS Snapshot retention cost]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithAutomatedBackups.html#USER_WorkingWithAutomatedBackups.RetentionCosts>"
     ]
   },
+  "CrossRegionBackupNotEnabled":{
+    "category": "R",
+    "^description": "[Disaster Recovery] You have {$COUNT} production RDS instances/clusters without cross-region automated backup replication enabled. Enable cross-region backup replication to protect against regional failures and meet disaster recovery requirements. You can replicate up to 20 backups per destination region per AWS account.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "criticality": "H",
+    "shortDesc": "Enable cross-region backup replication",
+    "ref": [
+      "[Enable Cross-Region Automated Backups]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/AutomatedBackups.Replicating.Enable.html>",
+      "[Cross-Region DR Solutions]<https://docs.aws.amazon.com/prescriptive-guidance/latest/dr-standard-edition-amazon-rds/design-cross-region-dr.html>"
+    ]
+  },
   "MoveToGraviton":{
     "category": "CP",
     "^description": "[Cost Optimisation] You have {$COUNT} RDS/Aurora is not running on graviton instance. Graviton2 provide up to 52% price/performance improvement for RDS open-source databases depending on database engine, version, and workload. Click on the references to learn more about Graviton2 benefits",
@@ -1071,6 +1085,32 @@
     "shortDesc": "Consider Aurora",
     "ref": [
       "[DB Modernization Blog]<https://aws.amazon.com/blogs/modernizing-with-aws/datavail-modernizing-databases-on-aws/>"
+    ]
+  },
+  "RDSRecommendationsActive":{
+    "category": "O",
+    "^description": "[RDS Recommendations] You have {$COUNT} instances/clusters with active RDS recommendations that should be reviewed and acted upon. RDS provides automated recommendations for database resources, such as DB instances, read replicas, and DB parameter groups. These recommendations cover areas like performance, security, reliability, and cost optimization. Review and apply the pending recommendations to improve your database environment.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Review active RDS recommendations",
+    "ref": [
+      "[Viewing and responding to RDS recommendations]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/monitoring-recommendations.html>"
+    ]
+  },
+  "EventSubscriptionNotConfigured":{
+    "category": "O",
+    "^description": "[Event Notifications] No RDS event subscriptions are configured in this region. Without event subscriptions, your team will not be notified of important database events such as failovers, maintenance windows, configuration changes, or failures. Configure RDS event subscriptions to receive notifications for critical event categories to improve operational awareness and incident response.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Configure RDS event subscriptions",
+    "ref": [
+      "[Using Amazon RDS event notification]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Events.html>"
     ]
   }
 }

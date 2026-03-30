@@ -493,6 +493,29 @@ class RdsCommon(Evaluator):
     
         if days > 180:
             self.results['ManualSnapshotTooOld'] = [-1, days]
+    
+    def _checkCrossRegionBackup(self):
+        if self.isCluster == True:
+            return
+        
+        try:
+            resp = self.rdsClient.describe_db_instance_automated_backups(
+                DBInstanceIdentifier=self.db['DBInstanceIdentifier']
+            )
+            
+            automated_backups = resp.get('DBInstanceAutomatedBackups', [])
+            has_cross_region = False
+            
+            for backup in automated_backups:
+                if backup.get('Region') != self.rdsClient.meta.region_name:
+                    has_cross_region = True
+                    break
+            
+            if not has_cross_region:
+                self.results['CrossRegionBackupNotEnabled'] = [-1, 'No cross-region backup']
+                
+        except botocore.exceptions.ClientError as e:
+            _warn(f"Unable to check cross-region backup: {e}")
             
     def _checkCAExpiry(self):
         if self.certInfo == None:
@@ -772,3 +795,62 @@ class RdsCommon(Evaluator):
                 self.results['FreeMemoryDropMT50pctIn24hours'] = [-1, "Max FreeMemory: {}GB, Min FreeMemory {}GB".format(freeMemoryMax, freeMemoryMin)]
         elif freeMemoryMthMinRatio > 0.60 and freeMemoryMthAvgRatio > 0.60:
             self.results['RightSizingMemoryMonthMinMT60pct'] = [-1, "Monthly<br>Min FreeMemory: {}%, Avg FreeMemory {}%".format(round(freeMemoryMinRatio*100, 1), round(freeMemoryAvgRatio*100, 1))]
+
+    def _checkRDSRecommendationsActive(self):
+        # Check if the resource has active (non-dismissed) RDS recommendations
+        # API may not be available in all regions, so wrap in try/except
+        try:
+            resourceArn = self.db.get('DBInstanceArn') or self.db.get('DBClusterArn')
+            if not resourceArn:
+                return
+            
+            resp = self.rdsClient.describe_db_recommendations(
+                Filters=[
+                    {
+                        'Name': 'status',
+                        'Values': ['active']
+                    }
+                ]
+            )
+            
+            recommendations = resp.get('DBRecommendations', [])
+            
+            # Filter recommendations for this specific resource
+            resourceRecommendations = []
+            for rec in recommendations:
+                recResourceArn = rec.get('ResourceArn', '')
+                if recResourceArn == resourceArn:
+                    resourceRecommendations.append(rec)
+            
+            if len(resourceRecommendations) > 0:
+                self.results['RDSRecommendationsActive'] = [-1, len(resourceRecommendations)]
+                
+        except botocore.exceptions.ClientError as e:
+            ecode = e.response['Error']['Code']
+            emsg = e.response['Error']['Message']
+            _warn("Unable to describe RDS recommendations: [{}] {}".format(ecode, emsg))
+
+    def _checkEventSubscriptionNotConfigured(self):
+        # Account/region-level check: verify if any active event subscriptions exist
+        # Use Config caching to avoid repeated API calls across instances
+        cacheKey = 'rds::EventSubscriptions'
+        hasSubscriptions = Config.get(cacheKey, None)
+        
+        if hasSubscriptions is None:
+            try:
+                resp = self.rdsClient.describe_event_subscriptions()
+                subscriptions = resp.get('EventSubscriptionsList', [])
+                
+                # Check for active subscriptions
+                activeSubscriptions = [s for s in subscriptions if s.get('Enabled', False)]
+                hasSubscriptions = len(activeSubscriptions) > 0
+                Config.set(cacheKey, hasSubscriptions)
+                
+            except botocore.exceptions.ClientError as e:
+                ecode = e.response['Error']['Code']
+                emsg = e.response['Error']['Message']
+                _warn("Unable to describe RDS event subscriptions: [{}] {}".format(ecode, emsg))
+                return
+        
+        if not hasSubscriptions:
+            self.results['EventSubscriptionNotConfigured'] = [-1, 'No event subscriptions configured']
