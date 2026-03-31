@@ -75,6 +75,134 @@ def setup_logging():
 def number_format(num, places=2):
     return locale.format_string("%.*f", (places, num), True)
 
+def collect_fork_results(contexts, serviceStat, scanned):
+    """Collect scan results from __fork directory files into contexts and stats"""
+    hasGlobal = False
+    for file in os.listdir(_C.FORK_DIR):
+        if file[0] == '.' or file == _C.SESSUID_FILENAME or file == 'tail.txt' or file == 'error.txt' or file == 'empty.txt' or file == 'all.csv' or file[0:10] == 'CustomPage':
+            continue
+        f = file.split('.')
+        if len(f) == 2:
+            if f[0] not in contexts:
+                contexts[f[0]] = {}
+            contexts[f[0]]['results'] = json.loads(open(_C.FORK_DIR + '/' + file).read())
+        elif f[1] == "charts":
+            if f[0] not in contexts:
+                contexts[f[0]] = {}
+            contexts[f[0]]['charts'] = json.loads(open(_C.FORK_DIR + '/' + file).read())
+        else:
+            cnt, rules, exceptions, timespent = list(json.loads(open(_C.FORK_DIR + '/' + file).read()).values())
+            serviceStat[f[0]] = cnt
+            scanned['resources'] += cnt
+            scanned['rules'] += rules
+            scanned['exceptions'] += exceptions
+            scanned['timespent'] += timespent
+            if f[0] in Config.GLOBAL_SERVICES:
+                hasGlobal = True
+    return hasGlobal
+
+def process_custom_pages(customPage, services, disable_custom_pages):
+    """Process CustomPage data collection (TA, COH) and store results in Config"""
+    if disable_custom_pages:
+        _info("CustomPage processing disabled via --disable-custom-pages flag")
+        Config.set('custom_page_data', {})
+        return
+    
+    _info("Processing CustomPage data collection...")
+    try:
+        _info("Building CustomPage data (TA, COH) - this happens after all service scans are complete")
+        customPage.buildPage()
+        _info("CustomPage processing completed successfully")
+        
+        customPageData = customPage.getCustomPageData()
+        if customPageData:
+            _info(f"CustomPage data available for: {list(customPageData.keys())}")
+            Config.set('custom_page_data', customPageData)
+    except Exception as e:
+        _warn(f"CustomPage processing failed: {str(e)}")
+        Config.set('custom_page_data', {})
+
+def run_content_enrichment(enable_enrichment, enrichment_categories, enrichment_timeout, serviceStat, contexts):
+    """Fetch and process AWS content enrichment data for beta UI"""
+    if not enable_enrichment:
+        _info("Content enrichment disabled (not in beta mode)")
+        Config.set('enriched_content_data', '{"contentData": {}, "metadata": {}, "userPreferences": {}}')
+        Config.set('content_enrichment_enabled', False)
+        return
+    
+    try:
+        from utils.ContentEnrichment import ContentAggregator, ContentProcessor, RelevanceEngine
+        from utils.ContentEnrichment.models import UserContext
+        
+        detected_services = list(serviceStat.keys()) if serviceStat else []
+        
+        scan_findings = []
+        for service, data in contexts.items():
+            if 'results' in data:
+                for result in data['results']:
+                    if isinstance(result, dict) and result.get('status') in ['FAIL', 'WARN']:
+                        scan_findings.append({
+                            'service': service,
+                            'category': result.get('category', 'general'),
+                            'severity': result.get('status', 'INFO')
+                        })
+        
+        user_context = UserContext(
+            detected_services=detected_services,
+            scan_findings=scan_findings
+        )
+        
+        _info(f"Fetching AWS best practices and security insights (this may take 10-15 seconds)...")
+        _info(f"Content enrichment: Processing {len(detected_services)} detected services...")
+        
+        requested_categories = [cat.strip() for cat in enrichment_categories.split(',')]
+        
+        content_aggregator = ContentAggregator(timeout=int(enrichment_timeout), max_retries=2)
+        content_processor = ContentProcessor()
+        relevance_engine = RelevanceEngine()
+        
+        raw_content = content_aggregator.fetch_aws_content()
+        
+        processed_content = {}
+        total_items = 0
+        
+        for category, items in raw_content.items():
+            if category not in requested_categories:
+                continue
+            
+            processed_items = []
+            for item in items:
+                processed_item = content_processor.process_single_item(item)
+                if processed_item:
+                    relevance_score = relevance_engine.calculate_relevance(processed_item, user_context)
+                    processed_item.relevance_score = relevance_score
+                    processed_items.append(processed_item)
+            
+            filtered_items = content_aggregator.filter_by_services(processed_items, detected_services)
+            prioritized_items = relevance_engine.prioritize_content(filtered_items, user_context)
+            
+            processed_content[category] = prioritized_items[:10]
+            total_items += len(processed_content[category])
+        
+        enriched_content_data = content_aggregator.serialize_for_html(processed_content, detected_services)
+        
+        _info(f"✓ Content enrichment complete: {total_items} relevant items found")
+        Config.set('enriched_content_data', enriched_content_data)
+        Config.set('content_enrichment_enabled', True)
+        
+    except Exception as e:
+        _warn(f"Content enrichment failed: {str(e)}")
+        try:
+            from utils.ContentEnrichment.error_handler import ContentEnrichmentErrorHandler
+            error_handler = ContentEnrichmentErrorHandler()
+            enriched_content_data = error_handler.create_empty_enrichment_data(detected_services)
+            Config.set('enriched_content_data', enriched_content_data)
+            Config.set('content_enrichment_enabled', False)
+        except Exception as fallback_error:
+            _warn(f"Failed to create fallback enrichment data: {str(fallback_error)}")
+            Config.set('enriched_content_data', '{"contentData": {}, "metadata": {}, "userPreferences": {}}')
+            Config.set('content_enrichment_enabled', False)
+
 scriptStartTime = time.time()
 _cli_options = ArguParser.Load()
 
@@ -325,32 +453,7 @@ for acctId, cred in rolesCred.items():
     inventory = {}
     
     hasGlobal = False
-    for file in os.listdir(_C.FORK_DIR):
-        if file[0] == '.' or file == _C.SESSUID_FILENAME or file == 'tail.txt' or file == 'error.txt' or file == 'empty.txt' or file == 'all.csv' or file[0:10] == 'CustomPage':
-            continue
-        f = file.split('.')
-        if len(f) == 2:
-            if f[0] not in contexts:
-                contexts[f[0]] = {}
-            contexts[f[0]]['results'] = json.loads(open(_C.FORK_DIR + '/' + file).read())
-        elif f[1] == "charts":
-            ## Create and consolidate charts findings
-            if f[0] not in contexts:
-                contexts[f[0]] = {}
-            contexts[f[0]]['charts'] = json.loads(open(_C.FORK_DIR + '/' + file).read())
-        else:
-            cnt, rules, exceptions, timespent = list(json.loads(open(_C.FORK_DIR + '/' + file).read()).values())
-            
-            serviceStat[f[0]] = cnt
-            scanned['resources'] += cnt
-            scanned['rules'] += rules
-            scanned['exceptions'] += exceptions
-            scanned['timespent'] += timespent
-            if f[0] in Config.GLOBAL_SERVICES:
-                hasGlobal = True
-    
-    # if testmode == True:
-    #   exit("Test mode enable, script halted")
+    hasGlobal = collect_fork_results(contexts, serviceStat, scanned)
     
     timespent = round(time.time() - overallTimeStart, 3)
     scanned['timespent'] = timespent
@@ -359,28 +462,7 @@ for acctId, cred in rolesCred.items():
     print("Total Resources scanned: " + str(number_format(scanned['resources'])) + " | No. Rules executed: " + str(number_format(scanned['rules'])))
     print("Time consumed (seconds): " + str(timespent))
     
-    # Process CustomPage data collection and build pages
-    if disable_custom_pages:
-        _info("CustomPage processing disabled via --disable-custom-pages flag")
-        Config.set('custom_page_data', {})
-    else:
-        _info("Processing CustomPage data collection...")
-        try:
-            # Build CustomPage pages (TA and COH will collect data here, after all services are scanned)
-            _info("Building CustomPage data (TA, COH) - this happens after all service scans are complete")
-            customPage.buildPage()
-            _info("CustomPage processing completed successfully")
-            
-            # Get CustomPage data for integration with main output
-            customPageData = customPage.getCustomPageData()
-            if customPageData:
-                _info(f"CustomPage data available for: {list(customPageData.keys())}")
-                # Store CustomPage data in Config for use by OutputGenerator
-                Config.set('custom_page_data', customPageData)
-            
-        except Exception as e:
-            _warn(f"CustomPage processing failed: {str(e)}")
-            Config.set('custom_page_data', {})
+    process_custom_pages(customPage, services, disable_custom_pages)
     
     # Cleanup
     # os.chdir(_C.HTML_DIR)
@@ -417,101 +499,7 @@ for acctId, cred in rolesCred.items():
     Config.set('cli_regions', regions)
     Config.set('cli_frameworks', frameworks)
     
-    # Content Enrichment Integration (Task 3.1)
-    enriched_content_data = None
-    if enable_enrichment:
-        try:
-            from utils.ContentEnrichment import ContentAggregator, ContentProcessor, RelevanceEngine
-            from utils.ContentEnrichment.models import UserContext
-            from utils.Tools import _info, _warn
-            
-            # Extract detected services from scan results for content relevance
-            detected_services = list(serviceStat.keys()) if serviceStat else []
-            
-            # Create user context for content relevance scoring
-            scan_findings = []
-            for service, data in contexts.items():
-                if 'results' in data:
-                    for result in data['results']:
-                        if isinstance(result, dict) and result.get('status') in ['FAIL', 'WARN']:
-                            scan_findings.append({
-                                'service': service,
-                                'category': result.get('category', 'general'),
-                                'severity': result.get('status', 'INFO')
-                            })
-            
-            user_context = UserContext(
-                detected_services=detected_services,
-                scan_findings=scan_findings
-            )
-            
-            _info(f"Fetching AWS best practices and security insights (this may take 10-15 seconds)...")
-            _info(f"Content enrichment: Processing {len(detected_services)} detected services...")
-            
-            # Parse enrichment categories from CLI options
-            requested_categories = [cat.strip() for cat in enrichment_categories.split(',')]
-            
-            # Fetch and process content in parallel to avoid blocking
-            content_aggregator = ContentAggregator(timeout=int(enrichment_timeout), max_retries=2)
-            content_processor = ContentProcessor()
-            relevance_engine = RelevanceEngine()
-            
-            # Fetch content from AWS sources
-            raw_content = content_aggregator.fetch_aws_content()
-            
-            # Process and filter content based on detected services and requested categories
-            processed_content = {}
-            total_items = 0
-            
-            for category, items in raw_content.items():
-                # Skip categories not requested by user
-                if category not in requested_categories:
-                    continue
-                    
-                # Process each content item
-                processed_items = []
-                for item in items:
-                    processed_item = content_processor.process_single_item(item)
-                    if processed_item:
-                        # Calculate relevance score based on detected services
-                        relevance_score = relevance_engine.calculate_relevance(processed_item, user_context)
-                        processed_item.relevance_score = relevance_score
-                        processed_items.append(processed_item)
-                
-                # Filter and prioritize content
-                filtered_items = content_aggregator.filter_by_services(processed_items, detected_services)
-                prioritized_items = relevance_engine.prioritize_content(filtered_items, user_context)
-                
-                # Limit to top 10 items per category to keep HTML size reasonable
-                processed_content[category] = prioritized_items[:10]
-                total_items += len(processed_content[category])
-            
-            # Serialize content for HTML embedding
-            enriched_content_data = content_aggregator.serialize_for_html(processed_content, detected_services)
-            
-            _info(f"✓ Content enrichment complete: {total_items} relevant items found")
-            
-            # Store enriched content in Config for use by page builders
-            Config.set('enriched_content_data', enriched_content_data)
-            Config.set('content_enrichment_enabled', True)
-            
-        except Exception as e:
-            _warn(f"Content enrichment failed: {str(e)}")
-            # Create empty enrichment data to ensure HTML generation continues
-            try:
-                from utils.ContentEnrichment.error_handler import ContentEnrichmentErrorHandler
-                error_handler = ContentEnrichmentErrorHandler()
-                enriched_content_data = error_handler.create_empty_enrichment_data(detected_services)
-                Config.set('enriched_content_data', enriched_content_data)
-                Config.set('content_enrichment_enabled', False)
-            except Exception as fallback_error:
-                _warn(f"Failed to create fallback enrichment data: {str(fallback_error)}")
-                Config.set('enriched_content_data', '{"contentData": {}, "metadata": {}, "userPreferences": {}}')
-                Config.set('content_enrichment_enabled', False)
-    else:
-        _info("Content enrichment disabled (not in beta mode)")
-        Config.set('enriched_content_data', '{"contentData": {}, "metadata": {}, "userPreferences": {}}')
-        Config.set('content_enrichment_enabled', False)
+    run_content_enrichment(enable_enrichment, enrichment_categories, enrichment_timeout, serviceStat, contexts)
 
     # Generate output using OutputGenerator (handles both legacy and Cloudscape)
     from utils.OutputGenerator import OutputGenerator
