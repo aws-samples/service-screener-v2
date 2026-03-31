@@ -540,9 +540,10 @@ class LambdaCommon(Evaluator):
             
             # Check if log group exists
             try:
-                logs_client.describe_log_groups(logGroupNamePrefix=log_group_name, limit=1)
+                resp = logs_client.describe_log_groups(logGroupNamePrefix=log_group_name, limit=1)
+                if not resp.get('logGroups') or resp['logGroups'][0].get('logGroupName') != log_group_name:
+                    return
             except Exception:
-                # No logs available, skip check
                 return
             
             # Query for max memory used in last 7 days
