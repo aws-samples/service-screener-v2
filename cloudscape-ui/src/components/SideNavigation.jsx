@@ -81,15 +81,21 @@ const ServiceScreenerSideNav = ({ services = [], frameworks = [], customPages = 
     items.push({
       type: 'section',
       text: 'Frameworks',
-      items: sortedFrameworks.map(framework => {
-        // Extract framework name from key (e.g., "framework_CIS" -> "CIS")
-        const frameworkName = framework.replace('framework_', '');
-        return {
+      items: [
+        {
           type: 'link',
-          text: frameworkName.toUpperCase(),
-          href: `#/framework/${frameworkName.toLowerCase()}`
-        };
-      })
+          text: '📊 Overview',
+          href: '#/framework/overview'
+        },
+        ...sortedFrameworks.map(framework => {
+          const frameworkName = framework.replace('framework_', '');
+          return {
+            type: 'link',
+            text: frameworkName.toUpperCase(),
+            href: `#/framework/${frameworkName.toLowerCase()}`
+          };
+        })
+      ]
     });
     
     items.push({

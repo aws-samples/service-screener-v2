@@ -11,6 +11,7 @@ import ServiceScreenerSideNav from './components/SideNavigation';
 import Dashboard from './components/Dashboard';
 import ServiceDetail from './components/ServiceDetail';
 import FrameworkDetail from './components/FrameworkDetail';
+import FrameworkOverview from './components/FrameworkOverview';
 import CustomPage from './components/CustomPage';
 import GuardDutyDetail from './components/GuardDutyDetail';
 import SuppressionModal from './components/SuppressionModal';
@@ -170,6 +171,7 @@ function App() {
                   } 
                 />
                 <Route path="/service/:serviceName" element={<ServiceDetail data={data} />} />
+                <Route path="/framework/overview" element={<FrameworkOverview data={data} frameworks={frameworks} />} />
                 <Route path="/framework/:frameworkName" element={<FrameworkDetail data={data} />} />
                 <Route path="/page/:pageName" element={<CustomPage data={data} />} />
               </Routes>

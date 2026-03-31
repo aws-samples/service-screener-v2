@@ -1,378 +1,721 @@
 {
-    "metadata": {
-      "originator": "NIST",
-      "shortname": "NIST AWS",
-      "fullname": "National Institute of Standards and Technology (NIST) SP 800-53 Rev. 5",
-      "description": "[Work In Progress] The NIST Special Publication 800-53 Revision 5 provides a catalog of security and privacy controls for federal information systems and organizations to protect organizational operations and assets, individuals, other organizations, and the Nation from a diverse set of threats including hostile cyber attacks, natural disasters, structural failures, and human errors.",
-      "_": "https://docs.aws.amazon.com/securityhub/latest/userguide/nist-standard.html",
-      "emptyCheckDefaultMsg": "<small><i>Please refer to the NIST control section for further details. Kindly provide evidence or artifacts demonstrating compliance with the respective NIST control.</i></small>"
+  "metadata": {
+    "originator": "NIST",
+    "shortname": "NIST AWS",
+    "fullname": "National Institute of Standards and Technology (NIST) SP 800-53 Rev. 5",
+    "description": "[Work In Progress] The NIST Special Publication 800-53 Revision 5 provides a catalog of security and privacy controls for federal information systems and organizations to protect organizational operations and assets, individuals, other organizations, and the Nation from a diverse set of threats including hostile cyber attacks, natural disasters, structural failures, and human errors.",
+    "_": "https://docs.aws.amazon.com/securityhub/latest/userguide/nist-standard.html",
+    "emptyCheckDefaultMsg": "<small><i>Please refer to the NIST control section for further details. Kindly provide evidence or artifacts demonstrating compliance with the respective NIST control.</i></small>"
+  },
+  "mapping": {
+    "Account.": {
+      "1": [
+        "iam.hasAlternateContact"
+      ],
+      "2": [
+        "iam.hasOrganization"
+      ]
     },
-    "mapping": {
-        "Account.": {
-            "1": ["iam.hasAlternateContact"],
-            "2": ["iam.hasOrganization"]
-        },
-        "ACM.": {
-            "1": []
-        },
-        "APIGateway.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": [],
-            "5": [],
-            "8": [],
-            "9": []
-        },
-        "Appsync.": {
-            "5": []
-        },
-        "Autoscaling.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "5": [],
-            "6": [],
-            "9": []
-        },
-        "Backup.": {
-            "1": []
-        },
-        "CloudFront.": {
-            "1": ["cloudfront.defaultRootObject"],
-            "3": ["cloudfront.viewerPolicyHttps"],
-            "4": ["cloudfront.originFailover"],
-            "5": ["cloudfront.accessLogging"],
-            "6": ["cloudfront.WAFAssociation"],
-            "7": [],
-            "8": [],
-            "9": [],
-            "10": ["cloudfront.DeprecatedSSLProtocol"],
-            "12": [],
-            "13": [],
-            "14": []
-        },
-        "CloudTrail.": {
-            "1": ["cloudtrail.HasOneMultiRegionTrail"],
-            "2": ["cloudtrail.RequiresKmsKey"],
-            "4": ["cloudtrail.LogFileValidationEnabled"],
-            "5": ["cloudtrail.CloudWatchLogsLogGroupArn"]
-        },
-        "CloudWatch.": {
-            "15": [],
-            "16": [],
-            "17": []
-        },
-        "CodeBuild.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": []
-        },
-        "Config.": {
-            "1": []
-        },
-        "DMS.": {
-            "1": [],
-            "6": [],
-            "7": [],
-            "8": [],
-            "9": []
-        },
-        "DocumentDB.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": [],
-            "5": []
-        },
-        "DynamoDB.": {
-            "1": ["dynamodb.autoScalingStatus"],
-            "2": ["dynamodb.disabledPointInTimeRecovery"],
-            "3": [],
-            "4": [],
-            "5": ["dynamodb.resourcesWithoutTags"],
-            "6": ["dynamodb.deleteTableProtection"]
-        },
-        "EC2.": {
-            "1": ["ec2.EBSSnapshotIsPublic"],
-            "2": ["ec2.SGDefaultDisallowTraffic"],
-            "3": ["ec2.EBSInUse", "ec2.EBSEncrypted"],
-            "4": ["ec2.EC2Active"],
-            "5": [],
-            "6": [],
-            "7": ["ec2.EBSEncrypted"],
-            "8": ["ec2.ASGIMDSv2"],
-            "9": ["ec2.EC2InstancePublicIP"],
-            "10": [],
-            "12": ["ec2.EC2EIPNotInUse"],
-            "13": ["ec2.SGSensitivePortOpenToAll", "ec2.SGAllPortOpenToAll"],
-            "15": ["ec2.EC2SubnetAutoPublicIP"],
-            "16": [],
-            "17": [],
-            "18": [],
-            "19": [],
-            "20": [],
-            "21": [],
-            "23": [],
-            "24": [],
-            "25": [],
-            "28": [],
-            "51": []
-
-        },
-        "ECR.": {
-            "1": [],
-            "2": [],
-            "3": []
-        },
-        "ECS.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": [],
-            "5": [],
-            "8": [],
-            "9": [],
-            "10": [],
-            "12": []
-        },
-        "EFS.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": []
-        },
-        "EKS.": {
-            "1": ["eks.eksEndpointPublicAccess"],
-            "2": ["eks.eksClusterVersionEol"],
-            "8": ["eks.eksClusterLogging"]
-        },
-        "ElastiCache.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": ["elasticache.EncInTransitAndRest"],
-            "5": ["elasticache.EncInTransitAndRest"],
-            "6": [],
-            "7": []
-        },
-        "ElasticBeanstalk.": {
-            "1": [],
-            "2": []
-        },
-        "ELB.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": [],
-            "5": [],
-            "6": [],
-            "7": ["ec2.ELBConnectionDraining"],
-            "8": [],
-            "9": ["ec2.ELBCrossZone"],
-            "10": [],
-            "12": [],
-            "13": [],
-            "14": [],
-            "16": ["ec2.ELBEnableWAF"]
-        },
-        "EMR.": {
-            "1": [],
-            "2": []
-        },
-        "ES.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": [],
-            "5": [],
-            "6": [],
-            "7": [],
-            "8": []
-        },
-        "EventBridge.": {
-            "3": [],
-            "4": []
-        },
-        "FSx.": {
-            "1": []
-        },
-        "GuardDuty.": {
-            "1": []
-        },
-        "IAM.": {
-            "1": ["iam.FullAdminAccess"],
-            "2": ["iam.userNotUsingGroup","iam.InlinePolicy"],
-            "3": ["iam.hasAccessKeyNoRotate90days"],
-            "4": ["iam.rootHasAccessKey"],
-            "5": ["iam.mfaActive"],
-            "6": [],
-            "7": ["iam.passwordPolicyWeak"],
-            "8": ["iam.consoleLastAccess90", "iam.consoleLastAccess365"],
-            "9": ["iam.rootMfaActive"],
-            "19": ["iam.mfaActive"],
-            "21": ["iam.ManagedPolicyFullAccessOneServ"]
-        },
-        "Kinesis.": {
-            "1": []
-        },
-        "KMS.": {
-            "1": [],
-            "2": [],
-            "3": ["kms.KeyInPendingDeletion"],
-            "4": ["kms.KeyRotationEnabled"]
-        },
-        "Lambda.": {
-            "1": ["lambda.lambdaPublicAccess"],
-            "2": ["lambda.lambdaRuntimeUpdate"],
-            "3": [],
-            "5": []
-        },
-        "Macie.": {
-            "1": ["s3.MacieToEnable"],
-            "2": []
-        },
-        "MSK.": {
-            "1": [],
-            "2": []
-        },
-        "MQ.": {
-            "5": [],
-            "6": []
-        },
-        "Neptune.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": [],
-            "5": [],
-            "6": [],
-            "7": [],
-            "8": [],
-            "9": []
-        },
-        "NetworkFirewall.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": [],
-            "5": [],
-            "6": [],
-            "9": []
-        },
-        "Opensearch.": {
-            "1": ["opensearch.EncyptionAtRest"],
-            "2": ["opensearch.DomainWithinVPC"],
-            "3": ["opensearch.NodeToNodeEncryption"],
-            "4": ["opensearch.ApplicationLogs"],
-            "5": ["opensearch.AuditLogs"],
-            "6": ["opensearch.DataNodes"],
-            "7": ["opensearch.FineGrainedAccessControl"],
-            "8": ["opensearch.TLSEnforced"],
-            "10": ["opensearch.ServiceSoftwareVersion"]
-        },
-        "PCA.": {
-            "1": []
-        },
-        "RDS.": {
-            "1": ["rds.SnapshotRDSIsPublic"],
-            "2": ["rds.PubliclyAccessible"],
-            "3": ["rds.StorageEncrypted"],
-            "4": [],
-            "5": ["rds.MultiAZ"],
-            "6": ["rds.EnhancedMonitor"],
-            "7": ["rds.DeleteProtection"],
-            "8": ["rds.DeleteProtection"],
-            "9": [],
-            "10": [],
-            "11": ["rds.Backup"],
-            "12": [],
-            "13": ["rds.AutoMinorVersionUpgrade"],
-            "14": [],
-            "15": ["rds.MultiAZ"],
-            "16": [],
-            "17": [],
-            "18": [],
-            "19": [],
-            "20": [],
-            "21": [],
-            "22": [],
-            "23": [],
-            "24": ["rds.DefaultMasterAdmin"],
-            "25": ["rds.DefaultMasterAdmin"],
-            "26": [],
-            "27": ["rds.StorageEncrypted"],
-            "34": [],
-            "35": ["rds.AutoMinorVersionUpgrade"]
-        },
-        "Redshift.": {
-            "1": ["redshift.PubliclyAcessible"],
-            "2": ["redshift.EncryptedInTransit"],
-            "3": ["redshift.AutomaticSnapshots"],
-            "4": ["redshift.AuditLogging"],
-            "6": ["redshift.AutomaticUpgrades"],
-            "7": ["redshift.EnhancedVPCRouting"],
-            "8": ["redshift.DefaultAdminUsername"],
-            "9": ["redshift.DefaultDatabaseName"],
-            "10": ["redshift.EncryptedAtRest"]
-        },
-        "Route53.": {
-            "2": []
-        },
-        "S3.": {
-            "1": ["s3.S3AccountPublicAccessBlock"],
-            "2": ["s3.PublicAccessBlock"],
-            "3": ["s3.PublicAccessBlock"],
-            "5": ["s3.TlsEnforced"],
-            "7": ["s3.CrossRegionReplication"],
-            "8": ["s3.PublicAccessBlock"],
-            "9": ["s3.BucketLogging"],
-            "10": ["s3.BucketVersioning", "s3.BucketLifecycle"],
-            "11": ["s3.EventNotification"],
-            "12": ["s3.AccessControlList"],
-            "13": ["s3.BucketLifecycle"],
-            "14": ["s3.BucketVersioning"],
-            "15": ["s3.ObjectLock"],
-            "17": ["s3.ServerSideEncrypted", "s3.SSEWithKMS"],
-            "19": [],
-            "20": ["s3.MFADelete"]
-        },
-        "Sagemaker.": {
-            "1": [],
-            "2": [],
-            "3": []
-        },
-        "SecretsManager.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": []
-        },
-        "SNS.": {
-            "1": []
-        },
-        "SQS.": {
-            "1": ["sqs.EncryptionAtRest"]
-        },
-        "SSM.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": []
-        },
-        "WAF.": {
-            "1": [],
-            "2": [],
-            "3": [],
-            "4": [],
-            "5": [],
-            "6": [],
-            "7": [],
-            "8": [],
-            "10": [],
-            "11": [],
-            "12": []
-        }
+    "ACM.": {
+      "1": []
+    },
+    "APIGateway.": {
+      "1": [
+        "apigateway.CloudWatchAlarms",
+        "apigateway.PerformanceMonitoring"
+      ],
+      "2": [],
+      "3": [
+        "apigateway.RequestValidation"
+      ],
+      "4": [
+        "apigateway.ResourcePolicy"
+      ],
+      "5": [
+        "apigateway.IAMAuthentication",
+        "apigateway.CognitoAuthorizer",
+        "apigateway.LambdaAuthorizer"
+      ],
+      "8": [
+        "apigateway.APIKeyAntiPattern",
+        "apigateway.LeastPrivilegeAccess"
+      ],
+      "9": [
+        "apigateway.RequestThrottling",
+        "apigateway.UsagePlanThrottling"
+      ]
+    },
+    "Appsync.": {
+      "5": []
+    },
+    "Autoscaling.": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "5": [],
+      "6": [],
+      "9": []
+    },
+    "Backup.": {
+      "1": []
+    },
+    "CloudFront.": {
+      "1": [
+        "cloudfront.defaultRootObject"
+      ],
+      "3": [
+        "cloudfront.viewerPolicyHttps",
+        "cloudfront.OriginTrafficEncryption"
+      ],
+      "4": [
+        "cloudfront.originFailover"
+      ],
+      "5": [
+        "cloudfront.accessLogging",
+        "cloudfront.S3OriginBucketExists"
+      ],
+      "6": [
+        "cloudfront.WAFAssociation"
+      ],
+      "7": [
+        "cloudfront.CustomSSLCertificate",
+        "cloudfront.SNIConfiguration"
+      ],
+      "8": [],
+      "9": [
+        "cloudfront.OriginTrafficEncryption"
+      ],
+      "10": [
+        "cloudfront.DeprecatedSSLProtocol",
+        "cloudfront.CustomSSLCertificate"
+      ],
+      "12": [],
+      "13": [
+        "cloudfront.S3OriginAccessControl"
+      ],
+      "14": [
+        "cloudfront.GeoRestrictionsConfigured"
+      ]
+    },
+    "CloudTrail.": {
+      "1": [
+        "cloudtrail.HasOneMultiRegionTrail",
+        "cloudtrail.OrganizationTrailEnabled"
+      ],
+      "2": [
+        "cloudtrail.RequiresKmsKey",
+        "cloudtrail.KMSPolicySourceArn"
+      ],
+      "4": [
+        "cloudtrail.LogFileValidationEnabled"
+      ],
+      "5": [
+        "cloudtrail.CloudWatchLogsLogGroupArn",
+        "cloudtrail.CloudWatchAlarmsConfigured",
+        "cloudtrail.SecurityHubIntegration",
+        "cloudtrail.GuardDutyIntegration"
+      ]
+    },
+    "CloudWatch.": {
+      "15": [
+        "cloudwatch.alarmsWithoutSNS",
+        "cloudwatch.missingServiceQuotaAlarms",
+        "cloudwatch.missingBillingAlarms",
+        "cloudwatch.missingCompositeAlarms"
+      ],
+      "16": [
+        "cloudwatch.logGroupsWithoutLogInsightsUsage"
+      ],
+      "17": [
+        "cloudwatch.alarmsWithoutAutoScalingActions",
+        "cloudwatch.missingCloudWatchDashboards",
+        "cloudwatch.missingCustomMetrics",
+        "cloudwatch.missingXRayIntegration",
+        "cloudwatch.missingApplicationSignals"
+      ]
+    },
+    "CodeBuild.": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "Config.": {
+      "1": []
+    },
+    "DMS.": {
+      "1": [],
+      "6": [],
+      "7": [],
+      "8": [],
+      "9": []
+    },
+    "DocumentDB.": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [],
+      "5": []
+    },
+    "DynamoDB.": {
+      "1": [
+        "dynamodb.autoScalingStatus",
+        "dynamodb.tableClassOptimization"
+      ],
+      "2": [
+        "dynamodb.disabledPointInTimeRecovery",
+        "dynamodb.globalTableVersion"
+      ],
+      "3": [
+        "dynamodb.encryptionAtRest"
+      ],
+      "4": [],
+      "5": [
+        "dynamodb.resourcesWithoutTags"
+      ],
+      "6": [
+        "dynamodb.deleteTableProtection"
+      ]
+    },
+    "EC2.": {
+      "1": [
+        "ec2.EBSSnapshotIsPublic"
+      ],
+      "2": [
+        "ec2.SGDefaultDisallowTraffic"
+      ],
+      "3": [
+        "ec2.EBSInUse",
+        "ec2.EBSEncrypted",
+        "ec2.EBSEncryptionByDefault",
+        "ec2.EBSVolumeDataClassification"
+      ],
+      "4": [
+        "ec2.EC2Active"
+      ],
+      "5": [],
+      "6": [],
+      "7": [
+        "ec2.EBSEncrypted",
+        "ec2.EBSEncryptionByDefault"
+      ],
+      "8": [
+        "ec2.ASGIMDSv2"
+      ],
+      "9": [
+        "ec2.EC2InstancePublicIP"
+      ],
+      "10": [],
+      "12": [
+        "ec2.EC2EIPNotInUse"
+      ],
+      "13": [
+        "ec2.SGSensitivePortOpenToAll",
+        "ec2.SGAllPortOpenToAll",
+        "ec2.VPCMultiAZ"
+      ],
+      "15": [
+        "ec2.EC2SubnetAutoPublicIP"
+      ],
+      "16": [],
+      "17": [
+        "ec2.EC2EbsOptimized"
+      ],
+      "18": [],
+      "19": [],
+      "20": [],
+      "21": [],
+      "23": [
+        "ec2.ELBMultiAZ",
+        "ec2.ASGMultiAZ"
+      ],
+      "24": [],
+      "25": [],
+      "28": [],
+      "51": []
+    },
+    "ECR.": {
+      "1": [],
+      "2": [],
+      "3": []
+    },
+    "ECS.": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [],
+      "5": [],
+      "8": [],
+      "9": [],
+      "10": [],
+      "12": []
+    },
+    "EFS.": {
+      "1": [
+        "efs.ComprehensiveSecurity",
+        "efs.FileSystemPolicy"
+      ],
+      "2": [
+        "efs.MountTargetSecurityGroups",
+        "efs.AccessPointsConfigured"
+      ],
+      "3": [
+        "efs.TLSRequired"
+      ],
+      "4": [
+        "efs.ReplicationEnabled"
+      ]
+    },
+    "EKS.": {
+      "1": [
+        "eks.eksEndpointPublicAccess",
+        "eks.eksNoManagedNodeGroups"
+      ],
+      "2": [
+        "eks.eksClusterVersionEol",
+        "eks.eksAutoModeNotEnabled",
+        "eks.eksNoManagedStorageDrivers"
+      ],
+      "8": [
+        "eks.eksClusterLogging",
+        "eks.eksClusterLoggingIncomplete",
+        "eks.eksSecretsEncryptionNoKMS",
+        "eks.eksNoIRSAConfigured",
+        "eks.eksNodeGroupSingleAZ"
+      ]
+    },
+    "ElastiCache.": {
+      "1": [
+        "elasticache.BackupEnabled"
+      ],
+      "2": [],
+      "3": [
+        "elasticache.MultiAZEnabled",
+        "elasticache.ClusterModeEnabled"
+      ],
+      "4": [
+        "elasticache.EncInTransitAndRest",
+        "elasticache.GlobalDatastoreConfig"
+      ],
+      "5": [
+        "elasticache.EncInTransitAndRest"
+      ],
+      "6": [],
+      "7": [
+        "elasticache.IdleTimeout",
+        "elasticache.ServerlessReadReplica"
+      ]
+    },
+    "ElasticBeanstalk.": {
+      "1": [],
+      "2": []
+    },
+    "ELB.": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [],
+      "5": [],
+      "6": [],
+      "7": [
+        "ec2.ELBConnectionDraining"
+      ],
+      "8": [],
+      "9": [
+        "ec2.ELBCrossZone"
+      ],
+      "10": [],
+      "12": [],
+      "13": [],
+      "14": [],
+      "16": [
+        "ec2.ELBEnableWAF"
+      ]
+    },
+    "EMR.": {
+      "1": [],
+      "2": []
+    },
+    "ES.": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [],
+      "5": [],
+      "6": [],
+      "7": [],
+      "8": []
+    },
+    "EventBridge.": {
+      "3": [],
+      "4": []
+    },
+    "FSx.": {
+      "1": []
+    },
+    "GuardDuty.": {
+      "1": []
+    },
+    "IAM.": {
+      "1": [
+        "iam.FullAdminAccess",
+        "iam.wildcardActionsDetection",
+        "iam.missingPolicyConditions"
+      ],
+      "2": [
+        "iam.userNotUsingGroup",
+        "iam.InlinePolicy",
+        "iam.missingPermissionsBoundaries"
+      ],
+      "3": [
+        "iam.hasAccessKeyNoRotate90days"
+      ],
+      "4": [
+        "iam.rootHasAccessKey",
+        "iam.scpBestPractices"
+      ],
+      "5": [
+        "iam.mfaActive",
+        "iam.iamUsersWithFederationAvailable"
+      ],
+      "6": [],
+      "7": [
+        "iam.passwordPolicyWeak"
+      ],
+      "8": [
+        "iam.consoleLastAccess90",
+        "iam.consoleLastAccess365",
+        "iam.unusedCustomerManagedPolicy",
+        "iam.unnecessaryCustomPolicies"
+      ],
+      "9": [
+        "iam.rootMfaActive"
+      ],
+      "19": [
+        "iam.mfaActive"
+      ],
+      "21": [
+        "iam.ManagedPolicyFullAccessOneServ",
+        "iam.wildcardActionsDetection"
+      ]
+    },
+    "Kinesis.": {
+      "1": []
+    },
+    "KMS.": {
+      "1": [
+        "kms.KeyPolicyWildcardAction",
+        "kms.KeyPolicySensitiveActionsNotRestricted",
+        "kms.KeyPolicyWildcardPrincipal"
+      ],
+      "2": [
+        "kms.GrantOverlyPermissive",
+        "kms.GrantWildcardPrincipal",
+        "kms.GrantMissingEncryptionContext"
+      ],
+      "3": [
+        "kms.KeyInPendingDeletion",
+        "kms.KeyUnused",
+        "kms.KeyPolicyCrossAccount"
+      ],
+      "4": [
+        "kms.KeyRotationEnabled",
+        "kms.KeyPolicyMissingRootAccess",
+        "kms.KeyPolicyNoConditions",
+        "kms.GrantDuplicate",
+        "kms.GrantOldAge",
+        "kms.KeyCentralizedManagement"
+      ]
+    },
+    "Lambda.": {
+      "1": [
+        "lambda.lambdaPublicAccess",
+        "lambda.lambdaRoleTooPermissive"
+      ],
+      "2": [
+        "lambda.lambdaRuntimeUpdate",
+        "lambda.lambdaGuardDutyProtectionDisabled",
+        "lambda.lambdaMemoryNotOptimized",
+        "lambda.lambdaTimeoutNotOptimized"
+      ],
+      "3": [
+        "lambda.lambdaQuotasNotMonitored",
+        "lambda.lambdaNoReservedConcurrencyForThrottling"
+      ],
+      "5": [
+        "lambda.lambdaAsyncRetryNotConfigured",
+        "lambda.lambdaPartialBatchResponseDisabled",
+        "lambda.lambdaSQSVisibilityTimeout",
+        "lambda.lambdaNoCloudWatchAlarms",
+        "lambda.lambdaNoIteratorAgeAlarm",
+        "lambda.lambdaBatchingWindowNotConfigured"
+      ]
+    },
+    "Macie.": {
+      "1": [
+        "s3.MacieToEnable"
+      ],
+      "2": []
+    },
+    "MSK.": {
+      "1": [],
+      "2": []
+    },
+    "MQ.": {
+      "5": [],
+      "6": []
+    },
+    "Neptune.": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [],
+      "5": [],
+      "6": [],
+      "7": [],
+      "8": [],
+      "9": []
+    },
+    "NetworkFirewall.": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [],
+      "5": [],
+      "6": [],
+      "9": []
+    },
+    "Opensearch.": {
+      "1": [
+        "opensearch.EncyptionAtRest"
+      ],
+      "2": [
+        "opensearch.DomainWithinVPC"
+      ],
+      "3": [
+        "opensearch.NodeToNodeEncryption"
+      ],
+      "4": [
+        "opensearch.ApplicationLogs",
+        "opensearch.CloudWatchAlarms"
+      ],
+      "5": [
+        "opensearch.AuditLogs"
+      ],
+      "6": [
+        "opensearch.DataNodes"
+      ],
+      "7": [
+        "opensearch.FineGrainedAccessControl"
+      ],
+      "8": [
+        "opensearch.TLSEnforced"
+      ],
+      "10": [
+        "opensearch.ServiceSoftwareVersion"
+      ]
+    },
+    "PCA.": {
+      "1": []
+    },
+    "RDS.": {
+      "1": [
+        "rds.SnapshotRDSIsPublic"
+      ],
+      "2": [
+        "rds.PubliclyAccessible"
+      ],
+      "3": [
+        "rds.StorageEncrypted"
+      ],
+      "4": [],
+      "5": [
+        "rds.MultiAZ",
+        "rds.CrossRegionBackupNotEnabled"
+      ],
+      "6": [
+        "rds.EnhancedMonitor",
+        "rds.EventSubscriptionNotConfigured"
+      ],
+      "7": [
+        "rds.DeleteProtection"
+      ],
+      "8": [
+        "rds.DeleteProtection"
+      ],
+      "9": [],
+      "10": [],
+      "11": [
+        "rds.Backup",
+        "rds.CrossRegionBackupNotEnabled"
+      ],
+      "12": [],
+      "13": [
+        "rds.AutoMinorVersionUpgrade",
+        "rds.RDSRecommendationsActive"
+      ],
+      "14": [],
+      "15": [
+        "rds.MultiAZ"
+      ],
+      "16": [],
+      "17": [],
+      "18": [],
+      "19": [],
+      "20": [],
+      "21": [],
+      "22": [],
+      "23": [],
+      "24": [
+        "rds.DefaultMasterAdmin"
+      ],
+      "25": [
+        "rds.DefaultMasterAdmin"
+      ],
+      "26": [],
+      "27": [
+        "rds.StorageEncrypted"
+      ],
+      "34": [],
+      "35": [
+        "rds.AutoMinorVersionUpgrade"
+      ]
+    },
+    "Redshift.": {
+      "1": [
+        "redshift.PubliclyAcessible",
+        "redshift.VpcDeployment",
+        "redshift.SecurityGroups"
+      ],
+      "2": [
+        "redshift.EncryptedInTransit"
+      ],
+      "3": [
+        "redshift.AutomaticSnapshots"
+      ],
+      "4": [
+        "redshift.AuditLogging",
+        "redshift.EventNotifications"
+      ],
+      "6": [
+        "redshift.AutomaticUpgrades"
+      ],
+      "7": [
+        "redshift.EnhancedVPCRouting",
+        "redshift.AdvisorRecommendations",
+        "redshift.QueryMonitoringRules"
+      ],
+      "8": [
+        "redshift.DefaultAdminUsername"
+      ],
+      "9": [
+        "redshift.DefaultDatabaseName"
+      ],
+      "10": [
+        "redshift.EncryptedAtRest"
+      ]
+    },
+    "Route53.": {
+      "2": []
+    },
+    "S3.": {
+      "1": [
+        "s3.S3AccountPublicAccessBlock"
+      ],
+      "2": [
+        "s3.PublicAccessBlock",
+        "s3.BucketOwnerEnforced",
+        "s3.WildcardPrincipalsActions"
+      ],
+      "3": [
+        "s3.PublicAccessBlock",
+        "s3.PublicAccessDocumentation"
+      ],
+      "5": [
+        "s3.TlsEnforced"
+      ],
+      "7": [
+        "s3.CrossRegionReplication"
+      ],
+      "8": [
+        "s3.PublicAccessBlock"
+      ],
+      "9": [
+        "s3.BucketLogging",
+        "s3.CloudWatchRequestMetrics"
+      ],
+      "10": [
+        "s3.BucketVersioning",
+        "s3.BucketLifecycle",
+        "s3.StorageLens"
+      ],
+      "11": [
+        "s3.EventNotification"
+      ],
+      "12": [
+        "s3.AccessControlList"
+      ],
+      "13": [
+        "s3.BucketLifecycle"
+      ],
+      "14": [
+        "s3.BucketVersioning"
+      ],
+      "15": [
+        "s3.ObjectLock"
+      ],
+      "17": [
+        "s3.ServerSideEncrypted",
+        "s3.SSEWithKMS",
+        "s3.SSECBlocking"
+      ],
+      "19": [
+        "s3.UnpredictableBucketNames"
+      ],
+      "20": [
+        "s3.MFADelete"
+      ]
+    },
+    "Sagemaker.": {
+      "1": [],
+      "2": [],
+      "3": []
+    },
+    "SecretsManager.": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "SNS.": {
+      "1": []
+    },
+    "SQS.": {
+      "1": [
+        "sqs.EncryptionAtRest",
+        "sqs.LongPollingConfiguration",
+        "sqs.MaxReceiveCountDetection",
+        "sqs.WildcardPrincipalDetection"
+      ]
+    },
+    "SSM.": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": []
+    },
+    "WAF.": {
+      "1": [],
+      "2": [],
+      "3": [],
+      "4": [],
+      "5": [],
+      "6": [],
+      "7": [],
+      "8": [],
+      "10": [],
+      "11": [],
+      "12": []
     }
+  }
 }

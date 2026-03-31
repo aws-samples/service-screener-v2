@@ -13,9 +13,73 @@ import Table from '@cloudscape-design/components/table';
 import TextFilter from '@cloudscape-design/components/text-filter';
 import Button from '@cloudscape-design/components/button';
 import Pagination from '@cloudscape-design/components/pagination';
+import Tabs from '@cloudscape-design/components/tabs';
+
+import ProgressBar from '@cloudscape-design/components/progress-bar';
+import StatusIndicator from '@cloudscape-design/components/status-indicator';
 
 import { getFrameworkData } from '../utils/dataLoader';
-import { renderHtml } from '../utils/htmlDecoder';
+import { renderHtml, decodeHtml } from '../utils/htmlDecoder';
+
+/**
+ * Parse framework description HTML into React elements with Cloudscape StatusIndicator
+ * Replaces invisible Font Awesome icons + Bootstrap classes with native Cloudscape components
+ */
+const DescriptionRenderer = ({ html }) => {
+  if (!html) return null;
+  const decoded = decodeHtml(html);
+
+  // Extract the h4 title if present
+  const titleMatch = decoded.match(/<h4>(.*?)<\/h4>/i);
+  const title = titleMatch ? titleMatch[1] : null;
+
+  // Parse each <dt> block into structured items
+  const items = [];
+  // Match both pass and fail patterns
+  const dtRegex = /<dt\s+class='text-(danger|success)'>\s*<i\s+class='fas fa-(?:times|check)'><\/i>\s*\[([^\]]+)\](.*?)<\/dt>([\s\S]*?)(?=<dt |<\/dl>|$)/gi;
+  let match;
+  while ((match = dtRegex.exec(decoded)) !== null) {
+    const status = match[1] === 'success' ? 'pass' : 'fail';
+    const checkId = match[2];
+    // Clean up the label text after checkId (e.g., " - Enable MFA on root user</i>")
+    const label = (match[3] || '').replace(/<\/?i>/gi, '').replace(/^\s*-\s*/, '').trim();
+    // Extract affected resources from <ul><li> blocks
+    const resourceHtml = match[4] || '';
+    const resources = [];
+    const liRegex = /<li>(.*?)<\/li>/gi;
+    let liMatch;
+    while ((liMatch = liRegex.exec(resourceHtml)) !== null) {
+      resources.push(liMatch[1]);
+    }
+    items.push({ status, checkId, label, resources });
+  }
+
+  // If no structured items found, fall back to raw HTML
+  if (items.length === 0) {
+    return <div dangerouslySetInnerHTML={{ __html: decoded.replace(/<i\s+class='fas[^']*'><\/i>/gi, '') }} />;
+  }
+
+  return (
+    <SpaceBetween size="xxs">
+      {title && <Box variant="small" fontWeight="bold">{title.replace(/&amp;/g, '&')}</Box>}
+      {items.map((item, i) => (
+        <div key={i} style={{ padding: '2px 0' }}>
+          <StatusIndicator type={item.status === 'pass' ? 'success' : 'error'}>
+            <Box variant="code" display="inline">{item.checkId}</Box>
+            {item.label && <span> — {item.label}</span>}
+          </StatusIndicator>
+          {item.resources.length > 0 && (
+            <Box padding={{ left: 'l' }} color="text-body-secondary" fontSize="body-s">
+              {item.resources.map((r, j) => (
+                <div key={j} dangerouslySetInnerHTML={{ __html: r }} />
+              ))}
+            </Box>
+          )}
+        </div>
+      ))}
+    </SpaceBetween>
+  );
+};
 
 /**
  * FrameworkDetail component - displays compliance framework reports
@@ -29,6 +93,7 @@ const FrameworkDetail = ({ data }) => {
   
   // Table state
   const [filteringText, setFilteringText] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [sortingColumn, setSortingColumn] = useState({ sortingField: 'category' });
   const [sortingDescending, setSortingDescending] = useState(false);
   const [currentPageIndex, setCurrentPageIndex] = useState(1);
@@ -89,6 +154,17 @@ const FrameworkDetail = ({ data }) => {
     }));
   }, [summary]);
 
+  // Compliance percentage per category
+  const categoryCompliance = useMemo(() => {
+    if (!summary || !summary.stats) return [];
+    return Object.entries(summary.stats).map(([category, values]) => {
+      const [na, compliant, needAttention] = values;
+      const assessed = compliant + needAttention;
+      const pct = assessed > 0 ? Math.round((compliant / assessed) * 100) : null;
+      return { category, na, compliant, needAttention, total: na + compliant + needAttention, assessed, pct };
+    });
+  }, [summary]);
+
   // Prepare table data from details array
   // Details format: [Category, Rule ID, Compliance Status, Description, Reference]
   const tableItems = useMemo(() => {
@@ -106,15 +182,29 @@ const FrameworkDetail = ({ data }) => {
 
   // Filter table items
   const filteredItems = useMemo(() => {
-    if (!filteringText) return tableItems;
+    let items = tableItems;
     
-    const lowerFilter = filteringText.toLowerCase();
-    return tableItems.filter(item => 
-      item.category.toLowerCase().includes(lowerFilter) ||
-      item.ruleId.toLowerCase().includes(lowerFilter) ||
-      item.description.toLowerCase().includes(lowerFilter)
-    );
-  }, [tableItems, filteringText]);
+    // Status filter
+    if (statusFilter === 'needAttention') {
+      items = items.filter(item => item.complianceStatus === -1);
+    } else if (statusFilter === 'compliant') {
+      items = items.filter(item => item.complianceStatus === 1);
+    } else if (statusFilter === 'notAvailable') {
+      items = items.filter(item => item.complianceStatus === 0);
+    }
+    
+    // Text filter
+    if (filteringText) {
+      const lowerFilter = filteringText.toLowerCase();
+      items = items.filter(item => 
+        item.category.toLowerCase().includes(lowerFilter) ||
+        item.ruleId.toLowerCase().includes(lowerFilter) ||
+        item.description.toLowerCase().includes(lowerFilter)
+      );
+    }
+    
+    return items;
+  }, [tableItems, filteringText, statusFilter]);
 
   // Sort table items
   const sortedItems = useMemo(() => {
@@ -220,11 +310,7 @@ const FrameworkDetail = ({ data }) => {
     {
       id: 'description',
       header: 'Description',
-      cell: item => (
-        <Box>
-          <div dangerouslySetInnerHTML={renderHtml(item.description)} />
-        </Box>
-      ),
+      cell: item => <DescriptionRenderer html={item.description} />,
       width: 400
     },
     {
@@ -381,6 +467,40 @@ const FrameworkDetail = ({ data }) => {
         />
       </Container>
 
+      {/* Compliance percentage per category */}
+      {categoryCompliance.length > 0 && (
+        <Container
+          header={
+            <Header
+              variant="h2"
+              description="Percentage based on assessed controls (excludes Not Available)"
+            >
+              Compliance Rate by Category
+            </Header>
+          }
+        >
+          <ColumnLayout columns={2}>
+            {categoryCompliance.map(c => (
+              <ProgressBar
+                key={c.category}
+                value={c.pct ?? 0}
+                label={c.category}
+                description={
+                  <span>
+                    <span style={{color:'#037f0c',fontWeight:600}}>{c.compliant} compliant</span>
+                    {', '}
+                    <span style={{color:'#d91515',fontWeight:600}}>{c.needAttention} need attention</span>
+                    {c.na > 0 && <>{', '}<span style={{color:'#0972d3',fontWeight:600}}>{c.na} not available</span></>}
+                  </span>
+                }
+                status={c.pct === null ? 'error' : 'success'}
+                resultText={c.pct === null ? 'No assessed controls' : `${c.pct}% compliant (${c.compliant}/${c.assessed})`}
+              />
+            ))}
+          </ColumnLayout>
+        </Container>
+      )}
+
       {/* Compliance details table */}
       <Table
         columnDefinitions={columnDefinitions}
@@ -409,15 +529,30 @@ const FrameworkDetail = ({ data }) => {
           </Header>
         }
         filter={
-          <TextFilter
-            filteringText={filteringText}
-            filteringPlaceholder="Find controls"
-            filteringAriaLabel="Filter controls"
-            onChange={({ detail }) => {
-              setFilteringText(detail.filteringText);
-              setCurrentPageIndex(1); // Reset to first page on filter
-            }}
-          />
+          <SpaceBetween size="xs">
+            <Tabs
+              activeTabId={statusFilter}
+              onChange={({ detail }) => {
+                setStatusFilter(detail.activeTabId);
+                setCurrentPageIndex(1);
+              }}
+              tabs={[
+                { id: 'all', label: `All (${tableItems.length})` },
+                { id: 'needAttention', label: `Need Attention (${tableItems.filter(i => i.complianceStatus === -1).length})` },
+                { id: 'compliant', label: `Compliant (${tableItems.filter(i => i.complianceStatus === 1).length})` },
+                { id: 'notAvailable', label: `Not Available (${tableItems.filter(i => i.complianceStatus === 0).length})` },
+              ]}
+            />
+            <TextFilter
+              filteringText={filteringText}
+              filteringPlaceholder="Find controls"
+              filteringAriaLabel="Filter controls"
+              onChange={({ detail }) => {
+                setFilteringText(detail.filteringText);
+                setCurrentPageIndex(1);
+              }}
+            />
+          </SpaceBetween>
         }
         pagination={
           <Pagination

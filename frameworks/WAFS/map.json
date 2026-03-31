@@ -3,79 +3,360 @@
     "originator": "AWS",
     "shortname": "WAFS",
     "fullname": "AWS Well-Architected Framework - Security Pillar",
-    "description": "This framework focuses on the security pillar. This will help you meet your business and regulatory requirements by following current AWS recommendations. It’s intended for those in technology roles, such as chief technology officers (CTOs), chief information security officers (CSOs/CISOs), architects, developers, and operations team members. The security pillar describes how to take advantage of cloud technologies to protect data, systems, and assets in a way that can improve your security posture.",
+    "description": "This framework focuses on the security pillar. This will help you meet your business and regulatory requirements by following current AWS recommendations. It\u2019s intended for those in technology roles, such as chief technology officers (CTOs), chief information security officers (CSOs/CISOs), architects, developers, and operations team members. The security pillar describes how to take advantage of cloud technologies to protect data, systems, and assets in a way that can improve your security posture.",
     "_": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/welcome.html",
     "emptyCheckDefaultMsg": ""
   },
   "mapping": {
     "SEC01": {
-      "BP01": ["iam.hasOrganization"],
-      "BP02": ["iam.rootMfaActive", "iam.hasAlternateContact", "iam.rootHasAccessKey", "iam.rootConsoleLogin30days", "iam.passwordPolicy", "iam.enableGuardDuty", "iam.rootConsoleLogin30days"],
-      "BP03": ["iam.SCPEnabled" , "iam.EnableConfigService"],
-      "BP04": ["iam.enableGuardDuty"],
+      "BP01": [
+        "iam.hasOrganization",
+        "iam.scpBestPractices"
+      ],
+      "BP02": [
+        "iam.rootMfaActive",
+        "iam.hasAlternateContact",
+        "iam.rootHasAccessKey",
+        "iam.rootConsoleLogin30days",
+        "iam.passwordPolicy",
+        "iam.enableGuardDuty",
+        "iam.rootConsoleLogin30days",
+        "cloudtrail.GuardDutyIntegration",
+        "cloudtrail.SecurityHubIntegration",
+        "lambda.lambdaGuardDutyProtectionDisabled"
+      ],
+      "BP03": [
+        "iam.SCPEnabled",
+        "iam.EnableConfigService",
+        "cloudwatch.alarmsWithoutSNS",
+        "cloudwatch.missingCompositeAlarms",
+        "cloudwatch.missingServiceQuotaAlarms",
+        "cloudwatch.missingBillingAlarms"
+      ],
+      "BP04": [
+        "iam.enableGuardDuty",
+        "cloudtrail.GuardDutyIntegration",
+        "cloudtrail.SecurityHubIntegration",
+        "lambda.lambdaGuardDutyProtectionDisabled"
+      ],
       "BP05": [],
-      "BP06": ["lambda.$length", "rds.$length", "eks.$length", "dynamodb.$length", "elasticache.$length"],
-      "BP07": ["iam.hasOrganization"],
+      "BP06": [
+        "lambda.$length",
+        "rds.$length",
+        "eks.$length",
+        "dynamodb.$length",
+        "elasticache.$length"
+      ],
+      "BP07": [
+        "iam.hasOrganization"
+      ],
       "BP08": []
     },
     "SEC02": {
-      "BP01": ["iam.mfaActive", "iam.passwordPolicyWeak", "iam.passwordLastChange90", "iam.hasAccessKeyNoRotate30days"],
-      "BP02": ["ec2.EC2IamProfile"],
-      "BP03": ["iam.hasAccessKeyNoRotate30days" , "rds.DBwithoutSecretManager" , "rds.DBwithSomeSecretsManagerOnly"],
-      "BP04": ["iam.hasSSORoles","iam.hasExternalIdentityProvider"],
-      "BP05": ["iam.passwordLastChange90", "iam.hasAccessKeyNoRotate30days", "eks.eksClusterRoleLeastPrivilege", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "iam.FullAdminAccess", "lambda.lambdaRoleReused", "ec2.EC2IamProfile"],
-      "BP06": ["iam.userNotUsingGroup", "iam.groupEmptyUsers"]
+      "BP01": [
+        "iam.mfaActive",
+        "iam.passwordPolicyWeak",
+        "iam.passwordLastChange90",
+        "iam.hasAccessKeyNoRotate30days",
+        "iam.iamUsersWithFederationAvailable"
+      ],
+      "BP02": [
+        "ec2.EC2IamProfile"
+      ],
+      "BP03": [
+        "iam.hasAccessKeyNoRotate30days",
+        "rds.DBwithoutSecretManager",
+        "rds.DBwithSomeSecretsManagerOnly"
+      ],
+      "BP04": [
+        "iam.hasSSORoles",
+        "iam.hasExternalIdentityProvider",
+        "iam.iamUsersWithFederationAvailable"
+      ],
+      "BP05": [
+        "iam.passwordLastChange90",
+        "iam.hasAccessKeyNoRotate30days",
+        "eks.eksClusterRoleLeastPrivilege",
+        "iam.InlinePolicyFullAccessOneServ",
+        "iam.InlinePolicyFullAdminAccess",
+        "iam.FullAdminAccess",
+        "lambda.lambdaRoleReused",
+        "ec2.EC2IamProfile",
+        "iam.unusedCustomerManagedPolicy",
+        "iam.unnecessaryCustomPolicies",
+        "kms.GrantOldAge"
+      ],
+      "BP06": [
+        "iam.userNotUsingGroup",
+        "iam.groupEmptyUsers"
+      ]
     },
     "SEC03": {
-      "BP01": ["iam.InlinePolicy"],
-      "BP02": ["eks.eksClusterRoleLeastPrivilege", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "iam.FullAdminAccess", "lambda.lambdaRoleReused", "ec2.EC2IamProfile", "iam.ManagedPolicyFullAccessOneServ", "sqs.AccessPolicy"],
-      "BP03": ["iam.EnableConfigService" , "iam.SCPEnabled" , "iam.InlinePolicy"],
-      "BP04": ["iam.groupEmptyUsers", "iam.userNoActivity90days", "cloudtrail.HasDataEventsCaptured"],
-      "BP05": ["iam.SCPEnabled" , "cloudtrail.NeedToEnableCloudTrail"],
-      "BP06": ["iam.SCPEnabled" , "s3.AccessControlList"],
-      "BP07": [],
+      "BP01": [
+        "iam.InlinePolicy",
+        "iam.missingPermissionsBoundaries"
+      ],
+      "BP02": [
+        "eks.eksClusterRoleLeastPrivilege",
+        "iam.InlinePolicyFullAccessOneServ",
+        "iam.InlinePolicyFullAdminAccess",
+        "iam.FullAdminAccess",
+        "lambda.lambdaRoleReused",
+        "ec2.EC2IamProfile",
+        "iam.ManagedPolicyFullAccessOneServ",
+        "sqs.AccessPolicy",
+        "iam.wildcardActionsDetection",
+        "iam.missingPolicyConditions",
+        "kms.GrantOverlyPermissive",
+        "kms.GrantWildcardPrincipal",
+        "kms.KeyPolicyWildcardAction",
+        "kms.KeyPolicyWildcardPrincipal",
+        "kms.KeyPolicySensitiveActionsNotRestricted",
+        "kms.KeyPolicyCrossAccount",
+        "lambda.lambdaRoleTooPermissive",
+        "sqs.WildcardPrincipalDetection",
+        "s3.WildcardPrincipalsActions",
+        "apigateway.LeastPrivilegeAccess"
+      ],
+      "BP03": [
+        "iam.EnableConfigService",
+        "iam.SCPEnabled",
+        "iam.InlinePolicy"
+      ],
+      "BP04": [
+        "iam.groupEmptyUsers",
+        "iam.userNoActivity90days",
+        "cloudtrail.HasDataEventsCaptured",
+        "iam.unusedCustomerManagedPolicy",
+        "iam.unnecessaryCustomPolicies",
+        "kms.GrantDuplicate",
+        "kms.KeyUnused"
+      ],
+      "BP05": [
+        "iam.SCPEnabled",
+        "cloudtrail.NeedToEnableCloudTrail",
+        "iam.scpBestPractices",
+        "iam.missingPermissionsBoundaries"
+      ],
+      "BP06": [
+        "iam.SCPEnabled",
+        "s3.AccessControlList"
+      ],
+      "BP07": [
+        "kms.KeyPolicyCrossAccount",
+        "s3.PublicAccessDocumentation"
+      ],
       "BP08": [],
-      "BP09": ["iam.EnableConfigService"]
+      "BP09": [
+        "iam.EnableConfigService"
+      ]
     },
     "SEC04": {
-      "BP01": ["eks.eksClusterLogging" ,"ec2.VPCFlowLogEnabled" , "opensearch.ApplicationLogs" ,"redshift.AuditLogging" , "s3.BucketLogging", "apigateway.ExecutionLogging" , "cloudfront.accessLogging" , "cloudtrail.NeedToEnableCloudTrail", "cloudtrail.HasOneMultiRegionTrail", "cloudtrail.EnableTrailS3BucketLifecycle", "cloudtrail.HasInsightSelectors", "iam.enableGuardDuty", "sqs.QueueMonitoring"],
-      "BP02": [],
-      "BP03": ["iam.EnableConfigService"],
-      "BP04": ["iam.enableGuardDuty" ,"s3.MacieToEnable"]
+      "BP01": [
+        "eks.eksClusterLogging",
+        "ec2.VPCFlowLogEnabled",
+        "opensearch.ApplicationLogs",
+        "redshift.AuditLogging",
+        "s3.BucketLogging",
+        "apigateway.ExecutionLogging",
+        "cloudfront.accessLogging",
+        "cloudtrail.NeedToEnableCloudTrail",
+        "cloudtrail.HasOneMultiRegionTrail",
+        "cloudtrail.EnableTrailS3BucketLifecycle",
+        "cloudtrail.HasInsightSelectors",
+        "iam.enableGuardDuty",
+        "sqs.QueueMonitoring",
+        "cloudtrail.OrganizationTrailEnabled",
+        "cloudtrail.CloudWatchAlarmsConfigured",
+        "cloudwatch.logGroupsWithoutLogInsightsUsage",
+        "cloudwatch.missingXRayIntegration",
+        "cloudwatch.missingApplicationSignals",
+        "eks.eksClusterLoggingIncomplete",
+        "glue.JobLoggingEnabled",
+        "opensearch.CloudWatchAlarms",
+        "redshift.EventNotifications",
+        "apigateway.PerformanceMonitoring",
+        "apigateway.CloudWatchAlarms",
+        "lambda.lambdaNoCloudWatchAlarms",
+        "rds.EventSubscriptionNotConfigured",
+        "s3.CloudWatchRequestMetrics"
+      ],
+      "BP02": [
+        "cloudwatch.missingCloudWatchDashboards",
+        "cloudwatch.missingCrossAccountDashboards",
+        "cloudwatch.missingVendedDashboards",
+        "cloudwatch.missingCustomMetrics",
+        "s3.StorageLens",
+        "rds.RDSRecommendationsActive",
+        "redshift.AdvisorRecommendations"
+      ],
+      "BP03": [
+        "iam.EnableConfigService",
+        "cloudwatch.alarmsWithoutSNS"
+      ],
+      "BP04": [
+        "iam.enableGuardDuty",
+        "s3.MacieToEnable",
+        "cloudtrail.GuardDutyIntegration",
+        "cloudtrail.SecurityHubIntegration",
+        "lambda.lambdaGuardDutyProtectionDisabled"
+      ]
     },
-    "SEC05":{
-      "BP01": ["cloudfront.$length"],
-      "BP02": ["ec.SGSensitivePortOpenToAll", "ec2.SGAllTCPOpen", "ec2.SGAllUDPOpen", "ec2.SGDefaultInUsed", "ec2.SGEncryptionInTransit", "ec2.ELBListenerInsecure", "rds.PubliclyAccessible"],
+    "SEC05": {
+      "BP01": [
+        "cloudfront.$length",
+        "apigateway.PrivateAPI",
+        "apigateway.VPCEndpointAssociation",
+        "apigateway.VPCAccessRestrictions",
+        "glue.PublicAccessibility",
+        "sagemaker.DirectInternetAccess",
+        "sagemaker.NotebookVpcSettings",
+        "sagemaker.ModelVpcSettings",
+        "sagemaker.TrainingVpcSettings",
+        "redshift.VpcDeployment"
+      ],
+      "BP02": [
+        "ec.SGSensitivePortOpenToAll",
+        "ec2.SGAllTCPOpen",
+        "ec2.SGAllUDPOpen",
+        "ec2.SGDefaultInUsed",
+        "ec2.SGEncryptionInTransit",
+        "ec2.ELBListenerInsecure",
+        "rds.PubliclyAccessible",
+        "apigateway.RequestThrottling",
+        "apigateway.UsagePlanThrottling",
+        "apigateway.ResourcePolicy",
+        "apigateway.MutualTLS",
+        "redshift.SecurityGroups",
+        "efs.MountTargetSecurityGroups",
+        "sagemaker.NetworkIsolation",
+        "sagemaker.TrainingNetworkIsolation"
+      ],
       "BP03": [],
-      "BP04": []
+      "BP04": [
+        "apigateway.RequestValidation"
+      ]
     },
-    "SEC06":{
-      "BP01": ["iam.enableGuardDuty"],
-      "BP02": [],
+    "SEC06": {
+      "BP01": [
+        "iam.enableGuardDuty",
+        "lambda.lambdaQuotasNotMonitored",
+        "ec2.EC2ServiceQuotas",
+        "sagemaker.ModelContainerImageSource"
+      ],
+      "BP02": [
+        "sagemaker.RootAccessDisabled",
+        "lambda.lambdaNoEnvironmentVariables"
+      ],
       "BP03": [],
       "BP04": [],
       "BP05": [],
-      "BP06": []
+      "BP06": [
+        "ec2.ComputeOptimizerEnhancedMetrics"
+      ]
     },
-    "SEC07":{
-      "BP01": [],
-      "BP02": [],
+    "SEC07": {
+      "BP01": [
+        "ec2.EBSVolumeDataClassification",
+        "efs.NoSensitiveDataInTags"
+      ],
+      "BP02": [
+        "s3.BucketOwnerEnforced"
+      ],
       "BP03": [],
-      "BP04": ["s3.MacieToEnable"]
+      "BP04": [
+        "s3.MacieToEnable"
+      ]
     },
-    "SEC08":{
-      "BP01": [],
-      "BP02": ["cloudtrail.RequiresKmsKey", "eks.eksSecretsEncryption", "lambda.lambdaCMKEncryptionDisabled", "s3.ServerSideEncrypted" , "s3.SSEWithKMS" , "ec2.EBSEncrypted" , "efs.EncryptedAtRest" , "rds.StorageEncrypted" , "redshift.EncryptedAtRest" , "redshift.EncryptedWithKMS" , "cloudfront.fieldLevelEncryption" , "apigateway.EncryptionAtRest" , "apigateway.EncryptionInTransit", "sqs.EncryptionAtRest"],
+    "SEC08": {
+      "BP01": [
+        "kms.KeyPolicyMissingRootAccess",
+        "kms.KeyPolicyNoConditions",
+        "kms.GrantMissingEncryptionContext",
+        "kms.KeyCentralizedManagement",
+        "cloudtrail.KMSPolicySourceArn"
+      ],
+      "BP02": [
+        "cloudtrail.RequiresKmsKey",
+        "eks.eksSecretsEncryption",
+        "lambda.lambdaCMKEncryptionDisabled",
+        "s3.ServerSideEncrypted",
+        "s3.SSEWithKMS",
+        "ec2.EBSEncrypted",
+        "efs.EncryptedAtRest",
+        "rds.StorageEncrypted",
+        "redshift.EncryptedAtRest",
+        "redshift.EncryptedWithKMS",
+        "cloudfront.fieldLevelEncryption",
+        "apigateway.EncryptionAtRest",
+        "apigateway.EncryptionInTransit",
+        "sqs.EncryptionAtRest",
+        "ec2.EBSEncryptionByDefault",
+        "glue.MetadataEncryption",
+        "glue.ConnectionPasswordEncryption",
+        "glue.JobBookmarkEncryption",
+        "glue.JobS3Encryption",
+        "glue.JobCloudWatchLogsEncryption",
+        "glue.DevEndpointBookmarkEncryption",
+        "glue.DevEndpointS3Encryption",
+        "glue.DevEndpointCloudWatchLogsEncryption",
+        "glue.MLTransformEncryptionAtRest",
+        "sagemaker.EncryptionEnabled",
+        "sagemaker.VolumeAndOutputEncryption",
+        "eks.eksSecretsEncryptionNoKMS",
+        "dynamodb.encryptionAtRest"
+      ],
       "BP03": [],
-      "BP04": ["eks.eksClusterRoleLeastPrivilege", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "iam.FullAdminAccess", "lambda.lambdaRoleReused", "ec2.EC2IamProfile", "s3.BucketVersioning", "s3.ObjectLock", "s3.PublicAccessBlock", "sqs.DeadLetterQueue", "sqs.FifoConfiguration"]
+      "BP04": [
+        "eks.eksClusterRoleLeastPrivilege",
+        "iam.InlinePolicyFullAccessOneServ",
+        "iam.InlinePolicyFullAdminAccess",
+        "iam.FullAdminAccess",
+        "lambda.lambdaRoleReused",
+        "ec2.EC2IamProfile",
+        "s3.BucketVersioning",
+        "s3.ObjectLock",
+        "s3.PublicAccessBlock",
+        "sqs.DeadLetterQueue",
+        "sqs.FifoConfiguration",
+        "s3.BucketOwnerEnforced",
+        "s3.SSECBlocking",
+        "s3.UnpredictableBucketNames"
+      ]
     },
-    "SEC09":{
-      "BP01": [],
-      "BP02": ["cloudfront.viewerPolicyHttps", "cloudfront.DeprecatedSSLProtocol", "ec2.SGEncryptionInTransit", "ec2.ELBListenerInsecure" , "s3.TlsEnforced" , "redshift.EncryptedInTransit" , "rds.MSSQLorPG__TransportEncrpytionDisabled" , "opensearch.NodeToNodeEncryption" , "opensearch.TLSEnforced" , "elasticache.EncInTransitAndRest" , "cloudfront.viewerPolicyHttps", "sqs.EncryptionInTransit"],
+    "SEC09": {
+      "BP01": [
+        "cloudfront.CustomSSLCertificate",
+        "cloudfront.SNIConfiguration"
+      ],
+      "BP02": [
+        "cloudfront.viewerPolicyHttps",
+        "cloudfront.DeprecatedSSLProtocol",
+        "ec2.SGEncryptionInTransit",
+        "ec2.ELBListenerInsecure",
+        "s3.TlsEnforced",
+        "redshift.EncryptedInTransit",
+        "rds.MSSQLorPG__TransportEncrpytionDisabled",
+        "opensearch.NodeToNodeEncryption",
+        "opensearch.TLSEnforced",
+        "elasticache.EncInTransitAndRest",
+        "cloudfront.viewerPolicyHttps",
+        "sqs.EncryptionInTransit",
+        "cloudfront.OriginTrafficEncryption",
+        "efs.TLSRequired",
+        "glue.SslEnabled",
+        "sagemaker.InterContainerEncryption",
+        "apigateway.CORSConfiguration"
+      ],
       "BP03": [],
-      "BP04": []
+      "BP04": [
+        "apigateway.IAMAuthentication",
+        "apigateway.CognitoAuthorizer",
+        "apigateway.LambdaAuthorizer",
+        "apigateway.APIKeyAntiPattern"
+      ]
     },
-    "SEC10":{
+    "SEC10": {
       "BP01": [],
       "BP02": [],
       "BP03": [],
@@ -84,7 +365,7 @@
       "BP06": [],
       "BP07": []
     },
-    "SEC11":{
+    "SEC11": {
       "BP01": [],
       "BP02": [],
       "BP03": [],
