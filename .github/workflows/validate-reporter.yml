@@ -51,11 +51,11 @@ jobs:
       - name: Run validation
         if: steps.changed-files.outputs.files != ''
         run: |
-          python scripts/validate_reporter.py ${{ steps.changed-files.outputs.files }}
+          echo "${{ steps.changed-files.outputs.files }}" | tr '\n' ' ' | xargs python scripts/validate_reporter.py
 
       - name: Comment on PR
         if: failure() && github.event_name == 'pull_request'
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
         with:
           script: |
             github.rest.issues.createComment({

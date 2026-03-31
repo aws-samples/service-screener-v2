@@ -2075,7 +2075,7 @@ class COH(CustomObject):
         # Use service, category, and affected resources for deduplication
         resource_ids = sorted([r.get('id', '') for r in rec.affected_resources])
         hash_input = f"{rec.service}_{rec.category}_{','.join(resource_ids)}"
-        return hashlib.md5(hash_input.encode()).hexdigest()
+        return hashlib.md5(hash_input.encode(), usedforsecurity=False).hexdigest()
     
     def _calculate_priorities_batch(self, recommendations):
         """Calculate priorities for all recommendations in batch for efficiency."""

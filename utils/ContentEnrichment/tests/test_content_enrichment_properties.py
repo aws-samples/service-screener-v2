@@ -941,7 +941,7 @@ class TestContentEnrichmentProperties:
         # Simulate multiple failures
         for i in range(3):
             try:
-                circuit_breaker.call(lambda: exec('raise Exception("Test failure")'))
+                circuit_breaker.call(lambda: (_ for _ in ()).throw(Exception("Test failure")))  # nosec B102
             except Exception:
                 pass  # Expected to fail
         
