@@ -13,7 +13,7 @@ class IamAccount(IamCommon):
     PASSWORD_POLICY_MIN_SCORE = 4
     ROOT_LOGIN_MAX_COUNT = 3
     
-    def __init__(self, none, awsClients, users, roles, ssBoto):
+    def __init__(self, none, awsClients, users, roles, ssBoto, authDetails=None, policyDocumentMap=None):
         super().__init__()
         
         self.ssBoto = ssBoto
@@ -39,9 +39,16 @@ class IamAccount(IamCommon):
         # Assuming AWS Organization is disabled at first
         self.organizationIsEnabled = False
 
-        # Cache for customer managed policies (populated lazily)
+        # Use prefetched data if available, otherwise lazy-load
+        self._authDetails = authDetails
+        self._policyDocumentMap = policyDocumentMap or {}
         self._customerPoliciesCache = None
-        self._policyDocumentsCache = {}
+        if authDetails and 'policies' in authDetails:
+            self._customerPoliciesCache = [
+                p for p in authDetails['policies'] 
+                if not p.get('Arn', '').startswith('arn:aws:iam::aws:')
+            ]
+        self._policyDocumentsCache = dict(self._policyDocumentMap)
 
         # Check if AWS Organization is enabled
         try:
@@ -65,28 +72,19 @@ class IamAccount(IamCommon):
         
         return self._customerPoliciesCache
     
-    def _preloadPolicyDocuments(self):
-        """Preload all customer managed policy documents into cache"""
-        for policy in self._getCustomerPolicies():
-            arn = policy['Arn']
-            vid = policy['DefaultVersionId']
-            key = f"{arn}:{vid}"
-            if key not in self._policyDocumentsCache:
-                try:
-                    resp = self.iamClient.get_policy_version(PolicyArn=arn, VersionId=vid)
-                    self._policyDocumentsCache[key] = resp['PolicyVersion']['Document']
-                except botocore.exceptions.ClientError:
-                    pass
-    
     def _getPolicyDocument(self, policyArn, versionId):
         """Cached fetch of policy document by ARN and version"""
         key = f"{policyArn}:{versionId}"
         if key not in self._policyDocumentsCache:
-            resp = self.iamClient.get_policy_version(
-                PolicyArn=policyArn,
-                VersionId=versionId
-            )
-            self._policyDocumentsCache[key] = resp['PolicyVersion']['Document']
+            # Check prefetched map by ARN only
+            if policyArn in self._policyDocumentMap:
+                self._policyDocumentsCache[key] = self._policyDocumentMap[policyArn]
+            else:
+                resp = self.iamClient.get_policy_version(
+                    PolicyArn=policyArn,
+                    VersionId=versionId
+                )
+                self._policyDocumentsCache[key] = resp['PolicyVersion']['Document']
         return self._policyDocumentsCache[key]
         
     def passwordPolicyScoring(self, policies):
@@ -525,8 +523,6 @@ class IamAccount(IamCommon):
             
             policies_with_issues = []
             
-            self._preloadPolicyDocuments()
-            
             for policy in self._getCustomerPolicies():
                 policy_name = policy['PolicyName']
                 policy_arn = policy['Arn']
@@ -625,9 +621,35 @@ class IamAccount(IamCommon):
                 return False
             
             def get_entity_policies(entity_type, entity_name):
-                """Get all policy documents for a role or user using cached lookups"""
+                """Get all policy documents for a role or user, using prefetched data when available"""
                 import json as _json
                 docs = []
+                
+                # Try prefetched data first
+                if self._authDetails:
+                    source = self._authDetails.get('roles' if entity_type == 'role' else 'users', [])
+                    key_field = 'RoleName' if entity_type == 'role' else 'UserName'
+                    policy_list_field = 'RolePolicyList' if entity_type == 'role' else 'UserPolicyList'
+                    
+                    for entity in source:
+                        if entity.get(key_field) == entity_name:
+                            # Inline policies (already have documents)
+                            for p in entity.get(policy_list_field, []):
+                                doc = p.get('PolicyDocument', {})
+                                if isinstance(doc, str):
+                                    doc = _json.loads(doc)
+                                docs.append(doc)
+                            # Attached managed policies
+                            for p in entity.get('AttachedManagedPolicies', []):
+                                arn = p['PolicyArn']
+                                if arn in self._policyDocumentMap:
+                                    doc = self._policyDocumentMap[arn]
+                                    if isinstance(doc, str):
+                                        doc = _json.loads(doc)
+                                    docs.append(doc)
+                            return docs
+                
+                # Fallback to API calls
                 try:
                     if entity_type == 'role':
                         inline_names = self.iamClient.list_role_policies(RoleName=entity_name).get('PolicyNames', [])

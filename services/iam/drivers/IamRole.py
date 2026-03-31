@@ -6,35 +6,32 @@ from .IamCommon import IamCommon
 class IamRole(IamCommon):
     MAXSESSIONDURATION = 3600
     MAXROLENOTUSEDDAYS = 14
-    def __init__(self, role, iamClient):
+    def __init__(self, role, iamClient, authDetails=None, policyDocumentMap=None):
         super().__init__()
         self.role = role
         self.iamClient = iamClient
         self._configPrefix = 'iam::role::'
+        self._authDetails = authDetails
+        self._policyDocumentMap = policyDocumentMap or {}
 
         self._resourceName = self.role['RoleName']
 
         self.init()
-        self.retrieveRoleDetail()
+        self._enrichRoleDetail()
         
-    def retrieveRoleDetail(self):
-        c = self.iamClient
-        result = c.get_role(RoleName=self.role['RoleName'])
+    def _enrichRoleDetail(self):
+        """Ensure RoleLastUsed is populated, using prefetched data or API fallback"""
+        if 'RoleLastUsed' in self.role:
+            return
         
-        detail = result.get('Role')
-        self.role['RoleLastUsed'] = detail['RoleLastUsed']
-        
-    #def _checkMocktest(self):
-    #    self.results['Mocktest'] = [-1, 'GG']
-    
-    #def _checkMocktest2(self):    
-    #    self.results['Mocktest2'] = [-1, 'GG']
+        # Fallback to API if not in prefetched data
+        result = self.iamClient.get_role(RoleName=self.role['RoleName'])
+        self.role['RoleLastUsed'] = result.get('Role', {}).get('RoleLastUsed', {})
         
     def _checkRoleOldAge(self):
-        c = self.iamClient
         now = datetime.datetime.today().date()
         
-        if not self.role['RoleLastUsed'] or not self.role['RoleLastUsed']['LastUsedDate']:
+        if not self.role['RoleLastUsed'] or not self.role['RoleLastUsed'].get('LastUsedDate'):
             cdate = self.role['CreateDate'].date()
             diff = now - cdate
             days = diff.days
@@ -52,18 +49,26 @@ class IamRole(IamCommon):
             self.results['unusedRole'] = [-1, "{} days".format(days)]
     
     def _checkLongSessionDuration(self):
-        if self.role['MaxSessionDuration'] > self.MAXSESSIONDURATION:
+        if self.role.get('MaxSessionDuration', self.MAXSESSIONDURATION) > self.MAXSESSIONDURATION:
             self.results['roleLongSession'] = [-1, self.role['MaxSessionDuration']]
             
     def _checkRolePolicy(self):
         role = self.role['RoleName']
-        ## Managed Policy
-        resp = self.iamClient.list_attached_role_policies(RoleName=role)
-        policies = resp.get('AttachedPolicies')
-        self.evaluateManagePolicy(policies)  ## code in iam_common.class.php
         
-        ## Inline Policy
-        resp = self.iamClient.list_role_policies(RoleName=role)
-        inlinePolicies = resp.get('PolicyNames')
-        self.evaluateInlinePolicy(inlinePolicies, role, 'role') 
-        
+        # Use prefetched data if available
+        if 'AttachedManagedPolicies' in self.role:
+            policies = self.role['AttachedManagedPolicies']
+            self.evaluateManagePolicy(policies, self._policyDocumentMap)
+            
+            inlinePolicies = self.role.get('RolePolicyList', [])
+            if inlinePolicies:
+                self.evaluateInlinePolicyFromDocs(inlinePolicies)
+        else:
+            # Fallback to API calls
+            resp = self.iamClient.list_attached_role_policies(RoleName=role)
+            policies = resp.get('AttachedPolicies')
+            self.evaluateManagePolicy(policies)
+            
+            resp = self.iamClient.list_role_policies(RoleName=role)
+            inlinePolicies = resp.get('PolicyNames')
+            self.evaluateInlinePolicy(inlinePolicies, role, 'role')
