@@ -68,17 +68,21 @@ The stack is automatically created at the start of each run with a unique name (
 ## Installing service-screener V2
 1. [Log in to your AWS account](https://docs.aws.amazon.com/cloudshell/latest/userguide/getting-started.html#start-session) using the IAM User with sufficient permissions described above. 
 2. Launch [AWS CloudShell](https://docs.aws.amazon.com/cloudshell/latest/userguide/getting-started.html#launch-region-shell) in any region. 
-3. In the AWS CloudShell terminal, run this script to install the dependencies:
+3. In the AWS CloudShell terminal, run this script to update python version to 3.13:
+  ``` bash
+   sudo yum install python3.13 -y
+   ```
+4. In the same CloudShell terminal, run this script to install the dependencies:
    ``` bash
    cd /tmp
-   python3 -m venv .
+   python3.13 -m venv .
    source bin/activate
-   python3 -m pip install --upgrade pip
+   python3.13 -m pip install --upgrade pip
    rm -rf service-screener-v2
    git clone https://github.com/aws-samples/service-screener-v2.git
    cd service-screener-v2
    pip install -r requirements.txt
-   python3 unzip_botocore_lambda_runtime.py
+   python3.13 unzip_botocore_lambda_runtime.py
    
    # Build Cloudscape UI (required for --beta 1 mode)
    cd cloudscape-ui
