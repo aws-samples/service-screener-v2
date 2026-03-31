@@ -6,7 +6,7 @@ An open source guidance tool for the AWS environment. Click [here](https://d3si6
 
 This version of Service Screener may not compatible with the Greater China region. Our community folks have made it work [here](https://github.com/lijh-aws-tools/service-screener-cn). 
 
-## 🎉 NEW: Enhanced Beta Features (v2.1.0-beta)
+## 🎉 NEW: Enhanced Beta Features (v2.5.0-beta)
 
 **Enable beta features with `--beta 1`!**
 
