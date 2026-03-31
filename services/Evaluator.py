@@ -17,11 +17,13 @@ def runSingleCheck(tmp_obj, method_name):
     try:
         startTime = time.time()
         getattr(obj, method_name)()
+        timeSpent = round(time.time() - startTime, 3)
         if debugFlag:
-            timeSpent = round(time.time() - startTime, 3)
             print('--- --- fn: ' + method_name)
             if timeSpent >= 0.2:
                 _warn("Long running checks {}s".format(timeSpent))
+        elif timeSpent >= 3:
+            _warn("[Slow] {} took {}s".format(method_name, timeSpent))
 
         return 'OK'
     except botocore.exceptions.ClientError as e:

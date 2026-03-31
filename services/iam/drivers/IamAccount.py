@@ -39,6 +39,10 @@ class IamAccount(IamCommon):
         # Assuming AWS Organization is disabled at first
         self.organizationIsEnabled = False
 
+        # Cache for customer managed policies (populated lazily)
+        self._customerPoliciesCache = None
+        self._policyDocumentsCache = {}
+
         # Check if AWS Organization is enabled
         try:
             resp = self.orgClient.describe_organization()
@@ -48,6 +52,42 @@ class IamAccount(IamCommon):
 
         
         self.init()
+    
+    def _getCustomerPolicies(self):
+        """Cached fetch of all customer managed policies with preloaded documents"""
+        if self._customerPoliciesCache is not None:
+            return self._customerPoliciesCache
+        
+        self._customerPoliciesCache = []
+        paginator = self.iamClient.get_paginator('list_policies')
+        for page in paginator.paginate(Scope='Local'):
+            self._customerPoliciesCache.extend(page.get('Policies', []))
+        
+        return self._customerPoliciesCache
+    
+    def _preloadPolicyDocuments(self):
+        """Preload all customer managed policy documents into cache"""
+        for policy in self._getCustomerPolicies():
+            arn = policy['Arn']
+            vid = policy['DefaultVersionId']
+            key = f"{arn}:{vid}"
+            if key not in self._policyDocumentsCache:
+                try:
+                    resp = self.iamClient.get_policy_version(PolicyArn=arn, VersionId=vid)
+                    self._policyDocumentsCache[key] = resp['PolicyVersion']['Document']
+                except botocore.exceptions.ClientError:
+                    pass
+    
+    def _getPolicyDocument(self, policyArn, versionId):
+        """Cached fetch of policy document by ARN and version"""
+        key = f"{policyArn}:{versionId}"
+        if key not in self._policyDocumentsCache:
+            resp = self.iamClient.get_policy_version(
+                PolicyArn=policyArn,
+                VersionId=versionId
+            )
+            self._policyDocumentsCache[key] = resp['PolicyVersion']['Document']
+        return self._policyDocumentsCache[key]
         
     def passwordPolicyScoring(self, policies):
         score = 0
@@ -349,26 +389,10 @@ class IamAccount(IamCommon):
     def _checkUnusedCustomerManagedPolicy(self):
         """Check for customer managed policies not attached to any users, groups, or roles"""
         try:
-            # List all customer managed policies
             unused_policies = []
-            paginator = self.iamClient.get_paginator('list_policies')
-            
-            for page in paginator.paginate(Scope='Local'):
-                for policy in page.get('Policies', []):
-                    # Check if policy has any attachments
-                    entities = self.iamClient.list_entities_for_policy(
-                        PolicyArn=policy['Arn']
-                    )
-                    
-                    # Count total attachments
-                    total_attachments = (
-                        len(entities.get('PolicyUsers', [])) +
-                        len(entities.get('PolicyGroups', [])) +
-                        len(entities.get('PolicyRoles', []))
-                    )
-                    
-                    if total_attachments == 0:
-                        unused_policies.append(policy['PolicyName'])
+            for policy in self._getCustomerPolicies():
+                if policy.get('AttachmentCount', 0) == 0:
+                    unused_policies.append(policy['PolicyName'])
             
             if unused_policies:
                 self.results['unusedCustomerManagedPolicy'] = [
@@ -501,44 +525,36 @@ class IamAccount(IamCommon):
             
             policies_with_issues = []
             
-            # List all customer managed policies
-            paginator = self.iamClient.get_paginator('list_policies')
+            self._preloadPolicyDocuments()
             
-            for page in paginator.paginate(Scope='Local'):
-                for policy in page.get('Policies', []):
-                    policy_name = policy['PolicyName']
-                    policy_arn = policy['Arn']
+            for policy in self._getCustomerPolicies():
+                policy_name = policy['PolicyName']
+                policy_arn = policy['Arn']
+                
+                try:
+                    policy_document = self._getPolicyDocument(policy_arn, policy['DefaultVersionId'])
                     
-                    try:
-                        # Get the default policy version
-                        policy_version = self.iamClient.get_policy_version(
-                            PolicyArn=policy_arn,
-                            VersionId=policy['DefaultVersionId']
-                        )
-                        
-                        policy_document = policy_version['PolicyVersion']['Document']
-                        
-                        # Parse policy using Policy class
-                        policy_obj = Policy(policy_document)
-                        
-                        # Check for missing conditions on sensitive actions
-                        missing_conditions = policy_obj.getMissingConditions(ALL_SENSITIVE_ACTIONS)
-                        
-                        if missing_conditions:
-                            # Format the missing conditions for this policy
-                            missing_details = []
-                            for item in missing_conditions:
-                                action = item['action']
-                                missing_types = ', '.join(item['missing'])
-                                missing_details.append(f"{action} (missing: {missing_types})")
-                            
-                            policy_issue = f"{policy_name}: {'; '.join(missing_details)}"
-                            policies_with_issues.append(policy_issue)
+                    # Parse policy using Policy class
+                    policy_obj = Policy(policy_document)
                     
-                    except botocore.exceptions.ClientError as e:
-                        ecode = e.response['Error']['Code']
-                        print(f'Error getting policy version for {policy_name}: {ecode}')
-                        continue
+                    # Check for missing conditions on sensitive actions
+                    missing_conditions = policy_obj.getMissingConditions(ALL_SENSITIVE_ACTIONS)
+                    
+                    if missing_conditions:
+                        # Format the missing conditions for this policy
+                        missing_details = []
+                        for item in missing_conditions:
+                            action = item['action']
+                            missing_types = ', '.join(item['missing'])
+                            missing_details.append(f"{action} (missing: {missing_types})")
+                        
+                        policy_issue = f"{policy_name}: {'; '.join(missing_details)}"
+                        policies_with_issues.append(policy_issue)
+                
+                except botocore.exceptions.ClientError as e:
+                    ecode = e.response['Error']['Code']
+                    print(f'Error getting policy version for {policy_name}: {ecode}')
+                    continue
             
             # Store results if any policies have issues
             if policies_with_issues:
@@ -570,164 +586,114 @@ class IamAccount(IamCommon):
         try:
             entities_without_boundaries = []
             
-            # Define delegated admin indicators
             DELEGATED_ADMIN_ACTIONS = [
-                'iam:CreateUser',
-                'iam:CreateRole',
-                'iam:AttachUserPolicy',
-                'iam:AttachRolePolicy',
-                'iam:PutUserPolicy',
-                'iam:PutRolePolicy'
+                'iam:CreateUser', 'iam:CreateRole',
+                'iam:AttachUserPolicy', 'iam:AttachRolePolicy',
+                'iam:PutUserPolicy', 'iam:PutRolePolicy'
             ]
             
             ADMIN_NAME_PATTERNS = ['admin', 'administrator', 'delegated', 'manager']
             
-            # Helper function to check if entity has IAM management permissions
-            def has_iam_management_permissions(policies):
-                """Check if any policy grants IAM management permissions"""
-                from utils.Policy import Policy
-                
-                for policy_doc in policies:
-                    try:
-                        policy_obj = Policy(policy_doc)
-                        # Check if policy allows any delegated admin actions
-                        for statement in policy_doc.get('Statement', []):
-                            if statement.get('Effect') == 'Allow':
-                                actions = statement.get('Action', [])
-                                if isinstance(actions, str):
-                                    actions = [actions]
-                                
-                                for action in actions:
-                                    # Check for exact match or wildcard match
-                                    if action in DELEGATED_ADMIN_ACTIONS:
-                                        return True
-                                    if action == 'iam:*' or action == '*':
-                                        return True
-                    except Exception as e:
-                        continue
-                
-                return False
-            
-            # Helper function to check if name matches admin patterns
             def has_admin_name_pattern(name):
-                """Check if entity name contains admin-related keywords"""
                 name_lower = name.lower()
                 return any(pattern in name_lower for pattern in ADMIN_NAME_PATTERNS)
             
-            # Check IAM roles
+            def has_iam_management_permissions(policy_docs):
+                for policy_doc in policy_docs:
+                    if isinstance(policy_doc, str):
+                        import json
+                        try:
+                            policy_doc = json.loads(policy_doc)
+                        except (json.JSONDecodeError, TypeError):
+                            continue
+                    if not isinstance(policy_doc, dict):
+                        continue
+                    statements = policy_doc.get('Statement', [])
+                    if isinstance(statements, str):
+                        continue
+                    for statement in statements:
+                        if not isinstance(statement, dict):
+                            continue
+                        if statement.get('Effect') != 'Allow':
+                            continue
+                        actions = statement.get('Action', [])
+                        if isinstance(actions, str):
+                            actions = [actions]
+                        for action in actions:
+                            if action in DELEGATED_ADMIN_ACTIONS or action in ('iam:*', '*'):
+                                return True
+                return False
+            
+            def get_entity_policies(entity_type, entity_name):
+                """Get all policy documents for a role or user using cached lookups"""
+                import json as _json
+                docs = []
+                try:
+                    if entity_type == 'role':
+                        inline_names = self.iamClient.list_role_policies(RoleName=entity_name).get('PolicyNames', [])
+                        for pn in inline_names:
+                            resp = self.iamClient.get_role_policy(RoleName=entity_name, PolicyName=pn)
+                            doc = resp.get('PolicyDocument', {})
+                            if isinstance(doc, str):
+                                doc = _json.loads(doc)
+                            docs.append(doc)
+                        attached = self.iamClient.list_attached_role_policies(RoleName=entity_name).get('AttachedPolicies', [])
+                    else:
+                        inline_names = self.iamClient.list_user_policies(UserName=entity_name).get('PolicyNames', [])
+                        for pn in inline_names:
+                            resp = self.iamClient.get_user_policy(UserName=entity_name, PolicyName=pn)
+                            doc = resp.get('PolicyDocument', {})
+                            if isinstance(doc, str):
+                                doc = _json.loads(doc)
+                            docs.append(doc)
+                        attached = self.iamClient.list_attached_user_policies(UserName=entity_name).get('AttachedPolicies', [])
+                    
+                    for p in attached:
+                        policy_info = self.iamClient.get_policy(PolicyArn=p['PolicyArn'])
+                        doc = self._getPolicyDocument(p['PolicyArn'], policy_info['Policy']['DefaultVersionId'])
+                        if isinstance(doc, str):
+                            doc = _json.loads(doc)
+                        docs.append(doc)
+                except botocore.exceptions.ClientError:
+                    pass
+                return docs
+            
+            # Check IAM roles - check name pattern first (cheap), then policies only if needed
             for role in self.roles:
                 role_name = role.get('RoleName', '')
-                permissions_boundary = role.get('PermissionsBoundary')
+                if role.get('PermissionsBoundary'):
+                    continue
                 
-                # Check if this is a delegated admin role
-                is_delegated_admin = False
+                # Skip AWS service-linked roles - they can't have permissions boundaries
+                role_path = role.get('Path', '')
+                if role_path.startswith('/aws-service-role/'):
+                    continue
                 
-                # Check name pattern
                 if has_admin_name_pattern(role_name):
-                    is_delegated_admin = True
+                    entities_without_boundaries.append(f"Role: {role_name}")
+                    continue
                 
-                # Check attached policies for IAM management permissions
-                if not is_delegated_admin:
-                    try:
-                        # Get inline policies
-                        inline_policies = []
-                        inline_policy_names = self.iamClient.list_role_policies(RoleName=role_name)
-                        for policy_name in inline_policy_names.get('PolicyNames', []):
-                            policy_doc = self.iamClient.get_role_policy(
-                                RoleName=role_name,
-                                PolicyName=policy_name
-                            )
-                            inline_policies.append(policy_doc.get('PolicyDocument', {}))
-                        
-                        # Get attached managed policies
-                        attached_policies = []
-                        attached_policy_list = self.iamClient.list_attached_role_policies(RoleName=role_name)
-                        for policy in attached_policy_list.get('AttachedPolicies', []):
-                            policy_arn = policy['PolicyArn']
-                            # Get policy document
-                            policy_info = self.iamClient.get_policy(PolicyArn=policy_arn)
-                            default_version = policy_info['Policy']['DefaultVersionId']
-                            policy_version = self.iamClient.get_policy_version(
-                                PolicyArn=policy_arn,
-                                VersionId=default_version
-                            )
-                            attached_policies.append(policy_version['PolicyVersion']['Document'])
-                        
-                        all_policies = inline_policies + attached_policies
-                        if has_iam_management_permissions(all_policies):
-                            is_delegated_admin = True
-                    
-                    except botocore.exceptions.ClientError as e:
-                        ecode = e.response['Error']['Code']
-                        # Skip this role if we can't check its policies
-                        continue
-                
-                # If delegated admin and no permissions boundary, flag it
-                if is_delegated_admin and not permissions_boundary:
+                if has_iam_management_permissions(get_entity_policies('role', role_name)):
                     entities_without_boundaries.append(f"Role: {role_name}")
             
             # Check IAM users
-            # Note: Users from credential report don't include PermissionsBoundary field
-            # We need to call get_user for each user to check the boundary
             try:
                 paginator = self.iamClient.get_paginator('list_users')
                 for page in paginator.paginate():
                     for user in page.get('Users', []):
                         user_name = user.get('UserName', '')
-                        permissions_boundary = user.get('PermissionsBoundary')
+                        if user.get('PermissionsBoundary'):
+                            continue
                         
-                        # Check if this is a delegated admin user
-                        is_delegated_admin = False
-                        
-                        # Check name pattern
                         if has_admin_name_pattern(user_name):
-                            is_delegated_admin = True
-                        
-                        # Check policies for IAM management permissions
-                        if not is_delegated_admin:
-                            try:
-                                # Get inline policies
-                                inline_policies = []
-                                inline_policy_names = self.iamClient.list_user_policies(UserName=user_name)
-                                for policy_name in inline_policy_names.get('PolicyNames', []):
-                                    policy_doc = self.iamClient.get_user_policy(
-                                        UserName=user_name,
-                                        PolicyName=policy_name
-                                    )
-                                    inline_policies.append(policy_doc.get('PolicyDocument', {}))
-                                
-                                # Get attached managed policies
-                                attached_policies = []
-                                attached_policy_list = self.iamClient.list_attached_user_policies(UserName=user_name)
-                                for policy in attached_policy_list.get('AttachedPolicies', []):
-                                    policy_arn = policy['PolicyArn']
-                                    # Get policy document
-                                    policy_info = self.iamClient.get_policy(PolicyArn=policy_arn)
-                                    default_version = policy_info['Policy']['DefaultVersionId']
-                                    policy_version = self.iamClient.get_policy_version(
-                                        PolicyArn=policy_arn,
-                                        VersionId=default_version
-                                    )
-                                    attached_policies.append(policy_version['PolicyVersion']['Document'])
-                                
-                                all_policies = inline_policies + attached_policies
-                                if has_iam_management_permissions(all_policies):
-                                    is_delegated_admin = True
-                            
-                            except botocore.exceptions.ClientError as e:
-                                ecode = e.response['Error']['Code']
-                                # Skip this user if we can't check its policies
-                                continue
-                        
-                        # If delegated admin and no permissions boundary, flag it
-                        if is_delegated_admin and not permissions_boundary:
                             entities_without_boundaries.append(f"User: {user_name}")
-            
+                            continue
+                        
+                        if has_iam_management_permissions(get_entity_policies('user', user_name)):
+                            entities_without_boundaries.append(f"User: {user_name}")
             except botocore.exceptions.ClientError as e:
-                ecode = e.response['Error']['Code']
-                print(f'Error listing users: {ecode}')
+                print(f'Error listing users: {e.response["Error"]["Code"]}')
             
-            # Store results if any entities are missing boundaries
             if entities_without_boundaries:
                 self.results['missingPermissionsBoundaries'] = [
                     len(entities_without_boundaries),
@@ -735,8 +701,7 @@ class IamAccount(IamCommon):
                 ]
         
         except botocore.exceptions.ClientError as e:
-            ecode = e.response['Error']['Code']
-            print(f'Error checking permissions boundaries: {ecode}')
+            print(f'Error checking permissions boundaries: {e.response["Error"]["Code"]}')
 
     def _checkScpBestPractices(self):
         """
