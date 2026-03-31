@@ -43,7 +43,10 @@ jobs:
           fi
           echo "Changed reporter files:"
           echo "$changed_files"
-          echo "files=${changed_files}" >> $GITHUB_OUTPUT
+          # Use delimiter syntax for multiline output
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          echo "$changed_files" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Run validation
         if: steps.changed-files.outputs.files != ''
