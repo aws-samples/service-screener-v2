@@ -41,9 +41,10 @@ if __name__ == "__main__":
                 resp = urlopen(conn, timeout=10)
             
                 if resp.getcode() != 200:
-                    if e.code not in invalidRefDict:
-                        invalidRefDict[resp.getcode()] = []
-                    invalidRefDict[resp.getcode()].append({rule: url})
+                    code = resp.getcode()
+                    if code not in invalidRefDict:
+                        invalidRefDict[code] = []
+                    invalidRefDict[code].append({rule: url})
             except urllib.error.HTTPError as e:
                 if e.code not in invalidRefDict:
                     invalidRefDict[e.code] = []
@@ -52,7 +53,7 @@ if __name__ == "__main__":
                 print(e)
                 if 'UnknownError' not in invalidRefDict:
                     invalidRefDict['UnknownError'] = []
-                invalidRefDict['UnknownError'].append({rule: e})
+                invalidRefDict['UnknownError'].append({rule: str(e)})
                 
                 
     print('')            

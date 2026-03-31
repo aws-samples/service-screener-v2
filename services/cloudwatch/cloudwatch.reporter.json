@@ -270,7 +270,7 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Service Quotas and CloudWatch]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Service-Quota-Integration.html>",
-			"[Visualizing Service Quotas]<https://aws.amazon.com/blogs/mt/visualizing-service-quotas-and-setting-up-alarms-using-aws-service-quotas-and-amazon-cloudwatch/>"
+			"[Visualizing Service Quotas]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Quotas-Visualize-Alarms.html>"
 		]
 	},
 	"cloudwatchResourcesWithoutTags": {
