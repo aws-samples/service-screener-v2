@@ -285,7 +285,7 @@ $(document).ready(function() {
         if len(hasTags.strip()) > 0:
             output.append(f"<dt>Label</dt><dd>{hasTags}</dd>")
 
-        if summary['__links']:
+        if summary.get('__links'):
             output.append("<dt>Recommendation</dt><dd class='detail-href'>" + "</dd><dd class='detail-href''>".join(summary['__links']) + "</dd>")
 
         output.append("</dl>")
