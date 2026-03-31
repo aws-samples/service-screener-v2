@@ -29,12 +29,13 @@ class LambdaCommon(Evaluator):
     RUNTIME_PATH = _C.BOTOCORE_DIR + '/data/lambda/2015-03-31/service-2.json'
     CW_HISTORY_DAYS = [30, 7]
 
-    def __init__(self, lambda_, lambda_client, iam_client, role_count):
+    def __init__(self, lambda_, lambda_client, iam_client, role_count, bConfig=None):
         self.lambda_ = lambda_
         self.function_name = lambda_['FunctionName']
         self.role_count = role_count
         self.lambda_client = lambda_client
         self.iam_client = iam_client
+        self.bConfig = bConfig
 
         self._resourceName = self.function_name
 
@@ -476,7 +477,7 @@ class LambdaCommon(Evaluator):
             
             guardduty_client = Config.get('GuardDutyClient')
             if not guardduty_client:
-                guardduty_client = boto3.client('guardduty', config=Config.get('bConfig'))
+                guardduty_client = boto3.client('guardduty', config=self.bConfig)
                 Config.set('GuardDutyClient', guardduty_client)
             
             # List detectors
@@ -531,7 +532,7 @@ class LambdaCommon(Evaluator):
             # Get CloudWatch Logs client
             logs_client = Config.get('LogsClient')
             if not logs_client:
-                logs_client = boto3.client('logs', config=Config.get('bConfig'))
+                logs_client = boto3.client('logs', config=self.bConfig)
                 Config.set('LogsClient', logs_client)
             
             # Query CloudWatch Logs Insights for max memory used
@@ -746,7 +747,7 @@ class LambdaCommon(Evaluator):
             # Get service quotas client
             sq_client = Config.get('ServiceQuotasClient')
             if not sq_client:
-                sq_client = boto3.client('service-quotas', config=Config.get('bConfig'))
+                sq_client = boto3.client('service-quotas', config=self.bConfig)
                 Config.set('ServiceQuotasClient', sq_client)
             
             # Check concurrent executions quota
