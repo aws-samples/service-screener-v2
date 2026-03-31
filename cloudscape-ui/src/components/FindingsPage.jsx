@@ -21,7 +21,6 @@ import Button from '@cloudscape-design/components/button';
 const FindingsPage = ({ data }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTabId, setActiveTabId] = useState('active');
-  const [selectedItems, setSelectedItems] = useState([]);
   const [filteringText, setFilteringText] = useState('');
   const [currentPageIndex, setCurrentPageIndex] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -284,9 +283,6 @@ const FindingsPage = ({ data }) => {
         items={paginatedItems}
         loading={false}
         loadingText="Loading findings"
-        selectedItems={selectedItems}
-        onSelectionChange={({ detail }) => setSelectedItems(detail.selectedItems)}
-        selectionType="multi"
         sortingColumn={sortingColumn}
         sortingDescending={isDescending}
         onSortingChange={handleSortingChange}
