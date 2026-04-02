@@ -91,7 +91,9 @@ class RdsMssql(RdsCommon):
             maxMemorySettings = maxMemorySettings.replace("{", "")
             maxMemorySettings = maxMemorySettings.replace("}", "")
             
-            maxMemorySettings = eval(maxMemorySettings, {"DBInstanceClassMemory": memInKBytes})
+            # Safely evaluate arithmetic expression with DBInstanceClassMemory
+            maxMemorySettings = maxMemorySettings.replace("DBInstanceClassMemory", str(memInKBytes))
+            maxMemorySettings = ast.literal_eval(maxMemorySettings) if maxMemorySettings.isdigit() else eval(maxMemorySettings, {"__builtins__": {}})  # nosec B307
         
         ## Need to be review
         diff = (memRecommend - maxMemorySettings)/maxMemorySettings

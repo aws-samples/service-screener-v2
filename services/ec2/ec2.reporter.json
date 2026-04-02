@@ -797,5 +797,239 @@
             "[Windows Upgrade Guide]<https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/serverupgrade.html/>",
             "[endoflife]<https://endoflife.date/windows-server>"
         ]
+    },
+    "EBSEncryptionByDefault": {
+        "category": "S",
+        "^description": "EBS Encryption by Default: EBS encryption by default is not enabled in this region. Enable encryption by default to ensure all new EBS volumes are encrypted automatically.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Enable EBS Encryption by Default",
+        "ref": [
+            "[EBS Encryption by Default]<https://docs.aws.amazon.com/ebs/latest/userguide/work-with-ebs-encr.html#encryption-by-default>"
+        ]
+    },
+    "EBSVolumeDataClassification": {
+        "category": "S",
+        "^description": "EBS Volume Data Classification: {$COUNT} of your EBS volumes lack data classification tags. Tag volumes with data classification (e.g., 'DataClassification', 'Sensitivity') for compliance and governance.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Tag Volumes with Data Classification",
+        "ref": [
+            "[Tagging EBS Resources]<https://docs.aws.amazon.com/ebs/latest/userguide/Using_Tags.html>"
+        ]
+    },
+    "EBSSnapshotFirstArchived": {
+        "category": "R",
+        "^description": "EBS Snapshot First Archived: {$COUNT} of your first snapshots in snapshot chains are archived. Avoid archiving first snapshots as they significantly impact restore time.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Avoid Archiving First Snapshots",
+        "ref": [
+            "[EBS Snapshot Archive]<https://docs.aws.amazon.com/ebs/latest/userguide/snapshot-archive.html>"
+        ]
+    },
+    "EBSSnapshotComplianceArchive": {
+        "category": "C",
+        "^description": "EBS Snapshot Compliance Archive: {$COUNT} of your old compliance snapshots are not archived. Archive old compliance snapshots to reduce storage costs while meeting retention requirements.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Archive Old Compliance Snapshots",
+        "ref": [
+            "[EBS Snapshot Archive]<https://docs.aws.amazon.com/ebs/latest/userguide/snapshot-archive.html>"
+        ]
+    },
+    "EC2EbsOptimized": {
+        "category": "P",
+        "^description": "EBS-Optimized Instances: {$COUNT} of your instances support EBS optimization but do not have it enabled. Enable EBS optimization for better I/O performance.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Enable EBS-Optimized Instances",
+        "ref": [
+            "[EBS-Optimized Instances]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-optimized.html>"
+        ]
+    },
+    "EC2RootVolumeImplications": {
+        "category": "R",
+        "^description": "Root Volume Implications: {$COUNT} of your instances have root volumes with DeleteOnTermination enabled but lack recent snapshots. Ensure root volumes have proper backup strategy.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Root Volume Backup Strategy",
+        "ref": [
+            "[EBS Root Device Volume]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/RootDeviceStorage.html>"
+        ]
+    },
+    "EBSSnapshotLatestArchived": {
+        "category": "R",
+        "^description": "EBS Snapshot Latest Archived: {$COUNT} of your volumes have their most recent snapshot archived. Keep the latest snapshot in standard tier for quick restore capability.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Keep Latest Snapshot in Standard Tier",
+        "ref": [
+            "[EBS Snapshot Archive]<https://docs.aws.amazon.com/ebs/latest/userguide/snapshot-archive.html>"
+        ]
+    },
+    "VPCMultiAZ": {
+        "category": "R",
+        "^description": "VPC Multi-AZ: {$COUNT} of your VPCs have subnets in only one availability zone. Distribute subnets across multiple AZs for high availability.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Use Multiple AZs for VPC",
+        "ref": [
+            "[VPC Subnets]<https://docs.aws.amazon.com/vpc/latest/userguide/configure-subnets.html>"
+        ]
+    },
+    "ELBMultiAZ": {
+        "category": "R",
+        "^description": "ELB Multi-AZ: {$COUNT} of your load balancers are configured with fewer than 2 availability zones. Enable multiple AZs for high availability.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Enable Multiple AZs for Load Balancers",
+        "ref": [
+            "[ELB Availability Zones]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/application-load-balancers.html#availability-zones>"
+        ]
+    },
+    "ASGMultiAZ": {
+        "category": "R",
+        "^description": "ASG Multi-AZ: {$COUNT} of your Auto Scaling Groups are configured with fewer than 2 availability zones. Distribute instances across multiple AZs for high availability.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Distribute ASG Across Multiple AZs",
+        "ref": [
+            "[ASG Availability Zones]<https://docs.aws.amazon.com/autoscaling/ec2/userguide/auto-scaling-benefits.html#arch-AutoScalingMultiAZ>"
+        ]
+    },
+    "ASGTargetTrackingPolicy": {
+        "category": "O",
+        "^description": "ASG Target Tracking Policy: {$COUNT} of your Auto Scaling Groups do not use target tracking scaling policies. Use target tracking for better scaling behavior and cost optimization.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Use Target Tracking Scaling Policies",
+        "ref": [
+            "[Target Tracking Scaling Policies]<https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-scaling-target-tracking.html>"
+        ]
+    },
+    "EC2ServiceQuotas": {
+        "category": "O",
+        "^description": "EC2 Service Quotas: {$COUNT} of your EC2 resource quotas are approaching limits (>80% utilization). Monitor and request quota increases to prevent service disruptions.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Monitor Service Quotas",
+        "ref": [
+            "[EC2 Service Quotas]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-resource-limits.html>"
+        ]
+    },
+    "ASGScalingCooldowns": {
+        "category": "O",
+        "^description": "ASG Scaling Cooldowns: {$COUNT} of your Auto Scaling Groups have very short or no scaling cooldown period. Configure appropriate cooldown periods (300+ seconds recommended) to prevent scaling thrashing.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Configure ASG Scaling Cooldowns",
+        "ref": [
+            "[Scaling Cooldowns]<https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-scaling-cooldowns.html>"
+        ]
+    },
+    "ComputeOptimizerEnhancedMetrics": {
+        "category": "CP",
+        "^description": "Compute Optimizer Enhanced Metrics: Enhanced infrastructure metrics are not enabled for Compute Optimizer. Enable enhanced metrics for better optimization recommendations with 93-day analysis period.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Enable Compute Optimizer Enhanced Metrics",
+        "ref": [
+            "[Enhanced Infrastructure Metrics]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/enhanced-infrastructure-metrics.html>"
+        ]
+    },
+    "EC2SeparateOSDataVolumes": {
+        "category": "R",
+        "^description": "Separate OS and Data Volumes: {$COUNT} of your instances have only a root volume without separate data volumes. Separate OS and data volumes for better data management and persistence.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Separate OS and Data Volumes",
+        "ref": [
+            "[EBS Best Practices]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-usage-best-practices.html>"
+        ]
+    },
+    "EC2InstanceStoreUsage": {
+        "category": "P",
+        "^description": "Instance Store Usage: {$COUNT} of your instances have instance store-capable instance types but may not be utilizing instance store volumes. Consider using instance store for temporary high-performance storage needs.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Review Instance Store Usage",
+        "ref": [
+            "[Instance Store Volumes]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/InstanceStorage.html>"
+        ]
+    },
+    "ComputeOptimizerRightsizingPrefs": {
+        "category": "CP",
+        "^description": "Compute Optimizer Rightsizing Preferences: Rightsizing recommendation preferences have not been customized. Customize preferences to get more accurate rightsizing recommendations for your workloads.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Customize Rightsizing Preferences",
+        "ref": [
+            "[Compute Optimizer Recommendation Preferences]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/rightsizing-preferences.html>"
+        ]
+    },
+    "ComputeOptimizerExportRecommendations": {
+        "category": "O",
+        "^description": "Compute Optimizer Export Recommendations: No recommendation export jobs are configured. Export recommendations to S3 for tracking and governance purposes.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Export Compute Optimizer Recommendations",
+        "ref": [
+            "[Export Recommendations]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/exporting-recommendations.html>"
+        ]
     }
 }

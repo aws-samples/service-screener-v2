@@ -1,0 +1,154 @@
+[2026-03-30 17:22:54] === Starting simulation resource creation in ap-southeast-1 ===
+[2026-03-30 17:22:54] --- Discovering default VPC and AZs ---
+[2026-03-30 17:22:55] Created DEFAULT_VPC_ID: "vpc-090fd382e4aa49a0e"
+[2026-03-30 17:22:56] Using AZs: [, "ap-southeast-1a",
+[2026-03-30 17:23:36] === Starting simulation resource creation in ap-southeast-1 ===
+[2026-03-30 17:23:36] --- Discovering default VPC and AZs ---
+[2026-03-30 17:23:37] Created DEFAULT_VPC_ID: vpc-090fd382e4aa49a0e
+[2026-03-30 17:23:38] Using AZs: ap-southeast-1a, ap-southeast-1b
+[2026-03-30 17:23:40] Created SUBNET_AZ1: subnet-04da231fd869961f8
+[2026-03-30 17:23:40] Created SUBNET_AZ2: subnet-0e864580c64df0469
+[2026-03-30 17:23:41] Created AMI_ID: ami-0edcb6af303da036a
+[2026-03-30 17:23:41] Using AMI: ami-0edcb6af303da036a
+[2026-03-30 17:23:41] --- Check 1: EBSEncryptionByDefault ---
+[2026-03-30 17:23:42] Current EBS encryption by default: False
+[2026-03-30 17:23:42] If 'False', the check will FAIL (expected for simulation).
+[2026-03-30 17:23:42] To test PASS: aws ec2 enable-ebs-encryption-by-default --region ap-southeast-1
+[2026-03-30 17:23:42] --- Check 2: EBSVolumeDataClassification ---
+[2026-03-30 17:23:43] Created VOL_NO_CLASSIFICATION: vol-0f0be44935e547aa8
+[2026-03-30 17:23:44] Created VOL_WITH_CLASSIFICATION: vol-0a0947b8083b443a9
+[2026-03-30 17:23:44] --- Check 3 & 7: EBSSnapshotFirstArchived / EBSSnapshotLatestArchived ---
+[2026-03-30 17:23:46] Created SNAP_STANDARD: snap-010d34fad232b190a
+[2026-03-30 17:23:46] Standard tier snapshot created. Both FirstArchived and LatestArchived checks will PASS.
+[2026-03-30 17:23:46] To test FAIL: archive this snapshot after 72h with:
+[2026-03-30 17:23:46]   aws ec2 modify-snapshot-tier --snapshot-id snap-010d34fad232b190a --storage-tier archive --region ap-southeast-1
+[2026-03-30 17:23:46] --- Check 4: EBSSnapshotComplianceArchive ---
+[2026-03-30 17:28:13] === Starting simulation resource creation in ap-southeast-1 ===
+[2026-03-30 17:28:13] --- Discovering default VPC and AZs ---
+[2026-03-30 17:28:14] Created DEFAULT_VPC_ID: vpc-090fd382e4aa49a0e
+[2026-03-30 17:28:14] Using AZs: ap-southeast-1a, ap-southeast-1b
+[2026-03-30 17:28:16] Created SUBNET_AZ1: subnet-04da231fd869961f8
+[2026-03-30 17:28:16] Created SUBNET_AZ2: subnet-0e864580c64df0469
+[2026-03-30 17:28:17] Created AMI_ID: ami-0edcb6af303da036a
+[2026-03-30 17:28:17] Using AMI: ami-0edcb6af303da036a
+[2026-03-30 17:28:17] --- Check 1: EBSEncryptionByDefault ---
+[2026-03-30 17:28:18] Current EBS encryption by default: False
+[2026-03-30 17:28:18] If 'False', the check will FAIL (expected for simulation).
+[2026-03-30 17:28:18] To test PASS: aws ec2 enable-ebs-encryption-by-default --region ap-southeast-1
+[2026-03-30 17:28:18] --- Check 2: EBSVolumeDataClassification ---
+[2026-03-30 17:28:19] Created VOL_NO_CLASSIFICATION: vol-037f90be529a6050a
+[2026-03-30 17:28:20] Created VOL_WITH_CLASSIFICATION: vol-0f9372250900da112
+[2026-03-30 17:28:20] --- Check 3 & 7: EBSSnapshotFirstArchived / EBSSnapshotLatestArchived ---
+[2026-03-30 17:28:22] Created SNAP_STANDARD: snap-02876129165b328ab
+[2026-03-30 17:28:22] Standard tier snapshot created. Both FirstArchived and LatestArchived checks will PASS.
+[2026-03-30 17:28:22] To test FAIL: archive this snapshot after 72h with:
+[2026-03-30 17:28:22]   aws ec2 modify-snapshot-tier --snapshot-id snap-02876129165b328ab --storage-tier archive --region ap-southeast-1
+[2026-03-30 17:28:22] --- Check 4: EBSSnapshotComplianceArchive ---
+[2026-03-30 17:30:49] === Starting simulation resource creation in ap-southeast-1 ===
+[2026-03-30 17:30:49] --- Discovering default VPC and AZs ---
+[2026-03-30 17:30:50] Created DEFAULT_VPC_ID: vpc-090fd382e4aa49a0e
+[2026-03-30 17:30:50] Using AZs: ap-southeast-1a, ap-southeast-1b
+[2026-03-30 17:30:52] Created SUBNET_AZ1: subnet-04da231fd869961f8
+[2026-03-30 17:30:52] Created SUBNET_AZ2: subnet-0e864580c64df0469
+[2026-03-30 17:30:53] Created AMI_ID: ami-0edcb6af303da036a
+[2026-03-30 17:30:53] Using AMI: ami-0edcb6af303da036a
+[2026-03-30 17:30:53] --- Check 1: EBSEncryptionByDefault ---
+[2026-03-30 17:30:54] Current EBS encryption by default: False
+[2026-03-30 17:30:54] If 'False', the check will FAIL (expected for simulation).
+[2026-03-30 17:30:54] To test PASS: aws ec2 enable-ebs-encryption-by-default --region ap-southeast-1
+[2026-03-30 17:30:54] --- Check 2: EBSVolumeDataClassification ---
+[2026-03-30 17:30:55] Created VOL_NO_CLASSIFICATION: vol-041dacddcdaab2ff4
+[2026-03-30 17:30:56] Created VOL_WITH_CLASSIFICATION: vol-0748ad3b3a7d7df1a
+[2026-03-30 17:30:56] --- Check 3 & 7: EBSSnapshotFirstArchived / EBSSnapshotLatestArchived ---
+[2026-03-30 17:30:58] Created SNAP_STANDARD: snap-09a3e77551e6a289d
+[2026-03-30 17:30:58] Standard tier snapshot created. Both FirstArchived and LatestArchived checks will PASS.
+[2026-03-30 17:30:58] To test FAIL: archive this snapshot after 72h with:
+[2026-03-30 17:30:58]   aws ec2 modify-snapshot-tier --snapshot-id snap-09a3e77551e6a289d --storage-tier archive --region ap-southeast-1
+[2026-03-30 17:30:58] --- Check 4: EBSSnapshotComplianceArchive ---
+[2026-03-30 17:31:04] Created SNAP_COMPLIANCE: snap-0324d2b34ea767553
+[2026-03-30 17:31:04] Compliance snapshot created. Will trigger FAIL after 90 days if not archived.
+[2026-03-30 17:31:04] --- Check 5: EC2EbsOptimized ---
+[2026-03-30 17:31:05] Created SG_ID: sg-033e104083d3f9b4a
+[2026-03-30 17:31:07] Created INSTANCE_NO_EBS_OPT: i-0cf61392fb6d218c1
+[2026-03-30 17:31:09] Created INSTANCE_EBS_OPT: i-0a627feaf30edb4a3
+[2026-03-30 17:31:09] --- Check 6: EC2RootVolumeImplications ---
+[2026-03-30 17:31:26] Created SNAP_ROOT_VOL: snap-02e0a935ee7aa4e25
+[2026-03-30 17:31:27] Root volume snapshot created for PASS scenario: snap-02e0a935ee7aa4e25
+[2026-03-30 17:31:27] Instance i-0cf61392fb6d218c1 will FAIL (no root vol snapshot).
+[2026-03-30 17:31:27] Instance i-0a627feaf30edb4a3 will PASS (has recent root vol snapshot).
+[2026-03-30 17:31:27] --- Check 8: VPCMultiAZ ---
+[2026-03-30 17:31:28] Created VPC_SINGLE_AZ: vpc-078ef0b2f3ba5e2d9
+[2026-03-30 17:31:29] Created SUBNET_SINGLE_AZ: subnet-00e0916bc6d34ceb3
+[2026-03-30 17:31:29] VPC vpc-078ef0b2f3ba5e2d9 with single-AZ subnet will FAIL VPCMultiAZ.
+[2026-03-30 17:31:29] Default VPC vpc-090fd382e4aa49a0e with multi-AZ subnets will PASS.
+[2026-03-30 17:31:29] --- Check 9: ELBMultiAZ ---
+[2026-03-30 17:31:31] Created ALB_MULTI_AZ: arn:aws:elasticloadbalancing:ap-southeast-1:090204645182:loadbalancer/app/ss-sim-alb-multi-az/7c6ede65af9d59ed
+[2026-03-30 17:31:32] Created NLB_SINGLE_AZ: arn:aws:elasticloadbalancing:ap-southeast-1:090204645182:loadbalancer/net/ss-sim-nlb-single-az/45fa42ac316ed64f
+[2026-03-30 17:31:32] ALB arn:aws:elasticloadbalancing:ap-southeast-1:090204645182:loadbalancer/app/ss-sim-alb-multi-az/7c6ede65af9d59ed in 2 AZs will PASS ELBMultiAZ.
+[2026-03-30 17:31:32] NLB arn:aws:elasticloadbalancing:ap-southeast-1:090204645182:loadbalancer/net/ss-sim-nlb-single-az/45fa42ac316ed64f in 1 AZ will FAIL ELBMultiAZ.
+[2026-03-30 17:31:32] --- Check 10 & 11: ASGMultiAZ / ASGTargetTrackingPolicy ---
+[2026-03-30 17:31:33] Created LAUNCH_TEMPLATE_ID: lt-09fee0a8e4baea131
+[2026-03-30 17:31:35] Created ASG_SINGLE_AZ: ss-sim-asg-single-az
+[2026-03-30 17:31:36] Created ASG_MULTI_AZ: ss-sim-asg-multi-az
+[2026-03-30 17:31:37] Target tracking policy added to ss-sim-asg-multi-az.
+[2026-03-30 17:31:37] ASG ss-sim-asg-single-az: FAIL ASGMultiAZ + FAIL ASGTargetTrackingPolicy
+[2026-03-30 17:31:37] ASG ss-sim-asg-multi-az:  PASS ASGMultiAZ + PASS ASGTargetTrackingPolicy
+[2026-03-30 17:31:37] --- Check 12: EC2ServiceQuotas ---
+[2026-03-30 17:31:37] EC2ServiceQuotas depends on actual account resource counts vs limits.
+[2026-03-30 17:31:37] Current resource counts will be evaluated against account quotas.
+[2026-03-30 17:31:37] No specific resources created for this check.
+[2026-03-30 17:31:37] --- Check 13: ASGScalingCooldowns (Tier 2) ---
+[2026-03-30 17:31:38] ASG ss-sim-asg-single-az: cooldown set to 0s → FAIL ASGScalingCooldowns
+[2026-03-30 17:31:38] ASG ss-sim-asg-multi-az: cooldown is 300s (default) → PASS ASGScalingCooldowns
+[2026-03-30 17:31:38] --- Check 14: ComputeOptimizerEnhancedMetrics (Tier 2) ---
+[2026-03-30 17:31:38] ComputeOptimizerEnhancedMetrics depends on Compute Optimizer enrollment.
+[2026-03-30 17:31:38] If Compute Optimizer is active but enhanced metrics are not enabled → FAIL.
+[2026-03-30 17:31:38] To test PASS: enable enhanced infrastructure metrics in Compute Optimizer console.
+[2026-03-30 17:31:38] --- Check 15: EC2SeparateOSDataVolumes (Tier 3) ---
+[2026-03-30 17:31:39] Created DATA_VOL_SEPARATE: vol-0a35d5e5de38ae2cc
+[2026-03-30 17:31:56] Attached data volume vol-0a35d5e5de38ae2cc to i-0a627feaf30edb4a3 → PASS EC2SeparateOSDataVolumes
+[2026-03-30 17:31:56] Instance i-0cf61392fb6d218c1 has only root volume → FAIL EC2SeparateOSDataVolumes
+[2026-03-30 17:31:56] --- Check 16: EC2InstanceStoreUsage (Tier 3) ---
+[2026-03-30 17:31:56] EC2InstanceStoreUsage requires instance types with instance store (e.g., m5d.large).
+[2026-03-30 17:31:56] t2.micro and t3.micro do not have instance store, so this check is skipped for them.
+[2026-03-30 17:31:56] To test FAIL: launch m5d.large without ephemeral volume mappings.
+[2026-03-30 17:31:56] To test PASS: launch m5d.large with ephemeral volumes mapped, or use types without instance store.
+[2026-03-30 17:31:56] --- Check 17: ComputeOptimizerRightsizingPrefs (Tier 3) ---
+[2026-03-30 17:31:56] ComputeOptimizerRightsizingPrefs depends on Compute Optimizer enrollment.
+[2026-03-30 17:31:56] If lookBackPeriod is default (DAYS_14) → FAIL.
+[2026-03-30 17:31:56] To test PASS: customize rightsizing preferences in Compute Optimizer console.
+[2026-03-30 17:31:56] --- Check 18: ComputeOptimizerExportRecommendations (Tier 3) ---
+[2026-03-30 17:31:56] ComputeOptimizerExportRecommendations depends on Compute Optimizer enrollment.
+[2026-03-30 17:31:56] If no export jobs exist → FAIL.
+[2026-03-30 17:31:56] To test PASS: configure recommendation export to S3 in Compute Optimizer console.
+[2026-03-30 17:31:56] 
+[2026-03-30 17:31:56] =============================================
+[2026-03-30 17:31:56]  Simulation Resources Created Successfully
+[2026-03-30 17:31:56] =============================================
+[2026-03-30 17:31:56] 
+[2026-03-30 17:31:56] Resource IDs saved to: /Users/kuettai/Documents/project/ssvsprowler/service-screener-v2/services/ec2/simulation/resources.env
+[2026-03-30 17:31:56] 
+[2026-03-30 17:31:56] Check Coverage Summary:
+[2026-03-30 17:31:56]   --- Tier 1 ---
+[2026-03-30 17:31:56]   1.  EBSEncryptionByDefault         - Regional setting (current: False)
+[2026-03-30 17:31:56]   2.  EBSVolumeDataClassification    - FAIL: vol-041dacddcdaab2ff4, PASS: vol-0748ad3b3a7d7df1a
+[2026-03-30 17:31:56]   3.  EBSSnapshotFirstArchived       - PASS: snap-09a3e77551e6a289d (standard tier)
+[2026-03-30 17:31:56]   4.  EBSSnapshotComplianceArchive   - Created: snap-0324d2b34ea767553 (triggers after 90d)
+[2026-03-30 17:31:56]   5.  EC2EbsOptimized                - FAIL: i-0cf61392fb6d218c1, PASS: i-0a627feaf30edb4a3
+[2026-03-30 17:31:56]   6.  EC2RootVolumeImplications      - FAIL: i-0cf61392fb6d218c1, PASS: i-0a627feaf30edb4a3
+[2026-03-30 17:31:56]   7.  EBSSnapshotLatestArchived      - PASS: snap-09a3e77551e6a289d (standard tier)
+[2026-03-30 17:31:56]   8.  VPCMultiAZ                     - FAIL: vpc-078ef0b2f3ba5e2d9, PASS: vpc-090fd382e4aa49a0e
+[2026-03-30 17:31:56]   9.  ELBMultiAZ                     - FAIL: arn:aws:elasticloadbalancing:ap-southeast-1:090204645182:loadbalancer/net/ss-sim-nlb-single-az/45fa42ac316ed64f, PASS: arn:aws:elasticloadbalancing:ap-southeast-1:090204645182:loadbalancer/app/ss-sim-alb-multi-az/7c6ede65af9d59ed
+[2026-03-30 17:31:56]   10. ASGMultiAZ                     - FAIL: ss-sim-asg-single-az, PASS: ss-sim-asg-multi-az
+[2026-03-30 17:31:56]   11. ASGTargetTrackingPolicy        - FAIL: ss-sim-asg-single-az, PASS: ss-sim-asg-multi-az
+[2026-03-30 17:31:56]   12. EC2ServiceQuotas               - Depends on account usage (no resources created)
+[2026-03-30 17:31:56]   --- Tier 2 ---
+[2026-03-30 17:31:56]   13. ASGScalingCooldowns            - FAIL: ss-sim-asg-single-az (0s), PASS: ss-sim-asg-multi-az (300s)
+[2026-03-30 17:31:56]   14. ComputeOptimizerEnhancedMetrics - Account-level setting (see instructions above)
+[2026-03-30 17:31:56]   --- Tier 3 ---
+[2026-03-30 17:31:56]   15. EC2SeparateOSDataVolumes       - FAIL: i-0cf61392fb6d218c1, PASS: i-0a627feaf30edb4a3
+[2026-03-30 17:31:56]   16. EC2InstanceStoreUsage          - Requires instance store types (see instructions above)
+[2026-03-30 17:31:56]   17. ComputeOptimizerRightsizingPrefs - Account-level setting (see instructions above)
+[2026-03-30 17:31:56]   18. ComputeOptimizerExportRecommendations - Account-level setting (see instructions above)
+[2026-03-30 17:31:56] 
+[2026-03-30 17:31:56] Run cleanup_test_resources.sh to remove all simulation resources.

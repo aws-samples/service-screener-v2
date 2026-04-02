@@ -1,16 +1,13 @@
 import boto3
 import botocore
 from packaging.version import Version
-
-from utils.Config import Config
-from utils.Tools import _pr, aws_get_latest_instance_generations
-from services.Service import Service
-from services.elasticache.drivers.ElasticacheMemcached import ElasticacheMemcached
-from services.elasticache.drivers.ElasticacheRedis import ElasticacheRedis
-from services.elasticache.drivers.ElasticacheReplicationGroup import ElasticacheReplicationGroup
 from typing import Dict, List, Set
 
-from utils.Tools import _pi
+from utils.Config import Config
+from utils.Tools import _pr, _pi, aws_get_latest_instance_generations
+from services.Service import Service
+from services.elasticache.drivers.ElasticacheRedis import ElasticacheRedis
+from services.elasticache.drivers.ElasticacheReplicationGroup import ElasticacheReplicationGroup
 
 class Elasticache(Service):
     def __init__(self, region) -> None:
@@ -39,23 +36,23 @@ class Elasticache(Service):
         except botocore.exceptions.ClientError as e:
             # print out error to console for now
             print(e)
-            
-        fArr = []    
+
+        fArr = []
         for i, detail in enumerate(arr):
             if detail['CacheClusterStatus'] == 'available':
                 fArr.append(arr[i])
 
         if not self.tags:
             return fArr
-            
+
         finalArr = []
         for i, detail in enumerate(fArr):
             tag = self.elasticacheClient.list_tags_for_resource(ResourceName=detail['ARN'])
             nTag = tag.get('TagList')
             if self.resourceHasTags(nTag):
                 finalArr.append(arr[i])
-                
-        return finalArr    
+
+        return finalArr
 
     def getEngineVersions(self) -> Dict[str, List]:
         lookup = {}
@@ -109,29 +106,72 @@ class Elasticache(Service):
 
     def getReplicationGroupInfo(self):
         results = self.elasticacheClient.describe_replication_groups()
-        
+
         arr = results.get("ReplicationGroups")
         while results.get("Marker") is not None:
             results = self.elasticacheClient.describe_replication_groups(
                 Marker=results.get("Marker")
             )
             arr = arr + results.get("ReplicationGroups")
-        
-        fArr = []    
+
+        fArr = []
         for i, detail in enumerate(arr):
             if detail['Status'] == 'available':
-                fArr.append(arr[i])    
-        
+                fArr.append(arr[i])
+
         if not self.tags:
             return fArr
-        
+
         finalArr = []
         for i, detail in enumerate(fArr):
             tag = self.elasticacheClient.list_tags_for_resource(ResourceName=detail['ARN'])
             nTag = tag.get('TagList')
             if self.resourceHasTags(nTag):
                 finalArr.append(arr[i])
-        
+
+        return finalArr
+
+    def getServerlessCacheInfo(self):
+        """
+        Get all ElastiCache Serverless caches in the region.
+        Returns only caches in 'available' status.
+        """
+        arr = []
+        try:
+            results = self.elasticacheClient.describe_serverless_caches()
+            arr = results.get("ServerlessCaches", [])
+
+            while results.get("NextToken") is not None:
+                results = self.elasticacheClient.describe_serverless_caches(
+                    NextToken=results.get("NextToken")
+                )
+                arr.extend(results.get("ServerlessCaches", []))
+        except botocore.exceptions.ClientError as e:
+            # Serverless may not be available in all regions or accounts
+            print(f"Unable to describe serverless caches: {e}")
+            return []
+
+        # Filter for available caches
+        fArr = []
+        for detail in arr:
+            if detail.get('Status') == 'available':
+                fArr.append(detail)
+
+        if not self.tags:
+            return fArr
+
+        # Filter by tags if specified
+        finalArr = []
+        for detail in fArr:
+            try:
+                tag = self.elasticacheClient.list_tags_for_resource(ResourceName=detail['ARN'])
+                nTag = tag.get('TagList')
+                if self.resourceHasTags(nTag):
+                    finalArr.append(detail)
+            except Exception:
+                # Skip if tags cannot be retrieved
+                pass
+
         return finalArr
 
     ## NOT IN USED
@@ -169,14 +209,23 @@ class Elasticache(Service):
 
     def advise(self):
         objs = {}
-        
+
         repGroups = self.getReplicationGroupInfo()
         for group in repGroups:
             _pi("ElastiCache::ReplicationGroup", group.get('ReplicationGroupId'))
             obj = ElasticacheReplicationGroup(group, self.elasticacheClient)
             obj.run(self.__class__)
             objs[f"ElastiCache::{group.get('ReplicationGroupId')}"] = obj.getInfo()
-        
+
+        # Process serverless caches
+        from services.elasticache.drivers.ElasticacheServerless import ElasticacheServerless
+        serverlessCaches = self.getServerlessCacheInfo()
+        for cache in serverlessCaches:
+            _pi("ElastiCache::Serverless", cache.get('ServerlessCacheName'))
+            obj = ElasticacheServerless(cache, self.elasticacheClient)
+            obj.run(self.__class__)
+            objs[f"ElastiCache::Serverless::{cache.get('ServerlessCacheName')}"] = obj.getInfo()
+
         self.cluster_info = self.getECClusterInfo()
 
         # loop through EC nodes
@@ -214,7 +263,4 @@ class Elasticache(Service):
 if __name__ == "__main__":
     Config.init()
     o = Elasticache('us-east-1')
-    # _pr(o.getAllInstanceOfferings())
-    # out = o.advise()
     out = o.getReplicationGroupInfo()
-    # _pr(out)

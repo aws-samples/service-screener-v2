@@ -1,0 +1,188 @@
+# RDS Service Review - Comprehensive Simulation Scripts
+
+Scripts to create AWS resources that trigger the majority of RDS service review checks.
+
+## Quick Start
+
+```bash
+# Create all test resources
+./create_test_resources.sh --region us-east-1
+
+# Run Service Screener
+cd ../../..
+python screener.py --regions us-east-1 --services rds
+
+# Clean up
+cd services/rds/simulation
+./cleanup_test_resources.sh created_resources_YYYYMMDD-HHMMSS.txt --region us-east-1
+```
+
+## Resources Created
+
+| # | Resource | Purpose |
+|---|----------|---------|
+| 1 | Security Group (public CIDRs) | Triggers `SecurityGroupIPRangeNotPrivateCidr` |
+| 2 | DB Subnet Group (2 AZs) | Triggers `Subnets3Az` |
+| 3 | MySQL Parameter Group | Suboptimal params for MySQL checks |
+| 4 | PostgreSQL Parameter Group | Suboptimal params for PG checks |
+| 5 | MySQL RDS Instance (db.t3.micro) | Triggers ~25 checks |
+| 6 | PostgreSQL RDS Instance (db.t3.micro) | Triggers ~25 checks |
+| 7 | SNS Topic | For optional event subscription testing |
+| 8 | (No event subscription) | Triggers `EventSubscriptionNotConfigured` |
+
+## Check Coverage Matrix
+
+### MySQL Instance Checks
+
+| Check | How Triggered | Category |
+|-------|---------------|----------|
+| `MultiAZ` | `--no-multi-az` | Reliability |
+| `Backup` | `--backup-retention-period 0` | Reliability |
+| `AutoMinorVersionUpgrade` | `--no-auto-minor-version-upgrade` | Operations |
+| `StorageEncrypted` | No `--storage-encrypted` flag | Security |
+| `PerformanceInsightsEnabled` | Not enabled | Performance |
+| `EnhancedMonitor` | `--monitoring-interval 0` | Operations |
+| `MonitoringIntervalTooLow` | `--monitoring-interval 0` | Operations |
+| `DeleteProtection` | `--no-deletion-protection` | Operations |
+| `PubliclyAccessible` | `--publicly-accessible` | Security |
+| `BurstableInstance` | `db.t3.micro` instance class | Performance |
+| `DefaultMasterAdmin` | `--master-username admin` | Security |
+| `EnableStorageAutoscaling` | No `--max-allocated-storage` | Reliability |
+| `Subnets3Az` | 2-AZ subnet group | Reliability |
+| `ConsiderAurora` | Non-Aurora MySQL engine | Transformation |
+| `MoveToGraviton` | Non-Graviton t3 instance | Cost/Perf |
+| `DBInstanceWithoutTags` | No tags on instance | Cost |
+| `SecurityGroupIPRangeNotPrivateCidr` | Public CIDR in SG | Security |
+| `MYSQL__param_syncBinLog` | `sync_binlog=0` | Reliability |
+| `MYSQL__param_innodbFlushTrxCommit` | `innodb_flush_log_at_trx_commit=0` | Reliability |
+| `MYSQL__PerfSchema` | `performance_schema=0` | Operations/Perf |
+| `MYSQL__parammAutoCommit` | `autocommit=0` | Reliability |
+| `MYSQL__parammInnodbStatsPersistent` | `innodb_stats_persistent=0` | Performance |
+| `MYSQL__LogsGeneral` | `general_log=1` | Perf/Cost |
+| `MYSQL__innodb_change_buffering` | `innodb_change_buffering=inserts` | Performance |
+| `MYSQL__innodb_open_files` | `innodb_open_files=50` (< 65) | Performance |
+
+### PostgreSQL Instance Checks
+
+| Check | How Triggered | Category |
+|-------|---------------|----------|
+| `MultiAZ` | `--no-multi-az` | Reliability |
+| `BackupTooLow` | `--backup-retention-period 3` (< 7) | Reliability |
+| `AutoMinorVersionUpgrade` | `--no-auto-minor-version-upgrade` | Operations |
+| `StorageEncrypted` | No `--storage-encrypted` flag | Security |
+| `PerformanceInsightsEnabled` | Not enabled | Performance |
+| `EnhancedMonitor` | `--monitoring-interval 0` | Operations |
+| `MonitoringIntervalTooLow` | `--monitoring-interval 0` | Operations |
+| `DeleteProtection` | `--no-deletion-protection` | Operations |
+| `DefaultMasterAdmin` | `--master-username postgres` | Security |
+| `EnableStorageAutoscaling` | No `--max-allocated-storage` | Reliability |
+| `Subnets3Az` | 2-AZ subnet group | Reliability |
+| `ConsiderAurora` | Non-Aurora PG engine | Transformation |
+| `MoveToGraviton` | Non-Graviton t3 instance | Cost/Perf |
+| `BurstableInstance` | `db.t3.micro` instance class | Performance |
+| `SecurityGroupIPRangeNotPrivateCidr` | Public CIDR in SG | Security |
+| `MSSQLorPG__TransportEncrpytionDisabled` | `rds.force_ssl=0` | Security |
+| `PG__param_idleTransTimeout` | `idle_in_transaction_session_timeout=0` | Performance |
+| `PG__param_statementTimeout` | `statement_timeout=0` | Performance |
+| `PG__param_logTempFiles` | `log_temp_files=-1` | Operations |
+| `PG__param_tempFileLimit` | `temp_file_limit=-1` | Performance |
+| `PG__param_rdsAutoVacuumLevel` | `rds.force_autovacuum_logging_level=disabled` | Operations |
+| `PG__param_autoVacDuration` | `log_autovacuum_min_duration=-1` | Operations |
+| `PG__param_trackIoTime` | `track_io_timing=0` | Perf/Operations |
+| `PG__param_logStatement` | `log_statement=all` | Performance |
+| `PG__param_synchronousCommit` | `synchronous_commit=off` | Performance |
+
+### Account/Region-Level Checks
+
+| Check | How Triggered |
+|-------|---------------|
+| `EventSubscriptionNotConfigured` | No event subscription created |
+| `RDSRecommendationsActive` | Recommendations generated by AWS over time (not immediate) |
+| `SecurityGroupDefault` | If default SG is associated with any RDS instance |
+
+### Checks NOT Covered (require special conditions)
+
+| Check | Reason Not Covered |
+|-------|-------------------|
+| `FreeStorage20pct` | Requires days of CloudWatch metric data |
+| `FreeMemoryLessThan10pct` | Requires days of CloudWatch metric data |
+| `FreeMemoryDropMT50pctIn24hours` | Requires 24h of CloudWatch data |
+| `RightSizingCpuMonthMaxLT50pct` | Requires 30 days of CloudWatch data |
+| `RightSizingCpuLowUsageDetected` | Requires 30 days of CloudWatch data |
+| `RightSizingCpuLowUsageDetectedWithWeeklySpike` | Requires 30 days of CloudWatch data |
+| `RightSizingMemoryMonthMinMT60pct` | Requires 30 days of CloudWatch data |
+| `RdsIsIdle7days` | Requires 7 days with no connections |
+| `AuroraStorageType*` | Requires Aurora cluster with IO data |
+| `Aurora__ClusterSize` | Requires Aurora cluster |
+| `AuroraStorage64TBLimit` | Requires specific Aurora version |
+| `MSSQL__*` (all) | Requires MSSQL license (expensive) |
+| `MYSQLA__*` (Aurora MySQL) | Requires Aurora MySQL cluster |
+| `EngineVersionMajor/Minor` | Depends on available upgrades at time of test |
+| `LatestInstanceGeneration` | Depends on available instance types |
+| `ManualSnapshotTooOld` | Requires 180+ day old manual snapshot |
+| `ManualSnapshotTooMany` | Requires 5+ manual snapshots |
+| `CACertExpiringIn365days` | Depends on certificate state |
+| `CrossRegionBackupNotEnabled` | Requires cross-region setup |
+| `SnapshotRDSIsPublic` | Security risk to create public snapshots |
+| `Secret__NoRotation` | Requires Secrets Manager secret |
+| `Secret__NotUsed7days` | Requires Secrets Manager + CloudTrail data |
+| `DBwithoutSecretManager` | Account-level ratio check |
+| `DBwithSomeSecretsManagerOnly` | Account-level ratio check |
+| `DefaultParams` | Both instances use custom param groups (intentional) |
+| `ConsiderOpenSource` | Only triggers for MSSQL engine |
+| `DeleteProtectionCluster` | Requires Aurora cluster |
+| `MYSQL__LogsErrorEnable` | Requires specific CloudWatch log export config |
+| `MYSQL__paramQueryCacheType` | Query cache removed in MySQL 8.0 |
+| `PG__param_autovacuum` | Default is ON; setting OFF is dangerous |
+| `PG__param_trackActivities` | Default is ON |
+| `PG__param_trackCounts` | Default is ON |
+| `PG__param_enable_indexonlyscan` | Default is ON |
+| `PG__param_enable_indexscan` | Default is ON |
+| `MSSQL_EditionIsWebOrExpress` | Requires MSSQL engine |
+
+## Prerequisites
+
+### AWS Permissions
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "rds:CreateDBInstance", "rds:DeleteDBInstance", "rds:ModifyDBInstance",
+        "rds:DescribeDBInstances",
+        "rds:CreateDBParameterGroup", "rds:DeleteDBParameterGroup",
+        "rds:ModifyDBParameterGroup",
+        "rds:CreateDBSubnetGroup", "rds:DeleteDBSubnetGroup",
+        "rds:CreateEventSubscription", "rds:DeleteEventSubscription",
+        "rds:DescribeEventSubscriptions",
+        "rds:AddTagsToResource",
+        "ec2:CreateSecurityGroup", "ec2:DeleteSecurityGroup",
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:DescribeVpcs", "ec2:DescribeSubnets", "ec2:DescribeSecurityGroups",
+        "sns:CreateTopic", "sns:DeleteTopic", "sns:TagResource"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+## Cost Estimate
+
+- 2x RDS db.t3.micro instances: ~$0.034/hour
+- SNS topic: Free
+- Other resources: Free
+- **Total: ~$0.034/hour (~$0.82/day)**
+
+Clean up immediately after validation to minimize costs.
+
+## Troubleshooting
+
+- **VPC not found**: Use `--vpc-id` to specify a VPC explicitly
+- **Subnet group creation fails**: Ensure VPC has subnets in at least 2 AZs
+- **Parameter group modification fails**: Some parameters require `pending-reboot` apply method
+- **Instance creation fails**: Check RDS instance limits for your account
+- **Cleanup fails on instances**: Wait for instances to reach `available` state first

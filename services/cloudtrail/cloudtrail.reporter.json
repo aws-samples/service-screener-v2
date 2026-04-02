@@ -238,5 +238,89 @@
     "ref": [
       "[Stop/Start Logging]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-turning-off-logging.html>"
     ]
+  },
+  "GuardDutyIntegration": {
+    "category": "S",
+    "^description": "Amazon GuardDuty is a threat detection service that continuously monitors for malicious activity and unauthorized behavior leveraging CloudTrail logs. GuardDuty analyzes CloudTrail management and data events to identify suspicious API calls, unusual network traffic patterns, and potential security threats.<br><br>Enabling GuardDuty provides:<br>- Automated threat detection and anomaly monitoring<br>- Identification of suspicious API activity and unauthorized access attempts<br>- Real-time security alerts for potential compromises<br>- Integration with AWS Security Hub for centralized security management<br><br>Without GuardDuty, you must manually analyze CloudTrail logs for security threats, which is time-consuming and may miss sophisticated attacks.",
+    "shortDesc": "Enable GuardDuty for threat detection",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "ref": [
+      "[GuardDuty Best Practices]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_best-practices.html>",
+      "[Getting Started with GuardDuty]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_settingup.html>"
+    ]
+  },
+  "SecurityHubIntegration": {
+    "category": "S",
+    "^description": "AWS Security Hub provides a comprehensive view of your security posture across AWS accounts and automates security checks including CloudTrail configuration validation. Security Hub aggregates, organizes, and prioritizes security findings from multiple AWS services including GuardDuty, Inspector, and Macie.<br><br>Enabling Security Hub provides:<br>- Centralized security findings and compliance monitoring<br>- Automated CloudTrail security control validation<br>- Integration with AWS security standards (CIS AWS Foundations Benchmark, PCI-DSS, AWS Foundational Security Best Practices)<br>- Continuous compliance monitoring and reporting<br><br>Without Security Hub, you must manually validate CloudTrail configurations against security standards and track compliance across multiple accounts.",
+    "shortDesc": "Enable Security Hub for centralized security monitoring",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "ref": [
+      "[Security Hub User Guide]<https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub.html>",
+      "[Enabling Security Hub]<https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-settingup.html>"
+    ]
+  },
+  "IAMFullAccessRestriction": {
+    "category": "S",
+    "^description": "IAM principals with the AWSCloudTrail_FullAccess managed policy have unrestricted permissions to create, update, delete, and stop CloudTrail trails. This violates the principle of least privilege and creates security risks:<br>- Unauthorized users could disable logging to hide malicious activity<br>- Trails could be deleted, causing permanent loss of audit logs<br>- Trail configurations could be modified to exclude critical events<br>- KMS encryption could be disabled, exposing sensitive log data<br><br>Best practices recommend:<br>- Limit CloudTrail full access to a small number of security administrators<br>- Use custom IAM policies with specific permissions instead of AWSCloudTrail_FullAccess<br>- Implement SCPs (Service Control Policies) to prevent trail deletion<br>- Enable CloudTrail log file validation to detect tampering<br><br>This check identifies IAM users and roles with AWSCloudTrail_FullAccess attached, helping you implement least privilege access controls.",
+    "shortDesc": "Restrict IAM principals with CloudTrail full access",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": [
+      "[CloudTrail Security Best Practices]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/best-practices-security.html>",
+      "[IAM Best Practices]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+    ]
+  },
+  "KMSPolicySourceArn": {
+    "category": "S",
+    "^description": "KMS key policies for CloudTrail encryption should include the aws:SourceArn condition to ensure the key can only be used by specific CloudTrail trails. Without this condition, any service or principal with kms:Decrypt or kms:GenerateDataKey permissions could potentially use the key, creating security risks:<br>- Unauthorized trails could use the same encryption key<br>- Cross-account access could be granted unintentionally<br>- Key usage cannot be audited per trail<br>- Compliance requirements for key isolation may be violated<br><br>Recommended KMS key policy condition:<br><code>{<br>  \"Condition\": {<br>    \"StringEquals\": {<br>      \"aws:SourceArn\": \"arn:aws:cloudtrail:region:account-id:trail/trail-name\"<br>    }<br>  }<br>}</code><br><br>This ensures the KMS key is only used by the specified CloudTrail trail, preventing unauthorized encryption/decryption operations.",
+    "shortDesc": "Validate KMS key policy includes aws:SourceArn condition",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": [
+      "[CloudTrail KMS Encryption]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/encrypting-cloudtrail-log-files-with-aws-kms.html>",
+      "[KMS Key Policies]<https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html>"
+    ]
+  },
+  "OrganizationTrailEnabled": {
+    "category": "O",
+    "^description": "Organization trails enable centralized CloudTrail logging across all accounts in an AWS Organization. When you create an organization trail in the management account, it automatically logs events for all member accounts, providing:<br>- Centralized audit logging across the entire organization<br>- Simplified compliance and security monitoring<br>- Prevention of logging gaps in member accounts<br>- Reduced operational overhead (single trail configuration)<br>- Immutable logging (member accounts cannot disable organization trails)<br><br>Without organization trails:<br>- Each account must configure its own trails (operational overhead)<br>- Member accounts can disable or delete trails (security risk)<br>- Audit logs are scattered across multiple accounts<br>- Compliance validation is more complex<br><br>This check validates that organization trails are configured when AWS Organizations is in use, ensuring comprehensive multi-account logging coverage.",
+    "shortDesc": "Enable organization trail for multi-account logging",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "ref": [
+      "[Creating Organization Trails]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/creating-trail-organization.html>",
+      "[CloudTrail Best Practices]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/best-practices-security.html>"
+    ]
+  },
+  "CloudWatchAlarmsConfigured": {
+    "category": "S",
+    "^description": "CloudWatch metric filters and alarms enable real-time monitoring and alerting for critical security events in CloudTrail logs. The CIS AWS Foundations Benchmark recommends configuring alarms for security-sensitive events such as:<br>- Unauthorized API calls<br>- Console sign-in failures<br>- IAM policy changes<br>- CloudTrail configuration changes<br>- S3 bucket policy changes<br>- Security group changes<br>- Network ACL changes<br>- Root account usage<br>- KMS key deletion or disabling<br><br>Without CloudWatch alarms:<br>- Security events are only discovered during manual log review<br>- Incident response is delayed (hours or days instead of minutes)<br>- Compliance requirements for real-time monitoring may not be met<br>- Attackers have more time to cause damage before detection<br><br>This check validates that CloudWatch Logs integration is configured and that metric filters with alarms exist for critical security events, enabling proactive security monitoring and rapid incident response.",
+    "shortDesc": "Configure CloudWatch alarms for security events",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 1,
+    "needFullTest": 0,
+    "ref": [
+      "[CloudWatch Alarms for CloudTrail]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudwatch-alarms-for-cloudtrail.html>",
+      "[CIS AWS Foundations Benchmark]<https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cis-controls.html>"
+    ]
   }
 }

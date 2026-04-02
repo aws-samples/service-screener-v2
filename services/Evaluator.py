@@ -17,11 +17,13 @@ def runSingleCheck(tmp_obj, method_name):
     try:
         startTime = time.time()
         getattr(obj, method_name)()
+        timeSpent = round(time.time() - startTime, 3)
         if debugFlag:
-            timeSpent = round(time.time() - startTime, 3)
             print('--- --- fn: ' + method_name)
             if timeSpent >= 0.2:
                 _warn("Long running checks {}s".format(timeSpent))
+        elif timeSpent >= 3:
+            _warn("[Slow] {} took {}s".format(method_name, timeSpent))
 
         return 'OK'
     except botocore.exceptions.ClientError as e:
@@ -85,18 +87,12 @@ class Evaluator():
 
         cnt = len(filteredMethods)
 
-        isBeta = Config.get('beta', False)
-        if isBeta:
-            with cf.ThreadPoolExecutor() as executor:
-                futures = [executor.submit(runSingleCheck, self, method) for method in filteredMethods]
-                
-                for future in cf.as_completed(futures):
-                    if future.result() == 'OK':
-                        continue
-                    else:
-                        emsg.append(future.result())
-                        ecnt += 1
-        else:
+        # Use concurrent execution by default for better performance
+        # Fall back to sequential if explicitly requested via --sequential flag
+        use_sequential = Config.get('sequential', False)
+        
+        if use_sequential:
+            # Sequential execution (for debugging or compatibility)
             for method in methods:
                 if not rules or str.lower(method[6:]) in rules:
                     try:
@@ -121,6 +117,17 @@ class Evaluator():
                         ecnt += 1
                         print(traceback.format_exc())
                         emsg.append(traceback.format_exc())
+        else:
+            # Concurrent execution (default for better performance)
+            with cf.ThreadPoolExecutor() as executor:
+                futures = [executor.submit(runSingleCheck, self, method) for method in filteredMethods]
+                
+                for future in cf.as_completed(futures):
+                    if future.result() == 'OK':
+                        continue
+                    else:
+                        emsg.append(future.result())
+                        ecnt += 1
             
         if emsg:
             with open(_C.FORK_DIR + '/error.txt', 'a+') as f:
@@ -151,32 +158,46 @@ class Evaluator():
     
     ## Enhancement 20240117 - Capture all scanned resources    
     def __del__(self):
-        driver = type(self).__name__.lower()
-        classPrefix = Config.getDriversClassPrefix(driver)
-        
-        ConfigKey = 'AllScannedResources.' + classPrefix
-        scanned = Config.get(ConfigKey, [])
-        
-        # print(classPrefix, Config.get(classPrefix))
-        
-        hasError = '1'
-        for check, find in self.results.items():
-            if find[0] == -1:
-                hasError = '-1'
-                break
-        
-        name = ""
-        if hasattr(self, '_resourceName'):
-            name = self._resourceName
-        else:
-            _warn("driver: '{}' need to set self._resourceName".format(driver))
+        try:
+            driver = type(self).__name__.lower()
+            classPrefix = Config.getDriversClassPrefix(driver)
+            
+            ConfigKey = 'AllScannedResources.' + classPrefix
+            scanned = Config.get(ConfigKey, [])
+            
+            # print(classPrefix, Config.get(classPrefix))
+            
+            hasError = '1'
+            for check, find in self.results.items():
+                if find[0] == -1:
+                    hasError = '-1'
+                    break
+            
+            name = ""
+            if hasattr(self, '_resourceName'):
+                name = self._resourceName
+            else:
+                _warn("driver: '{}' need to set self._resourceName".format(driver))
 
-        scanned.append(';'.join([Config.get(classPrefix, ""), driver or "", name or "", hasError or ""]))
-        Config.set(ConfigKey, scanned)
+            # Ensure all values are strings and handle None values
+            config_value = Config.get(classPrefix, "") or ""
+            driver_value = driver or ""
+            name_value = name or ""
+            error_value = hasError or ""
             
-            
-        ## Handle custom page requirement
-        cp = CustomPage()
+            # Join with proper string values
+            scanned.append(';'.join([config_value, driver_value, name_value, error_value]))
+            Config.set(ConfigKey, scanned)
+                
+            ## Handle custom page requirement
+            cp = CustomPage()
+        except Exception as e:
+            # Prevent destructor errors from propagating
+            try:
+                _warn(f"Error in Evaluator destructor for {type(self).__name__}: {str(e)}")
+            except:
+                # If even logging fails, silently ignore to prevent cascade errors
+                pass
         
         emsg = []
         try:

@@ -11,6 +11,8 @@ adminlte/aws/**/error.txt
 suppressions.json
 .~c9_invoke*
 pyvenv.cfg
+.cache/
+logs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -77,3 +79,4 @@ ENV/
 env.bak/
 venv.bak/
 >>>>>>> 533bf7053abb2c4935e28536b76d2a14435ef1fd
+.kiro/

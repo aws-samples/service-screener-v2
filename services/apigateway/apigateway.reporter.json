@@ -129,5 +129,271 @@
         "ref":[
             "[Setting up a stage using the API Gateway console]<https://docs.aws.amazon.com/apigateway/latest/developerguide/stages.html>"
         ]
+    },
+    "ResourcePolicy": {
+        "category": "S",
+        "^description": "API Gateway REST APIs should have resource policies configured for access control. Resource policies allow you to control who can invoke your API based on IP addresses, VPC endpoints, AWS accounts, or other conditions. This provides an additional layer of security beyond IAM and authorization.",
+        "shortDesc": "Configure resource policies for access control",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Control and manage access to REST APIs in API Gateway]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html>",
+            "[API Gateway resource policies]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-resource-policies.html>"
+        ]
+    },
+    "IAMAuthentication": {
+        "category": "S",
+        "^description": "API Gateway methods should use proper authentication instead of NONE authorization. Methods with NONE authorization allow unauthenticated access, which poses a security risk. Use IAM authentication, Lambda authorizers, or Cognito user pools to control access to your API methods.",
+        "shortDesc": "Use IAM or other authentication for API methods",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Control and manage access to REST APIs in API Gateway]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html>",
+            "[Use IAM authorization]<https://docs.aws.amazon.com/apigateway/latest/developerguide/permissions.html>"
+        ]
+    },
+    "RequestThrottling": {
+        "category": "S",
+        "^description": "API Gateway stages should have throttling limits configured to protect from traffic spikes and prevent backend system overload. Throttling helps improve overall throughput and stability by setting rate and burst limits at the stage or method level.",
+        "shortDesc": "Configure request throttling limits",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Throttle requests to your REST APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-request-throttling.html>",
+            "[Protect your REST APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/rest-api-protect.html>"
+        ]
+    },
+    "PrivateAPI": {
+        "category": "S",
+        "^description": "Private APIs should be properly configured with VPC endpoints for secure access. Private APIs are accessible only from within your VPC using interface VPC endpoints, isolating traffic from the public internet. Ensure private APIs have VPC endpoint IDs configured.",
+        "shortDesc": "Configure private APIs with VPC endpoints",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Private REST APIs in API Gateway]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-private-apis.html>",
+            "[Create a private API]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-private-api-create.html>"
+        ]
+    },
+    "LambdaAuthorizer": {
+        "category": "S",
+        "^description": "Lambda authorizers enable custom authorization logic for API Gateway. They support bearer token authentication and request parameter-based authorization decisions. Verify that Lambda authorizers are properly configured and used by API methods when custom authorization is needed.",
+        "shortDesc": "Configure Lambda authorizers for custom authorization",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Use API Gateway Lambda authorizers]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-use-lambda-authorizer.html>",
+            "[Control and manage access to REST APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html>"
+        ]
+    },
+    "CognitoAuthorizer": {
+        "category": "S",
+        "^description": "Amazon Cognito user pools provide authentication for API Gateway. They enable you to create customizable authentication solutions and control who can invoke API methods. Verify that Cognito authorizers are properly configured when user authentication is required.",
+        "shortDesc": "Configure Cognito user pools for authentication",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Control access to REST APIs using Amazon Cognito user pools]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-integrate-with-cognito.html>",
+            "[Control and manage access to REST APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html>"
+        ]
+    },
+    "MutualTLS": {
+        "category": "S",
+        "^description": "Mutual TLS authentication provides two-way authentication between clients and API Gateway. It verifies client certificates to enhance security for sensitive APIs. Enable mutual TLS for custom domains to ensure both client and server authentication.",
+        "shortDesc": "Enable mutual TLS for custom domains",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Configure mutual TLS authentication for REST APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/rest-api-mutual-tls.html>",
+            "[Protect your REST APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/rest-api-protect.html>"
+        ]
+    },
+    "UsagePlanThrottling": {
+        "category": "C",
+        "^description": "Usage plans should have throttling and quota limits configured to track and limit API usage per API key. Set appropriate rate limits, burst limits, and quota limits to manage API consumption and prevent abuse. Note that usage plan quotas are best-effort and not hard limits.",
+        "shortDesc": "Configure throttling and quotas in usage plans",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Usage plans and API keys for REST APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-api-usage-plans.html>",
+            "[Create and use usage plans]<https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-create-usage-plans.html>"
+        ]
+    },
+    "VPCEndpointAssociation": {
+        "category": "S",
+        "^description": "Private APIs must be associated with VPC endpoints to enable secure access from within your VPC. Verify that private APIs have VPC endpoint IDs configured and that the endpoints exist. This ensures proper network isolation and secure connectivity.",
+        "shortDesc": "Associate private APIs with VPC endpoints",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Private REST APIs in API Gateway]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-private-apis.html>",
+            "[Interface VPC endpoints for API Gateway]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-private-api-test-invoke-url.html>"
+        ]
+    },
+    "RequestValidation": {
+        "category": "S",
+        "^description": "Request validators should be configured to validate request parameters and body before passing requests to backend integrations. This reduces invalid requests reaching your backend, improves API security and reliability, and provides clear error messages for validation failures.",
+        "shortDesc": "Configure request validators",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Enable request validation in API Gateway]<https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-method-request-validation.html>",
+            "[Set up request validators]<https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-request-validation-set-up.html>"
+        ]
+    },
+    "LeastPrivilegeAccess": {
+        "category": "S",
+        "^description": "API Gateway should have appropriate access controls configured including resource policies and proper authorization. Verify that resource policies exist, authorization types are not NONE, and at least one authorizer is configured. This ensures comprehensive access control across multiple layers.",
+        "shortDesc": "Verify comprehensive access controls",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Control and manage access to REST APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html>",
+            "[API Gateway resource policies]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-resource-policies.html>"
+        ]
+    },
+    "CloudWatchAlarms": {
+        "category": "O",
+        "^description": "CloudWatch alarms should be configured for key API Gateway metrics including 4XXError, 5XXError, Latency, and Count. Alarms enable proactive monitoring and rapid response to API issues. Verify that alarms exist for critical metrics and have appropriate actions configured.",
+        "shortDesc": "Configure CloudWatch alarms for API metrics",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Monitor REST APIs with CloudWatch metrics]<https://docs.aws.amazon.com/apigateway/latest/developerguide/monitoring-cloudwatch.html>",
+            "[Using Amazon CloudWatch alarms]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html>"
+        ]
+    },
+    "APIKeyAntiPattern": {
+        "category": "S",
+        "^description": "API keys should not be used as the sole authentication mechanism. API keys are intended for usage tracking and rate limiting, not authentication. Methods that require API keys should also have proper authorization configured (IAM, Lambda authorizer, or Cognito). Flag methods that rely only on API keys.",
+        "shortDesc": "Avoid using API keys for authentication",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[API keys in API Gateway]<https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-api-key-source.html>",
+            "[Control and manage access to REST APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-control-access-to-api.html>"
+        ]
+    },
+    "VPCAccessRestrictions": {
+        "category": "S",
+        "^description": "Private APIs should have resource policies with VPC-specific conditions to restrict access. Verify that resource policies include aws:SourceVpc or aws:SourceVpce conditions to ensure only authorized VPCs can access the API. This provides network-level isolation for private APIs.",
+        "shortDesc": "Configure VPC access restrictions for private APIs",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Private REST APIs in API Gateway]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-private-apis.html>",
+            "[API Gateway resource policy examples]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-resource-policies-examples.html>"
+        ]
+    },
+    "PerformanceMonitoring": {
+        "category": "O",
+        "^description": "CloudWatch dashboards and alarms should be configured for API performance monitoring. Verify that dashboards exist for visualizing API metrics and that performance-related alarms are configured. This enables proactive performance management and rapid issue detection.",
+        "shortDesc": "Configure performance monitoring dashboards",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Monitor REST APIs with CloudWatch metrics]<https://docs.aws.amazon.com/apigateway/latest/developerguide/monitoring-cloudwatch.html>",
+            "[Using Amazon CloudWatch dashboards]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Dashboards.html>"
+        ]
+    },
+    "CanaryDeployment": {
+        "category": "R",
+        "^description": "Canary deployments enable gradual rollout of API changes by routing a percentage of traffic to new versions. This reduces risk by allowing validation with production traffic before full deployment. Verify that canary settings are configured for production stages.",
+        "shortDesc": "Configure canary deployments for gradual rollouts",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Set up canary deployments]<https://docs.aws.amazon.com/apigateway/latest/developerguide/canary-release.html>",
+            "[Create a canary release deployment]<https://docs.aws.amazon.com/apigateway/latest/developerguide/create-canary-deployment.html>"
+        ]
+    },
+    "StageVariables": {
+        "category": "O",
+        "^description": "Stage variables enable environment-specific configuration without code changes. They can be used to specify backend endpoints, Lambda function versions, or other environment-specific values. Using stage variables improves deployment flexibility and reduces configuration errors.",
+        "shortDesc": "Use stage variables for environment configuration",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Set up stage variables]<https://docs.aws.amazon.com/apigateway/latest/developerguide/stage-variables.html>",
+            "[Use stage variables]<https://docs.aws.amazon.com/apigateway/latest/developerguide/aws-api-gateway-stage-variables-reference.html>"
+        ]
+    },
+    "StageLifecycle": {
+        "category": "O",
+        "^description": "Proper stage lifecycle management includes maintaining multiple stages (dev, test, prod) with appropriate naming conventions and configurations. Multiple stages enable safe testing and gradual promotion of changes. Verify that APIs follow stage management best practices.",
+        "shortDesc": "Implement proper stage lifecycle management",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Setting up a stage]<https://docs.aws.amazon.com/apigateway/latest/developerguide/stages.html>",
+            "[Deploy REST APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/how-to-deploy-api.html>"
+        ]
+    },
+    "CORSConfiguration": {
+        "category": "S",
+        "^description": "CORS (Cross-Origin Resource Sharing) configuration is required for APIs accessed from web browsers on different domains. Proper CORS configuration prevents security issues while enabling legitimate cross-origin requests. Verify that CORS is configured when needed for browser-based clients.",
+        "shortDesc": "Configure CORS for cross-domain requests",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Enable CORS for REST APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/how-to-cors.html>",
+            "[Configuring CORS for HTTP APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-cors.html>"
+        ]
     }
 }

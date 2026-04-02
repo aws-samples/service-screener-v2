@@ -6,6 +6,30 @@ An open source guidance tool for the AWS environment. Click [here](https://d3si6
 
 This version of Service Screener may not compatible with the Greater China region. Our community folks have made it work [here](https://github.com/lijh-aws-tools/service-screener-cn). 
 
+## 🎉 NEW: Enhanced Beta Features (v2.5.0-beta)
+
+**Enable beta features with `--beta 1`!**
+
+### Latest Beta Features:
+- **🆕 AWS Cloudscape Design System UI**: Modern React-based interface
+  - Self-contained single HTML file (~2.7MB with embedded React and data)
+  - Enhanced GuardDuty reporting with interactive charts
+  - Cross-service findings aggregation with advanced filtering
+  - Interactive modernization recommendations (Sankey diagrams)
+  - Trusted Advisor integration with pillar-based organization
+  - Framework compliance reporting with visualizations
+  - Built on AWS Cloudscape Design System (designed for accessibility)
+  - Mobile responsive design
+
+- **🔧 API Buttons**: Interactive API call functionality in service pages
+
+### Standard Features (Always Enabled):
+- **⚡ Concurrent Mode**: Parallel check execution for better performance (use `--sequential` to disable)
+- **📊 Enhanced TA Data**: Advanced Trusted Advisor data generation
+- **🔍 Comprehensive Scanning**: All AWS services with Well-Architected best practices
+
+Enable beta features with: `--beta 1` (legacy AdminLTE remains default for backward compatibility)
+
 ## Overview
 Service Screener is a tool that runs automated checks on AWS environments and provides recommendations based on AWS and community best practices. 
 
@@ -30,34 +54,60 @@ Running this tool is free as it is covered under the AWS Free Tier. If you have 
 4. (Optional) If you need to run cross-account operations, additional permissions are required:
    - iam:SetSecurityTokenServicePreferences
 
+### Why CloudFormation Permissions Are Required
+
+Service Screener creates a temporary, empty CloudFormation stack during each run for audit and compliance purposes. This stack:
+
+- **Contains no actual resources** - It's an empty "marker" stack that incurs no cost
+- **Provides audit trail** - Creates a record in CloudFormation history of when Service Screener was executed
+- **Enables compliance tracking** - Allows organizations to track security assessment activities
+- **Supports partner integrations** - Enables tracking for AWS Partner evaluations (MPE)
+
+The stack is automatically created at the start of each run with a unique name (format: `ssv2-xxxxxxxxxxxx`) and is automatically deleted when the assessment completes. The stack remains visible in CloudFormation history (when viewing "Deleted" stacks) for audit purposes. This approach leverages AWS's built-in audit capabilities without requiring additional logging infrastructure.
+
 ## Installing service-screener V2
 1. [Log in to your AWS account](https://docs.aws.amazon.com/cloudshell/latest/userguide/getting-started.html#start-session) using the IAM User with sufficient permissions described above. 
 2. Launch [AWS CloudShell](https://docs.aws.amazon.com/cloudshell/latest/userguide/getting-started.html#launch-region-shell) in any region. 
-3. In the AWS CloudShell terminal, run this script this to install the dependencies:
+3. In the AWS CloudShell terminal, run this script to update python version to 3.13:
+  ``` bash
+   sudo yum install python3.13 -y
+   ```
+4. In the same CloudShell terminal, run this script to install the dependencies:
    ``` bash
    cd /tmp
-   python3 -m venv .
+   python3.13 -m venv .
    source bin/activate
-   python3 -m pip install --upgrade pip
+   python3.13 -m pip install --upgrade pip
    rm -rf service-screener-v2
    git clone https://github.com/aws-samples/service-screener-v2.git
    cd service-screener-v2
    pip install -r requirements.txt
-   python3 unzip_botocore_lambda_runtime.py
+   python3.13 unzip_botocore_lambda_runtime.py
+   
+   # Build Cloudscape UI (required for --beta 1 mode)
+   cd cloudscape-ui
+   npm install
+   npm run build
+   cd ..
+   
    alias screener='python3 $(pwd)/main.py'
    ```
+
+   **Note:** AWS CloudShell comes with Node.js pre-installed. The Cloudscape UI build takes approximately 30-60 seconds.
+   
+   **Important:** If you skip the Cloudscape UI build step, the `--beta 1` flag will still work but will only generate the legacy AdminLTE UI. To use the new Cloudscape UI features, you must complete the build step above.
 
 ## Using Service Screener
 When running Service Screener, you will need to specify the regions and services you would like it to run on. For the full list of services currently supported, please see "SERVICES_IDENTIFIER_MAPPING" in [Config.py](./utils/Config.py).
 
 We recommend running it in all regions where you have workloads deployed in. Adjust the commands below to suit your needs then copy and paste it into CloudShell to run Service Screener. 
 
-**Example 1: (Recommended) Run in the Singapore region, check all services with beta features enabled**
+**Example 1: (Recommended) Run in the Singapore region, check all services with NEW Cloudscape UI enabled**
 ``` bash
 screener --regions ap-southeast-1 --beta 1
 ``` 
 
-**Example 1a: Run in the Singapore region, check all services on stable releases**
+**Example 1a: Run in the Singapore region, check all services with legacy AdminLTE UI**
 ``` bash
 screener --regions ap-southeast-1
 ```
@@ -90,6 +140,37 @@ screener --regions ALL
 **Example 7: Run with suppression file to ignore specific findings**
 ``` bash
 screener --regions us-east-1 --services s3 --suppress_file ./suppressions.json
+```
+
+## Performance Options
+
+### Disable Custom Pages
+For faster scans focused on core AWS service analysis, you can disable custom pages processing:
+
+``` bash
+screener --regions ap-southeast-1 --services ec2,s3,rds --disable-custom-pages 1
+```
+
+This skips processing of:
+- **Cost Optimization Hub (COH)** - AWS cost optimization recommendations
+- **Trusted Advisor (TA)** - TA check results and pillar organization  
+- **Findings aggregation** - Cross-service findings analysis
+- **Modernize recommendations** - Modernization pathway analysis
+
+**Performance benefits:**
+- **Time savings:** ~2-3 minutes per scan
+- **Faster execution:** Focuses only on core service security checks
+- **Reduced API calls:** Skips COH, TA, and aggregation APIs
+
+**Use cases:**
+- CI/CD pipeline integration where speed is critical
+- Quick security validation checks
+- Development and testing environments
+- Core service analysis without additional insights
+
+**Example: Fast security scan**
+``` bash
+screener --regions us-east-1 --services ec2,iam,s3 --disable-custom-pages 1 --beta 1
 ```
 
 ## Other parameters
@@ -188,6 +269,12 @@ The output is generated as a ~/service-screener-v2/output.zip file.
 You can [download the file](https://docs.aws.amazon.com/cloudshell/latest/userguide/working-with-cloudshell.html#files-storage) in the CloudShell console by clicking the *Download file* button under the *Actions* menu on the top right of the CloudShell console. 
 
 Once downloaded, unzip the file and open 'index.html' in your browser. You should see a page like [this](https://dev.d11el1twchxpia.amplifyapp.com/961319563195/index.html).
+
+The new Cloudscape UI (enabled with `--beta 1`) includes:
+- **GuardDuty Special Handling** - Dedicated charts, settings, and grouped findings
+- **Cross-Service Findings** - Aggregated findings across all services with advanced filtering
+- **Modernization Recommendations** - Interactive Sankey diagrams showing modernization pathways
+- **Trusted Advisor Integration** - TA check results with pillar-based organization
 
 Ensure that you can see the service(s) run on listed on the left pane.
 You can navigate to the service(s) listed to see detailed findings on each service. 

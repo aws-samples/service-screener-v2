@@ -1,0 +1,199 @@
+{
+	"ConnectionPasswordEncryption": {
+		"category": "S",
+		"^description": "{$COUNT} Glue data catalog(s) do not have connection password encryption enabled",
+		"shortDesc": "Enable connection password encryption for Glue data catalogs",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Encrypting Your Data Catalog]<https://docs.aws.amazon.com/glue/latest/dg/encrypt-glue-data-catalog.html>"
+		]
+	},
+	"MetadataEncryption": {
+		"category": "S",
+		"^description": "{$COUNT} Glue data catalog(s) do not have metadata encryption enabled",
+		"shortDesc": "Enable metadata encryption for Glue data catalogs",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Encrypting Your Data Catalog]<https://docs.aws.amazon.com/glue/latest/dg/encrypt-glue-data-catalog.html>"
+		]
+	},
+	"PublicAccessibility": {
+		"category": "S",
+		"^description": "{$COUNT} Glue data catalog(s) are publicly accessible",
+		"shortDesc": "Ensure Glue data catalogs are not publicly accessible",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Glue Data Catalog Resource Policies]<https://docs.aws.amazon.com/glue/latest/dg/glue-resource-policies.html>"
+		]
+	},
+	"SslEnabled": {
+		"category": "S",
+		"^description": "{$COUNT} Glue database connection(s) do not have SSL enabled",
+		"shortDesc": "Enable SSL for Glue database connections",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Connecting to a JDBC Data Store in a VPC]<https://docs.aws.amazon.com/glue/latest/dg/connection-using.html>"
+		]
+	},
+	"DevEndpointCloudWatchLogsEncryption": {
+		"category": "S",
+		"^description": "{$COUNT} Glue development endpoint(s) do not have CloudWatch logs encryption enabled",
+		"shortDesc": "Enable CloudWatch logs encryption for Glue development endpoints",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Encryption and Secure Access for Development Endpoints]<https://docs.aws.amazon.com/glue/latest/dg/dev-endpoint-encryption.html>"
+		]
+	},
+	"DevEndpointBookmarkEncryption": {
+		"category": "S",
+		"^description": "{$COUNT} Glue development endpoint(s) do not have job bookmark encryption enabled",
+		"shortDesc": "Enable job bookmark encryption for Glue development endpoints",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Encryption and Secure Access for Development Endpoints]<https://docs.aws.amazon.com/glue/latest/dg/dev-endpoint-encryption.html>"
+		]
+	},
+	"DevEndpointS3Encryption": {
+		"category": "S",
+		"^description": "{$COUNT} Glue development endpoint(s) do not have S3 encryption enabled",
+		"shortDesc": "Enable S3 encryption for Glue development endpoints",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Encryption and Secure Access for Development Endpoints]<https://docs.aws.amazon.com/glue/latest/dg/dev-endpoint-encryption.html>"
+		]
+	},
+	"JobS3Encryption": {
+		"category": "S",
+		"^description": "{$COUNT} Glue ETL job(s) do not have S3 encryption enabled",
+		"shortDesc": "Enable S3 encryption for Glue ETL jobs",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Encrypting Data Written by Crawlers, Jobs, and Development Endpoints]<https://docs.aws.amazon.com/glue/latest/dg/encryption-security-configuration.html>"
+		]
+	},
+	"JobCloudWatchLogsEncryption": {
+		"category": "S",
+		"^description": "{$COUNT} Glue ETL job(s) do not have CloudWatch logs encryption enabled",
+		"shortDesc": "Enable CloudWatch logs encryption for Glue ETL jobs",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Encrypting Data Written by Crawlers, Jobs, and Development Endpoints]<https://docs.aws.amazon.com/glue/latest/dg/encryption-security-configuration.html>"
+		]
+	},
+	"JobBookmarkEncryption": {
+		"category": "S",
+		"^description": "{$COUNT} Glue ETL job(s) do not have job bookmark encryption enabled",
+		"shortDesc": "Enable job bookmark encryption for Glue ETL jobs",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Encrypting Data Written by Crawlers, Jobs, and Development Endpoints]<https://docs.aws.amazon.com/glue/latest/dg/encryption-security-configuration.html>"
+		]
+	},
+	"JobLoggingEnabled": {
+		"category": "O",
+		"^description": "{$COUNT} Glue ETL job(s) do not have logging enabled",
+		"shortDesc": "Enable logging for Glue ETL jobs",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Continuous Logging for AWS Glue Jobs]<https://docs.aws.amazon.com/glue/latest/dg/monitor-continuous-logging.html>"
+		]
+	},
+	"MLTransformEncryptionAtRest": {
+		"category": "S",
+		"^description": "{$COUNT} Glue ML transform(s) do not have encryption at rest enabled",
+		"shortDesc": "Enable encryption at rest for Glue ML transforms",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Encrypting Your AWS Glue Data]<https://docs.aws.amazon.com/glue/latest/dg/encryption-glue-resources.html>"
+		]
+	},
+	"JobBookmarkEnabled": {
+		"category": "O",
+		"^description": "{$COUNT} Glue ETL job(s) do not have job bookmarks enabled. Job bookmarks help track processed data and prevent duplicate processing",
+		"shortDesc": "Enable job bookmarks for Glue ETL jobs",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Tracking processed data using job bookmarks]<https://docs.aws.amazon.com/glue/latest/dg/monitor-continuations.html>"
+		]
+	},
+	"GlueVersionCurrent": {
+		"category": "P",
+		"^description": "{$COUNT} Glue ETL job(s) are using deprecated or old Glue versions. Consider upgrading to the latest version for performance improvements and new features",
+		"shortDesc": "Use latest Glue version for ETL jobs",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[AWS Glue versions]<https://docs.aws.amazon.com/glue/latest/dg/release-notes.html>",
+			"[Best practices for performance tuning]<https://docs.aws.amazon.com/prescriptive-guidance/latest/tuning-aws-glue-for-apache-spark/introduction.html>"
+		]
+	},
+	"CrawlerScheduleConfigured": {
+		"category": "O",
+		"^description": "{$COUNT} Glue crawler(s) do not have a schedule configured. Crawlers without schedules may not run regularly to keep the Data Catalog up-to-date",
+		"shortDesc": "Configure schedules for Glue crawlers",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Glue Data Catalog best practices]<https://docs.aws.amazon.com/glue/latest/dg/best-practice-catalog.html>",
+			"[Scheduling a crawler]<https://docs.aws.amazon.com/glue/latest/dg/schedule-crawler.html>"
+		]
+	}
+}

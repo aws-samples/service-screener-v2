@@ -489,3 +489,69 @@ class DynamoDbCommon(Evaluator):
             ecode = e.response['Error']['Code']
             emsg = e.response['Error']['Message']
             print(ecode, emsg)
+    
+    # logic to check encryption at rest
+    def _check_encryption_at_rest(self):
+        try:
+            # Check if SSEDescription exists and encryption is enabled
+            sse_description = self.tables['Table'].get('SSEDescription', {})
+            
+            if not sse_description:
+                # No encryption configured
+                self.results['encryptionAtRest'] = [-1, 'Encryption at rest is not enabled']
+            else:
+                sse_status = sse_description.get('Status')
+                sse_type = sse_description.get('SSEType')
+                
+                # Check if encryption is not enabled or in a transitional state
+                if sse_status not in ['ENABLED', 'ENABLING']:
+                    self.results['encryptionAtRest'] = [-1, f'Encryption status: {sse_status}']
+                # Optionally flag if not using KMS (using default AES256)
+                elif sse_type == 'AES256':
+                    self.results['encryptionAtRest'] = [-1, 'Using default encryption (AES256), consider KMS for better control']
+                    
+        except botocore.exceptions.ClientError as e:
+            ecode = e.response['Error']['Code']
+            emsg = e.response['Error']['Message']
+            print(ecode, emsg)
+    
+    # logic to check global table version
+    def _check_global_table_version(self):
+        try:
+            # Check if table is a global table and verify version
+            global_table_version = self.tables['Table'].get('GlobalTableVersion')
+            
+            # Only flag if it's a global table with legacy version
+            if global_table_version == '2017.11.29':
+                self.results['globalTableVersion'] = [-1, 'Using legacy global table version (2017.11.29)']
+            # Note: If GlobalTableVersion is None, it's not a global table (pass)
+            # If it's '2019.11.21', it's using current version (pass)
+                    
+        except botocore.exceptions.ClientError as e:
+            ecode = e.response['Error']['Code']
+            emsg = e.response['Error']['Message']
+            print(ecode, emsg)
+    
+    # logic to check table class optimization
+    def _check_table_class_optimization(self):
+        try:
+            # Get table class information
+            table_class_summary = self.tables['Table'].get('TableClassSummary', {})
+            table_class = table_class_summary.get('TableClass', 'STANDARD')
+            
+            # Only recommend Standard-IA if currently using STANDARD
+            if table_class == 'STANDARD':
+                # Get table size to determine if recommendation is relevant
+                table_size_bytes = self.tables['Table'].get('TableSizeBytes', 0)
+                
+                # Only recommend for tables with significant storage (>10 GB)
+                if table_size_bytes > 10 * 1024 * 1024 * 1024:  # 10 GB in bytes
+                    # Check CloudWatch metrics for access patterns (optional enhancement)
+                    # For now, flag all large STANDARD tables as potential candidates
+                    table_size_gb = table_size_bytes / (1024 * 1024 * 1024)
+                    self.results['tableClassOptimization'] = [-1, f'Table size: {table_size_gb:.2f} GB - Consider Standard-IA for infrequent access']
+                    
+        except botocore.exceptions.ClientError as e:
+            ecode = e.response['Error']['Code']
+            emsg = e.response['Error']['Message']
+            print(ecode, emsg)

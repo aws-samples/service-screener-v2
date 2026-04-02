@@ -21,6 +21,7 @@ class Apigateway(Service):
         
         self.apiClient = ssBoto.client('apigateway', config=self.bConfig)
         self.apiv2Client = ssBoto.client('apigatewayv2', config=self.bConfig)
+        self.cloudwatchClient = ssBoto.client('cloudwatch', config=self.bConfig)
         
         return
     

@@ -1,1 +1,1 @@
-{"apigateway": 10, "cloudfront": 8, "cloudtrail": 18, "cloudwatch": 18, "dynamodb": 24, "ec2": 61, "efs": 4, "eks": 7, "elasticache": 10, "guardduty": 5, "iam": 38, "kms": 4, "lambda": 15, "opensearch": 22, "rds": 82, "redshift": 16, "s3": 18, "sqs": 11}
+{"apigateway": 29, "cloudfront": 16, "cloudtrail": 24, "cloudwatch": 33, "dynamodb": 27, "ec2": 79, "efs": 15, "eks": 17, "elasticache": 16, "glue": 15, "guardduty": 5, "iam": 46, "kms": 17, "lambda": 28, "opensearch": 23, "rds": 85, "redshift": 21, "s3": 26, "sagemaker": 21, "sqs": 14}

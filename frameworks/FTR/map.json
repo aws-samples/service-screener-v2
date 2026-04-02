@@ -14,7 +14,9 @@
       "HOST-001.3": []
     },
     "Support level": {
-      "SUP-001.1": ["iam.supportPlanLowTier"]
+      "SUP-001.1": [
+        "iam.supportPlanLowTier"
+      ]
     },
     "Architecture review": {
       "WAFR-001.1": [],
@@ -22,24 +24,43 @@
       "WAFR-002.1": []
     },
     "AWS root account": {
-      "ARC-001.1": ["iam.rootConsoleLogin30days"],
-      "ARC-004.1": ["iam.rootHasAccessKey"],
+      "ARC-001.1": [
+        "iam.rootConsoleLogin30days"
+      ],
+      "ARC-004.1": [
+        "iam.rootHasAccessKey"
+      ],
       "ARC-005.1": []
     },
     "Communications from AWS": {
-      "ACOM-001.1": ["iam.hasAlternateContact"],
+      "ACOM-001.1": [
+        "iam.hasAlternateContact"
+      ],
       "ACOM-002.1": []
     },
     "Identity and Access Management": {
-      "IAM-001.1": ["iam.mfaActive", "iam.rootMfaActive"],
+      "IAM-001.1": [
+        "iam.mfaActive",
+        "iam.rootMfaActive",
+        "iam.iamUsersWithFederationAvailable"
+      ],
       "IAM-002.1": [
         "iam.passwordLastChange90",
         "iam.passwordLastChange365",
         "iam.hasAccessKeyNoRotate90days",
-        "iam.hasAccessKeyNoRotate30days"
+        "iam.hasAccessKeyNoRotate30days",
+        "kms.GrantOldAge"
       ],
-      "IAM-002.2": [],
-      "IAM-002.3": ["cloudtrail.NeedToEnableCloudTrail", "cloudtrail.HasOneMultiRegionTrail", "iam.enableGuardDuty"],
+      "IAM-002.2": [
+        "cloudtrail.CloudWatchAlarmsConfigured"
+      ],
+      "IAM-002.3": [
+        "cloudtrail.NeedToEnableCloudTrail",
+        "cloudtrail.HasOneMultiRegionTrail",
+        "iam.enableGuardDuty",
+        "cloudtrail.SecurityHubIntegration",
+        "lambda.lambdaGuardDutyProtectionDisabled"
+      ],
       "IAM-002.4": [],
       "IAM-003.1": [
         "iam.passwordPolicyWeak",
@@ -47,51 +68,144 @@
         "iam.passwordPolicyLength",
         "iam.passwordPolicyReuse"
       ],
-      "IAM-004.1": ["iam.noUsersFound"],
-      "IAM-005.1": ["iam.hasExternalIdentityProvider", "iam.hasSSORoles"],
-      "IAM-005.2": ["iam.hasExternalIdentityProvider", "iam.hasSSORoles"],
-      "IAM-006.1": ["iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "iam.ManagedPolicyFullAccessOneServ", "iam.FullAdminAccess"],
+      "IAM-004.1": [
+        "iam.noUsersFound"
+      ],
+      "IAM-005.1": [
+        "iam.hasExternalIdentityProvider",
+        "iam.hasSSORoles",
+        "iam.iamUsersWithFederationAvailable"
+      ],
+      "IAM-005.2": [
+        "iam.hasExternalIdentityProvider",
+        "iam.hasSSORoles",
+        "iam.iamUsersWithFederationAvailable"
+      ],
+      "IAM-006.1": [
+        "iam.InlinePolicyFullAccessOneServ",
+        "iam.InlinePolicyFullAdminAccess",
+        "iam.ManagedPolicyFullAccessOneServ",
+        "iam.FullAdminAccess",
+        "iam.wildcardActionsDetection",
+        "iam.missingPolicyConditions",
+        "iam.missingPermissionsBoundaries",
+        "lambda.lambdaRoleTooPermissive",
+        "kms.KeyPolicyWildcardAction",
+        "kms.KeyPolicyWildcardPrincipal",
+        "kms.KeyPolicySensitiveActionsNotRestricted",
+        "kms.GrantOverlyPermissive",
+        "kms.GrantWildcardPrincipal"
+      ],
       "IAM-007.1": [
         "iam.consoleLastAccess90",
         "iam.consoleLastAccess365",
         "iam.consoleLastAccess45",
         "iam.unusedRole",
-        "iam.userNoActivity90days"
+        "iam.userNoActivity90days",
+        "iam.unusedCustomerManagedPolicy",
+        "iam.unnecessaryCustomPolicies",
+        "kms.KeyUnused",
+        "kms.GrantDuplicate"
       ],
       "IAM-008.1": [],
       "IAM-009.1": [],
-      "IAM-010.1": ["cloudtrail.NeedToEnableCloudTrail"],
+      "IAM-010.1": [
+        "cloudtrail.NeedToEnableCloudTrail",
+        "cloudtrail.OrganizationTrailEnabled"
+      ],
       "IAM-011.1": [],
-      "IAM-012.1": ["ec2.EC2IamProfile"],
+      "IAM-012.1": [
+        "ec2.EC2IamProfile",
+        "eks.eksNoIRSAConfigured"
+      ],
       "IAM-012.2": []
     },
     "Operational security": {
-      "SECOPS-001": []
+      "SECOPS-001": [
+        "cloudwatch.alarmsWithoutSNS",
+        "cloudwatch.missingServiceQuotaAlarms",
+        "cloudtrail.CloudWatchAlarmsConfigured"
+      ]
     },
     "Network security": {
-      "NETSEC-001.1": ["ec2.SGDefaultInUsed", "ec2.SGSensitivePortOpenToAll", "ec2.SGAllOpenToAll", "ec2.SGAllOpen"],
-      "NETSEC-001.2": ["ec2.SGSensitivePortOpenToAll"],
-      "NETSEC-002.1": ["ec2.EC2InstancePublicIP"]
+      "NETSEC-001.1": [
+        "ec2.SGDefaultInUsed",
+        "ec2.SGSensitivePortOpenToAll",
+        "ec2.SGAllOpenToAll",
+        "ec2.SGAllOpen",
+        "apigateway.VPCAccessRestrictions",
+        "apigateway.PrivateAPI",
+        "redshift.SecurityGroups",
+        "efs.MountTargetSecurityGroups"
+      ],
+      "NETSEC-001.2": [
+        "ec2.SGSensitivePortOpenToAll"
+      ],
+      "NETSEC-002.1": [
+        "ec2.EC2InstancePublicIP",
+        "sagemaker.DirectInternetAccess",
+        "redshift.VpcDeployment",
+        "glue.PublicAccessibility",
+        "apigateway.VPCEndpointAssociation"
+      ]
     },
     "Backups and recovery": {
-      "BAR-001.1": ["ec2.EBSSnapshot", "rds.Backup", "rds.BackupTooLow", "dynamodb.backupStatus", "dynamodb.enabledContinuousBackup", "iam.hasAWSBackupPlans", "s3.BucketVersioning"],
-      "BAR-002.1": [],
+      "BAR-001.1": [
+        "ec2.EBSSnapshot",
+        "rds.Backup",
+        "rds.BackupTooLow",
+        "dynamodb.backupStatus",
+        "dynamodb.enabledContinuousBackup",
+        "iam.hasAWSBackupPlans",
+        "s3.BucketVersioning",
+        "elasticache.BackupEnabled",
+        "efs.ReplicationEnabled",
+        "rds.CrossRegionBackupNotEnabled",
+        "ec2.EBSSnapshotFirstArchived",
+        "ec2.EBSSnapshotLatestArchived"
+      ],
+      "BAR-002.1": [
+        "elasticache.GlobalDatastoreConfig"
+      ],
       "BAR-002.2": []
     },
     "Resiliency": {
-      "RES-001.1": [],
-      "RES-002.1": [],
+      "RES-001.1": [
+        "ec2.ASGMultiAZ",
+        "ec2.ELBMultiAZ",
+        "ec2.VPCMultiAZ",
+        "elasticache.MultiAZEnabled",
+        "eks.eksNodeGroupSingleAZ"
+      ],
+      "RES-002.1": [
+        "eks.eksNoAutoscaling",
+        "eks.eksNoKarpenter",
+        "sagemaker.EndpointAutoScalingConfigured"
+      ],
       "RES-004.1": [],
-      "RES-005.1": [],
+      "RES-005.1": [
+        "sagemaker.ProductionVariantInstanceCount",
+        "elasticache.ClusterModeEnabled"
+      ],
       "RES-006.1": [],
       "RES-006.2": [],
       "RES-007.1": []
     },
     "Amazon S3 bucket access": {
-      "S3-001.1": ["s3.PublicAccessBlock", "s3.PublicReadAccessBlock", "s3.PublicWriteAccessBlock", "s3.S3AccountPublicAccessBlock"]
+      "S3-001.1": [
+        "s3.PublicAccessBlock",
+        "s3.PublicReadAccessBlock",
+        "s3.PublicWriteAccessBlock",
+        "s3.S3AccountPublicAccessBlock",
+        "s3.BucketOwnerEnforced",
+        "s3.WildcardPrincipalsActions",
+        "s3.PublicAccessDocumentation"
+      ]
     },
     "Cross-account access": {
-      "CAA-001.1": [],
+      "CAA-001.1": [
+        "kms.KeyPolicyCrossAccount"
+      ],
       "CAA-002.1": [],
       "CAA-003.1": [],
       "CAA-004.1": [],
@@ -100,9 +214,36 @@
       "CAA-007.1": []
     },
     "Sensitive data": {
-      "SDAT-001.1": ["s3.MacieToEnable"],
-      "SDAT-002.1": ["ec2.EBSEncrypted", "s3.ServerSideEncrypted", "s3.SSEWithKMS", "rds.StorageEncrypted", "cloudtrail.RequiresKmsKey"],
-      "SDAT-003.1": ["ec2.SGEncryptionInTransit", "s3.TlsEnforced"]
+      "SDAT-001.1": [
+        "s3.MacieToEnable"
+      ],
+      "SDAT-002.1": [
+        "ec2.EBSEncrypted",
+        "s3.ServerSideEncrypted",
+        "s3.SSEWithKMS",
+        "rds.StorageEncrypted",
+        "cloudtrail.RequiresKmsKey",
+        "ec2.EBSEncryptionByDefault",
+        "dynamodb.encryptionAtRest",
+        "eks.eksSecretsEncryptionNoKMS",
+        "glue.MetadataEncryption",
+        "glue.ConnectionPasswordEncryption",
+        "glue.JobBookmarkEncryption",
+        "glue.JobS3Encryption",
+        "glue.JobCloudWatchLogsEncryption",
+        "sagemaker.EncryptionEnabled",
+        "sagemaker.VolumeAndOutputEncryption",
+        "s3.SSECBlocking"
+      ],
+      "SDAT-003.1": [
+        "ec2.SGEncryptionInTransit",
+        "s3.TlsEnforced",
+        "efs.TLSRequired",
+        "cloudfront.OriginTrafficEncryption",
+        "glue.SslEnabled",
+        "sagemaker.InterContainerEncryption",
+        "apigateway.MutualTLS"
+      ]
     },
     "Regulatory compliance validation process": {
       "RCVP-001.1": [],

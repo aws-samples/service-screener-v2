@@ -23,7 +23,7 @@ class ArguParser:
         "services": {
             "required": False,
             "emptymsg": "Missing --services, using default value: $defaultValue",
-            "default": "rds,ec2,iam,s3,efs,lambda,guardduty,cloudfront,cloudtrail,elasticache,eks,dynamodb,opensearch,kms,cloudwatch,redshift,apigateway,sqs",
+            "default": "rds,ec2,iam,s3,efs,lambda,guardduty,cloudfront,cloudtrail,elasticache,eks,dynamodb,opensearch,kms,cloudwatch,redshift,apigateway,sqs,glue,sagemaker",
             "help": "--services ec2,iam"
         },
         "debug": {
@@ -79,7 +79,7 @@ class ArguParser:
         'beta': {
             "required": False,
             "default": False,
-            "help": "Enable Beta features"
+            "help": "Enable Beta features (API Buttons, Cloudscape UI)"
         },
         'suppress_file': {
             "required": False,
@@ -89,7 +89,12 @@ class ArguParser:
         'sequential': {
             "required": False,
             "default": False,
-            "help": "Run checks sequentially instead of parallel (fixes macOS hanging issues)"
+            "help": "Run checks sequentially instead of concurrent (default: concurrent for better performance)"
+        },
+        'disable-custom-pages': {
+            "required": False,
+            "default": False,
+            "help": "Disable custom pages processing (COH, TA, Findings, Modernize) for faster scans. Only core service analysis will be performed."
         }
     }
 

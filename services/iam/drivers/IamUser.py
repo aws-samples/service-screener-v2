@@ -7,10 +7,20 @@ from .IamCommon import IamCommon
 class IamUser(IamCommon):
     ENUM_NO_INFO = ['not_supported', 'no_information']
     
-    def __init__(self, user, iamClient):
+    def __init__(self, user, iamClient, authDetails=None, policyDocumentMap=None):
         super().__init__()
         self.user = user
         self.iamClient = iamClient
+        self._authDetails = authDetails
+        self._policyDocumentMap = policyDocumentMap or {}
+        self._prefetchedUserDetail = None
+        
+        # Look up prefetched user detail by username
+        if authDetails and user['user'] != '<root_account>':
+            for u in authDetails.get('users', []):
+                if u.get('UserName') == user['user']:
+                    self._prefetchedUserDetail = u
+                    break
 
         self._resourceName = user['user']
         
@@ -54,31 +64,42 @@ class IamUser(IamCommon):
         if user == '<root_account>':
             return
         
-        try:
-            resp = self.iamClient.list_groups_for_user(UserName = user)
-            groups = resp.get('Groups')
+        if self._prefetchedUserDetail:
+            groups = self._prefetchedUserDetail.get('GroupList', [])
             if not groups:
                 self.results['userNotUsingGroup'] = [-1, '-']
-        except botocore.exceptions.ClientError as e:
-            print(e.response['Error']['Code'], e.response['Error']['Message'])
+        else:
+            try:
+                resp = self.iamClient.list_groups_for_user(UserName=user)
+                groups = resp.get('Groups')
+                if not groups:
+                    self.results['userNotUsingGroup'] = [-1, '-']
+            except botocore.exceptions.ClientError as e:
+                print(e.response['Error']['Code'], e.response['Error']['Message'])
                 
     def _checkUserPolicy(self):
         user = self.user['user']
         if user == '<root_account>':
             return
+        
+        if self._prefetchedUserDetail:
+            policies = self._prefetchedUserDetail.get('AttachedManagedPolicies', [])
+            self.evaluateManagePolicy(policies, self._policyDocumentMap)
             
-        ## Managed Policy   
-        try:
-            resp = self.iamClient.list_attached_user_policies(UserName = user)
-            policies = resp.get('AttachedPolicies')
-            self.evaluateManagePolicy(policies) ## code in iam_common.class.php
-            
-            ## Inline Policy
-            resp = self.iamClient.list_user_policies(UserName = user)
-            inlinePolicies = resp.get('PolicyNames')
-            self.evaluateInlinePolicy(inlinePolicies, user, 'user')
-        except botocore.exceptions.ClientError as e:
-            print(e.response['Error']['Code'], e.response['Error']['Message'])
+            inlinePolicies = self._prefetchedUserDetail.get('UserPolicyList', [])
+            if inlinePolicies:
+                self.evaluateInlinePolicyFromDocs(inlinePolicies)
+        else:
+            try:
+                resp = self.iamClient.list_attached_user_policies(UserName=user)
+                policies = resp.get('AttachedPolicies')
+                self.evaluateManagePolicy(policies)
+                
+                resp = self.iamClient.list_user_policies(UserName=user)
+                inlinePolicies = resp.get('PolicyNames')
+                self.evaluateInlinePolicy(inlinePolicies, user, 'user')
+            except botocore.exceptions.ClientError as e:
+                print(e.response['Error']['Code'], e.response['Error']['Message'])
         
     def _checkAccessKeyRotate(self):
         user = self.user

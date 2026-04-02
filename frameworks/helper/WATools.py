@@ -272,14 +272,41 @@ class WATools():
         if self.HASPERMISSION == False:
             return None
 
-        # Skip if questionId is None
-        if questionId is None:
-            _warn(f"[WATOOLS]: Skipping update for None questionId")
+        # Skip if questionId is None or empty
+        if questionId is None or questionId == '':
+            _warn(f"[WATOOLS]: Skipping update for invalid questionId: {questionId}")
             return None
 
-        # Ensure selectedChoices is not empty
+        # Validate and clean selectedChoices
         if not selectedChoices:
             selectedChoices = []
+        elif isinstance(selectedChoices, str):
+            # If it's a string, convert to list
+            selectedChoices = [selectedChoices] if selectedChoices.strip() else []
+        elif isinstance(selectedChoices, list):
+            # Filter out None and empty values, then remove duplicates
+            original_count = len(selectedChoices)
+            selectedChoices = [choice for choice in selectedChoices if choice is not None and choice != '']
+            # Remove duplicates while preserving order
+            selectedChoices = list(dict.fromkeys(selectedChoices))
+            
+            # Log if duplicates were found
+            if len(selectedChoices) != original_count:
+                _warn(f"[WATOOLS]: Removed duplicates/empty values for question {questionId}: {original_count} -> {len(selectedChoices)}")
+        else:
+            _warn(f"[WATOOLS]: Invalid selectedChoices type: {type(selectedChoices)}, converting to empty list")
+            selectedChoices = []
+
+        # Validate and clean unselectedNotes
+        if unselectedNotes is None:
+            unselectedNotes = ""
+        elif not isinstance(unselectedNotes, str):
+            unselectedNotes = str(unselectedNotes)
+        
+        # Truncate notes if too long (AWS limit is typically 2048 characters)
+        if len(unselectedNotes) > 2000:
+            unselectedNotes = unselectedNotes[:1997] + "..."
+            _warn(f"[WATOOLS]: Truncated notes for question {questionId} (too long)")
 
         ansArgs = {
             'WorkloadId': self.waInfo['WorkloadId'],
@@ -290,10 +317,30 @@ class WATools():
         }
 
         try:
-            resp = self.waClient.update_answer(**ansArgs)
-        except Exception as e:
-            _warn(f"[ERROR - WATOOLS]: {str(e)}")
-            self.HASPERMISSION = False
-            return None
+            # Additional validation before API call
+            if not self.waInfo.get('WorkloadId'):
+                _warn(f"[WATOOLS]: No WorkloadId available, skipping update for question {questionId}")
+                return None
+                
+            if not self.waInfo.get('LensesAlias'):
+                _warn(f"[WATOOLS]: No LensAlias available, skipping update for question {questionId}")
+                return None
 
-        pass
+            resp = self.waClient.update_answer(**ansArgs)
+            return resp
+            
+        except Exception as e:
+            error_msg = str(e)
+            if 'ValidationException' in error_msg:
+                _warn(f"[ERROR - WATOOLS]: Validation failed for question {questionId}")
+                _warn(f"[ERROR - WATOOLS]: QuestionId: {questionId}")
+                _warn(f"[ERROR - WATOOLS]: SelectedChoices: {selectedChoices}")
+                _warn(f"[ERROR - WATOOLS]: Notes length: {len(unselectedNotes)}")
+                _warn(f"[ERROR - WATOOLS]: Validation error: {error_msg}")
+            else:
+                _warn(f"[ERROR - WATOOLS]: {error_msg}")
+            
+            # Don't disable permissions for validation errors, just skip this update
+            if 'ValidationException' not in error_msg:
+                self.HASPERMISSION = False
+            return None

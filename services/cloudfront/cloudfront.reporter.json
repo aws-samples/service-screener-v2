@@ -103,5 +103,116 @@
 		"ref": [
 			"[AWS Docs]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-https-viewers-to-cloudfront.html>"
 		]
+	},
+	"S3OriginAccessControl": {
+		"category": "S",
+		"^description": "{$COUNT} CloudFront distribution(s) have S3 origins without Origin Access Control (OAC) or Origin Access Identity (OAI), allowing direct public access to S3 buckets",
+		"shortDesc": "Configure Origin Access Control (OAC) for S3 origins to restrict direct access",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Restrict access to an Amazon S3 origin]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html>",
+			"[Migrating from OAI to OAC]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html#migrate-from-oai-to-oac>"
+		]
+	},
+	"OriginTrafficEncryption": {
+		"category": "S",
+		"^description": "{$COUNT} CloudFront distribution(s) have custom origins that do not enforce HTTPS for communication between CloudFront and the origin",
+		"shortDesc": "Require HTTPS for communication between CloudFront and custom origins",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Use HTTPS with CloudFront]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-https.html>",
+			"[Require HTTPS for communication between CloudFront and your custom origin]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-https-cloudfront-to-custom-origin.html>"
+		]
+	},
+	"CustomSSLCertificate": {
+		"category": "S",
+		"^description": "{$COUNT} CloudFront distribution(s) are using the default CloudFront SSL certificate (*.cloudfront.net) instead of a custom certificate",
+		"shortDesc": "Use custom SSL/TLS certificates for production distributions",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Use HTTPS with CloudFront]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-https.html>",
+			"[Using alternate domain names and HTTPS]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-https-alternate-domain-names.html>"
+		]
+	},
+	"SNIConfiguration": {
+		"category": "C",
+		"^description": "{$COUNT} CloudFront distribution(s) with custom SSL certificates are using dedicated IP addresses instead of SNI, incurring $600/month per distribution",
+		"shortDesc": "Use SNI (Server Name Indication) instead of dedicated IPs for custom SSL certificates",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[Use HTTPS with CloudFront]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-https.html>",
+			"[Choosing how CloudFront serves HTTPS requests]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cnames-https-dedicated-ip-or-sni.html>"
+		]
+	},
+	"S3OriginBucketExists": {
+		"category": "R",
+		"^description": "{$COUNT} CloudFront distribution(s) have S3 origins pointing to non-existent or inaccessible S3 buckets",
+		"shortDesc": "Ensure S3 origin buckets exist and are accessible",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Using Amazon S3 origins]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistS3AndCustomOrigins.html>",
+			"[Troubleshooting error responses from your origin]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/troubleshooting-response-errors.html>"
+		]
+	},
+	"OriginShieldEnabled": {
+		"category": "P",
+		"^description": "{$COUNT} CloudFront distribution(s) do not have Origin Shield enabled, missing opportunity to reduce origin load and improve cache hit ratio",
+		"shortDesc": "Consider enabling Origin Shield to reduce origin load",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Using Origin Shield]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/origin-shield.html>",
+			"[Caching and availability]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/ConfiguringCaching.html>"
+		]
+	},
+	"GeoRestrictionsConfigured": {
+		"category": "S",
+		"^description": "{$COUNT} CloudFront distribution(s) do not have geographic restrictions configured, allowing access from all countries",
+		"shortDesc": "Consider configuring geographic restrictions for compliance and security",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Restricting the geographic distribution of your content]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/georestrictions.html>"
+		]
+	},
+	"PriceClassOptimization": {
+		"category": "C",
+		"^description": "{$COUNT} CloudFront distribution(s) are using all edge locations (PriceClass_All), which may be more expensive than necessary",
+		"shortDesc": "Review price class to optimize costs based on geographic requirements",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[Choosing the price class for a CloudFront distribution]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/PriceClass.html>",
+			"[Cost optimization]<https://docs.aws.amazon.com/whitepapers/latest/amazon-cloudfront-media/cost-optimization.html>"
+		]
 	}
 }

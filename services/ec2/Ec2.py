@@ -25,6 +25,7 @@ from services.ec2.drivers.Ec2AutoScaling import Ec2AutoScaling
 from services.ec2.drivers.Ec2EbsSnapshot import Ec2EbsSnapshot
 from services.ec2.drivers.Ec2Vpc import Ec2Vpc
 from services.ec2.drivers.Ec2NACL import Ec2NACL
+from services.ec2.drivers.Ec2Regional import Ec2Regional
 
 class Ec2(Service):
     CHARTSTYPE = {
@@ -513,6 +514,12 @@ class Ec2(Service):
     def advise(self):
         objs = {}
         secGroups = {}
+        
+        # Regional-level checks (EBS encryption by default, service quotas)
+        _pi('EC2::Regional Checks')
+        obj = Ec2Regional(self.ec2Client, self.compOptClient)
+        obj.run(self.__class__)
+        objs['EC2::Regional'] = obj.getInfo()
         
         # compute optimizer checks
         hasRunComputeOpt = Config.get('EC2_HasRunComputeOpt', False)

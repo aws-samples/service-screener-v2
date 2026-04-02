@@ -228,9 +228,16 @@ class CloudwatchTrails(Evaluator):
         args = {"logGroupNamePrefix": self.log[2]}
         
         resp = self.logClient.describe_log_groups(**args)
-        logDetail = resp.get('logGroups')[0]
+        logGroups = resp.get('logGroups', [])
         
-        if logDetail['metricFilterCount'] == 0:
+        # Check if log group exists
+        if not logGroups or len(logGroups) == 0:
+            self.results['trailWithoutCWLogs'] = [-1, None]
+            return
+        
+        logDetail = logGroups[0]
+        
+        if logDetail.get('metricFilterCount', 0) == 0:
             self.results['trailWithCWLogsWithoutMetrics'] = [-1, None]
             return
         

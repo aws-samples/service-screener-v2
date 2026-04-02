@@ -12,7 +12,10 @@ class GuarddutypageBuilder(PageBuilder):
     SERVICESUMMARY_DEFAULT = {
         'EC2': 0,
         'IAMUser': 0,
+        'IAM': 0,  # New GuardDuty category
         'Kubernetes': 0,
+        'EKS': 0,  # New GuardDuty category
+        'ECS': 0,  # New GuardDuty category
         'S3': 0,
         'Malware': 0,
         'RDS': 0,

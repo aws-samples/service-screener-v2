@@ -21,6 +21,10 @@ HTMLRES_DIR = ROOT_DIR + '/' + HTML_FOLDER
 FORK_DIR = ROOT_DIR + '/__fork'
 API_JSON = FORK_DIR + '/api.json'
 
+CACHE_DIR = ROOT_DIR + '/.cache'
+TA_CACHE_DIR = CACHE_DIR + '/ta'
+COH_CACHE_DIR = CACHE_DIR + '/coh'
+
 GENERAL_CONF_PATH = SERVICE_DIR + '/general.reporter.json'
 
 CLI_TRUE_KEYWORD_ARRAY = ['yes', 'y', 'true', '1', 1]

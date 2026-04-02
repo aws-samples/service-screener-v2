@@ -3,6 +3,9 @@ import os
 import shutil
 import json
 import locale
+import logging
+import sys
+from datetime import datetime
 from sys import platform
 
 if platform == 'darwin':
@@ -21,12 +24,190 @@ from utils.Tools import _info, _warn
 import constants as _C
 from utils.AwsRegionSelector import AwsRegionSelector
 from Screener import Screener
+from utils.CustomPage.CustomPage import CustomPage
+
+def setup_logging():
+    """Setup logging to capture all output to a timestamped log file"""
+    # Create timestamp for log filename
+    timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+    log_filename = f"ssv2-{timestamp}.log"
+    
+    # Create logs directory if it doesn't exist
+    os.makedirs('logs', exist_ok=True)
+    log_filepath = os.path.join('logs', log_filename)
+    
+    # Create a custom logger that captures print statements without buffering
+    class TeeOutput:
+        def __init__(self, original_stdout, log_file_path):
+            self.original_stdout = original_stdout
+            self.log_file_path = log_file_path
+            
+        def write(self, message):
+            # Write to original stdout immediately (console)
+            self.original_stdout.write(message)
+            self.original_stdout.flush()
+            
+            # Also write to log file immediately (no buffering)
+            if message.strip():  # Only log non-empty messages
+                try:
+                    with open(self.log_file_path, 'a', encoding='utf-8') as log_file:
+                        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        log_file.write(f"{timestamp} - {message.strip()}\n")
+                        log_file.flush()  # Force immediate write to disk
+                except Exception as e:
+                    # If logging fails, don't break the main process
+                    pass
+                
+        def flush(self):
+            self.original_stdout.flush()
+    
+    # Redirect stdout to capture print statements
+    sys.stdout = TeeOutput(sys.stdout, log_filepath)
+    
+    # Write initial log entries
+    print(f"=== Service Screener v2 - Scan Started ===")
+    print(f"Log file: {log_filepath}")
+    print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("=" * 50)
+    
+    return log_filepath
 
 def number_format(num, places=2):
     return locale.format_string("%.*f", (places, num), True)
 
+def collect_fork_results(contexts, serviceStat, scanned):
+    """Collect scan results from __fork directory files into contexts and stats"""
+    hasGlobal = False
+    for file in os.listdir(_C.FORK_DIR):
+        if file[0] == '.' or file == _C.SESSUID_FILENAME or file == 'tail.txt' or file == 'error.txt' or file == 'empty.txt' or file == 'all.csv' or file[0:10] == 'CustomPage':
+            continue
+        f = file.split('.')
+        if len(f) == 2:
+            if f[0] not in contexts:
+                contexts[f[0]] = {}
+            contexts[f[0]]['results'] = json.loads(open(_C.FORK_DIR + '/' + file).read())
+        elif f[1] == "charts":
+            if f[0] not in contexts:
+                contexts[f[0]] = {}
+            contexts[f[0]]['charts'] = json.loads(open(_C.FORK_DIR + '/' + file).read())
+        else:
+            cnt, rules, exceptions, timespent = list(json.loads(open(_C.FORK_DIR + '/' + file).read()).values())
+            serviceStat[f[0]] = cnt
+            scanned['resources'] += cnt
+            scanned['rules'] += rules
+            scanned['exceptions'] += exceptions
+            scanned['timespent'] += timespent
+            if f[0] in Config.GLOBAL_SERVICES:
+                hasGlobal = True
+    return hasGlobal
+
+def process_custom_pages(customPage, services, disable_custom_pages):
+    """Process CustomPage data collection (TA, COH) and store results in Config"""
+    if disable_custom_pages:
+        _info("CustomPage processing disabled via --disable-custom-pages flag")
+        Config.set('custom_page_data', {})
+        return
+    
+    _info("Processing CustomPage data collection...")
+    try:
+        _info("Building CustomPage data (TA, COH) - this happens after all service scans are complete")
+        customPage.buildPage()
+        _info("CustomPage processing completed successfully")
+        
+        customPageData = customPage.getCustomPageData()
+        if customPageData:
+            _info(f"CustomPage data available for: {list(customPageData.keys())}")
+            Config.set('custom_page_data', customPageData)
+    except Exception as e:
+        _warn(f"CustomPage processing failed: {str(e)}")
+        Config.set('custom_page_data', {})
+
+def run_content_enrichment(enable_enrichment, enrichment_categories, enrichment_timeout, serviceStat, contexts):
+    """Fetch and process AWS content enrichment data for beta UI"""
+    if not enable_enrichment:
+        _info("Content enrichment disabled (not in beta mode)")
+        Config.set('enriched_content_data', '{"contentData": {}, "metadata": {}, "userPreferences": {}}')
+        Config.set('content_enrichment_enabled', False)
+        return
+    
+    try:
+        from utils.ContentEnrichment import ContentAggregator, ContentProcessor, RelevanceEngine
+        from utils.ContentEnrichment.models import UserContext
+        
+        detected_services = list(serviceStat.keys()) if serviceStat else []
+        
+        scan_findings = []
+        for service, data in contexts.items():
+            if 'results' in data:
+                for result in data['results']:
+                    if isinstance(result, dict) and result.get('status') in ['FAIL', 'WARN']:
+                        scan_findings.append({
+                            'service': service,
+                            'category': result.get('category', 'general'),
+                            'severity': result.get('status', 'INFO')
+                        })
+        
+        user_context = UserContext(
+            detected_services=detected_services,
+            scan_findings=scan_findings
+        )
+        
+        _info(f"Fetching AWS best practices and security insights (this may take 10-15 seconds)...")
+        _info(f"Content enrichment: Processing {len(detected_services)} detected services...")
+        
+        requested_categories = [cat.strip() for cat in enrichment_categories.split(',')]
+        
+        content_aggregator = ContentAggregator(timeout=int(enrichment_timeout), max_retries=2)
+        content_processor = ContentProcessor()
+        relevance_engine = RelevanceEngine()
+        
+        raw_content = content_aggregator.fetch_aws_content()
+        
+        processed_content = {}
+        total_items = 0
+        
+        for category, items in raw_content.items():
+            if category not in requested_categories:
+                continue
+            
+            processed_items = []
+            for item in items:
+                processed_item = content_processor.process_single_item(item)
+                if processed_item:
+                    relevance_score = relevance_engine.calculate_relevance(processed_item, user_context)
+                    processed_item.relevance_score = relevance_score
+                    processed_items.append(processed_item)
+            
+            filtered_items = content_aggregator.filter_by_services(processed_items, detected_services)
+            prioritized_items = relevance_engine.prioritize_content(filtered_items, user_context)
+            
+            processed_content[category] = prioritized_items[:10]
+            total_items += len(processed_content[category])
+        
+        enriched_content_data = content_aggregator.serialize_for_html(processed_content, detected_services)
+        
+        _info(f"✓ Content enrichment complete: {total_items} relevant items found")
+        Config.set('enriched_content_data', enriched_content_data)
+        Config.set('content_enrichment_enabled', True)
+        
+    except Exception as e:
+        _warn(f"Content enrichment failed: {str(e)}")
+        try:
+            from utils.ContentEnrichment.error_handler import ContentEnrichmentErrorHandler
+            error_handler = ContentEnrichmentErrorHandler()
+            enriched_content_data = error_handler.create_empty_enrichment_data(detected_services)
+            Config.set('enriched_content_data', enriched_content_data)
+            Config.set('content_enrichment_enabled', False)
+        except Exception as fallback_error:
+            _warn(f"Failed to create fallback enrichment data: {str(fallback_error)}")
+            Config.set('enriched_content_data', '{"contentData": {}, "metadata": {}, "userPreferences": {}}')
+            Config.set('content_enrichment_enabled', False)
+
 scriptStartTime = time.time()
 _cli_options = ArguParser.Load()
+
+# Setup logging to capture all output to timestamped log file
+log_filepath = setup_logging()
 
 debugFlag = _cli_options['debug']
 # feedbackFlag = _cli_options['feedback']
@@ -38,13 +219,20 @@ workerCounts = _cli_options['workerCounts']
 beta = _cli_options['beta']
 suppress_file = _cli_options['suppress_file']
 sequential = _cli_options['sequential']
+disable_custom_pages = _cli_options['disable_custom_pages']
 
 # print(crossAccounts)
 DEBUG = True if debugFlag in _C.CLI_TRUE_KEYWORD_ARRAY or debugFlag is True else False
 testmode = True if testmode in _C.CLI_TRUE_KEYWORD_ARRAY or testmode is True else False
 crossAccounts = True if crossAccounts in _C.CLI_TRUE_KEYWORD_ARRAY or crossAccounts is True else False
 beta = True if beta in _C.CLI_TRUE_KEYWORD_ARRAY or beta is True else False
+disable_custom_pages = True if disable_custom_pages in _C.CLI_TRUE_KEYWORD_ARRAY or disable_custom_pages is True else False
 _cli_options['crossAccounts'] = crossAccounts
+
+# Content enrichment is automatically enabled with beta features
+enable_enrichment = beta
+enrichment_categories = "security-reliability,ai-ml-genai,best-practices"
+enrichment_timeout = 30
 
 # <TODO> analyse the impact profile switching
 _AWS_OPTIONS = {
@@ -61,13 +249,8 @@ if suppress_file:
     if suppressions_manager.load_suppressions(suppress_file):
         Config.set('suppressions_manager', suppressions_manager)
 Config.set('beta', beta)
-
-_AWS_OPTIONS = {
-    'signature_version': Config.AWS_SDK['signature_version']
-}
-
+Config.set('disable_custom_pages', disable_custom_pages)
 Config.set("_SS_PARAMS", _cli_options)
-Config.set("_AWS_OPTIONS", _AWS_OPTIONS)
 
 defaultSessionRegion = 'us-east-1'
 
@@ -250,6 +433,14 @@ for acctId, cred in rolesCred.items():
     # if testmode == False:
         # CfnTrailObj.deleteStack()
     
+    # Initialize CustomPage for cost optimization and other custom features
+    customPage = CustomPage()
+    _info(f"CustomPage initialized with pages: {customPage.getRegistrar()}")
+    
+    # Reset CustomPage output for clean start
+    for service in services:
+        customPage.resetOutput(service)
+    
     ## <TODO>
     ## parallel logic to be implement in Python
     scanned = {
@@ -262,32 +453,7 @@ for acctId, cred in rolesCred.items():
     inventory = {}
     
     hasGlobal = False
-    for file in os.listdir(_C.FORK_DIR):
-        if file[0] == '.' or file == _C.SESSUID_FILENAME or file == 'tail.txt' or file == 'error.txt' or file == 'empty.txt' or file == 'all.csv' or file[0:10] == 'CustomPage':
-            continue
-        f = file.split('.')
-        if len(f) == 2:
-            if f[0] not in contexts:
-                contexts[f[0]] = {}
-            contexts[f[0]]['results'] = json.loads(open(_C.FORK_DIR + '/' + file).read())
-        elif f[1] == "charts":
-            ## Create and consolidate charts findings
-            if f[0] not in contexts:
-                contexts[f[0]] = {}
-            contexts[f[0]]['charts'] = json.loads(open(_C.FORK_DIR + '/' + file).read())
-        else:
-            cnt, rules, exceptions, timespent = list(json.loads(open(_C.FORK_DIR + '/' + file).read()).values())
-            
-            serviceStat[f[0]] = cnt
-            scanned['resources'] += cnt
-            scanned['rules'] += rules
-            scanned['exceptions'] += exceptions
-            scanned['timespent'] += timespent
-            if f[0] in Config.GLOBAL_SERVICES:
-                hasGlobal = True
-    
-    # if testmode == True:
-    #   exit("Test mode enable, script halted")
+    hasGlobal = collect_fork_results(contexts, serviceStat, scanned)
     
     timespent = round(time.time() - overallTimeStart, 3)
     scanned['timespent'] = timespent
@@ -295,6 +461,8 @@ for acctId, cred in rolesCred.items():
     
     print("Total Resources scanned: " + str(number_format(scanned['resources'])) + " | No. Rules executed: " + str(number_format(scanned['rules'])))
     print("Time consumed (seconds): " + str(timespent))
+    
+    process_custom_pages(customPage, services, disable_custom_pages)
     
     # Cleanup
     # os.chdir(_C.HTML_DIR)
@@ -331,7 +499,33 @@ for acctId, cred in rolesCred.items():
     Config.set('cli_regions', regions)
     Config.set('cli_frameworks', frameworks)
     
-    Screener.generateScreenerOutput(contexts, hasGlobal, regions, uploadToS3)
+    run_content_enrichment(enable_enrichment, enrichment_categories, enrichment_timeout, serviceStat, contexts)
+
+    # Generate output using OutputGenerator (handles both legacy and Cloudscape)
+    from utils.OutputGenerator import OutputGenerator
+    from utils.Tools import _info, _warn
+    
+    beta_mode = Config.get('beta', False)
+    generator = OutputGenerator(beta_mode=beta_mode)
+    
+    if beta_mode:
+        _info("Beta mode enabled - Generating both AdminLTE (legacy) and Cloudscape UI...")
+    else:
+        _info("Generating AdminLTE HTML output...")
+    
+    try:
+        generator.generate(contexts, regions, frameworks)
+        
+        if beta_mode:
+            _info("Both AdminLTE (index-legacy.html) and Cloudscape (index.html) generated successfully!")
+        else:
+            _info("AdminLTE HTML generated successfully!")
+            
+    except Exception as e:
+        _warn(f"Output generation failed: {e}")
+        # Fallback to old method if OutputGenerator fails
+        _warn("Falling back to legacy output generation...")
+        Screener.generateScreenerOutput(contexts, hasGlobal, regions, uploadToS3)
     
     # os.chdir(_C.FORK_DIR)
     filetodel = _C.FORK_DIR + '/tail.txt'
@@ -363,6 +557,20 @@ if beta:
     print("")
     print("\033[93m[-- ..... --] BETA MODE ENABLED [-- ..... --] \033[0m")
     print("Current Beta Features:")
-    print("\033[96m  01/ Concurrent Mode on Evaluator (Attempt to improve performance) \033[0m")
-    print("\033[96m  02/ API Buttons on each service html \033[0m")
+    print("\033[96m  01/ API Buttons on each service html (Interactive GenAI functionality) \033[0m")
+    print("\033[92m  02/ AWS Cloudscape Design System UI (Modern React-based interface) \033[0m")
+    print("\033[95m  03/ Content Enrichment (AWS best practices & security insights) \033[0m")
     print("\033[93m[-- ..... --] THANK YOU FOR TESTING BETA FEATURES [-- ..... --] \033[0m")
+    print("")
+    print("\033[94mStandard Features (Always Enabled):\033[0m")
+    print("\033[94m  • Concurrent Mode: Parallel check execution for better performance\033[0m")
+    print("\033[94m  • Enhanced TA Data: Advanced Trusted Advisor data generation\033[0m")
+    print("\033[94m  • Use --sequential to disable concurrent mode if needed\033[0m")
+
+# Log completion
+print("=" * 50)
+print(f"=== Service Screener v2 - Scan Completed ===")
+print(f"Total execution time: {scriptTimeSpent}s")
+print(f"Log saved to: {log_filepath}")
+print(f"Completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+print("=" * 50)

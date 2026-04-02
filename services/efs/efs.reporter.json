@@ -14,7 +14,7 @@
     },
     "EnabledLifecycle": {
         "category": "C",
-        "^description": "",
+        "^description": "EFS Lifecycle Management is not enabled. Lifecycle management automatically moves files that have not been accessed for a set period of time to the Infrequent Access (IA) storage class, which can reduce storage costs by up to 92%. This is recommended for file systems with files that are not accessed regularly.",
         "downtime": 0,
         "slowness": 0,
         "additionalCost": 0,
@@ -51,6 +51,149 @@
             "[Create EFS]<https://docs.aws.amazon.com/efs/latest/ug/creating-using-create-fs.html>",
             "[Options to transfer data]<https://docs.aws.amazon.com/efs/latest/ug/transfer-data-to-efs.html>",
             "[Comparison between Regional vs SingleAZ]<https://docs.aws.amazon.com/efs/latest/ug/features.html>"
+        ]
+    },
+    "ElasticThroughput": {
+        "category": "P",
+        "^description": "File system is not using Elastic throughput mode. Elastic throughput automatically scales throughput performance up or down to meet the needs of your workload activity, and you only pay for the throughput you use. This is recommended for most workloads with variable or unpredictable throughput patterns.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Switch to Elastic throughput mode for automatic scaling",
+        "ref": [
+            "[EFS Performance Modes]<https://docs.aws.amazon.com/efs/latest/ug/performance.html>"
+        ]
+    },
+    "ReplicationEnabled": {
+        "category": "R",
+        "^description": "File system does not have replication configured. EFS replication provides automatic, continuous replication of your file system to another AWS Region for disaster recovery and business continuity. This helps protect your data from regional failures.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Enable replication to another AWS Region for disaster recovery",
+        "ref": [
+            "[EFS Replication]<https://docs.aws.amazon.com/efs/latest/ug/efs-replication.html>"
+        ]
+    },
+    "ThroughputModeOptimized": {
+        "category": "P",
+        "^description": "File system throughput mode may not be optimized for your workload. Bursting mode is suitable for spiky workloads but may not provide consistent performance. Provisioned mode requires manual capacity planning and may result in over-provisioning. Elastic mode is recommended for most workloads as it automatically scales and optimizes costs.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Review and optimize throughput mode configuration",
+        "ref": [
+            "[EFS Throughput Modes]<https://docs.aws.amazon.com/efs/latest/ug/performance.html#throughput-modes>"
+        ]
+    },
+    "FileSystemPolicy": {
+        "category": "S",
+        "^description": "File system does not have an IAM policy configured. File system policies provide an additional layer of access control by defining which AWS principals can perform specific actions on your file system. This is a security best practice for controlling access at the file system level.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Configure IAM file system policy for access control",
+        "ref": [
+            "[EFS IAM Policies]<https://docs.aws.amazon.com/efs/latest/ug/iam-access-control-nfs-efs.html>"
+        ]
+    },
+    "MountTargetSecurityGroups": {
+        "category": "S",
+        "^description": "Mount targets do not have security groups properly configured. Security groups act as virtual firewalls to control network access to your file system. All mount targets should have at least one security group attached to restrict access to authorized clients only.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Ensure all mount targets have security groups configured",
+        "ref": [
+            "[EFS Security Groups]<https://docs.aws.amazon.com/efs/latest/ug/network-access.html>"
+        ]
+    },
+    "AccessPointsConfigured": {
+        "category": "S",
+        "^description": "File system does not have access points configured. EFS access points provide application-specific entry points into an EFS file system, making it easier to manage application access. Access points can enforce a user identity, including POSIX groups, and a root directory for all file system requests made through the access point.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Configure access points for application-specific access control",
+        "ref": [
+            "[EFS Access Points]<https://docs.aws.amazon.com/efs/latest/ug/efs-access-points.html>"
+        ]
+    },
+    "ComprehensiveSecurity": {
+        "category": "S",
+        "^description": "File system does not have all three recommended security controls in place. AWS recommends implementing defense-in-depth by using security groups (network-level), IAM file system policies (identity-level), and access points (application-level) together for comprehensive security.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Implement all three security controls for defense-in-depth",
+        "ref": [
+            "[EFS Security Best Practices]<https://docs.aws.amazon.com/efs/latest/ug/security-considerations.html>"
+        ]
+    },
+    "TLSRequired": {
+        "category": "S",
+        "^description": "File system policy does not require TLS for connections. Requiring TLS (encryption in transit) via file system policy ensures that all data transmitted between clients and the file system is encrypted. This is a security best practice to protect data in transit from interception.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Configure file system policy to require TLS for all connections",
+        "ref": [
+            "[EFS Encryption in Transit]<https://docs.aws.amazon.com/efs/latest/ug/encryption-in-transit.html>"
+        ]
+    },
+    "PerformanceModeOptimized": {
+        "category": "P",
+        "^description": "File system performance mode may not be appropriate for your workload. General Purpose mode is recommended for most workloads as it provides lower latency. Max I/O mode is designed for highly parallelized workloads that can tolerate higher latency in exchange for higher aggregate throughput. Ensure the selected mode matches your workload characteristics.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Verify performance mode matches workload requirements",
+        "ref": [
+            "[EFS Performance Modes]<https://docs.aws.amazon.com/efs/latest/ug/performance.html#performancemodes>"
+        ]
+    },
+    "StorageOptimization": {
+        "category": "C",
+        "^description": "File system storage distribution may not be optimized for cost. If lifecycle management is enabled but no data has transitioned to Infrequent Access (IA) storage class, you may not be realizing cost savings. Review your lifecycle policy settings and file access patterns to ensure cost optimization.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Review storage distribution for cost optimization",
+        "ref": [
+            "[EFS Storage Classes]<https://docs.aws.amazon.com/efs/latest/ug/storage-classes.html>"
+        ]
+    },
+    "NoSensitiveDataInTags": {
+        "category": "S",
+        "^description": "File system tags may contain sensitive data. Tags should not contain sensitive information such as passwords, API keys, secrets, personally identifiable information (PII), or other confidential data. Tags are visible to anyone with appropriate IAM permissions and may be logged or exposed in various AWS services.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Review tags to ensure no sensitive data is present",
+        "ref": [
+            "[AWS Tagging Best Practices]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>"
         ]
     }
 }

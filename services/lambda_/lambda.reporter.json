@@ -193,5 +193,174 @@
         "ref": [
             "[Advantages of using arm64]<https://docs.aws.amazon.com/lambda/latest/dg/foundation-arch.html>"    
         ]
+    },
+    "lambdaSQSVisibilityTimeout":{
+        "category": "R",
+        "^description": "SQS Visibility Timeout: {$COUNT} of your Lambda functions with SQS triggers have visibility timeout less than 6x function timeout. This may cause duplicate message processing.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "SQS Visibility Timeout Too Low",
+        "ref": [
+            "[AWS Lambda with Amazon SQS]<https://docs.aws.amazon.com/lambda/latest/dg/with-sqs.html>"
+        ]
+    },
+    "lambdaAsyncRetryNotConfigured":{
+        "category": "R",
+        "^description": "Async Retry Configuration: {$COUNT} of your Lambda functions do not have customized async invocation retry configuration. Configure retry attempts and event age for better reliability.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "Async Retry Configuration Not Set",
+        "ref": [
+            "[Asynchronous invocation]<https://docs.aws.amazon.com/lambda/latest/dg/invocation-async.html>"
+        ]
+    },
+    "lambdaNoCloudWatchAlarms":{
+        "category": "O",
+        "^description": "CloudWatch Alarms: {$COUNT} of your Lambda functions do not have CloudWatch alarms configured for critical metrics (Errors, Duration, Throttles). Configure alarms for proactive monitoring.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "No CloudWatch Alarms Configured",
+        "ref": [
+            "[Using Lambda with CloudWatch]<https://docs.aws.amazon.com/lambda/latest/dg/monitoring-cloudwatchlogs.html>"
+        ]
+    },
+    "lambdaPartialBatchResponseDisabled":{
+        "category": "R",
+        "^description": "Partial Batch Response: {$COUNT} of your Lambda functions with stream event sources do not have partial batch response enabled. Enable ReportBatchItemFailures to avoid reprocessing entire batches.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "Partial Batch Response Not Enabled",
+        "ref": [
+            "[Reporting batch item failures]<https://docs.aws.amazon.com/lambda/latest/dg/with-kinesis.html#services-kinesis-batchfailurereporting>"
+        ]
+    },
+    "lambdaBatchingWindowNotConfigured":{
+        "category": "P",
+        "^description": "Batching Window: {$COUNT} of your Lambda functions with stream event sources do not have batching window configured. Configure batching window to aggregate records for better efficiency.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 1,
+        "shortDesc": "Batching Window Not Configured",
+        "ref": [
+            "[Batching behavior]<https://docs.aws.amazon.com/lambda/latest/dg/invocation-eventsourcemapping.html#invocation-eventsourcemapping-batching>"
+        ]
+    },
+    "lambdaNoIteratorAgeAlarm":{
+        "category": "O",
+        "^description": "IteratorAge Monitoring: {$COUNT} of your Lambda functions consuming streams do not have IteratorAge alarms configured. Monitor IteratorAge to detect processing lag.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "No IteratorAge Alarm",
+        "ref": [
+            "[Monitoring stream processors]<https://docs.aws.amazon.com/lambda/latest/dg/monitoring-metrics.html>"
+        ]
+    },
+    "lambdaGuardDutyProtectionDisabled":{
+        "category": "S",
+        "^description": "GuardDuty Lambda Protection: GuardDuty Lambda Protection is not enabled in this account. Enable Lambda Protection for threat detection on your Lambda functions.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "GuardDuty Lambda Protection Disabled",
+        "ref": [
+            "[GuardDuty Lambda Protection]<https://docs.aws.amazon.com/guardduty/latest/ug/lambda-protection.html>"
+        ]
+    },
+    "lambdaNoEnvironmentVariables":{
+        "category": "O",
+        "^description": "Environment Variables: {$COUNT} of your Lambda functions do not have environment variables defined. Consider using environment variables for configuration instead of hard-coding values.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "No Environment Variables Defined",
+        "ref": [
+            "[Using environment variables]<https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars.html>"
+        ]
+    },
+    "lambdaMemoryNotOptimized":{
+        "category": "C",
+        "^description": "Memory Optimization: {$COUNT} of your Lambda functions may have sub-optimal memory configuration. Review memory usage and adjust for cost and performance optimization.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "Memory Not Optimized",
+        "ref": [
+            "[Lambda Power Tuning]<https://docs.aws.amazon.com/lambda/latest/operatorguide/profile-functions.html>"
+        ]
+    },
+    "lambdaTimeoutNotOptimized":{
+        "category": "R",
+        "^description": "Timeout Configuration: {$COUNT} of your Lambda functions have timeout configuration that may not match execution patterns. Review and optimize timeout settings.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 1,
+        "shortDesc": "Timeout Not Optimized",
+        "ref": [
+            "[Lambda function configuration]<https://docs.aws.amazon.com/lambda/latest/dg/configuration-function-common.html>"
+        ]
+    },
+    "lambdaRoleTooPermissive":{
+        "category": "S",
+        "^description": "IAM Permissions: {$COUNT} of your Lambda functions have execution roles with overly broad permissions. Review and apply least privilege principle.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "Execution Role Too Permissive",
+        "ref": [
+            "[Lambda execution role]<https://docs.aws.amazon.com/lambda/latest/dg/lambda-intro-execution-role.html>"
+        ]
+    },
+    "lambdaQuotasNotMonitored":{
+        "category": "R",
+        "^description": "Service Quotas: Lambda service quotas are approaching limits in this account. Monitor quotas and request increases if needed to prevent service disruptions.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Lambda Quotas Not Monitored",
+        "ref": [
+            "[Lambda quotas]<https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html>"
+        ]
+    },
+    "lambdaNoReservedConcurrencyForThrottling":{
+        "category": "R",
+        "^description": "Reserved Concurrency: {$COUNT} of your Lambda functions experience throttling but do not have reserved concurrency configured. Consider setting reserved concurrency to protect downstream services.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 1,
+        "shortDesc": "No Reserved Concurrency for Throttling",
+        "ref": [
+            "[Managing concurrency]<https://docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html>"
+        ]
     }
 }

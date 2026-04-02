@@ -314,6 +314,7 @@ class Reporter:
                 for link in ref:
                     output = re.search(r'\[(.*)\]<(.*)>', link)
                     if not output:
+                        print(f"  [WARNING] Invalid ref syntax in {self.service}/{check}: '{link}'")
                         continue
                     
                     links.append("<a href='{}'>{}</a>".format(output.group(2), output.group(1)))
@@ -361,6 +362,7 @@ class Reporter:
                 for link in ref:
                     output = re.search(r'\[(.*)\]<(.*)>', link)
                     if not output:
+                        print(f"  [WARNING] Invalid ref syntax in {self.service}/{check} (suppressed): '{link}'")
                         continue
                     
                     links.append("<a href='{}'>{}</a>".format(output.group(2), output.group(1)))

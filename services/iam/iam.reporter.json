@@ -527,5 +527,106 @@
 			"[AWS Backup]<https://docs.aws.amazon.com/aws-backup/latest/devguide/whatisbackup.html>",
 			"[Getting Started]<https://docs.aws.amazon.com/aws-backup/latest/devguide/getting-started.html>"
 		]
+	},
+	"unusedCustomerManagedPolicy": {
+		"category": "O",
+		"^description": "You have {$COUNT} customer managed policies that are not attached to any IAM users, groups, or roles. These unused policies represent operational clutter and potential security risks if accidentally attached. Review these policies and delete them if they are no longer needed. Regularly removing unused policies helps maintain a clean IAM environment and reduces the attack surface.",
+		"shortDesc": "Remove unused customer managed policies",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[IAM Best Practices]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#remove-unused-credentials>",
+			"[Delete IAM Policy]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_manage-delete.html>"
+		]
+	},
+	"iamUsersWithFederationAvailable": {
+		"category": "S",
+		"^description": "{$COUNT} IAM users have long-term credentials (passwords or access keys) while federation (SAML or OIDC) is configured in your account. When federation is available, human users should use federated access with temporary credentials instead of IAM users with long-term credentials. This reduces the risk of credential exposure and aligns with AWS security best practices. Consider migrating these users to federated access through AWS IAM Identity Center or your configured identity provider.",
+		"shortDesc": "Use federation instead of IAM users",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[IAM Best Practices]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#bp-users-federation-idp>",
+			"[Federation]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers.html>"
+		]
+	},
+	"wildcardActionsDetection": {
+		"category": "S",
+		"^description": "{$COUNT} policies contain wildcard actions (e.g., s3:*, ec2:*) beyond full administrator access. While full admin access is sometimes necessary, service-level wildcards grant excessive permissions that violate the principle of least privilege. Review these policies and replace wildcard actions with specific permissions that match the actual requirements. This reduces the risk of unintended access and improves your security posture.",
+		"shortDesc": "Replace wildcard actions with specific permissions",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Least Privilege]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>",
+			"[Policy Evaluation]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_evaluation-logic.html>"
+		]
+	},
+	"unnecessaryCustomPolicies": {
+		"category": "O",
+		"^description": "{$COUNT} customer managed policies may duplicate functionality available in AWS managed policies. AWS managed policies are maintained by AWS and automatically updated when new services or features are released. Review these custom policies and consider replacing them with AWS managed policies where appropriate. This reduces maintenance burden and ensures your policies stay current with AWS best practices.",
+		"shortDesc": "Consider using AWS managed policies",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Managed Policies]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_managed-vs-inline.html#aws-managed-policies>",
+			"[IAM Best Practices]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#bp-use-aws-defined-policies>"
+		]
+	},
+	"missingPolicyConditions": {
+		"category": "S",
+		"^description": "{$COUNT} customer managed policies contain sensitive operations without appropriate security conditions. Sensitive operations such as IAM modifications, security configuration changes, and privilege escalation actions should be protected with conditions like MFA enforcement (aws:MultiFactorAuthPresent), IP restrictions (aws:SourceIp), or secure transport requirements (aws:SecureTransport). Adding these conditions provides defense-in-depth by ensuring that even if credentials are compromised, additional security controls must be satisfied before sensitive actions can be performed. Review the identified policies and add appropriate condition blocks to restrict when and how sensitive operations can be executed.",
+		"shortDesc": "Add security conditions to policies with sensitive operations",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[IAM Policy Conditions]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_condition.html>",
+			"[IAM Best Practices]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#use-policy-conditions>",
+			"[MFA Conditions]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa_configure-api-require.html>"
+		]
+	},
+	"missingPermissionsBoundaries": {
+		"category": "S",
+		"^description": "{$COUNT} IAM users or roles with delegated administration capabilities are missing permissions boundaries. Permissions boundaries are an advanced IAM feature that sets the maximum permissions an identity-based policy can grant to an IAM entity. When you delegate administrative permissions to users or roles (such as the ability to create or manage other IAM entities), permissions boundaries provide an additional layer of control by defining the maximum permissions these delegated administrators can have, even if their identity-based policies grant broader access. This helps prevent privilege escalation and ensures that delegated administrators cannot grant themselves or others more permissions than intended. Review the identified entities and apply appropriate permissions boundaries to limit their maximum permissions scope.",
+		"shortDesc": "Apply permissions boundaries to delegated administrators",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Permissions Boundaries]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html>",
+			"[IAM Best Practices]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#bp-permissions-boundaries>",
+			"[Delegating Permissions]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html#access_policies_boundaries-delegate>"
+		]
+	},
+	"scpBestPractices": {
+		"category": "S",
+		"^description": "{$COUNT} Service Control Policies (SCPs) in your AWS Organization are missing recommended security guardrails. SCPs are a type of organization policy that you can use to manage permissions across your organization, providing central control over the maximum available permissions for all accounts. Best practice SCPs should include: (1) Denying root user actions to prevent use of root credentials across member accounts, (2) Restricting access to specific AWS regions to limit where resources can be created, and (3) Preventing privilege escalation by denying sensitive IAM actions like creating policy versions or setting default policy versions. These guardrails provide defense-in-depth by ensuring that even if individual account policies are misconfigured, organizational controls prevent high-risk actions. Review the identified SCPs and enhance them with appropriate Deny statements to implement these security patterns.",
+		"shortDesc": "Improve SCP security guardrails",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Service Control Policies]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html>",
+			"[IAM Best Practices]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#bp-use-aws-organizations>",
+			"[SCP Examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html>"
+		]
 	}
 }

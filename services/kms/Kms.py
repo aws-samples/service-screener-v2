@@ -31,8 +31,11 @@ class Kms(Service):
             res = self.kmsClient.describe_key(KeyId = key['KeyId'])
             metadata = res.get('KeyMetadata')
             if metadata['KeyManager'] != 'AWS':
-                rr = self.kmsClient.get_key_rotation_status(KeyId = key['KeyId'])
-                metadata['KeyRotationEnabled'] = rr.get('KeyRotationEnabled')
+                try:
+                    rr = self.kmsClient.get_key_rotation_status(KeyId = key['KeyId'])
+                    metadata['KeyRotationEnabled'] = rr.get('KeyRotationEnabled')
+                except botocore.exceptions.ClientError:
+                    metadata['KeyRotationEnabled'] = None
                 
                 if self.tags:
                     tags = self.kmsClient.list_resource_tags(KeyId = key['KeyId'])

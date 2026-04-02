@@ -284,5 +284,19 @@
         "ref": [
             "[Use cold storage for time-series log data]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp.html#bp-cost-optimization>"    
         ]
+    },
+    "CloudWatchAlarms": {
+        "category": "O",
+        "^description": "CloudWatch alarms enable proactive monitoring of OpenSearch domain health and performance. Recommended alarms include ClusterStatus.red (cluster health), ClusterStatus.yellow (replica issues), FreeStorageSpace (storage capacity), and ClusterIndexWritesBlocked (write capacity). These alarms help detect issues before they impact users and prevent costly emergency responses.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "H",
+        "needFullTest": 0,
+        "shortDesc": "Configure CloudWatch alarms for critical OpenSearch metrics to enable proactive monitoring.",
+        "ref": [
+            "[CloudWatch Alarms for OpenSearch]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/cloudwatch-alarms.html>",
+            "[Recommended Alarms]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/bp.html#bp-monitoring>"
+        ]
     }
 }

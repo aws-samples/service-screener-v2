@@ -74,7 +74,7 @@ class Lambda(Service):
                 # cls = getattr(module, driver)
                 _pi('Lambda', lambda_function['FunctionName'])
                 # obj = cls(lambda_function, self.lambda_client, self.iam_client, role_count)
-                obj = LambdaCommon(lambda_function, self.lambda_client, self.iam_client, role_count)
+                obj = LambdaCommon(lambda_function, self.lambda_client, self.iam_client, role_count, self.bConfig)
                 obj.run(self.__class__)
                 objs[f"Lambda::{lambda_function['FunctionName']}"] = obj.getInfo()
             except (ImportError, AttributeError):

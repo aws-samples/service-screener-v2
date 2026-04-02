@@ -194,7 +194,7 @@ class ExcelBuilder:
     def _formatReporterDataToArray(self, service, cardSummary):
         arr = []
         for check, detail in cardSummary.items():
-            if not detail['__links']:
+            if not detail.get('__links'):
                 detail['__links'] = ''
             
             if not service in self.recommendations:

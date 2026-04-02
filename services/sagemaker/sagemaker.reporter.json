@@ -1,0 +1,286 @@
+{
+    "ProductionVariantInstanceCount": {
+        "category": "R",
+        "^description": "{$COUNT} SageMaker endpoint configuration(s) have production variants with less than 2 instances, creating a single point of failure",
+        "shortDesc": "Ensure production variants have at least 2 instances for high availability",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[SageMaker Endpoint Configuration Best Practices]<https://docs.aws.amazon.com/securityhub/latest/userguide/sagemaker-controls.html#sagemaker-4>",
+            "[Production Variant Instance Count]<https://docs.aws.amazon.com/config/latest/developerguide/sagemaker-endpoint-config-prod-instance-count.html>"
+        ]
+    },
+    "NetworkIsolation": {
+        "category": "S",
+        "^description": "{$COUNT} SageMaker model(s) do not have network isolation enabled, allowing containers to make outbound network connections",
+        "shortDesc": "Enable network isolation for SageMaker models to prevent data exfiltration",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SageMaker Network Isolation]<https://docs.aws.amazon.com/sagemaker/latest/dg/studio-notebooks-and-internet-access.html>"
+        ]
+    },
+    "ModelVpcSettings": {
+        "category": "S",
+        "^description": "{$COUNT} SageMaker model(s) are not configured with VPC settings, using public networking instead of private VPC",
+        "shortDesc": "Configure VPC settings for SageMaker models to use private networking",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SageMaker VPC Configuration]<https://docs.aws.amazon.com/sagemaker/latest/dg/studio-notebooks-and-internet-access.html>"
+        ]
+    },
+    "EncryptionEnabled": {
+        "category": "S",
+        "^description": "{$COUNT} SageMaker notebook instance(s) are not encrypted with a KMS key, leaving data at rest unprotected",
+        "shortDesc": "Enable KMS encryption for SageMaker notebook instances",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[SageMaker Encryption at Rest]<https://docs.aws.amazon.com/sagemaker/latest/dg/key-management.html>"
+        ]
+    },
+    "RootAccessDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} SageMaker notebook instance(s) have root access enabled, allowing users full system control",
+        "shortDesc": "Disable root access on SageMaker notebook instances",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SageMaker Root Access Control]<https://docs.aws.amazon.com/sagemaker/latest/dg/nbi-root-access.html>"
+        ]
+    },
+    "NotebookVpcSettings": {
+        "category": "S",
+        "^description": "{$COUNT} SageMaker notebook instance(s) are not configured with VPC settings, relying on public networking",
+        "shortDesc": "Configure VPC settings for SageMaker notebook instances",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SageMaker Notebook VPC Configuration]<https://docs.aws.amazon.com/sagemaker/latest/dg/studio-notebooks-and-internet-access.html>"
+        ]
+    },
+    "DirectInternetAccess": {
+        "category": "S",
+        "^description": "{$COUNT} SageMaker notebook instance(s) have direct internet access enabled, allowing unrestricted outbound connections",
+        "shortDesc": "Disable direct internet access for SageMaker notebook instances",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SageMaker Direct Internet Access]<https://docs.aws.amazon.com/sagemaker/latest/dg/interface-vpc-endpoint.html>"
+        ]
+    },
+    "InterContainerEncryption": {
+        "category": "S",
+        "^description": "{$COUNT} SageMaker training job(s) do not have inter-container traffic encryption enabled",
+        "shortDesc": "Enable inter-container traffic encryption for SageMaker training jobs",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SageMaker Inter-Container Encryption]<https://docs.aws.amazon.com/sagemaker/latest/dg/interface-vpc-endpoint.html>"
+        ]
+    },
+    "TrainingNetworkIsolation": {
+        "category": "S",
+        "^description": "{$COUNT} SageMaker training job(s) do not have network isolation enabled, allowing network access during training",
+        "shortDesc": "Enable network isolation for SageMaker training jobs",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SageMaker Training Network Isolation]<https://docs.aws.amazon.com/sagemaker/latest/dg/interface-vpc-endpoint.html>"
+        ]
+    },
+    "VolumeAndOutputEncryption": {
+        "category": "S",
+        "^description": "{$COUNT} SageMaker training job(s) do not have volume and output encryption enabled with KMS",
+        "shortDesc": "Enable KMS encryption for training job volumes and outputs",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[SageMaker Training Encryption]<https://docs.aws.amazon.com/sagemaker/latest/dg/key-management.html>"
+        ]
+    },
+    "TrainingVpcSettings": {
+        "category": "S",
+        "^description": "{$COUNT} SageMaker training job(s) are not configured with VPC settings, using public networking",
+        "shortDesc": "Configure VPC settings for SageMaker training jobs",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SageMaker Training VPC Configuration]<https://docs.aws.amazon.com/sagemaker/latest/dg/interface-vpc-endpoint.html>"
+        ]
+    },
+    "EndpointAutoScalingConfigured": {
+        "category": "R",
+        "^description": "{$COUNT} SageMaker endpoint(s) do not have auto-scaling configured, which may lead to performance issues during traffic spikes or unnecessary costs during low traffic",
+        "shortDesc": "Configure auto-scaling for SageMaker endpoints",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Automatically Scale SageMaker Models]<https://docs.aws.amazon.com/sagemaker/latest/dg/endpoint-auto-scaling.html>",
+            "[Best practices for deploying models]<https://docs.aws.amazon.com/sagemaker/latest/dg/deployment-best-practices.html>"
+        ]
+    },
+    "ModelDataUrlValidation": {
+        "category": "S",
+        "^description": "{$COUNT} SageMaker model(s) have model data URLs that are not from S3, which may pose security risks",
+        "shortDesc": "Ensure model data is loaded from S3 buckets only",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SageMaker Model Data]<https://docs.aws.amazon.com/sagemaker/latest/dg/API_ContainerDefinition.html>",
+            "[Security Best Practices]<https://docs.aws.amazon.com/sagemaker/latest/dg/security-best-practices.html>"
+        ]
+    },
+    "TrainingSpotInstancesEnabled": {
+        "category": "C",
+        "^description": "{$COUNT} SageMaker training job(s) are not using managed spot instances, missing opportunity for up to 90% cost savings",
+        "shortDesc": "Consider using managed spot instances for training jobs",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": -1,
+        "needFullTest": 0,
+        "ref": [
+            "[Use Managed Spot Training]<https://docs.aws.amazon.com/sagemaker/latest/dg/model-managed-spot-training.html>",
+            "[Managed Spot Training Best Practices]<https://docs.aws.amazon.com/sagemaker/latest/dg/model-managed-spot-training.html#model-managed-spot-training-best-practices>"
+        ]
+    },
+    "TrainingCheckpointConfigured": {
+        "category": "R",
+        "^description": "{$COUNT} SageMaker training job(s) do not have checkpoint configuration, which prevents resuming interrupted training jobs",
+        "shortDesc": "Configure checkpoints for training jobs to enable resumption",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Use Checkpoints in SageMaker]<https://docs.aws.amazon.com/sagemaker/latest/dg/model-checkpoints.html>",
+            "[Managed Spot Training with Checkpoints]<https://docs.aws.amazon.com/sagemaker/latest/dg/model-managed-spot-training.html>"
+        ]
+    },
+    "EndpointDataCaptureEnabled": {
+        "category": "O",
+        "^description": "{$COUNT} SageMaker endpoint configuration(s) do not have data capture enabled, which prevents model quality monitoring and drift detection",
+        "shortDesc": "Enable data capture for SageMaker endpoints to monitor model quality",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Capture Data from Real-time Endpoint]<https://docs.aws.amazon.com/sagemaker/latest/dg/model-monitor-data-capture.html>",
+            "[Monitor Models for Data and Model Quality]<https://docs.aws.amazon.com/sagemaker/latest/dg/model-monitor.html>"
+        ]
+    },
+    "NotebookLifecycleConfigAttached": {
+        "category": "O",
+        "^description": "{$COUNT} SageMaker notebook instance(s) do not have lifecycle configuration attached, missing automation opportunities for setup and teardown",
+        "shortDesc": "Attach lifecycle configuration to notebook instances for automation",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Customize Notebook Instances Using Lifecycle Configurations]<https://docs.aws.amazon.com/sagemaker/latest/dg/notebook-lifecycle-config.html>",
+            "[Lifecycle Configuration Best Practices]<https://docs.aws.amazon.com/sagemaker/latest/dg/nbi-lifecycle-config-install.html>"
+        ]
+    },
+    "EndpointInstanceTypeConsistency": {
+        "category": "R",
+        "^description": "{$COUNT} SageMaker endpoint configuration(s) have production variants using different instance types, which may lead to unpredictable performance",
+        "shortDesc": "Use consistent instance types across production variants for predictable performance",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Best practices for deploying models]<https://docs.aws.amazon.com/sagemaker/latest/dg/deployment-best-practices.html>",
+            "[Production Variants]<https://docs.aws.amazon.com/sagemaker/latest/dg/model-ab-testing.html>"
+        ]
+    },
+    "HyperparameterTuningEarlyStopping": {
+        "category": "C",
+        "^description": "{$COUNT} SageMaker hyperparameter tuning job(s) do not have early stopping enabled, missing opportunity to reduce training costs",
+        "shortDesc": "Enable early stopping for hyperparameter tuning jobs to reduce costs",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": -1,
+        "needFullTest": 0,
+        "ref": [
+            "[Stop Training Jobs Early]<https://docs.aws.amazon.com/sagemaker/latest/dg/automatic-model-tuning-early-stopping.html>",
+            "[Best Practices for Hyperparameter Tuning]<https://docs.aws.amazon.com/sagemaker/latest/dg/automatic-model-tuning-considerations.html>"
+        ]
+    },
+    "EndpointVariantWeightDistribution": {
+        "category": "R",
+        "^description": "{$COUNT} SageMaker endpoint(s) have only one production variant or unbalanced traffic distribution, missing A/B testing opportunities",
+        "shortDesc": "Consider using multiple variants with balanced traffic for A/B testing",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Test models in production]<https://docs.aws.amazon.com/sagemaker/latest/dg/model-ab-testing.html>",
+            "[Best practices for deploying models]<https://docs.aws.amazon.com/sagemaker/latest/dg/deployment-best-practices.html>"
+        ]
+    },
+    "ModelContainerImageSource": {
+        "category": "S",
+        "^description": "{$COUNT} SageMaker model(s) use container images from non-AWS registries, which may pose security risks",
+        "shortDesc": "Use container images from AWS Deep Learning Containers or approved ECR repositories",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Deep Learning Containers]<https://docs.aws.amazon.com/deep-learning-containers/latest/devguide/what-is-dlc.html>",
+            "[Security Best Practices]<https://docs.aws.amazon.com/sagemaker/latest/dg/security-best-practices.html>"
+        ]
+    }
+}

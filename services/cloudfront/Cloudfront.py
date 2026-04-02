@@ -17,6 +17,7 @@ class Cloudfront(Service):
         
         ssBoto = self.ssBoto
         self.cloudfrontClient = ssBoto.client('cloudfront')
+        self.s3Client = ssBoto.client('s3')
         
     def getDistributions(self):
         
@@ -51,7 +52,7 @@ class Cloudfront(Service):
         dists = self.getDistributions()
         for dist in dists:
             _pi('CloudFront::Distribution', dist)
-            obj = cloudfrontDist(dist, self.cloudfrontClient)
+            obj = cloudfrontDist(dist, self.cloudfrontClient, self.s3Client)
             obj.run(self.__class__)
             
             objs['Cloudfront::' + dist] = obj.getInfo()

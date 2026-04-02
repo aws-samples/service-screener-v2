@@ -234,5 +234,121 @@
         "ref": [
             "[Getting started with Amazon Macie]<https://docs.aws.amazon.com/macie/latest/user/getting-started.html>"
         ]
+    },
+    "BucketOwnerEnforced": {
+        "category": "S",
+        "^description": "You have not enabled 'Bucket Owner Enforced' setting on {$COUNT} buckets. This setting disables ACLs and ensures that the bucket owner automatically owns and has full control over every object in the bucket. ACLs are legacy access control mechanisms that can create security vulnerabilities and are difficult to audit at scale. AWS recommends disabling ACLs by enabling 'Bucket Owner Enforced' for all buckets.",
+        "shortDesc": "Enable Bucket Owner Enforced",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Controlling ownership of objects]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/about-object-ownership.html>",
+            "[Disabling ACLs]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/ensure-object-ownership.html>"
+        ]
+    },
+    "TransferAcceleration": {
+        "category": "P",
+        "^description": "You have not enabled Transfer Acceleration on {$COUNT} buckets. Transfer Acceleration enables fast, easy, and secure transfers of files over long distances between your client and an S3 bucket by leveraging Amazon CloudFront's globally distributed edge locations. This is particularly beneficial for applications with geographically distributed users uploading or downloading large files.",
+        "shortDesc": "Consider Transfer Acceleration",
+        "criticality": "I",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Transfer Acceleration]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/transfer-acceleration.html>",
+            "[Getting Started]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/transfer-acceleration-getting-started.html>"
+        ]
+    },
+    "CloudWatchRequestMetrics": {
+        "category": "OS",
+        "^description": "You have not enabled CloudWatch request metrics on {$COUNT} buckets. CloudWatch request metrics provide visibility into S3 bucket operations, including request counts, latency, and error rates. These metrics enable proactive monitoring, security incident detection, cost optimization, and compliance auditing. Enabling request metrics helps identify unusual access patterns and supports operational troubleshooting.",
+        "shortDesc": "Enable CloudWatch Request Metrics",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Monitoring with CloudWatch]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/cloudwatch-monitoring.html>",
+            "[Request Metrics]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/metrics-configurations.html>"
+        ]
+    },
+    "WildcardPrincipalsActions": {
+        "category": "S",
+        "^description": "You have {$COUNT} buckets with wildcard principals ('Principal': '*') or wildcard actions ('Action': '*' or 's3:*') in Allow statements of their bucket policies. This is a critical security risk that grants overly permissive access and violates the principle of least privilege. Wildcard principals allow anyone on the internet to access your bucket, and wildcard actions grant all S3 permissions including destructive operations. This is a common source of data breaches and unauthorized access. Review and restrict these policies to specific principals and actions, or use Condition clauses to mitigate risks.",
+        "shortDesc": "Remove Wildcard Principals/Actions",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Bucket Policy Examples]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/example-bucket-policies.html>",
+            "[Security Best Practices]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html>",
+            "[IAM Policy Elements]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html>"
+        ]
+    },
+    "SSECBlocking": {
+        "category": "S",
+        "^description": "You have {$COUNT} buckets that do not block SSE-C (Server-Side Encryption with Customer-Provided Keys). AWS recommends using SSE-S3 or SSE-KMS instead of SSE-C due to operational complexity and key management risks. With SSE-C, customers must manage encryption keys themselves, and key loss means permanent data loss with no AWS recovery option. Blocking SSE-C through bucket policies and using AWS-managed encryption simplifies operations, reduces risk, and improves compliance posture.",
+        "shortDesc": "Block SSE-C Encryption",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Server-Side Encryption]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/serv-side-encryption.html>",
+            "[SSE-C]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerSideEncryptionCustomerKeys.html>",
+            "[Bucket Policies for Encryption]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucket-encryption.html>"
+        ]
+    },
+    "StorageLens": {
+        "category": "CO",
+        "^description": "S3 Storage Lens is not enabled for your AWS account. Storage Lens provides organization-wide visibility into S3 storage usage, activity trends, and cost optimization opportunities. It helps identify unused buckets, optimize storage classes, track storage growth, and improve security posture. The free tier includes basic metrics, while advanced metrics provide additional insights. Enabling Storage Lens helps reduce costs and improve operational efficiency.",
+        "shortDesc": "Enable S3 Storage Lens",
+        "criticality": "I",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Storage Lens Overview]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage_lens.html>",
+            "[Getting Started]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage_lens_console_getting_started.html>",
+            "[Cost Optimization]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-lens-optimize-storage.html>"
+        ]
+    },
+    "PublicAccessDocumentation": {
+        "category": "S",
+        "^description": "You have {$COUNT} public buckets without proper approval documentation. While public access may be intentional for some use cases (e.g., static website hosting), all public buckets should have documented approval through tags such as 'PublicAccessApproved=true' and 'ApprovalDate'. This ensures public access is intentional, provides an audit trail, and enables periodic review of justifications. Undocumented public buckets may indicate accidental exposure or lack of governance.",
+        "shortDesc": "Document Public Access Approval",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Bucket Tagging]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-tagging.html>",
+            "[Public Access Best Practices]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html>",
+            "[Governance]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-overview.html>"
+        ]
+    },
+    "UnpredictableBucketNames": {
+        "category": "S",
+        "^description": "You have {$COUNT} buckets with predictable naming patterns. AWS recommends using unpredictable bucket names to reduce the risk of unauthorized access attempts through enumeration. Predictable patterns include sequential numbers, dates, common words, or obvious naming conventions. While this is a defense-in-depth measure and proper access controls are more important, unpredictable names add an additional layer of security by making it harder for attackers to guess bucket names.",
+        "shortDesc": "Use Unpredictable Bucket Names",
+        "criticality": "I",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Bucket Naming Rules]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html>",
+            "[Security Best Practices]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html>"
+        ]
     }
 }

@@ -18,8 +18,8 @@ class RdsPostgres(RdsCommon):
             self.results['PG__param_statementTimeout'] = [-1, "Configured: {}, Recommended: {}".format(idleTimeout, '1-1800001')]
 
         logTempFiles = params.get('log_temp_files', False)
-        if logTempFiles in (False, None) or int(logTempFiles) > 5242880:
-            self.results['PG__param_logTempFiles'] = [-1, "Configured: {}, Recommended: {}".format(idleTimeout, '0-5242880')]
+        if logTempFiles in (False, None) or int(logTempFiles) < 0 or int(logTempFiles) > 5242880:
+            self.results['PG__param_logTempFiles'] = [-1, "Configured: {}, Recommended: {}".format(logTempFiles, '0-5242880')]
 
         ## seems no such things
         tempFileLimit = params.get('temp_file_limit', False)
@@ -34,8 +34,8 @@ class RdsPostgres(RdsCommon):
             self.results['PG__param_rdsAutoVacuumLevel'] = [-1, "Configured: {}, Recommended: {}".format(alevel, 'INFO or DEBUG1')]
 
         adlevel = params.get('log_autovacuum_min_duration', False)
-        if adlevel in (False, None) or int(adlevel) > 120000:
-            self.results['PG__param_autoVacDuration'] = [-1, "Configured: {}, Recommended: {}".format(alevel, '0-120000')]
+        if adlevel in (False, None) or int(adlevel) < 0 or int(adlevel) > 120000:
+            self.results['PG__param_autoVacDuration'] = [-1, "Configured: {}, Recommended: {}".format(adlevel, '0-120000')]
 
         trackIo = params.get('track_io_timing', False)
         if not trackIo in ('on', '1', 1):
@@ -58,14 +58,14 @@ class RdsPostgres(RdsCommon):
         if not synchronous_commit in ('on', '1', 1, False):
             self.results['PG__param_synchronousCommit'] = [-1, "Configured: {}, Recommended: {}".format(synchronous_commit, '1')]
             
-        autovacuum = params.get('autovacuum', False)
-        if autovacuum in ('False', 'off', 0):
+        autovacuum = params.get('autovacuum', None)
+        if autovacuum in ('False', 'off', '0'):
             self.results['PG__param_autovacuum'] = [-1, "Configured: {}, Recommended: {}".format(autovacuum, '1')]
             
-        enable_indexonlyscan = params.get('enable_indexonlyscan', False)
-        if enable_indexonlyscan in ('False', 'off', 0):
+        enable_indexonlyscan = params.get('enable_indexonlyscan', None)
+        if enable_indexonlyscan in ('False', 'off', '0'):
             self.results['PG__param_enable_indexonlyscan'] = [-1, "Configured: {}, Recommended: {}".format(enable_indexonlyscan, '1')]
             
-        enable_indexscan = params.get('enable_indexscan', False)
-        if enable_indexscan in ('False', 'off', 0):
+        enable_indexscan = params.get('enable_indexscan', None)
+        if enable_indexscan in ('False', 'off', '0'):
             self.results['PG__param_enable_indexscan'] = [-1, "Configured: {}, Recommended: {}".format(enable_indexscan, '1')]
