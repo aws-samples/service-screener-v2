@@ -415,14 +415,11 @@ export const getCategoryStats = (data) => {
   const categoryMap = {};
   
   services.forEach(service => {
-    // Skip GuardDuty as it has special handling and isn't included in customPage_findings
-    if (service.toLowerCase() === 'guardduty') {
-      return;
-    }
     const serviceData = data[service];
     if (serviceData && serviceData.summary) {
       Object.values(serviceData.summary).forEach(finding => {
         const category = finding.__categoryMain || 'Other';
+        if (category === 'T') return;
         const severity = finding.criticality || 'I';
         
         // Count affected resources instead of rules
@@ -474,6 +471,5 @@ export const getCategoryStats = (data) => {
   
   // Convert to array, filter out 'T' category, and sort by total (descending)
   return Object.values(categoryMap)
-    .filter(cat => cat.category !== 'T')
     .sort((a, b) => b.total - a.total);
 };
