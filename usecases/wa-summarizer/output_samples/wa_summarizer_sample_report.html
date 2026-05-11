@@ -875,6 +875,14 @@
                         <span class="nav-icon">✅</span>Conclusion
                     </a>
                 </div>
+                <div class="nav-section" style="border-top: 1px solid var(--gray-200); margin-top: 10px; padding-top: 10px;">
+                    <a href="#wa-lens-report" class="nav-link">
+                        <span class="nav-icon">📄</span>WA Framework Report
+                    </a>
+                    <a href="wa_lens_review_report.pdf" download style="display: block; padding: 10px 20px; color: var(--aws-orange-dark); text-decoration: none; font-weight: 600; font-size: 0.9rem; border-left: 4px solid transparent; transition: all 0.2s ease;">
+                        <span class="nav-icon">📥</span>Download PDF
+                    </a>
+                </div>
             </div>
         </nav>
 
@@ -1798,6 +1806,20 @@ aws s3api put-bucket-lifecycle-configuration --bucket mydw-prod-front --lifecycl
                     </div>
                 </div>
                 <!-- ==================== APPENDIX SECTION END ==================== -->
+
+                <!-- ==================== WA LENS REPORT DOWNLOAD SECTION START ==================== -->
+                <div class="section" id="wa-lens-report" style="background: linear-gradient(135deg, #232F3E, #37475A); color: white; text-align: center; padding: 40px;">
+                    <h2 style="color: white; border-bottom-color: var(--aws-orange);">📥 Well-Architected Framework Review Report</h2>
+                    <p style="margin-bottom: 20px; font-size: 1.1rem; opacity: 0.9;">Download the full Well-Architected Framework Review Report generated from the AWS Well-Architected Tool workload assessment.</p>
+                    <a href="wa_lens_review_report.pdf" download 
+                       style="display: inline-block; background: var(--aws-orange); color: white; padding: 15px 40px; border-radius: 4px; text-decoration: none; font-weight: 700; font-size: 1.1rem; transition: background 0.3s ease; box-shadow: 0 2px 4px rgba(0,0,0,0.3);"
+                       onmouseover="this.style.background='#EC7211'" 
+                       onmouseout="this.style.background='#FF9900'">
+                        📄 Download WA Framework Review Report (PDF)
+                    </a>
+                    <p style="margin-top: 15px; font-size: 0.85rem; opacity: 0.7;">This PDF contains the detailed framework review from the AWS Well-Architected Tool.</p>
+                </div>
+                <!-- ==================== WA LENS REPORT DOWNLOAD SECTION END ==================== -->
 
                 <!-- ==================== FOOTER SECTION START ==================== -->
                 <div class="footer">

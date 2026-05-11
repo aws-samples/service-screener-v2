@@ -126,3 +126,5 @@ class WAFS(Framework):
 
     def _hookPostBuildContentDetail(self):
         self.WATools.createMilestoneIfNotExists()
+        # Generate and download the WA lens review report (PDF) after milestone creation
+        self.WATools.generateReport()

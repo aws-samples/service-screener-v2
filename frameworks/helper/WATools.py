@@ -1,9 +1,9 @@
-import boto3, json, botocore
+import boto3, json, botocore, base64, os
 from botocore.exceptions import BotoCoreError
 from botocore.config import Config as bConfig
 from utils.Config import Config
 from datetime import datetime
-from utils.Tools import _warn
+from utils.Tools import _warn, _info
 import time
 
 ## --others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":0}}'
@@ -343,4 +343,82 @@ class WATools():
             # Don't disable permissions for validation errors, just skip this update
             if 'ValidationException' not in error_msg:
                 self.HASPERMISSION = False
+            return None
+
+    def generateReport(self, outputDir=None):
+        """
+        Generate and download the WA lens review report as PDF.
+        
+        Calls the Well-Architected Tool get_lens_review_report API to retrieve
+        a Base64-encoded PDF report for the workload, then saves it to disk.
+        
+        Args:
+            outputDir: Directory to save the PDF. Defaults to the HTML account folder.
+            
+        Returns:
+            The filename of the generated PDF report, or None if generation failed.
+        """
+        if self.HASPERMISSION == False:
+            _warn("[WATOOLS]: No permission, cannot generate report")
+            return None
+
+        if not self.waInfo.get('WorkloadId'):
+            _warn("[WATOOLS]: No WorkloadId available, cannot generate report")
+            return None
+
+        reportArgs = {
+            'WorkloadId': self.waInfo['WorkloadId'],
+            'LensAlias': self.waInfo['LensesAlias']
+        }
+
+        # Include milestone number if available for a point-in-time report
+        if self.waInfo.get('MilestoneNumber'):
+            reportArgs['MilestoneNumber'] = self.waInfo['MilestoneNumber']
+
+        try:
+            _info(f"*** [WATool] Generating lens review report for workload: {self.waInfo['WorkloadId']}")
+            response = self.waClient.get_lens_review_report(**reportArgs)
+
+            lens_review_report = response.get('LensReviewReport', {})
+            base64_report = lens_review_report.get('Base64String')
+
+            if not base64_report:
+                _warn("[WATOOLS]: Report returned empty Base64String")
+                return None
+
+            # Decode Base64 to PDF binary
+            pdf_data = base64.b64decode(base64_report)
+
+            if outputDir is None:
+                outputDir = Config.get('HTML_ACCOUNT_FOLDER_FULLPATH', '.')
+
+            # Ensure output directory exists
+            if not os.path.exists(outputDir):
+                os.makedirs(outputDir, exist_ok=True)
+
+            # Generate filename with timestamp
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            report_filename = f"wa_lens_review_report_{timestamp}.pdf"
+            report_path = os.path.join(outputDir, report_filename)
+
+            with open(report_path, 'wb') as f:
+                f.write(pdf_data)
+
+            _info(f"*** [WATool] Report generated successfully: {report_path}")
+            _info(f"*** [WATool] Report size: {len(pdf_data)} bytes")
+
+            # Store the report filename in Config for downstream use (HTML link generation)
+            Config.set('WA_REPORT_FILENAME', report_filename)
+
+            return report_filename
+
+        except self.waClient.exceptions.ResourceNotFoundException as e:
+            _warn(f"[WATOOLS]: Workload or lens not found: {str(e)}")
+            return None
+        except self.waClient.exceptions.AccessDeniedException as e:
+            _warn(f"[WATOOLS]: Access denied for get_lens_review_report. Ensure IAM policy includes wellarchitected:GetLensReviewReport")
+            _warn(f"[WATOOLS]: {str(e)}")
+            return None
+        except Exception as e:
+            _warn(f"[WATOOLS]: Failed to generate report: {str(e)}")
             return None

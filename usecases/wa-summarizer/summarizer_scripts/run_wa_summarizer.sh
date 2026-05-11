@@ -199,6 +199,65 @@ main() {
         echo -e "${RED}❌ Failed to generate report.${NC}"
         exit 1
     fi
+
+    # Post-processing: Copy WA Lens Review Report PDF and inject download link
+    echo -e "${YELLOW}📎 Checking for Well-Architected Lens Review Report (PDF)...${NC}"
+    
+    # Search for the WA lens review report PDF in the Service Screener results directory
+    wa_pdf=$(find "$service_screener_dir" -maxdepth 2 -name "wa_lens_review_report_*.pdf" -type f 2>/dev/null | sort -r | head -1)
+    
+    if [ -n "$wa_pdf" ] && [ -f "$wa_pdf" ]; then
+        # Copy PDF to output directory with a stable name for the HTML link
+        cp "$wa_pdf" "${output_dir}/wa_lens_review_report.pdf"
+        echo -e "${GREEN}✅ WA Lens Review Report copied to: ${output_dir}/wa_lens_review_report.pdf${NC}"
+        
+        # Find the generated HTML report and inject the download link
+        generated_report=$(find "$output_dir" -maxdepth 1 -name "wa_summary_report_*.html" -type f 2>/dev/null | sort -r | head -1)
+        
+        if [ -n "$generated_report" ] && [ -f "$generated_report" ]; then
+            # Check if the download link is already present
+            if ! grep -q "wa_lens_review_report.pdf" "$generated_report"; then
+                echo -e "${YELLOW}📝 Injecting WA Report download link into HTML report...${NC}"
+                
+                # Inject download link in sidebar navigation (after Overview link)
+                sed -i.bak 's|<span class="nav-icon">🏠</span>Overview|<span class="nav-icon">🏠</span>Overview\
+                    </a>\
+                </div>\
+                <div class="nav-section">\
+                    <a href="wa_lens_review_report.pdf" class="nav-link" download>\
+                        <span class="nav-icon">📄</span>Download WA Report (PDF)|' "$generated_report"
+                
+                # If sed sidebar injection didn't work cleanly, try a simpler approach
+                if ! grep -q "wa_lens_review_report.pdf" "$generated_report"; then
+                    # Fallback: inject after HEADER SECTION END comment
+                    sed -i.bak '/<!-- ==================== HEADER SECTION END ====================.*-->/a\
+\
+                <!-- ==================== WA REPORT DOWNLOAD SECTION START ==================== -->\
+                <div style="background: #e6f7e6; border: 1px solid #1D8102; border-radius: 4px; padding: 20px; margin-bottom: 20px;">\
+                    <h3 style="color: #1D8102; margin-bottom: 10px;">📄 Well-Architected Lens Review Report</h3>\
+                    <p style="color: #37475A; margin-bottom: 15px;">A PDF report has been generated from the AWS Well-Architected Tool for this workload. This report includes your responses to workload questions, notes, and a summary of identified high and medium risks along with improvement plans.</p>\
+                    <a href="wa_lens_review_report.pdf" download style="display: inline-block; background: #0073bb; color: #fff; padding: 10px 20px; border-radius: 4px; text-decoration: none; font-weight: 600; font-size: 14px;">⬇️ Download WA Lens Review Report (PDF)</a>\
+                    <p style="color: #687078; font-size: 12px; margin-top: 10px;">This report can be shared with stakeholders who do not have direct access to the AWS Well-Architected Tool.</p>\
+                </div>\
+                <!-- ==================== WA REPORT DOWNLOAD SECTION END ==================== -->' "$generated_report"
+                fi
+                
+                # Clean up backup file from sed
+                rm -f "${generated_report}.bak"
+                
+                if grep -q "wa_lens_review_report.pdf" "$generated_report"; then
+                    echo -e "${GREEN}✅ Download link injected into report successfully!${NC}"
+                else
+                    echo -e "${YELLOW}⚠️ Could not inject download link automatically. PDF is available at: ${output_dir}/wa_lens_review_report.pdf${NC}"
+                fi
+            else
+                echo -e "${GREEN}✅ Download link already present in report.${NC}"
+            fi
+        fi
+    else
+        echo -e "${YELLOW}ℹ️ No WA Lens Review Report PDF found in Service Screener results.${NC}"
+        echo -e "${YELLOW}   To generate one, run Service Screener with: --frameworks WAFS --others '{\"WA\": {\"region\": \"<region>\", \"reportName\": \"SS_Report\", \"newMileStone\": 1}}'${NC}"
+    fi
 }
 
 # Execute the main function
