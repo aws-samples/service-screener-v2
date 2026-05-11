@@ -935,6 +935,11 @@ cat <acount_id>/CPFindings.html | grep -o '<tr><td>[^<]*</td><td>[^<]*</td><td>[
                     </a>
                 </div>
                 <div class="nav-section">
+                    <a href="wa_lens_review_report.pdf" download style="display: block; padding: 10px 20px; color: var(--aws-orange-dark); text-decoration: none; font-weight: 600; font-size: 0.9rem; border-left: 4px solid transparent; transition: all 0.2s ease;">
+                        <span class="nav-icon">📄</span>Download WA Report (PDF)
+                    </a>
+                </div>
+                <div class="nav-section">
                     <a href="#screener-analysis" class="nav-link">
                         <span class="nav-icon">🔍</span>Screener Analysis
                     </a>
@@ -977,6 +982,26 @@ cat <acount_id>/CPFindings.html | grep -o '<tr><td>[^<]*</td><td>[^<]*</td><td>[
                     <p>Account ID: 123456789012 | Generated: July 21, 2025 07:50:41 (UTC)</p>
                 </div>
                 <!-- ==================== HEADER SECTION END ==================== -->
+
+                <!-- ==================== WA REPORT DOWNLOAD SECTION START ==================== -->
+                <div style="background: #e6f7e6; border: 1px solid #1D8102; border-radius: 4px; padding: 20px; margin-bottom: 20px;">
+                    <h3 style="color: #1D8102; margin-bottom: 10px;">
+                        📄 Well-Architected Framework Review Report
+                    </h3>
+                    <p style="color: #37475A; margin-bottom: 15px;">
+                        A PDF report has been generated from the AWS Well-Architected Tool for this workload.
+                        This report includes your responses to workload questions, notes, and a summary of
+                        identified high and medium risks along with improvement plans.
+                    </p>
+                    <a href="wa_lens_review_report.pdf" download
+                       style="display: inline-block; background: #0073bb; color: #fff; padding: 10px 20px; border-radius: 4px; text-decoration: none; font-weight: 600; font-size: 14px;">
+                        ⬇️ Download WA Framework Review Report (PDF)
+                    </a>
+                    <p style="color: #687078; font-size: 12px; margin-top: 10px;">
+                        This report can be shared with stakeholders who don't have direct access to the AWS Well-Architected Tool.
+                    </p>
+                </div>
+                <!-- ==================== WA REPORT DOWNLOAD SECTION END ==================== -->
 
                 <!-- ==================== DASHBOARD SECTION START ==================== -->
                 <div class="summary-dashboard">
@@ -2066,5 +2091,10 @@ Use the following CSS styling for the report:
 4. Organize information in a logical, hierarchical structure.
 5. Make the report responsive and readable on different devices.
 6. Provide realistic cost estimates and timelines.
+7. **CRITICAL: Always include the "Well-Architected Framework Review Report" download section.** The generated HTML report MUST contain:
+   - A download link in the sidebar navigation (NOT using the `nav-link` class to avoid JavaScript `preventDefault` interference) pointing to `wa_lens_review_report.pdf` with the `download` attribute.
+   - A prominent download banner section (placed between the Header/Overview and the Dashboard sections) with a styled button linking to `wa_lens_review_report.pdf` with the `download` attribute.
+   - The PDF file `wa_lens_review_report.pdf` is expected to exist in the same directory as the generated HTML report.
+   - Use the label "Well-Architected Framework Review Report" (NOT "Lens Review Report").
 
 Analyze the Service Screener data thoroughly and generate a comprehensive Well-Architected Framework analysis HTML report that follows the provided guidelines and instructions. The report should be in HTML format and saved as `wa_summary_report_{YYYYMMDD_HHMMSS}.html` in the current location's `{DEFAULT_OUTPUT_DIR}` folder (Timezone: UTC).
