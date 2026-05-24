@@ -152,8 +152,42 @@ class FrameworkPageBuilder(PageBuilder):
         outp.append(self.generateRowWithCol(size=12, items=items, rowHtmlAttr="data-context=detail"))
 
         self.framework._hookPostBuildContentDetail()
-        
+
+        # If the WAFS framework produced a Well-Architected Review report PDF,
+        # inject a download button into the top-right of the page header.
+        from utils.Config import Config as _Cfg
+        report_filename = _Cfg.get('WAFS_REPORT_FILENAME', None)
+        if report_filename and self.framework.framework == 'WAFS':
+            self._injectWAFRDownloadButton(report_filename)
+
         return (outp)
+
+    def _injectWAFRDownloadButton(self, report_filename):
+        """Add a JS snippet that places a 'Download WAFR Report' button on the
+        top-right of the WAFS page header. The PDF lives in the same account
+        folder as WAFS.html, so a relative href works for both local viewing
+        and the zipped output bundle."""
+        # Escape filename for safe inline-JS literal use.
+        safe = str(report_filename).replace('\\', '\\\\').replace("'", "\\'")
+        js = """
+(function(){
+  var fname = '%s';
+  var $bcRow = $('.content-header .container-fluid .row.mb-2').first();
+  if(!$bcRow.length) return;
+  if($bcRow.find('a.wafr-download-btn').length) return;
+  var btnHtml = "<a class='btn btn-primary btn-sm wafr-download-btn float-sm-right ml-2' "
+              + "href='" + fname + "' download target='_blank' rel='noopener noreferrer' "
+              + "title='Download Well-Architected Framework Review Report (PDF)'>"
+              + "<i class='fas fa-file-download'></i> Download WAFR Report</a>";
+  var $rightCol = $bcRow.children('.col-sm-6').last();
+  if($rightCol.length){
+    $rightCol.prepend(btnHtml);
+  } else {
+    $bcRow.append("<div class='col-sm-6'>" + btnHtml + "</div>");
+  }
+})();
+""" % safe
+        self.addJS(js)
         
     # To be overwrite by custom class
     def _hookPreBuildContentDetail(self):

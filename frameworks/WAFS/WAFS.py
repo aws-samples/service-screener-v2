@@ -1,4 +1,4 @@
-import json, re
+import json, re, os
 
 import constants as _C
 from utils.Config import Config
@@ -125,4 +125,29 @@ class WAFS(Framework):
         return f"{titleStr} - {sectStr}"
 
     def _hookPostBuildContentDetail(self):
+        if self.WATools is None or self.WATools.HASPERMISSION is False:
+            return
+
         self.WATools.createMilestoneIfNotExists()
+
+        # Generate Well-Architected Framework Review Report (PDF) and save it
+        # 1) Inside the WAFS account folder so the WAFS.html download button works
+        # 2) Inside usecases/wa-summarizer/wafr_report for downstream summarizer tooling
+        try:
+            import constants as _C
+            acctFolder = Config.get('HTML_ACCOUNT_FOLDER_FULLPATH')
+            wafrLocalDir = os.path.join(_C.ROOT_DIR, 'usecases', 'wa-summarizer', 'wafr_report')
+
+            output_dirs = []
+            if acctFolder:
+                output_dirs.append(acctFolder)
+            output_dirs.append(wafrLocalDir)
+
+            written = self.WATools.generateReviewReport(output_dirs=output_dirs)
+            if written:
+                # Stash the filename so WAFSPageBuilder can wire up the download button.
+                # The relative path matches the HTML output location (account folder).
+                Config.set('WAFS_REPORT_FILENAME', self.WATools.waInfo.get('LatestReportFilename'))
+                Config.set('WAFS_REPORT_PATHS', written)
+        except Exception as e:
+            _warn(f"[WAFS]: Unable to generate review report: {str(e)}")
