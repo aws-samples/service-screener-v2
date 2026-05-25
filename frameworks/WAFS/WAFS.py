@@ -1,4 +1,4 @@
-import json, re, os
+import json, re, os, traceback
 
 import constants as _C
 from utils.Config import Config
@@ -13,6 +13,13 @@ class WAFS(Framework):
     def __init__(self, data):
         super().__init__(data)
         self.isBeta = Config.get('beta', False)
+
+        # Filename of the latest Well-Architected Framework Review report PDF
+        # written by ``_hookPostBuildContentDetail``. Lives on the framework
+        # instance (rather than global Config) so the WAFSPageBuilder can read
+        # it directly without temporal coupling and so cross-account runs each
+        # carry their own value.
+        self.reportFilename = None
 
         self.WATools = None
         waTools = WATools('security')
@@ -134,7 +141,6 @@ class WAFS(Framework):
         # 1) Inside the WAFS account folder so the WAFS.html download button works
         # 2) Inside usecases/wa-summarizer/wafr_report for downstream summarizer tooling
         try:
-            import constants as _C
             acctFolder = Config.get('HTML_ACCOUNT_FOLDER_FULLPATH')
             wafrLocalDir = os.path.join(_C.ROOT_DIR, 'usecases', 'wa-summarizer', 'wafr_report')
 
@@ -145,9 +151,18 @@ class WAFS(Framework):
 
             written = self.WATools.generateReviewReport(output_dirs=output_dirs)
             if written:
-                # Stash the filename so WAFSPageBuilder can wire up the download button.
-                # The relative path matches the HTML output location (account folder).
-                Config.set('WAFS_REPORT_FILENAME', self.WATools.waInfo.get('LatestReportFilename'))
-                Config.set('WAFS_REPORT_PATHS', written)
+                # Expose the filename via the framework instance so WAFSPageBuilder
+                # can pick it up explicitly through ``self.framework.reportFilename``
+                # rather than via global Config.
+                self.reportFilename = self.WATools.waInfo.get('LatestReportFilename')
+        except (OSError, IOError) as e:
+            # Filesystem failures while writing the PDF copies — surface details
+            # so operators can fix permissions/disk-space issues.
+            _warn(f"[WAFS]: Filesystem error while saving review report: {str(e)}")
+            _warn(traceback.format_exc())
         except Exception as e:
+            # Anything else is unexpected. Don't fail the whole framework run,
+            # but log a full traceback so the failure is diagnosable instead of
+            # being silently dropped.
             _warn(f"[WAFS]: Unable to generate review report: {str(e)}")
+            _warn(traceback.format_exc())
