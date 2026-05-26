@@ -57,6 +57,25 @@ class FrameworkPageBuilder(PageBuilder):
         ServiceClass = getattr(importlib.import_module(module), className)
         return ServiceClass
 
+    @staticmethod
+    def create(framework, reporter):
+        """Factory that returns a framework-specific page builder subclass when
+        one exists at ``frameworks/<NAME>/<NAME>PageBuilder.py``, falling back
+        to the generic ``FrameworkPageBuilder`` otherwise. Keeps the base class
+        free of framework-specific knowledge while still allowing call sites
+        to construct the right page builder for a given framework name."""
+        try:
+            module = importlib.import_module(
+                'frameworks.{name}.{name}PageBuilder'.format(name=framework)
+            )
+            cls = getattr(module, '{}PageBuilder'.format(framework), None)
+            if isinstance(cls, type) and issubclass(cls, FrameworkPageBuilder) \
+                    and cls is not FrameworkPageBuilder:
+                return cls(framework, reporter)
+        except (ImportError, AttributeError):
+            pass
+        return FrameworkPageBuilder(framework, reporter)
+
 
     def getGateCheckStatus(self):
         return self.framework.gateCheck()
@@ -152,9 +171,18 @@ class FrameworkPageBuilder(PageBuilder):
         outp.append(self.generateRowWithCol(size=12, items=items, rowHtmlAttr="data-context=detail"))
 
         self.framework._hookPostBuildContentDetail()
-        
+
+        # Allow framework-specific subclasses to inject extra UI (download
+        # buttons, banners, etc.) after the framework hook has run and produced
+        # any artifacts it needs.
+        self._postBuildContentDetailHook()
+
         return (outp)
-        
+
+    def _postBuildContentDetailHook(self):
+        """Override in subclasses for framework-specific post-processing."""
+        pass
+
     # To be overwrite by custom class
     def _hookPreBuildContentDetail(self):
         pass

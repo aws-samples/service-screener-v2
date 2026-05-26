@@ -277,7 +277,7 @@ class Screener:
         frameworks = Config.get('cli_frameworks')
         if len(frameworks) > 0:
             for framework in frameworks:
-                o = FrameworkPageBuilder(framework, apiResultArray)
+                o = FrameworkPageBuilder.create(framework, apiResultArray)
                 if o.getGateCheckStatus() == True:
                     p = o.buildPage()
                 else:
