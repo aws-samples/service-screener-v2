@@ -342,6 +342,20 @@ for acctId, cred in rolesCred.items():
         frameworks = _cli_options['frameworks'].split(',')
     else:
         # Auto-discover frameworks from frameworks/ directory
+        _fw_dir = _C.FRAMEWORK_DIR
+        if os.path.isdir(_fw_dir):
+            frameworks = [
+                d for d in os.listdir(_fw_dir)
+                if os.path.isdir(os.path.join(_fw_dir, d))
+                and os.path.exists(os.path.join(_fw_dir, d, 'map.json'))
+                and not d.startswith('_')
+                and not d.startswith('.')
+                and d != '__pycache__'
+            ]
+            if frameworks:
+                print(f"  Auto-discovered frameworks: {', '.join(sorted(frameworks))}")
+    else:
+        # Auto-discover frameworks from frameworks/ directory
         # constants already imported at top
         _fw_dir = _C.FRAMEWORK_DIR
         if os.path.isdir(_fw_dir):
