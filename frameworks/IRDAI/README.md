@@ -26,19 +26,27 @@ It enables Indian insurance entities to evaluate their AWS environments against 
 - [AWS Compliance Center - India](https://aws.amazon.com/financial-services/security-compliance/compliance-center/in/)
 - [IRDAI Cybersecurity Workbook (AWS Artifact)](https://aws.amazon.com/artifact/)
 
+> **Note on regulatory citations:** The IRDAI section references (e.g., "Sec 3.2") in this document
+> are indicative mappings based on the publicly available IRDAI Information and Cyber Security
+> Guidelines 2023 and the April 2026 revision circular. Exact clause numbering may vary between
+> the original gazette notification and subsequent circulars. Always refer to the official IRDAI
+> gazette notifications and circulars available at [irdai.gov.in](https://www.irdai.gov.in/) for
+> authoritative clause references.
+
 ## Control Categories
 
-| Code | Category | Auto-Checks | Manual |
-|------|----------|:-----------:|:------:|
-| **DS** | Data Security and Privacy | ✅ | 1 |
-| **IAM** | Identity and Access Management | ✅ | — |
-| **NS** | Network Security | ✅ | — |
-| **ML** | Monitoring, Logging and Incident Response | ✅ | 1 |
-| **VAPT** | Vulnerability Assessment and Penetration Testing | Partial | 3 |
-| **BC** | Business Continuity and Disaster Recovery | ✅ | 1 |
-| **OT** | Outsourcing and Third-Party Risk | Partial | 5 |
-| **GRC** | Governance, Risk and Compliance | Partial | 4 |
-| **WF** | Workforce and Endpoint Security | Partial | 3 |
+| Code | Category | Sub-Controls | Automated | Manual |
+|------|----------|:------------:|:---------:|:------:|
+| **DS** | Data Security and Privacy | 8 | 6 | 2 |
+| **IAM** | Identity and Access Management | 7 | 7 | 0 |
+| **NS** | Network Security | 6 | 6 | 0 |
+| **ML** | Monitoring, Logging and Incident Response | 6 | 5 | 1 |
+| **VAPT** | Vulnerability Assessment and Penetration Testing | 4 | 1 | 3 |
+| **BC** | Business Continuity and Disaster Recovery | 6 | 4 | 2 |
+| **OT** | Outsourcing and Third-Party Risk | 7 | 2 | 5 |
+| **GRC** | Governance, Risk and Compliance | 14 | 4 | 10 |
+| **WF** | Workforce and Endpoint Security | 5 | 1 | 4 |
+| | **Totals** | **63** | **36** | **27** |
 
 ## Detailed Control Mapping
 
@@ -50,7 +58,9 @@ It enables Indian insurance entities to evaluate their AWS environments against 
 | DS.3 | Data encryption in transit (TLS/mTLS) | Sec 3.2 |
 | DS.4 | Prevention of unintended data exposure | Sec 3.3 |
 | DS.5 | Data integrity, versioning, and immutability | Sec 3.3 |
-| DS.6 | Data localisation (India residency) — manual | Sec 3.4 |
+| DS.6 | Cryptographic key rotation and centralised management | Sec 3.4 |
+| DS.7 | Data localisation (India residency) — manual | Sec 3.4 |
+| DS.8 | Data classification and handling — manual | Sec 3.5 |
 
 ### IAM — Identity and Access Management
 | Control | Description | IRDAI Ref |
@@ -99,6 +109,7 @@ It enables Indian insurance entities to evaluate their AWS environments against 
 | BC.3 | Deletion protection | Sec 8.2 |
 | BC.4 | Auto-scaling and capacity management | Sec 8.3 |
 | BC.5 | Documented IT continuity/DR plan — manual | Sec 8.4 |
+| BC.6 | DR testing and RTO/RPO validation — manual | Sec 8.4 |
 
 ### OT — Outsourcing and Third-Party Risk
 | Control | Description | IRDAI Ref |
@@ -123,6 +134,11 @@ It enables Indian insurance entities to evaluate their AWS environments against 
 | GRC.7 | Recommendations and advisories | Sec 10.2 |
 | GRC.8 | Compliance evidence and audit readiness | Sec 10.3 |
 | GRC.9 | Cybersecurity budget (% of IT spend) — manual | Sec 2.6 |
+| GRC.10 | IT Steering Committee governance (2026) — manual | Sec 2.7 |
+| GRC.11 | Post-quantum cryptography readiness (2026) — manual | Sec 2.8 |
+| GRC.12 | 30-day audit report submission (2026) — manual | Sec 2.9 |
+| GRC.13 | Annual cyber-insurance review — manual | Sec 2.10 |
+| GRC.14 | Board accountability for cyber incidents (2026) — manual | Sec 2.11 |
 
 ### WF — Workforce and Endpoint Security
 | Control | Description | IRDAI Ref |
@@ -135,12 +151,19 @@ It enables Indian insurance entities to evaluate their AWS environments against 
 
 ## Controls Requiring Manual Evidence
 
-Controls marked "manual" cannot be validated automatically via AWS APIs. The framework will display the `emptyCheckDefaultMsg` prompting users to provide evidence. Key manual controls include:
+Controls with empty check arrays (`[]` in `map.json`) cannot be validated automatically via AWS APIs.
+The framework's `generateMappingInformation()` method in `Framework.py` automatically displays the
+`emptyCheckDefaultMsg` (defined in `map.json` metadata) for these controls, prompting users to
+provide evidence or artifacts demonstrating compliance.
 
+Key manual controls include:
+
+- **DS.7-8**: Data localisation evidence and data classification records
 - **VAPT.1-3**: Penetration testing reports from CERT-In empaneled auditors
 - **ML.6**: Incident notification logs showing 6-hour CERT-In / 24-hour IRDAI reporting
+- **BC.5-6**: BCP/DR documentation and testing evidence
 - **OT.3-7**: Contractual and governance documentation for outsourcing
-- **GRC.1-4, GRC.9**: Board approvals, CISO reporting structure, budgets
+- **GRC.1-4, GRC.9-14**: Board approvals, CISO reporting structure, budgets, 2026 governance requirements
 - **WF.1, WF.3-5**: HR processes, training records, endpoint tooling
 
 ## Installation
@@ -171,7 +194,7 @@ screener --regions ap-south-1 --services s3,iam,ec2,rds,kms --frameworks IRDAI
 ```
 frameworks/IRDAI/
 ├── IRDAI.py      # Framework class (extends Framework base class)
-├── map.json      # Control-to-check mapping (9 categories, 47 sub-controls)
+├── map.json      # Control-to-check mapping (9 categories, 63 sub-controls)
 └── README.md     # This file
 ```
 
