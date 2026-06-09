@@ -342,7 +342,7 @@ for acctId, cred in rolesCred.items():
         frameworks = _cli_options['frameworks'].split(',')
     else:
         # Auto-discover frameworks from frameworks/ directory
-        import constants as _C
+        # constants already imported at top
         _fw_dir = _C.FRAMEWORK_DIR
         if os.path.isdir(_fw_dir):
             frameworks = [
@@ -357,7 +357,7 @@ for acctId, cred in rolesCred.items():
                 print(f"  Auto-discovered frameworks: {', '.join(sorted(frameworks))}")
     else:
         # Auto-discover frameworks from frameworks/ directory
-        import constants as _C
+        # constants already imported at top
         _fw_dir = _C.FRAMEWORK_DIR
         if os.path.isdir(_fw_dir):
             frameworks = [
