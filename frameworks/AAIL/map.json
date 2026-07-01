@@ -1,0 +1,259 @@
+{
+    "metadata": {
+        "originator": "AWS",
+        "shortname": "AAIL",
+        "fullname": "AWS Well-Architected Framework - Agentic AI Lens",
+        "description": "This lens extends the AWS Well-Architected Framework with best practices for agentic AI systems on AWS. It covers operational excellence, security, reliability, performance efficiency, cost optimization, and sustainability considerations specific to agent-based architectures built on Amazon Bedrock and supporting services.",
+        "_": "https://docs.aws.amazon.com/wellarchitected/latest/agentic-ai-lens/welcome.html",
+        "emptyCheckDefaultMsg": "Manual review required \u2014 no automated check available"
+    },
+    "mapping": {
+        "AGENTOPS01": {
+            "BP01": [
+                "bedrock.bedrockAgentNoInstruction",
+                "bedrock.bedrockAgentActionGroupNoSchema"
+            ],
+            "BP02": [
+                "bedrock.bedrockAgentGuardrailAttached",
+                "bedrock.bedrockAgentCollaborationDisabled"
+            ]
+        },
+        "AGENTOPS02": {
+            "BP02": [
+                "bedrock.bedrockAgentExcessiveVersions"
+            ]
+        },
+        "AGENTOPS03": {
+            "BP01": [
+                "bedrock.bedrockAgentNotPrepared",
+                "bedrock.bedrockGuardrailStatusFailed"
+            ],
+            "BP03": [
+                "bedrock.bedrockServiceLimitAgents",
+                "bedrock.bedrockServiceLimitKnowledgeBases",
+                "bedrock.bedrockServiceLimitGuardrails",
+                "bedrock.bedrockACServiceLimitRuntimes"
+            ]
+        },
+        "AGENTOPS04": {
+            "BP01": [
+                "bedrock.bedrockAgentActionGroupNoSchema",
+                "bedrock.bedrockServiceLimitAgentActionGroups"
+            ],
+            "BP02": [
+                "bedrock.bedrockACGatewayNoTargets",
+                "bedrock.bedrockACGatewayTargetNoAuth"
+            ]
+        },
+        "AGENTOPS05": {
+            "BP01": [
+                "bedrock.bedrockModelInvocationLoggingDisabled",
+                "cloudtrail.trailEnabled"
+            ],
+            "BP03": [
+                "bedrock.bedrockModelInvocationNoCloudWatch",
+                "cloudwatch.$length"
+            ],
+            "BP04": [
+                "cloudwatch.alarmsWithoutSNS",
+                "cloudwatch.missingCompositeAlarms"
+            ]
+        },
+        "AGENTOPS07": {
+            "BP01": [
+                "cloudwatch.missingBillingAlarms"
+            ]
+        },
+        "AGENTOPS06": {
+            "BP01": [
+                "bedrock.bedrockACNoEvaluator"
+            ]
+        },
+        "AGENTSEC01": {
+            "BP01": [
+                "dynamodb.encryptionAtRest",
+                "dynamodb.disabledPointInTimeRecovery",
+                "bedrock.bedrockAgentMemoryDisabled",
+                "bedrock.bedrockACMemoryNoEncryption",
+                "bedrock.bedrockACMemoryNoNamespace"
+            ],
+            "BP02": [
+                "bedrock.bedrockGuardrailContentFilterDisabled",
+                "bedrock.bedrockGuardrailNoPiiDetection"
+            ],
+            "BP03": [
+                "bedrock.bedrockGuardrailNoGroundingFilter"
+            ]
+        },
+        "AGENTSEC02": {
+            "BP01": [
+                "bedrock.bedrockAgentIamRoleOverprivileged",
+                "iam.InlinePolicyFullAdminAccess",
+                "bedrock.bedrockACRuntimeWildcardRole"
+            ],
+            "BP02": [
+                "iam.InlinePolicyFullAccessOneServ",
+                "iam.FullAdminAccess",
+                "lambda.lambdaRoleTooPermissive"
+            ],
+            "BP03": [
+                "bedrock.bedrockAgentNoEncryptionKey",
+                "bedrock.bedrockGuardrailNoEncryption",
+                "bedrock.bedrockKBNoEncryption"
+            ]
+        },
+        "AGENTSEC03": {
+            "BP01": [
+                "iam.missingPermissionsBoundaries",
+                "bedrock.bedrockAgentIamRoleOverprivileged",
+                "bedrock.bedrockACNoIdentityProvider",
+                "bedrock.bedrockACApiKeyProviderUsed"
+            ],
+            "BP02": [
+                "bedrock.bedrockKBRoleOverprivileged"
+            ]
+        },
+        "AGENTSEC04": {
+            "BP01": [
+                "bedrock.bedrockAgentGuardrailAttached",
+                "bedrock.bedrockGuardrailContentFilterDisabled",
+                "bedrock.bedrockGuardrailNoDeniedTopics",
+                "bedrock.bedrockNoGuardrailsExist",
+                "bedrock.bedrockACGatewayNoPolicy",
+                "bedrock.bedrockACNoPolicyEngine"
+            ],
+            "BP02": [
+                "bedrock.bedrockGuardrailOutputFilterDisabled",
+                "bedrock.bedrockGuardrailContentFilterWeak"
+            ]
+        },
+        "AGENTSEC05": {
+            "BP01": [
+                "bedrock.bedrockModelInvocationLoggingDisabled",
+                "cloudtrail.trailEnabled",
+                "cloudtrail.trailMultiRegion"
+            ],
+            "BP02": [
+                "bedrock.bedrockModelInvocationNoS3"
+            ]
+        },
+        "AGENTSEC08": {
+            "BP01": [
+                "bedrock.bedrockGuardrailNoPromptAttackFilter",
+                "bedrock.bedrockGuardrailNoPiiDetection"
+            ],
+            "BP02": [
+                "bedrock.bedrockGuardrailNoWordFilter"
+            ]
+        },
+        "AGENTSEC09": {
+            "BP01": [
+                "iam.enableGuardDuty",
+                "guardduty.$length"
+            ]
+        },
+        "AGENTSEC06": {
+            "BP02": [
+                "bedrock.bedrockACRuntimeNoGateway",
+                "bedrock.bedrockACGatewayNoPolicy"
+            ]
+        },
+        "AGENTREL01": {
+            "BP01": [
+                "sqs.DeadLetterQueue",
+                "sqs.EncryptionAtRest"
+            ],
+            "BP02": [
+                "bedrock.bedrockACRuntimeNoVPC"
+            ]
+        },
+        "AGENTREL02": {
+            "BP01": [
+                "lambda.lambdaTimeoutNotOptimized",
+                "lambda.lambdaDeadLetterQueueDisabled"
+            ]
+        },
+        "AGENTREL05": {
+            "BP03": [
+                "bedrock.bedrockKBNoDataSources",
+                "bedrock.bedrockKBDataSourceSyncStale"
+            ]
+        },
+        "AGENTREL07": {
+            "BP02": [
+                "sqs.DeadLetterQueue",
+                "lambda.lambdaDeadLetterQueueDisabled"
+            ]
+        },
+        "AGENTREL08": {
+            "BP01": [
+                "bedrock.bedrockServiceLimitAgents",
+                "bedrock.bedrockServiceLimitTPM"
+            ]
+        },
+        "AGENTPERF01": {
+            "BP02": [
+                "bedrock.bedrockModelInvocationLoggingDisabled",
+                "bedrock.bedrockModelInvocationNoCloudWatch"
+            ]
+        },
+        "AGENTPERF03": {
+            "BP01": [
+                "bedrock.bedrockAgentMemoryDisabled",
+                "elasticache.encryptionInTransit"
+            ]
+        },
+        "AGENTPERF06": {
+            "BP01": [
+                "lambda.lambdaTimeoutNotOptimized",
+                "lambda.lambdaReservedConcurrencyDisabled"
+            ]
+        },
+        "AGENTPERF07": {
+            "BP01": [
+                "bedrock.bedrockServiceLimitTPM",
+                "bedrock.bedrockServiceLimitAgents",
+                "bedrock.bedrockACRuntimeNoVPC"
+            ]
+        },
+        "AGENTCOST01": {
+            "BP01": [
+                "bedrock.bedrockModelInvocationLoggingDisabled"
+            ]
+        },
+        "AGENTCOST03": {
+            "BP01": [
+                "bedrock.bedrockAgentIdleSessionTimeout"
+            ]
+        },
+        "AGENTCOST04": {
+            "BP01": [
+                "lambda.lambdaReservedConcurrencyDisabled"
+            ]
+        },
+        "AGENTCOST06": {
+            "BP02": [
+                "bedrock.bedrockAgentExcessiveVersions"
+            ]
+        },
+        "AGENTCOST07": {
+            "BP01": [
+                "bedrock.bedrockServiceLimitAgents",
+                "bedrock.bedrockServiceLimitKnowledgeBases",
+                "bedrock.bedrockServiceLimitGuardrails"
+            ]
+        },
+        "AGENTSUS01": {
+            "BP01": [
+                "bedrock.bedrockAgentIamRoleOverprivileged",
+                "bedrock.bedrockAgentNoInstruction",
+                "bedrock.bedrockACRuntimeWildcardRole"
+            ]
+        },
+        "AGENTSUS02": {
+            "BP04": [
+                "cloudwatch.missingBillingAlarms"
+            ]
+        }
+    }
+}

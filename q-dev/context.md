@@ -209,11 +209,11 @@ Simulation testing integrates with the standard development workflow:
 6. Review Service Screener HTML report
 7. Iterate until all checks work correctly
 
-See `./SIMULATION_TESTING.md` for complete documentation.
+See `../docs/SIMULATION_TESTING.md` for complete documentation.
 
 ## Resources
 
 Please also read the following documents for better understanding:
 - ./README.md
 - ./docs/DevelopmentGuide.md
-- ./SIMULATION_TESTING.md (for testing security checks with real AWS resources)
+- ../docs/SIMULATION_TESTING.md (for testing security checks with real AWS resources)

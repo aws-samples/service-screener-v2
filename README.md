@@ -44,7 +44,7 @@ Service Screener uses [AWS CloudShell](https://aws.amazon.com/cloudshell/), a fr
 Running this tool is free as it is covered under the AWS Free Tier. If you have exceeded the free tier limits, each run will cost less than $0.01.
 
 ## Prerequisites
-1. Please review the [DISCLAIMER](./DISCLAIMER.md) before proceeding. 
+1. Please review the [DISCLAIMER](./docs/DISCLAIMER.md) before proceeding. 
 2. You must have an existing AWS Account.
 3. You must have an IAM User with sufficient read permissions. Here is a sample [policy](https://docs.aws.amazon.com/aws-managed-policy/latest/reference/ReadOnlyAccess.html). Additionally, the IAM User must also have the following permissions:
    - AWSCloudShellFullAccess
@@ -82,7 +82,7 @@ The stack is automatically created at the start of each run with a unique name (
    git clone https://github.com/aws-samples/service-screener-v2.git
    cd service-screener-v2
    pip install -r requirements.txt
-   python3.13 unzip_botocore_lambda_runtime.py
+   python3.13 scripts/unzip_botocore_lambda_runtime.py
    
    # Build Cloudscape UI (required for --beta 1 mode)
    cd cloudscape-ui

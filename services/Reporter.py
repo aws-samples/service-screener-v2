@@ -57,7 +57,7 @@ class Reporter:
         f = open(infopath, "r")
         checks = json.loads(f.read())
         if not self.service in checks:
-            _warn( "[{}] is not available in checks, please submit an issue to github to update info.json through RuleCount.py.".format(self.service))
+            _warn( "[{}] is not available in checks, please submit an issue to github to update info.json through scripts/RuleCount.py.".format(self.service))
         else:
             checksCount = checks[self.service]
             

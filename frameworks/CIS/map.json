@@ -132,7 +132,10 @@
       "1": [
         "iam.FullAdminAccess",
         "iam.wildcardActionsDetection",
-        "iam.missingPolicyConditions"
+        "iam.missingPolicyConditions",
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "bedrock.bedrockKBRoleOverprivileged",
+        "bedrock.bedrockACRuntimeWildcardRole"
       ],
       "3": [
         "iam.hasAccessKeyNoRotate90days"

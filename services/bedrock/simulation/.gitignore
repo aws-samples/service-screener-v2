@@ -1,0 +1,5 @@
+# Runtime artifacts produced by the simulation scripts.
+# The scripts write these files as they create AWS test resources; cleanup
+# consumes them and they should never be committed.
+created_resources_*.txt
+logging_config_backup_*.json

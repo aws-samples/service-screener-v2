@@ -97,7 +97,11 @@
       ],
       "28": [
         "sagemaker.EncryptionEnabled",
-        "sagemaker.VolumeAndOutputEncryption"
+        "sagemaker.VolumeAndOutputEncryption",
+        "bedrock.bedrockAgentNoEncryptionKey",
+        "bedrock.bedrockGuardrailNoEncryption",
+        "bedrock.bedrockKBNoEncryption",
+        "bedrock.bedrockACMemoryNoEncryption"
       ]
     },
     "10.2": {
@@ -157,7 +161,9 @@
       "4": [
         "ec2.VPCFlowLogEnabled",
         "cloudtrail.OrganizationTrailEnabled",
-        "cloudtrail.CloudWatchAlarmsConfigured"
+        "cloudtrail.CloudWatchAlarmsConfigured",
+        "bedrock.bedrockModelInvocationLoggingDisabled",
+        "bedrock.bedrockModelInvocationNoCloudWatch"
       ]
     },
     "10.36": {
@@ -248,7 +254,10 @@
         "iam.FullAdminAccess",
         "iam.ManagedPolicyFullAccessOneServ",
         "iam.wildcardActionsDetection",
-        "iam.missingPolicyConditions"
+        "iam.missingPolicyConditions",
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "bedrock.bedrockKBRoleOverprivileged",
+        "bedrock.bedrockACRuntimeWildcardRole"
       ],
       "25": [
         "iam.rootHasAccessKey"
@@ -448,7 +457,10 @@
       ],
       "5": [
         "iam.FullAdminAccess",
-        "iam.ManagedPolicyFullAccessOneServ"
+        "iam.ManagedPolicyFullAccessOneServ",
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "bedrock.bedrockKBRoleOverprivileged",
+        "bedrock.bedrockACRuntimeWildcardRole"
       ],
       "6": [
         "iam.userNotUsingGroup"
@@ -520,7 +532,10 @@
         "iam.scpBestPractices"
       ],
       "6": [
-        "cloudtrail.CloudWatchLogsLogGroupArn"
+        "cloudtrail.CloudWatchLogsLogGroupArn",
+        "bedrock.bedrockModelInvocationLoggingDisabled",
+        "bedrock.bedrockModelInvocationNoCloudWatch",
+        "bedrock.bedrockModelInvocationNoS3"
       ],
       "7": [
         "cloudwatch.SetRetentionDays"
@@ -638,7 +653,11 @@
       "18": [
         "redshift.EncryptedWithKMS",
         "sagemaker.EncryptionEnabled",
-        "sagemaker.VolumeAndOutputEncryption"
+        "sagemaker.VolumeAndOutputEncryption",
+        "bedrock.bedrockAgentNoEncryptionKey",
+        "bedrock.bedrockGuardrailNoEncryption",
+        "bedrock.bedrockKBNoEncryption",
+        "bedrock.bedrockACMemoryNoEncryption"
       ],
       "19": [
         "redshift.EncryptedInTransit"

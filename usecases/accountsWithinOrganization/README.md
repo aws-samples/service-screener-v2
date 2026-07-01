@@ -4,7 +4,7 @@ As users launch more and more workload in AWS, users will eventually move themse
 
 ## Solutions
 
-SS today support crossAccounts scanned, which required users to manually setup the crossAccounts.json file by providing the list of AWS accountID, roleNameToBeAssumed, and externalID. To accelerate the crossAccounts.json creation, you can now run ```python3 organizationAccountsInit.py``` and the crossAccounts.json will be generated based on the input given. 
+SS today support crossAccounts scanned, which required users to manually setup the crossAccounts.json file by providing the list of AWS accountID, roleNameToBeAssumed, and externalID. To accelerate the crossAccounts.json creation, you can now run ```python3 scripts/organizationAccountsInit.py``` and the crossAccounts.json will be generated based on the input given. 
 
 Then, you can execute the following to scan all your accounts within your organization
 ```

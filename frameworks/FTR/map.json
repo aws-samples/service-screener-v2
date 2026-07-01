@@ -94,7 +94,10 @@
         "kms.KeyPolicyWildcardPrincipal",
         "kms.KeyPolicySensitiveActionsNotRestricted",
         "kms.GrantOverlyPermissive",
-        "kms.GrantWildcardPrincipal"
+        "kms.GrantWildcardPrincipal",
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "bedrock.bedrockKBRoleOverprivileged",
+        "bedrock.bedrockACRuntimeWildcardRole"
       ],
       "IAM-007.1": [
         "iam.consoleLastAccess90",
@@ -146,7 +149,8 @@
         "sagemaker.DirectInternetAccess",
         "redshift.VpcDeployment",
         "glue.PublicAccessibility",
-        "apigateway.VPCEndpointAssociation"
+        "apigateway.VPCEndpointAssociation",
+        "bedrock.bedrockACRuntimeNoVPC"
       ]
     },
     "Backups and recovery": {
@@ -233,7 +237,11 @@
         "glue.JobCloudWatchLogsEncryption",
         "sagemaker.EncryptionEnabled",
         "sagemaker.VolumeAndOutputEncryption",
-        "s3.SSECBlocking"
+        "s3.SSECBlocking",
+        "bedrock.bedrockAgentNoEncryptionKey",
+        "bedrock.bedrockGuardrailNoEncryption",
+        "bedrock.bedrockKBNoEncryption",
+        "bedrock.bedrockACMemoryNoEncryption"
       ],
       "SDAT-003.1": [
         "ec2.SGEncryptionInTransit",

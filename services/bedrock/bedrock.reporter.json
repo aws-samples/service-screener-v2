@@ -1,0 +1,656 @@
+{
+    "bedrockAgentGuardrailAttached": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock agent(s) do not have a Guardrail attached. Guardrails enforce content safety policies, denied topics, PII detection, and prompt-injection defenses on agent input/output. Operating an agent without a guardrail exposes the application to unsafe responses, sensitive data leakage, and prompt-injection attacks.",
+        "shortDesc": "Attach a Guardrail to every Bedrock agent",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Use Guardrails with an agent]<https://docs.aws.amazon.com/bedrock/latest/userguide/agents-guardrail.html>",
+            "[AWS Well-Architected Agentic AI Lens - Security]<https://docs.aws.amazon.com/wellarchitected/latest/agentic-ai-lens/welcome.html>"
+        ]
+    },
+    "bedrockAgentIamRoleOverprivileged": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock agent execution role(s) use overly permissive policies (Action='*' or Resource='*' with broad actions). Least-privilege violations on the agent role allow tool calls to escalate privileges far beyond the agent's intended boundaries, magnifying the blast radius of prompt-injection or model-hijacking events.",
+        "shortDesc": "Apply least-privilege to the Bedrock agent execution role",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Service roles for Bedrock agents]<https://docs.aws.amazon.com/bedrock/latest/userguide/agents-permissions.html>",
+            "[IAM least-privilege best practices]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+        ]
+    },
+    "bedrockAgentNoInstruction": {
+        "category": "O",
+        "^description": "{$COUNT} Bedrock agent(s) have an empty or missing instruction (system prompt). Without an explicit instruction defining the agent's role, success criteria, and constraints, behavior becomes unpredictable and hard to evaluate or version-control.",
+        "shortDesc": "Define a clear instruction (system prompt) for every agent",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Write effective agent instructions]<https://docs.aws.amazon.com/bedrock/latest/userguide/agents-prompt-templates.html>"
+        ]
+    },
+    "bedrockAgentIdleSessionTimeout": {
+        "category": "C",
+        "^description": "{$COUNT} Bedrock agent(s) use the default idle-session TTL (600s) or an excessively high value (>3600s). Excessively long idle session TTLs hold conversational context (and the cost of stored memory) longer than needed, while leaving the default may not reflect a deliberate cost/security tradeoff.",
+        "shortDesc": "Tune idleSessionTTLInSeconds for cost and memory governance",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Agent session management]<https://docs.aws.amazon.com/bedrock/latest/userguide/agents-session-state.html>"
+        ]
+    },
+    "bedrockAgentMemoryDisabled": {
+        "category": "R",
+        "^description": "{$COUNT} Bedrock agent(s) have no memory configuration enabled. Without memory, the agent cannot retain cross-session context, limiting reliability for multi-turn workflows and forcing repeated context-gathering on every invocation.",
+        "shortDesc": "Enable agent memory for cross-session continuity",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Agent memory]<https://docs.aws.amazon.com/bedrock/latest/userguide/agents-memory.html>"
+        ]
+    },
+    "bedrockAgentNoEncryptionKey": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock agent(s) use default AWS-owned encryption (no customer-managed KMS key). Customer-managed CMKs are required to fully control key lifecycle, rotation, cross-account sharing, and audit through CloudTrail KMS events.",
+        "shortDesc": "Set a customerEncryptionKeyArn on each agent",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Bedrock encryption with KMS]<https://docs.aws.amazon.com/bedrock/latest/userguide/encryption-agents.html>"
+        ]
+    },
+    "bedrockAgentNotPrepared": {
+        "category": "O",
+        "^description": "{$COUNT} Bedrock agent(s) are in a non-operational state (NOT_PREPARED, FAILED, or similar). Agents in these states cannot serve invocations and indicate a broken deployment, missing PrepareAgent step, or unresolved configuration error.",
+        "shortDesc": "Resolve failed/not-prepared agents",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[PrepareAgent API]<https://docs.aws.amazon.com/bedrock/latest/APIReference/API_agent_PrepareAgent.html>",
+            "[Bedrock agent lifecycle]<https://docs.aws.amazon.com/bedrock/latest/userguide/agents.html>"
+        ]
+    },
+    "bedrockAgentExcessiveVersions": {
+        "category": "C",
+        "^description": "{$COUNT} Bedrock agent(s) have more than 10 versions retained. Excessive agent versions inflate management overhead, complicate rollback decisions, and indicate missing lifecycle/cleanup automation.",
+        "shortDesc": "Clean up obsolete agent versions",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Manage agent versions]<https://docs.aws.amazon.com/bedrock/latest/userguide/agents-deploy.html>"
+        ]
+    },
+    "bedrockAgentActionGroupNoSchema": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock agent action group(s) have no API/function schema attached. Without a structured schema, the model has open-ended discretion over tool invocations, which weakens validation, increases prompt-injection blast radius, and prevents tool-registry governance.",
+        "shortDesc": "Attach a function/API schema to every action group",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Agent action groups]<https://docs.aws.amazon.com/bedrock/latest/userguide/agents-action-create.html>"
+        ]
+    },
+    "bedrockAgentCollaborationDisabled": {
+        "category": "O",
+        "^description": "{$COUNT} Bedrock agent(s) do not have multi-agent collaboration configured. For complex workflows, specialized sub-agents with collaboration deliver better separation of concerns and observability than monolithic agents.",
+        "shortDesc": "Consider multi-agent collaboration for complex workflows",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Multi-agent collaboration]<https://docs.aws.amazon.com/bedrock/latest/userguide/agents-multi-agent-collaboration.html>"
+        ]
+    },
+    "bedrockGuardrailContentFilterDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock guardrail(s) have no content filters defined (SEXUAL, VIOLENCE, HATE, INSULTS, MISCONDUCT). Without content filters, harmful model output is not blocked, exposing users to unsafe content and creating brand/legal risk.",
+        "shortDesc": "Enable Guardrail content filters",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Guardrail content filters]<https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-content-filters.html>"
+        ]
+    },
+    "bedrockGuardrailContentFilterWeak": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock guardrail(s) include at least one content filter set to LOW strength on input or output. LOW strength permits a wide range of harmful content through; production workloads should default to MEDIUM/HIGH on every category.",
+        "shortDesc": "Strengthen Guardrail content filters above LOW",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Tune content filter strength]<https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-content-filters.html>"
+        ]
+    },
+    "bedrockGuardrailNoPromptAttackFilter": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock guardrail(s) have no PROMPT_ATTACK filter configured. Prompt-injection is the most-cited attack vector against agentic systems; the PROMPT_ATTACK content filter is the first line of defense.",
+        "shortDesc": "Enable PROMPT_ATTACK filter for prompt-injection defense",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Prompt attack filter]<https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-content-filters.html>"
+        ]
+    },
+    "bedrockGuardrailNoPiiDetection": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock guardrail(s) have no sensitive-information policy configured (no PII entities or regex). Without PII detection, the model may echo customer SSNs, credit cards, addresses, or other sensitive data in responses and logs.",
+        "shortDesc": "Enable sensitive information (PII) detection",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Guardrail sensitive information filters]<https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-sensitive-filters.html>"
+        ]
+    },
+    "bedrockGuardrailNoDeniedTopics": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock guardrail(s) have no denied topics configured. Denied topics let you block whole categories of conversation (e.g., legal/medical advice, competitor discussion) that content filters alone cannot catch.",
+        "shortDesc": "Configure denied topics on Guardrail",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Denied topics]<https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-denied-topics.html>"
+        ]
+    },
+    "bedrockGuardrailNoWordFilter": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock guardrail(s) have no word policy configured (no profanity or custom word filters). Word filters are a cheap, deterministic complement to model-based filtering for brand-specific or compliance-mandated terminology.",
+        "shortDesc": "Configure a Guardrail word policy",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Word filters]<https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-word-filters.html>"
+        ]
+    },
+    "bedrockGuardrailNoGroundingFilter": {
+        "category": "R",
+        "^description": "{$COUNT} Bedrock guardrail(s) have no contextual grounding policy configured. The grounding policy detects responses unsupported by the retrieved context (hallucinations) and is critical for RAG/knowledge-base workloads.",
+        "shortDesc": "Enable contextual grounding policy for hallucination defense",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Contextual grounding check]<https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-contextual-grounding-check.html>"
+        ]
+    },
+    "bedrockGuardrailNoEncryption": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock guardrail(s) use default AWS-owned encryption (no kmsKeyArn). For regulated workloads, customer-managed CMKs are required to control key access, rotation, and cross-account auditability of guardrail configuration.",
+        "shortDesc": "Encrypt Guardrails with a customer-managed KMS key",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Bedrock encryption with KMS]<https://docs.aws.amazon.com/bedrock/latest/userguide/encryption.html>"
+        ]
+    },
+    "bedrockGuardrailStatusFailed": {
+        "category": "O",
+        "^description": "{$COUNT} Bedrock guardrail(s) are in FAILED state. A FAILED guardrail does not enforce its policies and indicates a broken deployment that must be re-versioned or recreated.",
+        "shortDesc": "Resolve FAILED guardrails",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Manage Guardrails]<https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails.html>"
+        ]
+    },
+    "bedrockGuardrailOutputFilterDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock guardrail(s) have content filters enabled on input but disabled on output. Filtering only input leaves model-generated unsafe content unfiltered on the response path.",
+        "shortDesc": "Enable Guardrail filters on both input and output",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Guardrail content filters]<https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-content-filters.html>"
+        ]
+    },
+    "bedrockKBNoEncryption": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock knowledge base(s) use default AWS-owned encryption (no CMK). Knowledge bases store potentially sensitive corporate documents; a customer-managed KMS key is required for regulated data and key-revocation guarantees.",
+        "shortDesc": "Encrypt Knowledge Bases with a customer-managed KMS key",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Knowledge base encryption]<https://docs.aws.amazon.com/bedrock/latest/userguide/encryption-kb.html>"
+        ]
+    },
+    "bedrockKBStatusFailed": {
+        "category": "O",
+        "^description": "{$COUNT} Bedrock knowledge base(s) are in FAILED state. A failed knowledge base cannot serve retrieval queries and indicates a broken vector-store or data-source configuration.",
+        "shortDesc": "Resolve FAILED knowledge bases",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Knowledge base lifecycle]<https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base.html>"
+        ]
+    },
+    "bedrockKBNoDataSources": {
+        "category": "R",
+        "^description": "{$COUNT} Bedrock knowledge base(s) have zero data sources attached. A KB without data sources cannot ground responses and serves no purpose, indicating an abandoned or misconfigured resource.",
+        "shortDesc": "Attach at least one data source to every Knowledge Base",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Knowledge base data sources]<https://docs.aws.amazon.com/bedrock/latest/userguide/knowledge-base-ds.html>"
+        ]
+    },
+    "bedrockKBDataSourceSyncStale": {
+        "category": "R",
+        "^description": "{$COUNT} Bedrock knowledge base data source(s) have not been synced (ingested) in the last 7 days. Stale KBs cause the agent to ground answers on outdated information, raising hallucination/freshness risk.",
+        "shortDesc": "Re-ingest stale Knowledge Base data sources",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Sync a data source]<https://docs.aws.amazon.com/bedrock/latest/userguide/kb-data-source-sync-ingest.html>"
+        ]
+    },
+    "bedrockKBRoleOverprivileged": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock knowledge base service role(s) use overly permissive policies (Action='*' or Resource='*' with broad actions). KB roles should grant only the S3/OpenSearch/Bedrock model permissions strictly required for retrieval.",
+        "shortDesc": "Apply least-privilege to the Knowledge Base service role",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Service roles for Knowledge Bases]<https://docs.aws.amazon.com/bedrock/latest/userguide/kb-permissions.html>"
+        ]
+    },
+    "bedrockModelInvocationLoggingDisabled": {
+        "category": "O",
+        "^description": "Bedrock model invocation logging is disabled at the account/region level. Without invocation logging, prompts, completions, token usage, and tool calls are not captured, which blocks audit, cost attribution, abuse detection, and incident response.",
+        "shortDesc": "Enable Bedrock model invocation logging",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Model invocation logging]<https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html>"
+        ]
+    },
+    "bedrockModelInvocationNoCloudWatch": {
+        "category": "O",
+        "^description": "Bedrock model invocation logging is enabled but has no CloudWatch Logs destination. CloudWatch is required for near-real-time alerting, Logs Insights queries, and operational dashboards.",
+        "shortDesc": "Send Bedrock invocation logs to CloudWatch Logs",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Model invocation logging]<https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html>"
+        ]
+    },
+    "bedrockModelInvocationNoS3": {
+        "category": "O",
+        "^description": "Bedrock model invocation logging is enabled but has no S3 destination. S3 is required for long-term, cost-efficient archival, lifecycle policies, and offline analysis of prompt/completion data.",
+        "shortDesc": "Send Bedrock invocation logs to S3 for archival",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Model invocation logging]<https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html>"
+        ]
+    },
+    "bedrockNoGuardrailsExist": {
+        "category": "S",
+        "^description": "The account has zero Bedrock guardrails defined in this region. Even if no agents are wired to a guardrail today, the absence of any guardrail indicates that the team has not adopted the primary safety control for Bedrock.",
+        "shortDesc": "Define at least one Bedrock Guardrail",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Bedrock Guardrails]<https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails.html>"
+        ]
+    },
+    "bedrockAgentWithoutGuardrail": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock agent(s) in the account are not wired to any Guardrail. Cross-checked at the account level so a missing guardrail association is caught even when per-agent inspection is suppressed.",
+        "shortDesc": "Associate every agent with a Guardrail",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Use Guardrails with an agent]<https://docs.aws.amazon.com/bedrock/latest/userguide/agents-guardrail.html>"
+        ]
+    },
+    "bedrockServiceLimitAgents": {
+        "category": "R",
+        "^description": "Bedrock agent count is at or above 80% of the service quota in this region. Approaching the quota means new agent creations or CI/CD deployments will start failing without warning.",
+        "shortDesc": "Request a quota increase for Bedrock agents",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Bedrock service quotas]<https://docs.aws.amazon.com/bedrock/latest/userguide/quotas.html>"
+        ]
+    },
+    "bedrockServiceLimitKnowledgeBases": {
+        "category": "R",
+        "^description": "Bedrock knowledge base count is at or above 80% of the service quota in this region. Approaching the quota means new KB creations will start failing without warning.",
+        "shortDesc": "Request a quota increase for Bedrock Knowledge Bases",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Bedrock service quotas]<https://docs.aws.amazon.com/bedrock/latest/userguide/quotas.html>"
+        ]
+    },
+    "bedrockServiceLimitGuardrails": {
+        "category": "R",
+        "^description": "Bedrock guardrail count is at or above 80% of the service quota in this region. Approaching the quota means new guardrail creations or version updates will start failing without warning.",
+        "shortDesc": "Request a quota increase for Bedrock Guardrails",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Bedrock service quotas]<https://docs.aws.amazon.com/bedrock/latest/userguide/quotas.html>"
+        ]
+    },
+    "bedrockServiceLimitAgentActionGroups": {
+        "category": "R",
+        "^description": "{$COUNT} Bedrock agent(s) are at or above 80% of the action-groups-per-agent quota. Hitting this per-agent quota prevents adding new tools and indicates either runaway tool growth or the need for a quota increase.",
+        "shortDesc": "Request a quota increase for action groups per agent",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Bedrock service quotas]<https://docs.aws.amazon.com/bedrock/latest/userguide/quotas.html>"
+        ]
+    },
+    "bedrockServiceLimitTPM": {
+        "category": "P",
+        "^description": "Primary Bedrock on-demand InvokeModel TPM (tokens-per-minute) quota is at the default/low value typical of newly-onboarded accounts. Low TPM caps throttle agent throughput, degrade tail latency, and cap horizontal scaling.",
+        "shortDesc": "Request a TPM quota increase for the primary model",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Request a quota increase]<https://docs.aws.amazon.com/general/latest/gr/aws_service_limits.html>",
+            "[Bedrock service quotas]<https://docs.aws.amazon.com/bedrock/latest/userguide/quotas.html>"
+        ]
+    },
+    "bedrockACRuntimeNoEncryption": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock AgentCore agent runtime(s) do not have a customer-managed KMS key configured. Customer-managed CMKs are required for regulated workloads to control key lifecycle, rotation, and revocation. Note: when the AgentCore runtime API does not expose a direct CMK field, this check downgrades to INFO and points to the per-resource Memory/Gateway/PolicyEngine CMK checks.",
+        "shortDesc": "Ensure CMK encryption across the AgentCore stack",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[AgentCore security best practices]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-security-best-practices.html>"
+        ]
+    },
+    "bedrockACRuntimeNoVPC": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock AgentCore agent runtime(s) use networkMode=PUBLIC (not deployed in a VPC). Running agent runtimes in a VPC isolates outbound traffic, lets you apply security groups and VPC endpoints, and is the recommended posture for production workloads.",
+        "shortDesc": "Deploy AgentCore runtimes in a VPC",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AgentCore network configuration]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-security-best-practices.html>"
+        ]
+    },
+    "bedrockACRuntimeStatusFailed": {
+        "category": "O",
+        "^description": "{$COUNT} Bedrock AgentCore agent runtime(s) are in FAILED / CREATE_FAILED state. A non-operational runtime cannot serve invocations and indicates a broken deployment or unresolved configuration error.",
+        "shortDesc": "Resolve FAILED AgentCore runtimes",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[AgentCore runtime lifecycle]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime.html>"
+        ]
+    },
+    "bedrockACRuntimeWildcardRole": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock AgentCore agent runtime execution role(s) use overly permissive policies (Action='*' or Resource='*' with broad actions). Least-privilege violations on the runtime role allow tool calls and code in the runtime to escalate privileges far beyond the intended boundary.",
+        "shortDesc": "Apply least-privilege to AgentCore runtime roles",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AgentCore IAM best practices]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-security-best-practices.html>"
+        ]
+    },
+    "bedrockACRuntimeNoGateway": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock AgentCore agent runtime(s) are not fronted by an AgentCore Gateway target. The documented best practice is to front every runtime with a gateway so that authorization, observability, rate-limiting, and tool-routing can be centrally enforced.",
+        "shortDesc": "Front every AgentCore runtime with a Gateway target",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AgentCore Gateway]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway.html>"
+        ]
+    },
+    "bedrockACGatewayNoPolicy": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock AgentCore gateway(s) have no policy engine attached (policyEngineConfiguration.arn is null). Without a policy engine, the gateway cannot enforce Cedar-based authorization on tool invocations.",
+        "shortDesc": "Attach a policy engine to every AgentCore gateway",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AgentCore policy engines]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-security-best-practices.html>"
+        ]
+    },
+    "bedrockACGatewayNoTargets": {
+        "category": "O",
+        "^description": "{$COUNT} Bedrock AgentCore gateway(s) have zero targets configured. A gateway without targets cannot route traffic and indicates an abandoned or incomplete deployment.",
+        "shortDesc": "Configure at least one target per AgentCore gateway",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[AgentCore Gateway targets]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/gateway.html>"
+        ]
+    },
+    "bedrockACGatewayTargetNoAuth": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock AgentCore gateway target(s) have no explicit outbound authorization (no OAUTH or API_KEY credential provider configured). Relying on the gateway IAM role alone is insufficient when calling external tools; OAuth2 or API-key providers should scope outbound auth per target.",
+        "shortDesc": "Configure outbound auth (OAuth2/API key) on every gateway target",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AgentCore Identity & credential providers]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/identity.html>"
+        ]
+    },
+    "bedrockACMemoryNoEncryption": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock AgentCore memory store(s) use default AWS-owned encryption (no encryptionKeyArn set). Memory stores hold conversational state and potentially sensitive user data; a customer-managed CMK is required for regulated data and revocation guarantees.",
+        "shortDesc": "Encrypt AgentCore Memory stores with a customer-managed KMS key",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[AgentCore Memory]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/memory.html>"
+        ]
+    },
+    "bedrockACMemoryNoNamespace": {
+        "category": "S",
+        "^description": "{$COUNT} Bedrock AgentCore memory store(s) have no namespace or namespaceTemplate scoping configured on any strategy. Without per-actor namespacing, memories from one user can be retrieved by an agent serving another user, creating cross-tenant data-leakage risk.",
+        "shortDesc": "Add namespace/actor scoping to every AgentCore memory strategy",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AgentCore Memory namespaces]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/memory.html>"
+        ]
+    },
+    "bedrockACNoPolicyEngine": {
+        "category": "S",
+        "^description": "AgentCore resources are present in the account but no policy engines are defined. Policy engines provide Cedar-based authorization for gateway-routed tool invocations; an account that uses AgentCore without any policy engine has no centralized authz model.",
+        "shortDesc": "Create at least one AgentCore policy engine",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AgentCore policy engines]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-security-best-practices.html>"
+        ]
+    },
+    "bedrockACNoIdentityProvider": {
+        "category": "S",
+        "^description": "AgentCore resources are present but no OAuth2 or API-key credential providers are configured. Without credential providers, agents cannot authenticate to external tools securely; tool calls fall back to broad gateway IAM permissions or fail.",
+        "shortDesc": "Configure at least one OAuth2 or API-key credential provider",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AgentCore Identity]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/identity.html>"
+        ]
+    },
+    "bedrockACApiKeyProviderUsed": {
+        "category": "S",
+        "^description": "API-key credential providers are configured in this account. API keys are functional but generally less secure than OAuth2 (longer-lived, fewer revocation paths). Prefer OAuth2 where the target service supports it.",
+        "shortDesc": "Prefer OAuth2 over API-key providers where possible",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[AgentCore Identity]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/identity.html>"
+        ]
+    },
+    "bedrockACNoEvaluator": {
+        "category": "O",
+        "^description": "AgentCore resources are present but no evaluators are defined. Evaluators run behavioral tests against agent runtimes (correctness, safety, regression) and are the documented foundation for CI gating in production agent workflows.",
+        "shortDesc": "Define AgentCore evaluators for behavioral testing",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[AgentCore Evaluators]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/evaluator.html>"
+        ]
+    },
+    "bedrockACServiceLimitRuntimes": {
+        "category": "R",
+        "^description": "Bedrock AgentCore agent runtime count is at or above 80% of the service quota in this region. Approaching the quota means new runtime creations or CI/CD deployments will start failing without warning.",
+        "shortDesc": "Request a quota increase for AgentCore agent runtimes",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Bedrock AgentCore quotas]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/quotas.html>"
+        ]
+    }
+}

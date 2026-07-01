@@ -31,7 +31,9 @@
         "cloudwatch.alarmsWithoutSNS",
         "cloudwatch.missingCompositeAlarms",
         "cloudwatch.missingServiceQuotaAlarms",
-        "cloudwatch.missingBillingAlarms"
+        "cloudwatch.missingBillingAlarms",
+        "bedrock.bedrockModelInvocationLoggingDisabled",
+        "bedrock.bedrockNoGuardrailsExist"
       ],
       "BP04": [
         "iam.enableGuardDuty",
@@ -84,7 +86,9 @@
         "ec2.EC2IamProfile",
         "iam.unusedCustomerManagedPolicy",
         "iam.unnecessaryCustomPolicies",
-        "kms.GrantOldAge"
+        "kms.GrantOldAge",
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "bedrock.bedrockACRuntimeWildcardRole"
       ],
       "BP06": [
         "iam.userNotUsingGroup",
@@ -116,7 +120,10 @@
         "lambda.lambdaRoleTooPermissive",
         "sqs.WildcardPrincipalDetection",
         "s3.WildcardPrincipalsActions",
-        "apigateway.LeastPrivilegeAccess"
+        "apigateway.LeastPrivilegeAccess",
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "bedrock.bedrockKBRoleOverprivileged",
+        "bedrock.bedrockACRuntimeWildcardRole"
       ],
       "BP03": [
         "iam.EnableConfigService",
@@ -179,7 +186,9 @@
         "apigateway.CloudWatchAlarms",
         "lambda.lambdaNoCloudWatchAlarms",
         "rds.EventSubscriptionNotConfigured",
-        "s3.CloudWatchRequestMetrics"
+        "s3.CloudWatchRequestMetrics",
+        "bedrock.bedrockModelInvocationLoggingDisabled",
+        "bedrock.bedrockModelInvocationNoCloudWatch"
       ],
       "BP02": [
         "cloudwatch.missingCloudWatchDashboards",
@@ -258,7 +267,8 @@
     "SEC07": {
       "BP01": [
         "ec2.EBSVolumeDataClassification",
-        "efs.NoSensitiveDataInTags"
+        "efs.NoSensitiveDataInTags",
+        "bedrock.bedrockGuardrailNoPiiDetection"
       ],
       "BP02": [
         "s3.BucketOwnerEnforced"
@@ -304,7 +314,12 @@
         "sagemaker.EncryptionEnabled",
         "sagemaker.VolumeAndOutputEncryption",
         "eks.eksSecretsEncryptionNoKMS",
-        "dynamodb.encryptionAtRest"
+        "dynamodb.encryptionAtRest",
+        "bedrock.bedrockAgentNoEncryptionKey",
+        "bedrock.bedrockGuardrailNoEncryption",
+        "bedrock.bedrockKBNoEncryption",
+        "bedrock.bedrockACMemoryNoEncryption",
+        "bedrock.bedrockACRuntimeNoEncryption"
       ],
       "BP03": [],
       "BP04": [
@@ -346,7 +361,8 @@
         "efs.TLSRequired",
         "glue.SslEnabled",
         "sagemaker.InterContainerEncryption",
-        "apigateway.CORSConfiguration"
+        "apigateway.CORSConfiguration",
+        "bedrock.bedrockACRuntimeNoVPC"
       ],
       "BP03": [],
       "BP04": [
@@ -357,7 +373,10 @@
       ]
     },
     "SEC10": {
-      "BP01": [],
+      "BP01": [
+        "bedrock.bedrockGuardrailNoPromptAttackFilter",
+        "bedrock.bedrockGuardrailContentFilterDisabled"
+      ],
       "BP02": [],
       "BP03": [],
       "BP04": [],

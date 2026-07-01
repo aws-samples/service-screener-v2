@@ -43,7 +43,11 @@
         "sagemaker.EncryptionEnabled",
         "sagemaker.VolumeAndOutputEncryption",
         "s3.SSECBlocking",
-        "s3.BucketOwnerEnforced"
+        "s3.BucketOwnerEnforced",
+        "bedrock.bedrockAgentNoEncryptionKey",
+        "bedrock.bedrockGuardrailNoEncryption",
+        "bedrock.bedrockKBNoEncryption",
+        "bedrock.bedrockACMemoryNoEncryption"
       ],
       "1.3": [
         "s3.TlsEnforced",
@@ -94,7 +98,10 @@
         "iam.missingPolicyConditions",
         "iam.missingPermissionsBoundaries",
         "lambda.lambdaRoleTooPermissive",
-        "sqs.WildcardPrincipalDetection"
+        "sqs.WildcardPrincipalDetection",
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "bedrock.bedrockKBRoleOverprivileged",
+        "bedrock.bedrockACRuntimeWildcardRole"
       ],
       "2.4": [
         "iam.rootHasAccessKey"
@@ -149,7 +156,10 @@
         "redshift.EventNotifications",
         "apigateway.CloudWatchAlarms",
         "apigateway.PerformanceMonitoring",
-        "s3.CloudWatchRequestMetrics"
+        "s3.CloudWatchRequestMetrics",
+        "bedrock.bedrockModelInvocationLoggingDisabled",
+        "bedrock.bedrockModelInvocationNoCloudWatch",
+        "bedrock.bedrockModelInvocationNoS3"
       ],
       "3.5": [
         "iam.enableGuardDuty",
@@ -186,7 +196,8 @@
         "sagemaker.ModelVpcSettings",
         "sagemaker.TrainingVpcSettings",
         "sagemaker.NetworkIsolation",
-        "sagemaker.TrainingNetworkIsolation"
+        "sagemaker.TrainingNetworkIsolation",
+        "bedrock.bedrockACRuntimeNoVPC"
       ],
       "4.4": [
         "apigateway.WAFWACL",

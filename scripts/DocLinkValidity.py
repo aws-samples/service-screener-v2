@@ -1,8 +1,12 @@
 import os
 import re
+import sys
 from urllib.request import Request, urlopen
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+# Make project root importable when this script is invoked from anywhere
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.RuleReader import RuleReader
 
