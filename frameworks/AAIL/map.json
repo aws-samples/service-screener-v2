@@ -50,7 +50,9 @@
                 "bedrock.bedrockModelInvocationLoggingDisabled",
                 "cloudtrail.trailEnabled",
                 "stepfunctions.sfnTracingDisabled",
-                "sns.snsTracingDisabled"
+                "sns.snsTracingDisabled",
+                "wafv2.wafv2LoggingNotConfigured",
+                "wafv2.wafv2CloudWatchMetricsDisabled"
             ],
             "BP03": [
                 "bedrock.bedrockModelInvocationNoCloudWatch",
@@ -85,7 +87,8 @@
             ],
             "BP02": [
                 "bedrock.bedrockGuardrailContentFilterDisabled",
-                "bedrock.bedrockGuardrailNoPiiDetection"
+                "bedrock.bedrockGuardrailNoPiiDetection",
+                "wafv2.wafv2RulesInCountMode"
             ],
             "BP03": [
                 "bedrock.bedrockGuardrailNoGroundingFilter"
@@ -96,7 +99,8 @@
                 "bedrock.bedrockAgentIamRoleOverprivileged",
                 "iam.InlinePolicyFullAdminAccess",
                 "bedrock.bedrockACRuntimeWildcardRole",
-                "stepfunctions.sfnRoleOverprivileged"
+                "stepfunctions.sfnRoleOverprivileged",
+                "cognito.cognitoWeakPasswordPolicy"
             ],
             "BP02": [
                 "iam.InlinePolicyFullAccessOneServ",
@@ -117,7 +121,9 @@
                 "iam.missingPermissionsBoundaries",
                 "bedrock.bedrockAgentIamRoleOverprivileged",
                 "bedrock.bedrockACNoIdentityProvider",
-                "bedrock.bedrockACApiKeyProviderUsed"
+                "bedrock.bedrockACApiKeyProviderUsed",
+                "cognito.cognitoMfaNotEnforced",
+                "cognito.cognitoAdvancedSecurityNotEnforced"
             ],
             "BP02": [
                 "bedrock.bedrockKBRoleOverprivileged"
@@ -150,10 +156,13 @@
         "AGENTSEC08": {
             "BP01": [
                 "bedrock.bedrockGuardrailNoPromptAttackFilter",
-                "bedrock.bedrockGuardrailNoPiiDetection"
+                "bedrock.bedrockGuardrailNoPiiDetection",
+                "wafv2.wafv2NoRules",
+                "wafv2.wafv2NoManagedRuleGroups"
             ],
             "BP02": [
-                "bedrock.bedrockGuardrailNoWordFilter"
+                "bedrock.bedrockGuardrailNoWordFilter",
+                "wafv2.wafv2RulesInCountMode"
             ]
         },
         "AGENTSEC09": {
@@ -204,7 +213,8 @@
         "AGENTREL08": {
             "BP01": [
                 "bedrock.bedrockServiceLimitAgents",
-                "bedrock.bedrockServiceLimitTPM"
+                "bedrock.bedrockServiceLimitTPM",
+                "wafv2.wafv2NoRateBasedRules"
             ]
         },
         "AGENTPERF01": {

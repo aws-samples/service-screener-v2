@@ -41,8 +41,8 @@
       "CC5.3 - Deploys through policies and procedures": ["iam.noRootUserAccessKey"]
     },
     "CC6.0 - Logical and Physical Access Controls": {
-      "CC6.1 - Restricts logical access to authorized users": ["iam.usersMfaEnabled", "iam.noInlinePolicy", "iam.noUserPolicies", "bedrock.bedrockAgentIamRoleOverprivileged", "bedrock.bedrockKBRoleOverprivileged", "bedrock.bedrockACRuntimeWildcardRole", "stepfunctions.sfnRoleOverprivileged"],
-      "CC6.2 - Manages identification and authentication": ["iam.passwordPolicy"],
+      "CC6.1 - Restricts logical access to authorized users": ["iam.usersMfaEnabled", "iam.noInlinePolicy", "iam.noUserPolicies", "bedrock.bedrockAgentIamRoleOverprivileged", "bedrock.bedrockKBRoleOverprivileged", "bedrock.bedrockACRuntimeWildcardRole", "stepfunctions.sfnRoleOverprivileged", "cognito.cognitoMfaNotEnforced", "cognito.cognitoAdvancedSecurityNotEnforced"],
+      "CC6.2 - Manages identification and authentication": ["iam.passwordPolicy", "cognito.cognitoWeakPasswordPolicy", "cognito.cognitoMfaNotEnforced"],
       "CC6.3 - Manages logical access": ["iam.supportRoleExists", "iam.noFullAdminPolicies"],
       "CC6.4 - Restricts physical access": [],
       "CC6.5 - Manages production changes": [],
@@ -52,7 +52,7 @@
     },
     "CC7.0 - System Operations": {
       "CC7.1 - Manages infrastructure, software, and data": ["ec2.instanceDetailedMonitoringEnabled", "ec2.ebsOptimizedEnabled"],
-      "CC7.2 - Manages security incidents": ["guardduty.isEnabled", "securityhub.isEnabled", "bedrock.bedrockNoGuardrailsExist", "bedrock.bedrockAgentWithoutGuardrail", "bedrock.bedrockGuardrailNoPromptAttackFilter", "stepfunctions.sfnLoggingDisabled", "sns.snsDeliveryStatusLoggingDisabled"],
+      "CC7.2 - Manages security incidents": ["guardduty.isEnabled", "securityhub.isEnabled", "bedrock.bedrockNoGuardrailsExist", "bedrock.bedrockAgentWithoutGuardrail", "bedrock.bedrockGuardrailNoPromptAttackFilter", "stepfunctions.sfnLoggingDisabled", "sns.snsDeliveryStatusLoggingDisabled", "wafv2.wafv2LoggingNotConfigured", "wafv2.wafv2RulesInCountMode"],
       "CC7.3 - Manages business continuity": ["backup.resourcesProtectedByBackupPlan", "rds.instanceBackupEnabled"],
       "CC7.4 - Recovers from incidents": ["rds.instanceMultiAZ", "ec2.instanceEbsBackupEnabled"]
     },

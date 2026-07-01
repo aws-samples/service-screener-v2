@@ -9,9 +9,9 @@
   },
   "mapping": {
     "Identity Protection": {
-      "P1.1": ["iam.rootMfaActive" , "iam.mfaActive"],
+      "P1.1": ["iam.rootMfaActive" , "iam.mfaActive" , "cognito.cognitoMfaNotEnforced" , "cognito.cognitoAdvancedSecurityNotEnforced"],
       "P1.2": ["iam.hasAccessKeyNoRotate30days" , "iam.hasAccessKeyNoRotate90days"],
-      "P1.3": ["iam.passwordPolicy" , "iam.passwordPolicyWeak" , "iam.passwordPolicyReuse" , "iam.passwordPolicyLength"],
+      "P1.3": ["iam.passwordPolicy" , "iam.passwordPolicyWeak" , "iam.passwordPolicyReuse" , "iam.passwordPolicyLength" , "cognito.cognitoWeakPasswordPolicy"],
       "P1.4": ["iam.hasSSORoles" , "iam.hasExternalIdentityProvider"],
       "P1.5": ["iam.SCPEnabled", "iam.hasOrganization"],
       "P1.6": [],
@@ -26,7 +26,7 @@
     },
     "Infrastructure Protection and Visibility": {
       "P3.1": ["ec2.SGDefaultInUsed" , "ec2.SGSensitivePortOpenToAll" , "ec2.SGAllTCPOpen" , "ec2.SGAllUDPOpen" , "ec2.SGAllPortOpen"],
-      "P3.2": ["cloudfront.WAFAssociation"],
+      "P3.2": ["cloudfront.WAFAssociation", "wafv2.wafv2NoRules", "wafv2.wafv2NoManagedRuleGroups", "wafv2.wafv2NoRateBasedRules"],
       "P3.3": ["cloudfront.defaultRootObject"],
       "P3.4": [],
       "P3.5": ["ec2.SGSensitivePortOpenToAll"],

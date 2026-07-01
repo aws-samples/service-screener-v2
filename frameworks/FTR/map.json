@@ -42,7 +42,9 @@
       "IAM-001.1": [
         "iam.mfaActive",
         "iam.rootMfaActive",
-        "iam.iamUsersWithFederationAvailable"
+        "iam.iamUsersWithFederationAvailable",
+        "cognito.cognitoMfaNotEnforced",
+        "cognito.cognitoAdvancedSecurityNotEnforced"
       ],
       "IAM-002.1": [
         "iam.passwordLastChange90",
@@ -66,7 +68,8 @@
         "iam.passwordPolicyWeak",
         "iam.passwordPolicy",
         "iam.passwordPolicyLength",
-        "iam.passwordPolicyReuse"
+        "iam.passwordPolicyReuse",
+        "cognito.cognitoWeakPasswordPolicy"
       ],
       "IAM-004.1": [
         "iam.noUsersFound"
@@ -140,7 +143,10 @@
         "apigateway.VPCAccessRestrictions",
         "apigateway.PrivateAPI",
         "redshift.SecurityGroups",
-        "efs.MountTargetSecurityGroups"
+        "efs.MountTargetSecurityGroups",
+        "wafv2.wafv2NoRules",
+        "wafv2.wafv2NoManagedRuleGroups",
+        "wafv2.wafv2NoRateBasedRules"
       ],
       "NETSEC-001.2": [
         "ec2.SGSensitivePortOpenToAll"

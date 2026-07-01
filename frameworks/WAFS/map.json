@@ -60,7 +60,9 @@
         "iam.passwordPolicyWeak",
         "iam.passwordLastChange90",
         "iam.hasAccessKeyNoRotate30days",
-        "iam.iamUsersWithFederationAvailable"
+        "iam.iamUsersWithFederationAvailable",
+        "cognito.cognitoMfaNotEnforced",
+        "cognito.cognitoWeakPasswordPolicy"
       ],
       "BP02": [
         "ec2.EC2IamProfile"
@@ -73,7 +75,8 @@
       "BP04": [
         "iam.hasSSORoles",
         "iam.hasExternalIdentityProvider",
-        "iam.iamUsersWithFederationAvailable"
+        "iam.iamUsersWithFederationAvailable",
+        "cognito.cognitoAdvancedSecurityNotEnforced"
       ],
       "BP05": [
         "iam.passwordLastChange90",
@@ -193,7 +196,9 @@
         "bedrock.bedrockModelInvocationNoCloudWatch",
         "stepfunctions.sfnLoggingDisabled",
         "stepfunctions.sfnTracingDisabled",
-        "sns.snsDeliveryStatusLoggingDisabled"
+        "sns.snsDeliveryStatusLoggingDisabled",
+        "wafv2.wafv2LoggingNotConfigured",
+        "wafv2.wafv2CloudWatchMetricsDisabled"
       ],
       "BP02": [
         "cloudwatch.missingCloudWatchDashboards",
@@ -371,7 +376,10 @@
         "apigateway.CORSConfiguration",
         "bedrock.bedrockACRuntimeNoVPC",
         "sns.snsNoHttpsEnforcement",
-        "sns.snsInsecureSubscription"
+        "sns.snsInsecureSubscription",
+        "wafv2.wafv2NoRules",
+        "wafv2.wafv2NoManagedRuleGroups",
+        "wafv2.wafv2NoRateBasedRules"
       ],
       "BP03": [],
       "BP04": [
@@ -384,7 +392,8 @@
     "SEC10": {
       "BP01": [
         "bedrock.bedrockGuardrailNoPromptAttackFilter",
-        "bedrock.bedrockGuardrailContentFilterDisabled"
+        "bedrock.bedrockGuardrailContentFilterDisabled",
+        "wafv2.wafv2RulesInCountMode"
       ],
       "BP02": [],
       "BP03": [],

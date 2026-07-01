@@ -87,11 +87,14 @@
       "2.1": [
         "iam.rootMfaActive",
         "iam.mfaActive",
-        "iam.iamUsersWithFederationAvailable"
+        "iam.iamUsersWithFederationAvailable",
+        "cognito.cognitoMfaNotEnforced",
+        "cognito.cognitoAdvancedSecurityNotEnforced"
       ],
       "2.2": [
         "iam.passwordPolicy",
-        "iam.passwordPolicyWeak"
+        "iam.passwordPolicyWeak",
+        "cognito.cognitoWeakPasswordPolicy"
       ],
       "2.3": [
         "iam.FullAdminAccess",
@@ -210,7 +213,11 @@
         "ec2.ELBEnableWAF",
         "apigateway.ResourcePolicy",
         "apigateway.RequestThrottling",
-        "apigateway.RequestValidation"
+        "apigateway.RequestValidation",
+        "wafv2.wafv2NoRules",
+        "wafv2.wafv2NoManagedRuleGroups",
+        "wafv2.wafv2NoRateBasedRules",
+        "wafv2.wafv2RulesInCountMode"
       ]
     },
     "Resilience and Business Continuity": {

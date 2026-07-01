@@ -1,0 +1,159 @@
+{
+    "cognitoMfaNotEnforced": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) do not enforce multi-factor authentication (MfaConfiguration is OFF or OPTIONAL). Without enforced MFA, credentials compromised via phishing or reuse are sufficient to sign in. Enforcing MFA is the single largest security lift Cognito offers.",
+        "shortDesc": "Set MfaConfiguration=ON to require MFA on every sign-in",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Cognito MFA]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-mfa.html>",
+            "[Managing security]<https://docs.aws.amazon.com/cognito/latest/developerguide/managing-security.html>"
+        ]
+    },
+    "cognitoWeakPasswordPolicy": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) have a weak password policy (MinimumLength < 12, or one or more of RequireUppercase / RequireLowercase / RequireNumbers / RequireSymbols is false). Weak password policies materially reduce the cost of credential-stuffing and brute-force attacks.",
+        "shortDesc": "Require length >= 12 and all four character classes",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Password policy]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-policies.html>"
+        ]
+    },
+    "cognitoAdvancedSecurityNotEnforced": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) do not have advanced security in ENFORCED mode (UserPoolAddOns.AdvancedSecurityMode is missing, OFF, or AUDIT). Advanced security features (adaptive authentication, compromised-credential detection) only apply enforcement actions when the mode is ENFORCED.",
+        "shortDesc": "Set UserPoolAddOns.AdvancedSecurityMode=ENFORCED",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Advanced security features]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-advanced-security.html>"
+        ]
+    },
+    "cognitoDeletionProtectionDisabled": {
+        "category": "R",
+        "^description": "{$COUNT} Cognito user pool(s) have DeletionProtection set to INACTIVE. A user pool can be deleted with a single API call in this state; the pool ID cannot be recreated and all users are lost.",
+        "shortDesc": "Enable DeletionProtection on every production user pool",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Deletion protection]<https://docs.aws.amazon.com/cognito/latest/developerguide/managing-users-with-user-pools.html>"
+        ]
+    },
+    "cognitoNoEmailPhoneVerification": {
+        "category": "O",
+        "^description": "{$COUNT} Cognito user pool(s) do not auto-verify email or phone (AutoVerifiedAttributes is empty). Without verification, an attacker can register an account claiming any email/phone and later use account-recovery flows on that unverified attribute.",
+        "shortDesc": "Auto-verify at least one of email / phone_number",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Verifying contact info]<https://docs.aws.amazon.com/cognito/latest/developerguide/signing-up-users-in-your-app.html>"
+        ]
+    },
+    "cognitoNoLambdaTriggers": {
+        "category": "O",
+        "^description": "{$COUNT} Cognito user pool(s) have no Lambda triggers configured (LambdaConfig is empty). Lambda triggers such as PreAuthentication / PostAuthentication / PreTokenGeneration are the only way to add custom auth-time telemetry, risk scoring, or claim customisation.",
+        "shortDesc": "Wire at least one Lambda trigger for auth observability or custom logic",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Cognito Lambda triggers]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-identity-pools-working-with-aws-lambda-triggers.html>"
+        ]
+    },
+    "cognitoAccountRecoveryNotConfigured": {
+        "category": "R",
+        "^description": "{$COUNT} Cognito user pool(s) have no account-recovery mechanism configured (AccountRecoverySetting is missing or RecoveryMechanisms is empty). Users who lose credentials have no self-service reset path; every reset becomes a support ticket.",
+        "shortDesc": "Configure AccountRecoverySetting with at least one recovery mechanism",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Account recovery]<https://docs.aws.amazon.com/cognito/latest/developerguide/how-to-recover-a-user-account.html>"
+        ]
+    },
+    "cognitoSingleRecoveryOption": {
+        "category": "R",
+        "^description": "{$COUNT} Cognito user pool(s) have exactly one account-recovery mechanism configured. If that channel (e.g. the user's only email address) becomes unavailable, self-service recovery is blocked. A second mechanism provides a fall-back.",
+        "shortDesc": "Configure at least two recovery mechanisms with distinct priorities",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Recovery mechanisms]<https://docs.aws.amazon.com/cognito/latest/developerguide/how-to-recover-a-user-account.html>"
+        ]
+    },
+    "cognitoUnusedUserPool": {
+        "category": "C",
+        "^description": "{$COUNT} Cognito user pool(s) have zero users (EstimatedNumberOfUsers=0). Empty pools accumulate configuration drift and, on paid tiers (PLUS/ESSENTIALS), incur monthly fixed charges even with no active users.",
+        "shortDesc": "Delete unused user pools",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Cognito pricing]<https://aws.amazon.com/cognito/pricing/>"
+        ]
+    },
+    "cognitoTokenValidityTooLong": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) have at least one app client with long-lived tokens (AccessTokenValidity > 60 min, IdTokenValidity > 60 min, or RefreshTokenValidity > 30 days). Long-lived tokens increase the window during which a stolen token remains valid.",
+        "shortDesc": "Access/Id <= 60 min, Refresh <= 30 days",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Token validity]<https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-using-tokens-with-identity-providers.html>"
+        ]
+    },
+    "cognitoDeviceTrackingDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) have device tracking disabled (DeviceConfiguration is missing, or ChallengeRequiredOnNewDevice is false). Device tracking enables 'remembered-device' MFA suppression and detection of sign-ins from unknown devices.",
+        "shortDesc": "Enable DeviceConfiguration with ChallengeRequiredOnNewDevice=true",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Device tracking]<https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-device-tracking.html>"
+        ]
+    },
+    "cognitoResourcesWithoutTags": {
+        "category": "C",
+        "^description": "{$COUNT} Cognito user pool(s) have no tags applied. Tags enable cost allocation, tag-based IAM policies, and lifecycle governance.",
+        "shortDesc": "Tag every user pool (owner, environment, cost-centre)",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>"
+        ]
+    }
+}

@@ -1,0 +1,1 @@
+WEBACL:ss-test-wafv2-acl-20260701-161506|92560746-a194-4590-99b9-8cdfd06a3730|arn:aws:wafv2:us-east-1:956288449190:regional/webacl/ss-test-wafv2-acl-20260701-161506/92560746-a194-4590-99b9-8cdfd06a3730
