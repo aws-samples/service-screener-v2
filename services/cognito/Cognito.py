@@ -28,6 +28,9 @@ class Cognito(Service):
         super().__init__(region)
         ssBoto = self.ssBoto
         self.cognitoClient = ssBoto.client('cognito-idp', config=self.bConfig)
+        # WAFv2 for user-pool WebACL association lookup (Cognito user pools
+        # are REGIONAL resources so this client runs in the target region).
+        self.wafClient = ssBoto.client('wafv2', config=self.bConfig)
 
     # ------------------------------------------------------------------ #
     # Discovery
@@ -54,6 +57,10 @@ class Cognito(Service):
                     detail['_tagList'] = tagList
 
                     detail['_appClients'] = self._listAppClients(poolId)
+                    detail['_riskConfiguration'] = self._describeRiskConfiguration(poolId)
+                    detail['_wafWebAclArn'] = self._getAssociatedWebAcl(detail.get('Arn'))
+                    detail['_logConfig'] = self._getLogDeliveryConfig(poolId)
+                    detail['_identityProviders'] = self._listIdentityProviders(poolId)
 
                     _pi('Cognito', f"User pool: {detail.get('Name', poolId)}")
                     pools.append(detail)
@@ -101,6 +108,84 @@ class Cognito(Service):
     @staticmethod
     def _userPoolTagsAsList(tagsDict):
         return [{'Key': k, 'Value': v} for k, v in (tagsDict or {}).items()]
+
+    def _describeRiskConfiguration(self, poolId):
+        """Return the pool-level RiskConfiguration dict, or None if not set / not permitted.
+
+        DescribeRiskConfiguration is only meaningful when Advanced Security is
+        enabled; when it isn't, AWS returns a mostly-empty response — which
+        the driver treats as INFO for the compromised-credentials check.
+        """
+        try:
+            resp = self.cognitoClient.describe_risk_configuration(UserPoolId=poolId)
+            return resp.get('RiskConfiguration')
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', '')
+            # UserPoolAddOnNotEnabled means Advanced Security is off — return None,
+            # driver skips gracefully.
+            if code in ('UserPoolAddOnNotEnabledException',
+                        'ResourceNotFoundException', 'InvalidParameterException'):
+                return None
+            self._logClientError(f'describe_risk_configuration({poolId})', e)
+            return None
+
+    def _getAssociatedWebAcl(self, poolArn):
+        """Return the ARN of a WAFv2 WebACL associated with this user pool, or None."""
+        if not poolArn:
+            return None
+        try:
+            resp = self.wafClient.get_web_acl_for_resource(ResourceArn=poolArn)
+            wac = resp.get('WebACL') or {}
+            return wac.get('ARN')
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', '')
+            # WAFNonexistentItemException = no WebACL associated (normal case)
+            # WAFInvalidParameterException = resource type not supported in this region
+            if code in ('WAFNonexistentItemException',
+                        'WAFInvalidParameterException'):
+                return None
+            self._logClientError(f'wafv2.get_web_acl_for_resource({poolArn})', e)
+            return None
+
+    def _getLogDeliveryConfig(self, poolId):
+        """Return the pool-level log delivery configuration, or {} if none / not permitted."""
+        try:
+            resp = self.cognitoClient.get_log_delivery_configuration(
+                UserPoolId=poolId
+            )
+            return resp.get('LogDeliveryConfiguration') or {}
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', '')
+            if code in ('ResourceNotFoundException', 'InvalidParameterException'):
+                # Older pools or unsupported tiers → treated as "not configured"
+                return {}
+            self._logClientError(f'get_log_delivery_configuration({poolId})', e)
+            return {}
+
+    def _listIdentityProviders(self, poolId):
+        """Return the list of DescribeIdentityProvider dicts for this pool."""
+        providers = []
+        try:
+            paginator = self.cognitoClient.get_paginator('list_identity_providers')
+            for page in paginator.paginate(UserPoolId=poolId, MaxResults=60):
+                for summary in page.get('Providers', []) or []:
+                    name = summary.get('ProviderName')
+                    if not name:
+                        continue
+                    try:
+                        resp = self.cognitoClient.describe_identity_provider(
+                            UserPoolId=poolId, ProviderName=name
+                        )
+                        p = resp.get('IdentityProvider')
+                        if p:
+                            providers.append(p)
+                    except botocore.exceptions.ClientError as e:
+                        self._logClientError(
+                            f'describe_identity_provider({poolId}/{name})', e
+                        )
+        except botocore.exceptions.ClientError as e:
+            self._logClientError(f'list_identity_providers({poolId})', e)
+        return providers
 
     # ------------------------------------------------------------------ #
     # Advise

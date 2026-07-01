@@ -155,5 +155,201 @@
         "ref": [
             "[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>"
         ]
+    },
+    "cognitoCompromisedCredentialProtection": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) have Advanced Security enabled but the CompromisedCredentialsRiskConfiguration event action is not set to BLOCK. Compromised-credentials detection is worthless if the response is just LOG or NO_ACTION — attackers can still complete sign-in with a leaked password.",
+        "shortDesc": "Set CompromisedCredentialsRiskConfiguration EventAction to BLOCK",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Cognito compromised credentials]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-compromised-credentials.html>"
+        ]
+    },
+    "cognitoSelfServiceSignUpNoVerification": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) allow public self-service sign-up (AdminCreateUserConfig.AllowAdminCreateUserOnly=false) with no email/phone verification required (AutoVerifiedAttributes is empty). Anyone can create an account with a made-up address, creating spam/abuse and fake-user risk.",
+        "shortDesc": "Require email or phone verification when self-service sign-up is enabled",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Cognito user pool sign-up]<https://docs.aws.amazon.com/cognito/latest/developerguide/signing-up-users-in-your-app.html>"
+        ]
+    },
+    "cognitoNoCustomDomain": {
+        "category": "O",
+        "^description": "{$COUNT} Cognito user pool(s) use only the default amazoncognito.com domain with no custom domain configured. Custom domains give you a brandable auth URL and let you rotate the ACM cert independently; the default domain forces the AWS-owned certificate chain. Informational only.",
+        "shortDesc": "Configure a custom domain on user pools serving public traffic",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Cognito user pool custom domains]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-add-custom-domain.html>"
+        ]
+    },
+    "cognitoNoWafAssociation": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) have no WAFv2 WebACL associated. Without WAF, the hosted-UI sign-in / sign-up endpoints have no bot mitigation, no rate-based throttling, and no IP-reputation filtering — leaving them open to credential-stuffing and enumeration attacks.",
+        "shortDesc": "Associate a WAFv2 WebACL with the user pool",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[WAF on Cognito user pools]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-waf.html>"
+        ]
+    },
+    "cognitoClientImplicitGrantEnabled": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) have at least one app client with the Implicit OAuth grant enabled (AllowedOAuthFlows contains 'implicit'). The Implicit flow returns tokens in the URL fragment and is deprecated in OAuth 2.1 — Authorization Code + PKCE is the modern replacement.",
+        "shortDesc": "Remove 'implicit' from AllowedOAuthFlows; use code + PKCE",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Cognito OAuth flows]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-idp-settings.html>",
+            "[OAuth 2.1 draft]<https://oauth.net/2.1/>"
+        ]
+    },
+    "cognitoClientTokenRevocationDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) have at least one app client with EnableTokenRevocation=false. Stolen refresh tokens remain valid even after a user signs out — an attacker who captured a refresh token retains access until natural expiry.",
+        "shortDesc": "Set EnableTokenRevocation=true on every app client",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Cognito token revocation]<https://docs.aws.amazon.com/cognito/latest/developerguide/token-revocation.html>"
+        ]
+    },
+    "cognitoClientHttpCallbackUrl": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) have at least one app client with an http:// CallbackURL (non-localhost). Auth codes and tokens are transmitted to the callback URL in the query string — over HTTP that traffic is exposed to any on-path attacker.",
+        "shortDesc": "Use https:// CallbackURLs for every app client",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Cognito app client settings]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-idp-settings.html>"
+        ]
+    },
+    "cognitoClientUserExistenceErrors": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) have at least one app client with PreventUserExistenceErrors=LEGACY (or missing). LEGACY mode returns distinct errors for 'user not found' vs 'wrong password', enabling username enumeration by unauthenticated attackers.",
+        "shortDesc": "Set PreventUserExistenceErrors=ENABLED on every app client",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Preventing user existence errors]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-managing-errors.html>"
+        ]
+    },
+    "cognitoClientInsecureAuthFlow": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) have at least one app client with ALLOW_USER_PASSWORD_AUTH in ExplicitAuthFlows. This flow sends the user's password in cleartext to Cognito (no SRP challenge); ALLOW_USER_SRP_AUTH is the secure alternative.",
+        "shortDesc": "Replace ALLOW_USER_PASSWORD_AUTH with ALLOW_USER_SRP_AUTH",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Cognito authentication flows]<https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-authentication-flow.html>"
+        ]
+    },
+    "cognitoClientHttpLogoutUrl": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) have at least one app client with an http:// LogoutURL (non-localhost). Sign-out redirects and any state carried in the URL are exposed to on-path attackers.",
+        "shortDesc": "Use https:// LogoutURLs for every app client",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Cognito app client settings]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-idp-settings.html>"
+        ]
+    },
+    "cognitoAccountTakeoverProtectionWeak": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) have Advanced Security ENFORCED but the AccountTakeoverRiskConfiguration.Actions.HighAction.EventAction is not BLOCK (e.g., NO_ACTION or MFA_IF_CONFIGURED without enforcement). Detecting high-risk sign-ins without blocking them is close to no protection at all.",
+        "shortDesc": "Set AccountTakeover HighAction to BLOCK",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Cognito account takeover protection]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-account-takeover.html>"
+        ]
+    },
+    "cognitoNoLoggingConfiguration": {
+        "category": "O",
+        "^description": "{$COUNT} Cognito user pool(s) have no LogDeliveryConfiguration set. Authentication events, admin actions, and user-management operations are not delivered to CloudWatch Logs / S3 / Firehose — no audit trail.",
+        "shortDesc": "Configure LogDelivery to CloudWatch Logs (or S3/Firehose)",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Cognito log delivery]<https://docs.aws.amazon.com/cognito/latest/developerguide/exporting-quotas-and-usage.html>"
+        ]
+    },
+    "cognitoThreatProtectionAuditOnly": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) have Advanced Security in AUDIT mode. Threats are detected and logged but no protective action is taken. Distinct from cognitoAdvancedSecurityNotEnforced (which flags OFF) — AUDIT is an intentional halfway step that many teams forget to graduate from.",
+        "shortDesc": "Move AdvancedSecurityMode from AUDIT to ENFORCED",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Cognito advanced security]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-advanced-security.html>"
+        ]
+    },
+    "cognitoDefaultEmailSender": {
+        "category": "O",
+        "^description": "{$COUNT} Cognito user pool(s) use EmailSendingAccount=COGNITO_DEFAULT. This limits to 50 emails/day, uses the AWS-owned no-reply@verificationemail.com sender (which many mail providers flag as phishing), and offers no bounce/complaint tracking. Production pools should use DEVELOPER (SES).",
+        "shortDesc": "Set EmailConfiguration.EmailSendingAccount=DEVELOPER (SES)",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Cognito email configuration]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-email.html>"
+        ]
+    },
+    "cognitoIdpHttpMetadataUrl": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) have an identity provider (SAML/OIDC) whose MetadataURL uses http://. SAML metadata / OIDC discovery documents fetched over HTTP can be replaced by an attacker who controls the network path — enabling federation-level impersonation.",
+        "shortDesc": "Use https:// for identity provider MetadataURL",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Cognito identity providers]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-identity-federation.html>"
+        ]
     }
 }

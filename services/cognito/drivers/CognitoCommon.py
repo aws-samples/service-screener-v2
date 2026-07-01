@@ -329,3 +329,390 @@ class CognitoCommon(Evaluator):
             hours = minutes // 60
             return f"{hours}h"
         return f"{minutes}m"
+
+    # ------------------------------------------------------------------ #
+    # 13. Compromised-credentials protection not set to BLOCK
+    # ------------------------------------------------------------------ #
+    def _checkCognitoCompromisedCredentialProtection(self):
+        # If Advanced Security is off entirely, this is not the check to flag —
+        # cognitoAdvancedSecurityNotEnforced handles that. Skip here.
+        add_ons = self.pool.get('UserPoolAddOns') or {}
+        adv_mode = add_ons.get('AdvancedSecurityMode', 'OFF')
+        if adv_mode != 'ENFORCED':
+            self.results['cognitoCompromisedCredentialProtection'] = [
+                0,
+                f"Advanced Security is {adv_mode} — see cognitoAdvancedSecurityNotEnforced"
+            ]
+            return
+
+        risk = self.pool.get('_riskConfiguration')
+        if not risk:
+            # DescribeRiskConfiguration returned nothing usable — treat as
+            # not configured (which is a FAIL, since Advanced Security IS on).
+            self.results['cognitoCompromisedCredentialProtection'] = [
+                -1,
+                "Advanced Security is ENFORCED but no RiskConfiguration is set"
+            ]
+            return
+
+        cc = risk.get('CompromisedCredentialsRiskConfiguration') or {}
+        actions = cc.get('Actions') or {}
+        event_action = actions.get('EventAction', 'NO_ACTION')
+        if event_action == 'BLOCK':
+            self.results['cognitoCompromisedCredentialProtection'] = [
+                1, "CompromisedCredentials EventAction=BLOCK"
+            ]
+        else:
+            self.results['cognitoCompromisedCredentialProtection'] = [
+                -1,
+                f"CompromisedCredentials EventAction={event_action} (should be BLOCK)"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 14. Self-service sign-up with no verification
+    # ------------------------------------------------------------------ #
+    def _checkCognitoSelfServiceSignUpNoVerification(self):
+        admin_only = (self.pool.get('AdminCreateUserConfig') or {}).get(
+            'AllowAdminCreateUserOnly', False
+        )
+        # Self-service is enabled when AllowAdminCreateUserOnly is False.
+        if admin_only:
+            self.results['cognitoSelfServiceSignUpNoVerification'] = [
+                1, "Self-service sign-up disabled (admin-only)"
+            ]
+            return
+
+        verified = self.pool.get('AutoVerifiedAttributes') or []
+        if not verified:
+            self.results['cognitoSelfServiceSignUpNoVerification'] = [
+                -1,
+                "Self-service sign-up enabled but AutoVerifiedAttributes is empty "
+                "(no email/phone verification)"
+            ]
+        else:
+            self.results['cognitoSelfServiceSignUpNoVerification'] = [
+                1,
+                f"Self-service sign-up enabled with verification of: "
+                f"{', '.join(verified)}"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 15. No custom domain (informational)
+    # ------------------------------------------------------------------ #
+    def _checkCognitoNoCustomDomain(self):
+        # describe_user_pool returns:
+        #   Domain       -- Cognito prefix on amazoncognito.com (may be blank)
+        #   CustomDomain -- fully-qualified custom domain (blank when unset)
+        custom = self.pool.get('CustomDomain')
+        default = self.pool.get('Domain')
+
+        if custom:
+            self.results['cognitoNoCustomDomain'] = [
+                1, f"Custom domain: {custom}"
+            ]
+        elif default:
+            self.results['cognitoNoCustomDomain'] = [
+                0,
+                f"Only default domain configured ({default}.auth.<region>.amazoncognito.com)"
+            ]
+        else:
+            self.results['cognitoNoCustomDomain'] = [
+                0, "No hosted-UI domain configured on this user pool"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 16. No WAFv2 WebACL associated
+    # ------------------------------------------------------------------ #
+    def _checkCognitoNoWafAssociation(self):
+        arn = self.pool.get('_wafWebAclArn')
+        if arn:
+            # Show just the WebACL name for readability
+            name = arn.split('/')[-2] if '/webacl/' in arn else arn.split('/')[-1]
+            self.results['cognitoNoWafAssociation'] = [
+                1, f"Associated WebACL: {name}"
+            ]
+        else:
+            self.results['cognitoNoWafAssociation'] = [
+                -1, "No WAFv2 WebACL associated with this user pool"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # Helper: iterate app clients with names for compact reporting
+    # ------------------------------------------------------------------ #
+    def _appClients(self):
+        return self.pool.get('_appClients') or []
+
+    def _clientLabel(self, c):
+        return c.get('ClientName') or c.get('ClientId') or '?'
+
+    # ------------------------------------------------------------------ #
+    # 17. App client with Implicit grant enabled
+    # ------------------------------------------------------------------ #
+    def _checkCognitoClientImplicitGrantEnabled(self):
+        clients = self._appClients()
+        if not clients:
+            self.results['cognitoClientImplicitGrantEnabled'] = [
+                0, "No app clients"
+            ]
+            return
+        offenders = [
+            self._clientLabel(c) for c in clients
+            if 'implicit' in [f.lower() for f in (c.get('AllowedOAuthFlows') or [])]
+        ]
+        if offenders:
+            self.results['cognitoClientImplicitGrantEnabled'] = [
+                -1, f"App client(s) using Implicit flow: {', '.join(offenders[:5])}"
+            ]
+        else:
+            self.results['cognitoClientImplicitGrantEnabled'] = [
+                1, f"{len(clients)} app client(s), none use Implicit flow"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 18. App client token revocation disabled
+    # ------------------------------------------------------------------ #
+    def _checkCognitoClientTokenRevocationDisabled(self):
+        clients = self._appClients()
+        if not clients:
+            self.results['cognitoClientTokenRevocationDisabled'] = [
+                0, "No app clients"
+            ]
+            return
+        offenders = [
+            self._clientLabel(c) for c in clients
+            if c.get('EnableTokenRevocation') is False
+        ]
+        if offenders:
+            self.results['cognitoClientTokenRevocationDisabled'] = [
+                -1,
+                f"App client(s) with EnableTokenRevocation=false: "
+                f"{', '.join(offenders[:5])}"
+            ]
+        else:
+            self.results['cognitoClientTokenRevocationDisabled'] = [
+                1, f"All {len(clients)} app client(s) enable token revocation"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 19. App client with http:// CallbackURL
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _isInsecureHttpUrl(url):
+        """True if url is http:// AND the host is not localhost/127.x."""
+        if not isinstance(url, str):
+            return False
+        u = url.lower().strip()
+        if not u.startswith('http://'):
+            return False
+        # Strip scheme + optional port
+        host = u[len('http://'):].split('/', 1)[0].split(':', 1)[0]
+        if host in ('localhost', '127.0.0.1') or host.startswith('127.'):
+            return False
+        return True
+
+    def _checkCognitoClientHttpCallbackUrl(self):
+        clients = self._appClients()
+        if not clients:
+            self.results['cognitoClientHttpCallbackUrl'] = [0, "No app clients"]
+            return
+        offenders = []
+        for c in clients:
+            for url in (c.get('CallbackURLs') or []):
+                if self._isInsecureHttpUrl(url):
+                    offenders.append(f"{self._clientLabel(c)}:{url}")
+                    break
+        if offenders:
+            self.results['cognitoClientHttpCallbackUrl'] = [
+                -1, f"App client(s) with http:// CallbackURL: {', '.join(offenders[:3])}"
+            ]
+        else:
+            self.results['cognitoClientHttpCallbackUrl'] = [
+                1, "No app clients use http:// CallbackURLs"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 20. App client with PreventUserExistenceErrors = LEGACY (or missing)
+    # ------------------------------------------------------------------ #
+    def _checkCognitoClientUserExistenceErrors(self):
+        clients = self._appClients()
+        if not clients:
+            self.results['cognitoClientUserExistenceErrors'] = [0, "No app clients"]
+            return
+        offenders = [
+            self._clientLabel(c) for c in clients
+            if (c.get('PreventUserExistenceErrors') or 'LEGACY') != 'ENABLED'
+        ]
+        if offenders:
+            self.results['cognitoClientUserExistenceErrors'] = [
+                -1,
+                f"App client(s) with PreventUserExistenceErrors!=ENABLED: "
+                f"{', '.join(offenders[:5])}"
+            ]
+        else:
+            self.results['cognitoClientUserExistenceErrors'] = [
+                1, f"All {len(clients)} app client(s) prevent user-existence errors"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 21. App client with insecure auth flow (ALLOW_USER_PASSWORD_AUTH)
+    # ------------------------------------------------------------------ #
+    def _checkCognitoClientInsecureAuthFlow(self):
+        clients = self._appClients()
+        if not clients:
+            self.results['cognitoClientInsecureAuthFlow'] = [0, "No app clients"]
+            return
+        offenders = [
+            self._clientLabel(c) for c in clients
+            if 'ALLOW_USER_PASSWORD_AUTH' in (c.get('ExplicitAuthFlows') or [])
+        ]
+        if offenders:
+            self.results['cognitoClientInsecureAuthFlow'] = [
+                -1,
+                f"App client(s) allow ALLOW_USER_PASSWORD_AUTH (no SRP): "
+                f"{', '.join(offenders[:5])}"
+            ]
+        else:
+            self.results['cognitoClientInsecureAuthFlow'] = [
+                1, "No app clients use plain USER_PASSWORD_AUTH"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 22. App client with http:// LogoutURL
+    # ------------------------------------------------------------------ #
+    def _checkCognitoClientHttpLogoutUrl(self):
+        clients = self._appClients()
+        if not clients:
+            self.results['cognitoClientHttpLogoutUrl'] = [0, "No app clients"]
+            return
+        offenders = []
+        for c in clients:
+            for url in (c.get('LogoutURLs') or []):
+                if self._isInsecureHttpUrl(url):
+                    offenders.append(f"{self._clientLabel(c)}:{url}")
+                    break
+        if offenders:
+            self.results['cognitoClientHttpLogoutUrl'] = [
+                -1, f"App client(s) with http:// LogoutURL: {', '.join(offenders[:3])}"
+            ]
+        else:
+            self.results['cognitoClientHttpLogoutUrl'] = [
+                1, "No app clients use http:// LogoutURLs"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 23. Account-takeover protection weak (HighAction != BLOCK)
+    # ------------------------------------------------------------------ #
+    def _checkCognitoAccountTakeoverProtectionWeak(self):
+        add_ons = self.pool.get('UserPoolAddOns') or {}
+        adv_mode = add_ons.get('AdvancedSecurityMode', 'OFF')
+        if adv_mode != 'ENFORCED':
+            self.results['cognitoAccountTakeoverProtectionWeak'] = [
+                0,
+                f"Advanced Security is {adv_mode} — see cognitoAdvancedSecurityNotEnforced"
+            ]
+            return
+        risk = self.pool.get('_riskConfiguration')
+        if not risk:
+            self.results['cognitoAccountTakeoverProtectionWeak'] = [
+                -1, "Advanced Security ENFORCED but no RiskConfiguration set"
+            ]
+            return
+        ato = risk.get('AccountTakeoverRiskConfiguration') or {}
+        actions = ato.get('Actions') or {}
+        high = (actions.get('HighAction') or {}).get('EventAction')
+        if high == 'BLOCK':
+            self.results['cognitoAccountTakeoverProtectionWeak'] = [
+                1, "AccountTakeover HighAction=BLOCK"
+            ]
+        else:
+            self.results['cognitoAccountTakeoverProtectionWeak'] = [
+                -1,
+                f"AccountTakeover HighAction={high or 'not set'} (should be BLOCK)"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 24. No log delivery configuration
+    # ------------------------------------------------------------------ #
+    def _checkCognitoNoLoggingConfiguration(self):
+        cfg = self.pool.get('_logConfig') or {}
+        # AWS returns the field as 'LogConfigurations' — list of per-event-type entries.
+        entries = cfg.get('LogConfigurations') or []
+        if entries:
+            targets = []
+            for e in entries:
+                for k in ('CloudWatchLogsConfiguration', 'S3Configuration',
+                          'FirehoseConfiguration'):
+                    if e.get(k):
+                        targets.append(k.replace('Configuration', ''))
+                        break
+            self.results['cognitoNoLoggingConfiguration'] = [
+                1, f"{len(entries)} log delivery configuration(s) "
+                   f"({', '.join(sorted(set(targets)))[:60]})"
+            ]
+        else:
+            self.results['cognitoNoLoggingConfiguration'] = [
+                -1, "No LogDeliveryConfiguration on this user pool"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 25. Threat protection in AUDIT mode (detection without enforcement)
+    # ------------------------------------------------------------------ #
+    def _checkCognitoThreatProtectionAuditOnly(self):
+        add_ons = self.pool.get('UserPoolAddOns') or {}
+        mode = add_ons.get('AdvancedSecurityMode', 'OFF')
+        if mode == 'AUDIT':
+            self.results['cognitoThreatProtectionAuditOnly'] = [
+                -1,
+                "AdvancedSecurityMode=AUDIT (detection only — no protective action)"
+            ]
+        elif mode == 'ENFORCED':
+            self.results['cognitoThreatProtectionAuditOnly'] = [
+                1, "AdvancedSecurityMode=ENFORCED"
+            ]
+        else:
+            # OFF → covered by cognitoAdvancedSecurityNotEnforced; skip here
+            self.results['cognitoThreatProtectionAuditOnly'] = [
+                0, "AdvancedSecurityMode=OFF — see cognitoAdvancedSecurityNotEnforced"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 26. Default email sender (COGNITO_DEFAULT instead of DEVELOPER/SES)
+    # ------------------------------------------------------------------ #
+    def _checkCognitoDefaultEmailSender(self):
+        email_cfg = self.pool.get('EmailConfiguration') or {}
+        acct = email_cfg.get('EmailSendingAccount', 'COGNITO_DEFAULT')
+        if acct == 'DEVELOPER':
+            self.results['cognitoDefaultEmailSender'] = [
+                1, f"EmailSendingAccount=DEVELOPER (SES: {email_cfg.get('SourceArn','?')})"
+            ]
+        else:
+            self.results['cognitoDefaultEmailSender'] = [
+                -1,
+                f"EmailSendingAccount={acct} — limited to 50 emails/day and no-reply@verificationemail.com"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 27. Identity provider MetadataURL over http://
+    # ------------------------------------------------------------------ #
+    def _checkCognitoIdpHttpMetadataUrl(self):
+        providers = self.pool.get('_identityProviders') or []
+        if not providers:
+            self.results['cognitoIdpHttpMetadataUrl'] = [
+                0, "No identity providers configured"
+            ]
+            return
+        offenders = []
+        for p in providers:
+            details = p.get('ProviderDetails') or {}
+            url = details.get('MetadataURL') or details.get('oidc_issuer')
+            if url and isinstance(url, str) and url.lower().startswith('http://'):
+                offenders.append(f"{p.get('ProviderName','?')}:{url}")
+        if offenders:
+            self.results['cognitoIdpHttpMetadataUrl'] = [
+                -1,
+                f"IdP metadata over http://: {', '.join(offenders[:3])}"
+            ]
+        else:
+            self.results['cognitoIdpHttpMetadataUrl'] = [
+                1, f"All {len(providers)} identity provider(s) use https metadata"
+            ]

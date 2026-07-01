@@ -16,6 +16,9 @@ class Stepfunctions(Service):
       - describe_state_machine (definition + logging/tracing/encryption config)
       - list_tags_for_resource (tag-based governance)
       - list_executions (single-page recency probe for the unused check)
+      - validate_state_machine_definition (structural validation)
+      - iam.get_role                     (execution role existence check)
+      - logs.describe_log_groups         (log-group existence check when logging on)
     """
 
     def __init__(self, region):
@@ -24,6 +27,8 @@ class Stepfunctions(Service):
         self.sfnClient = ssBoto.client('stepfunctions', config=self.bConfig)
         # IAM is global but the client honours regional signing; used for role analysis.
         self.iamClient = ssBoto.client('iam', config=self.bConfig)
+        # CloudWatch Logs client for log-group existence probe (check #24).
+        self.logsClient = ssBoto.client('logs', config=self.bConfig)
 
     # ------------------------------------------------------------------ #
     # Discovery
@@ -51,6 +56,10 @@ class Stepfunctions(Service):
                         detail['_tags'] = self._listTags(arn)
 
                     detail['_mostRecentExecution'] = self._mostRecentExecution(arn)
+                    detail['_validationResult'] = self._validateDefinition(detail)
+                    detail['_roleExists'] = self._roleExistsFor(detail.get('roleArn'))
+                    detail['_logGroupExists'] = self._logGroupExistsFor(detail)
+                    detail['_currentAccount'] = self._currentAccount()
 
                     _pi('Stepfunctions', f"State machine: {detail.get('name', arn)}")
                     stateMachines.append(detail)
@@ -86,6 +95,108 @@ class Stepfunctions(Service):
         except botocore.exceptions.ClientError as e:
             self._logClientError(f'list_executions({arn})', e)
             return None
+
+    # ------------------------------------------------------------------ #
+    # Phase-1 extension APIs (checks 17-24)
+    # ------------------------------------------------------------------ #
+    def _validateDefinition(self, detail):
+        """Return the ValidateStateMachineDefinition response, or {} on failure."""
+        definition = detail.get('definition')
+        smType = detail.get('type', 'STANDARD')
+        if not definition:
+            return {}
+        try:
+            return self.sfnClient.validate_state_machine_definition(
+                definition=definition, type=smType
+            )
+        except botocore.exceptions.ClientError as e:
+            self._logClientError('validate_state_machine_definition', e)
+            return {}
+
+    def _roleExistsFor(self, roleArn):
+        """
+        Return a status string:
+          'exists'          - iam:GetRole succeeded
+          'missing'         - iam returned NoSuchEntity
+          'cross_account'   - role belongs to a different account (skipped)
+          'unknown'         - lookup could not complete (AccessDenied etc.)
+        """
+        if not roleArn or ':role/' not in roleArn:
+            return 'unknown'
+
+        # ARN: arn:aws:iam::<acct>:role/<name>
+        parts = roleArn.split(':')
+        if len(parts) < 5:
+            return 'unknown'
+        acct = parts[4]
+        me = self._currentAccount()
+        if me and acct != me:
+            return 'cross_account'
+
+        roleName = roleArn.split(':role/', 1)[1].split('/')[-1]
+        try:
+            self.iamClient.get_role(RoleName=roleName)
+            return 'exists'
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', '')
+            if code in ('NoSuchEntity', 'NoSuchEntityException'):
+                return 'missing'
+            if code in ('AccessDenied', 'AccessDeniedException',
+                        'UnauthorizedOperation'):
+                return 'unknown'
+            self._logClientError(f'iam.get_role({roleName})', e)
+            return 'unknown'
+
+    def _logGroupExistsFor(self, detail):
+        """
+        For state machines with logging enabled, verify the CloudWatch log
+        group ARN exists. Returns:
+          None    - logging not configured for this SM (check is N/A)
+          True    - log group exists
+          False   - log group does not exist (config drift)
+          'unknown' - lookup could not complete
+        """
+        cfg = detail.get('loggingConfiguration') or {}
+        dests = cfg.get('destinations') or []
+        if not dests:
+            return None
+
+        # destinations[0].cloudWatchLogsLogGroup.logGroupArn
+        log_group_arn = None
+        for d in dests:
+            cwlg = d.get('cloudWatchLogsLogGroup') or {}
+            arn = cwlg.get('logGroupArn')
+            if arn:
+                log_group_arn = arn
+                break
+        if not log_group_arn:
+            return None
+
+        # Log-group ARN: arn:aws:logs:region:account:log-group:<name>[:*]
+        try:
+            name = log_group_arn.split(':log-group:', 1)[1].rstrip(':*').rstrip(':')
+        except IndexError:
+            return 'unknown'
+
+        try:
+            resp = self.logsClient.describe_log_groups(logGroupNamePrefix=name)
+            groups = resp.get('logGroups', []) or []
+            for g in groups:
+                if g.get('logGroupName') == name:
+                    return True
+            return False
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', '')
+            if code in ('AccessDenied', 'AccessDeniedException'):
+                return 'unknown'
+            self._logClientError(f'logs.describe_log_groups({name})', e)
+            return 'unknown'
+
+    def _currentAccount(self):
+        info = Config.get('stsInfo', {})
+        if isinstance(info, dict):
+            return info.get('Account')
+        return None
 
     # ------------------------------------------------------------------ #
     # Advise

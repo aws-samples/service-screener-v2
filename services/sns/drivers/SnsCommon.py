@@ -273,6 +273,162 @@ class SnsCommon(Evaluator):
             ]
 
     # ------------------------------------------------------------------ #
+    # 13. No Data Protection Policy (PII masking)
+    # ------------------------------------------------------------------ #
+    def _checkSnsNoDataProtectionPolicy(self):
+        dpp = self.topic.get('_dataProtectionPolicy')
+        if not dpp:
+            self.results['snsNoDataProtectionPolicy'] = [
+                -1, "No DataProtectionPolicy attached to this topic"
+            ]
+            return
+
+        # Any non-empty DPP counts as configured — content-level analysis is
+        # beyond a static best-practices check.
+        try:
+            parsed = json.loads(dpp) if isinstance(dpp, str) else dpp
+            stmts = parsed.get('Statement') if isinstance(parsed, dict) else None
+            n = len(stmts) if isinstance(stmts, list) else 1
+        except (ValueError, TypeError, AttributeError):
+            n = 1
+        self.results['snsNoDataProtectionPolicy'] = [
+            1, f"DataProtectionPolicy configured ({n} statement(s))"
+        ]
+
+    # ------------------------------------------------------------------ #
+    # 14. Cross-account access without aws:PrincipalOrgID condition
+    # ------------------------------------------------------------------ #
+    def _checkSnsCrossAccountAccessNoCondition(self):
+        if self._policy is None:
+            self.results['snsCrossAccountAccessNoCondition'] = [
+                0, "No topic policy present"
+            ]
+            return
+
+        # Extract the owner account from the topic ARN.
+        owner = self._ownerAccountFromArn(self.topic.get('_arn', ''))
+        if not owner:
+            self.results['snsCrossAccountAccessNoCondition'] = [
+                0, "Could not derive topic owner account"
+            ]
+            return
+
+        offending = []
+        for i, stmt in enumerate(self._policyStatements()):
+            if stmt.get('Effect') != 'Allow':
+                continue
+
+            # Skip wildcard-principal Allow (handled by snsPublicAccess).
+            if self._principalIsWildcard(stmt.get('Principal')):
+                continue
+
+            # Extract external account IDs referenced by this Allow statement.
+            external_accts = self._externalAccountsInPrincipal(
+                stmt.get('Principal'), owner
+            )
+            if not external_accts:
+                continue
+
+            # A PrincipalOrgID condition is the specific requirement.
+            if self._hasPrincipalOrgIDCondition(stmt.get('Condition')):
+                continue
+
+            sid = stmt.get('Sid', f"stmt{i}")
+            offending.append(f"{sid}({','.join(sorted(external_accts)[:3])})")
+
+        if offending:
+            self.results['snsCrossAccountAccessNoCondition'] = [
+                -1,
+                "Cross-account Allow without aws:PrincipalOrgID: "
+                + "; ".join(offending[:5])
+            ]
+        else:
+            self.results['snsCrossAccountAccessNoCondition'] = [
+                1, "No unrestricted cross-account access"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 15. Default (untuned) delivery retry policy
+    # ------------------------------------------------------------------ #
+    def _checkSnsNoDeliveryRetryPolicy(self):
+        # DeliveryPolicy is the user-set override; if absent, the topic uses
+        # the AWS default retry schedule (which is what EffectiveDeliveryPolicy
+        # returns).
+        user_policy = self.attrs.get('DeliveryPolicy')
+        if user_policy:
+            self.results['snsNoDeliveryRetryPolicy'] = [
+                1, "Custom DeliveryPolicy set at the topic level"
+            ]
+        else:
+            self.results['snsNoDeliveryRetryPolicy'] = [
+                0,
+                "No topic-level DeliveryPolicy — SNS default retry schedule in effect "
+                "(23 retries over ~4h)"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # Helpers for #14
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _ownerAccountFromArn(arn):
+        # ARN format: arn:aws:sns:region:account:name
+        parts = arn.split(':') if arn else []
+        if len(parts) >= 5 and parts[4].isdigit():
+            return parts[4]
+        return None
+
+    @staticmethod
+    def _accountFromPrincipalValue(v):
+        """Return the 12-digit account ID referenced by a principal value, or None."""
+        if not isinstance(v, str):
+            return None
+        if v == '*':
+            return None
+        # Cases: "123456789012", "arn:aws:iam::123456789012:root",
+        #        "arn:aws:iam::123456789012:role/Foo"
+        if v.isdigit() and len(v) == 12:
+            return v
+        if ':iam::' in v:
+            tail = v.split(':iam::', 1)[1]
+            acct = tail.split(':', 1)[0]
+            if acct.isdigit() and len(acct) == 12:
+                return acct
+        return None
+
+    @classmethod
+    def _externalAccountsInPrincipal(cls, principal, owner):
+        """Return a set of account IDs referenced by Principal that are NOT the owner."""
+        accts = set()
+        if principal is None or principal == '*':
+            return accts
+        if isinstance(principal, str):
+            a = cls._accountFromPrincipalValue(principal)
+            if a and a != owner:
+                accts.add(a)
+            return accts
+        if isinstance(principal, dict):
+            for v in principal.values():
+                if isinstance(v, str):
+                    a = cls._accountFromPrincipalValue(v)
+                    if a and a != owner:
+                        accts.add(a)
+                elif isinstance(v, list):
+                    for item in v:
+                        a = cls._accountFromPrincipalValue(item)
+                        if a and a != owner:
+                            accts.add(a)
+        return accts
+
+    @staticmethod
+    def _hasPrincipalOrgIDCondition(condition):
+        if not condition or not isinstance(condition, dict):
+            return False
+        for op_block in condition.values():
+            if isinstance(op_block, dict) and 'aws:PrincipalOrgID' in op_block:
+                return True
+        return False
+
+    # ------------------------------------------------------------------ #
     # Policy parsing helpers
     # ------------------------------------------------------------------ #
     @staticmethod
@@ -341,3 +497,210 @@ class SnsCommon(Evaluator):
                 if 'false' in vals:
                     return True
         return False
+
+    # ------------------------------------------------------------------ #
+    # 16. Overly broad admin actions granted to non-owner principals
+    # ------------------------------------------------------------------ #
+    BROAD_ADMIN_ACTIONS = {
+        'sns:*', 'sns:addpermission', 'sns:removepermission',
+        'sns:settopicattributes', 'sns:deletetopic',
+    }
+
+    def _checkSnsPolicyOverlyBroadActions(self):
+        if self._policy is None:
+            self.results['snsPolicyOverlyBroadActions'] = [0, "No topic policy present"]
+            return
+
+        owner = self._ownerAccountFromArn(self.topic.get('_arn', ''))
+        if not owner:
+            self.results['snsPolicyOverlyBroadActions'] = [
+                0, "Could not derive topic owner account"
+            ]
+            return
+
+        offenders = []
+        for i, stmt in enumerate(self._policyStatements()):
+            if stmt.get('Effect') != 'Allow':
+                continue
+
+            # If Principal is wildcard, snsPublicAccess handles it — skip.
+            if self._principalIsWildcard(stmt.get('Principal')):
+                continue
+
+            # Extract action list, lowercase for case-insensitive matching.
+            actions = stmt.get('Action', [])
+            if isinstance(actions, str):
+                actions = [actions]
+            act_lower = {a.lower() for a in actions if isinstance(a, str)}
+
+            broad = act_lower & self.BROAD_ADMIN_ACTIONS
+            # Also catch service-wide wildcard 'sns:*' via the exact match above.
+            # A bare '*' Action grants everything.
+            if '*' in act_lower:
+                broad.add('*')
+
+            if not broad:
+                continue
+
+            # Determine if the Principal is a NON-owner account.
+            external = self._externalAccountsInPrincipal(
+                stmt.get('Principal'), owner
+            )
+            if not external:
+                continue
+
+            sid = stmt.get('Sid', f"stmt{i}")
+            offenders.append(f"{sid}({','.join(sorted(broad))})")
+
+        if offenders:
+            self.results['snsPolicyOverlyBroadActions'] = [
+                -1,
+                "Broad admin actions to non-owner principals: "
+                + "; ".join(offenders[:5])
+            ]
+        else:
+            self.results['snsPolicyOverlyBroadActions'] = [
+                1, "No admin actions granted to non-owner principals"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 17. Subscription confirmed without authentication
+    # ------------------------------------------------------------------ #
+    def _checkSnsSubscriptionUnauthenticatedConfirmation(self):
+        offenders = []
+        checked = 0
+        for s in self.subscriptions:
+            arn = s.get('SubscriptionArn', '')
+            if not arn.startswith('arn:'):
+                # PendingConfirmation — no attrs yet.
+                continue
+            attrs = s.get('_attributes') or {}
+            val = attrs.get('ConfirmationWasAuthenticated')
+            if val is None:
+                continue
+            checked += 1
+            if str(val).lower() == 'false':
+                proto = s.get('Protocol', '?')
+                endpoint = s.get('Endpoint', '(no endpoint)')
+                offenders.append(f"{proto}:{endpoint.split(':')[-1] or endpoint}")
+
+        if not checked:
+            self.results['snsSubscriptionUnauthenticatedConfirmation'] = [
+                0, "No confirmed subscriptions to evaluate"
+            ]
+        elif offenders:
+            self.results['snsSubscriptionUnauthenticatedConfirmation'] = [
+                -1,
+                f"Subscription(s) confirmed without authentication: "
+                f"{', '.join(offenders[:5])}"
+                + (f" (+{len(offenders)-5} more)" if len(offenders) > 5 else "")
+            ]
+        else:
+            self.results['snsSubscriptionUnauthenticatedConfirmation'] = [
+                1, f"All {checked} confirmed subscription(s) were authenticated"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 18. HTTP/S subscription endpoint is a raw IP address
+    # ------------------------------------------------------------------ #
+    import re as _re_module  # local alias avoids polluting the class namespace
+    _RAW_IPV4_RE = _re_module.compile(
+        r'^https?://(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})(?::\d+)?(?:/|$)'
+    )
+
+    def _checkSnsSubscriptionEndpointIsIPAddress(self):
+        offenders = []
+        checked = 0
+        for s in self.subscriptions:
+            proto = s.get('Protocol', '')
+            if proto not in ('http', 'https'):
+                continue
+            checked += 1
+            endpoint = s.get('Endpoint', '') or ''
+            m = self._RAW_IPV4_RE.match(endpoint)
+            if not m:
+                continue
+            octets = tuple(int(x) for x in m.groups())
+            # Exclude loopback (127.x.x.x) and link-local (169.254.x.x)
+            if octets[0] == 127 or (octets[0] == 169 and octets[1] == 254):
+                continue
+            offenders.append(f"{proto}:{endpoint}")
+        if not checked:
+            self.results['snsSubscriptionEndpointIsIPAddress'] = [
+                0, "No HTTP/S subscriptions"
+            ]
+        elif offenders:
+            self.results['snsSubscriptionEndpointIsIPAddress'] = [
+                -1,
+                f"Raw-IP endpoint(s): {', '.join(offenders[:5])}"
+                + (f" (+{len(offenders)-5} more)" if len(offenders) > 5 else "")
+            ]
+        else:
+            self.results['snsSubscriptionEndpointIsIPAddress'] = [
+                1, f"All {checked} HTTP/S subscription(s) use hostnames"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 19. Platform-application credentials expiring soon
+    #
+    # Platform apps are region-level. To avoid duplicate FAILs across every
+    # topic in the region, we only emit the finding on the FIRST topic we
+    # see per driver instance. Subsequent topics report INFO deferring to it.
+    # ------------------------------------------------------------------ #
+    import datetime as _datetime_module
+    CERT_EXPIRY_DAYS = 30
+
+    def _checkSnsPlatformAppCertExpiringSoon(self):
+        apps = self.topic.get('_platformApps') or []
+        if not apps:
+            self.results['snsPlatformAppCertExpiringSoon'] = [
+                0, "No SNS platform applications in this region"
+            ]
+            return
+
+        now = self._datetime_module.datetime.now(self._datetime_module.timezone.utc)
+        expiring = []
+        for app in apps:
+            attrs = app.get('Attributes') or {}
+            for key in ('AppleCertificateExpiryDate', 'AppleCertificateExpirationDate'):
+                exp = attrs.get(key)
+                if not exp:
+                    continue
+                exp_dt = self._parseAwsDatetime(exp)
+                if exp_dt is None:
+                    continue
+                days = (exp_dt - now).days
+                if days <= self.CERT_EXPIRY_DAYS:
+                    name = app.get('PlatformApplicationArn', '?').split('/')[-1]
+                    expiring.append(f"{name}({days}d)")
+                break
+
+        if expiring:
+            self.results['snsPlatformAppCertExpiringSoon'] = [
+                -1,
+                f"Platform app(s) with cert expiring ≤{self.CERT_EXPIRY_DAYS}d: "
+                + ", ".join(expiring[:5])
+            ]
+        else:
+            self.results['snsPlatformAppCertExpiringSoon'] = [
+                1, f"{len(apps)} platform application(s); no imminent cert expiry"
+            ]
+
+    @classmethod
+    def _parseAwsDatetime(cls, val):
+        """AWS returns cert expiry as a datetime (boto3) or ISO string."""
+        dt = cls._datetime_module
+        if isinstance(val, dt.datetime):
+            if val.tzinfo is None:
+                return val.replace(tzinfo=dt.timezone.utc)
+            return val
+        if isinstance(val, str):
+            try:
+                # boto sometimes stringifies to '2027-05-01 12:00:00+00:00'
+                parsed = dt.datetime.fromisoformat(val.replace('Z', '+00:00'))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=dt.timezone.utc)
+                return parsed
+            except (ValueError, TypeError):
+                return None
+        return None

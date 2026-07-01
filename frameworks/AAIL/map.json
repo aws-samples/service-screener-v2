@@ -26,7 +26,10 @@
         "AGENTOPS03": {
             "BP01": [
                 "bedrock.bedrockAgentNotPrepared",
-                "bedrock.bedrockGuardrailStatusFailed"
+                "bedrock.bedrockGuardrailStatusFailed",
+                "stepfunctions.sfnDefinitionValidationErrors",
+                "stepfunctions.sfnRoleDoesNotExist",
+                "stepfunctions.sfnLogGroupDoesNotExist"
             ],
             "BP03": [
                 "bedrock.bedrockServiceLimitAgents",
@@ -88,7 +91,9 @@
             "BP02": [
                 "bedrock.bedrockGuardrailContentFilterDisabled",
                 "bedrock.bedrockGuardrailNoPiiDetection",
-                "wafv2.wafv2RulesInCountMode"
+                "wafv2.wafv2RulesInCountMode",
+                "sns.snsNoDataProtectionPolicy",
+                "sns.snsPolicyOverlyBroadActions"
             ],
             "BP03": [
                 "bedrock.bedrockGuardrailNoGroundingFilter"
@@ -123,7 +128,11 @@
                 "bedrock.bedrockACNoIdentityProvider",
                 "bedrock.bedrockACApiKeyProviderUsed",
                 "cognito.cognitoMfaNotEnforced",
-                "cognito.cognitoAdvancedSecurityNotEnforced"
+                "cognito.cognitoAdvancedSecurityNotEnforced",
+                "cognito.cognitoCompromisedCredentialProtection",
+                "cognito.cognitoClientImplicitGrantEnabled",
+                "cognito.cognitoClientHttpCallbackUrl",
+                "cognito.cognitoAccountTakeoverProtectionWeak"
             ],
             "BP02": [
                 "bedrock.bedrockKBRoleOverprivileged"
@@ -158,7 +167,12 @@
                 "bedrock.bedrockGuardrailNoPromptAttackFilter",
                 "bedrock.bedrockGuardrailNoPiiDetection",
                 "wafv2.wafv2NoRules",
-                "wafv2.wafv2NoManagedRuleGroups"
+                "wafv2.wafv2NoManagedRuleGroups",
+                "wafv2.wafv2NoIpReputationList",
+                "wafv2.wafv2NoSqlInjectionProtection",
+                "wafv2.wafv2ManagedRuleGroupAllCountOverride",
+                "wafv2.wafv2NoCoreRuleSet",
+                "wafv2.wafv2AllowRuleBeforeManagedRules"
             ],
             "BP02": [
                 "bedrock.bedrockGuardrailNoWordFilter",
@@ -192,7 +206,13 @@
                 "lambda.lambdaDeadLetterQueueDisabled",
                 "stepfunctions.sfnNoTimeout",
                 "stepfunctions.sfnNoRetryPolicy",
-                "stepfunctions.sfnNoCatchHandler"
+                "stepfunctions.sfnNoCatchHandler",
+                "stepfunctions.sfnNoHeartbeat",
+                "stepfunctions.sfnTaskNoTimeout",
+                "stepfunctions.sfnChoiceNoDefault",
+                "stepfunctions.sfnUnreachableStates",
+                "stepfunctions.sfnParallelNoCatch",
+                "stepfunctions.sfnMapNoCatch"
             ]
         },
         "AGENTREL05": {

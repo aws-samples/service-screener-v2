@@ -160,5 +160,162 @@
             "[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>",
             "[Step Functions best practices]<https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html>"
         ]
+    },
+    "sfnNoHeartbeat": {
+        "category": "R",
+        "^description": "{$COUNT} Step Functions state machine(s) have Task state(s) using the .waitForTaskToken callback pattern without a HeartbeatSeconds set. Without a heartbeat, a task waiting on an external callback can hang until the (much larger) TaskTimeout — or forever — if the caller silently dies. The best-practices guide explicitly recommends setting HeartbeatSeconds for every callback task.",
+        "shortDesc": "Set HeartbeatSeconds on every .waitForTaskToken Task state",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Step Functions best practices — Using timeouts]<https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html>",
+            "[Callback pattern with .waitForTaskToken]<https://docs.aws.amazon.com/step-functions/latest/dg/connect-to-resource.html#connect-wait-token>"
+        ]
+    },
+    "sfnLargePayloadRisk": {
+        "category": "P",
+        "^description": "{$COUNT} Step Functions state machine(s) have a large definition (>50KB) with no S3 integration pattern referenced. Large inline payloads pushed through workflow state hit the 256KB payload limit and can trigger StateEntered/StateExited history bloat. Advisory only — some large-but-legit workflows are fine.",
+        "shortDesc": "Consider offloading large payloads to S3 (getObject/putObject pattern)",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Payload size limits and Amazon S3 offload]<https://docs.aws.amazon.com/step-functions/latest/dg/avoid-exec-failures.html>"
+        ]
+    },
+    "sfnMapNoConcurrencyLimit": {
+        "category": "P",
+        "^description": "{$COUNT} Step Functions state machine(s) have Map state(s) without MaxConcurrency set. Unbounded parallel execution can exhaust downstream service quotas (Lambda concurrent executions, DynamoDB capacity, API rate limits) and produce cascading failures under load.",
+        "shortDesc": "Set MaxConcurrency on every Map state",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Map state MaxConcurrency]<https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-map-state.html>"
+        ]
+    },
+    "sfnTaskNoTimeout": {
+        "category": "R",
+        "^description": "{$COUNT} Step Functions state machine(s) have Task state(s) with neither TimeoutSeconds nor HeartbeatSeconds set at the state level. Per-task timeouts are the AWS-recommended way to fail-fast on stuck integrations — relying solely on a top-level TimeoutSeconds can leave one bad task blocking the whole workflow for the full execution window.",
+        "shortDesc": "Set TimeoutSeconds on every Task state",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Step Functions best practices — Using timeouts]<https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html>"
+        ]
+    },
+    "sfnDefinitionValidationErrors": {
+        "category": "O",
+        "^description": "{$COUNT} Step Functions state machine(s) have structural issues flagged by ValidateStateMachineDefinition (ERROR-severity diagnostics). Definitions that fail validation can still be created via CreateStateMachine but may fail at runtime or under specific execution paths.",
+        "shortDesc": "Fix ValidateStateMachineDefinition ERROR diagnostics",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[ValidateStateMachineDefinition API]<https://docs.aws.amazon.com/step-functions/latest/apireference/API_ValidateStateMachineDefinition.html>"
+        ]
+    },
+    "sfnChoiceNoDefault": {
+        "category": "R",
+        "^description": "{$COUNT} Step Functions state machine(s) have Choice state(s) without a Default field. When no Choice rule matches, the execution fails with States.NoChoiceMatched — a common cause of production incidents on unexpected input.",
+        "shortDesc": "Add a Default branch to every Choice state",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Choice state Default]<https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-choice-state.html>"
+        ]
+    },
+    "sfnRoleDoesNotExist": {
+        "category": "O",
+        "^description": "{$COUNT} Step Functions state machine(s) reference an IAM execution role that no longer exists. Every execution attempt will fail with AccessDenied at StartExecution — a completely broken state machine.",
+        "shortDesc": "Recreate the missing execution role or update roleArn",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[IAM role for Step Functions]<https://docs.aws.amazon.com/step-functions/latest/dg/procedure-create-iam-role.html>"
+        ]
+    },
+    "sfnUnreachableStates": {
+        "category": "O",
+        "^description": "{$COUNT} Step Functions state machine(s) contain state(s) that are never reachable from StartAt through Next/Default/Choice.Choices[*].Next/Catch[*].Next transitions. Dead code makes the workflow harder to reason about and may indicate an incomplete refactor.",
+        "shortDesc": "Remove unreachable states",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Step Functions definition best practices]<https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html>"
+        ]
+    },
+    "sfnParallelNoCatch": {
+        "category": "R",
+        "^description": "{$COUNT} Step Functions state machine(s) have Parallel state(s) without a Catch handler. A single failing branch fails the entire Parallel state (and the whole execution unless caught upstream). Catch on the Parallel is the standard way to consolidate branch failures.",
+        "shortDesc": "Add a Catch handler to every Parallel state",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Parallel state error handling]<https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-parallel-state.html>"
+        ]
+    },
+    "sfnMapNoCatch": {
+        "category": "R",
+        "^description": "{$COUNT} Step Functions state machine(s) have Map state(s) without a Catch handler. A single item failure fails the Map (and the whole execution unless caught upstream), even when the workflow could reasonably keep processing.",
+        "shortDesc": "Add a Catch handler to every Map state",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Map state error handling]<https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-map-state.html>"
+        ]
+    },
+    "sfnRetryNoBackoff": {
+        "category": "R",
+        "^description": "{$COUNT} Step Functions state machine(s) have Retry configurations with BackoffRate=1.0 (no exponential back-off) and MaxAttempts>3. Retrying an intermittently-failing downstream at a fixed interval hammers the target and lengthens outage impact.",
+        "shortDesc": "Use exponential BackoffRate (2.0 default) on Retry blocks",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Retry / BackoffRate]<https://docs.aws.amazon.com/step-functions/latest/dg/concepts-error-handling.html#error-handling-retrying-after-an-error>"
+        ]
+    },
+    "sfnLogGroupDoesNotExist": {
+        "category": "O",
+        "^description": "{$COUNT} Step Functions state machine(s) reference a CloudWatch log group that no longer exists. Logging config drift causes silent logging failure — the state machine appears healthy but no logs are actually written.",
+        "shortDesc": "Recreate the missing log group or update loggingConfiguration",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Step Functions execution logging]<https://docs.aws.amazon.com/step-functions/latest/dg/cw-logs.html>"
+        ]
     }
 }

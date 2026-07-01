@@ -157,5 +157,96 @@
         "ref": [
             "[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>"
         ]
+    },
+    "snsNoDataProtectionPolicy": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) have no Data Protection Policy configured. Without a DPP, personally-identifiable information (SSN, credit card, address, etc.) can flow through messages undetected and unmasked to every subscriber and every downstream log.",
+        "shortDesc": "Attach a Data Protection Policy to topics that carry sensitive data",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS message data protection]<https://docs.aws.amazon.com/sns/latest/dg/sns-message-data-protection.html>"
+        ]
+    },
+    "snsCrossAccountAccessNoCondition": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) allow cross-account principals (specific external account IDs, not '*') without an aws:PrincipalOrgID condition. Named external accounts are less risky than wildcard access (see snsPublicAccess) but still lack organisation-scoped audit — a compromised account remains authorised until manually revoked.",
+        "shortDesc": "Add aws:PrincipalOrgID to cross-account Allow statements",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Using aws:PrincipalOrgID]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html#condition-keys-principalorgid>"
+        ]
+    },
+    "snsNoDeliveryRetryPolicy": {
+        "category": "R",
+        "^description": "{$COUNT} SNS topic(s) rely on the default effective delivery retry policy. The default aggressive backoff (23 retries over ~4 hours) can overwhelm HTTP subscribers during transient failures. Customising DeliveryPolicy per subscription is recommended for high-volume topics. Informational only.",
+        "shortDesc": "Consider a topic-level DeliveryPolicy tuned for your subscribers",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS delivery retry policy]<https://docs.aws.amazon.com/sns/latest/dg/sns-message-delivery-retries.html>"
+        ]
+    },
+    "snsPolicyOverlyBroadActions": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) grant sensitive management actions (SNS:*, SNS:AddPermission, SNS:RemovePermission, SNS:SetTopicAttributes, SNS:DeleteTopic) to non-owner principals. Wildcard Action or admin actions given to another account effectively hand over topic ownership; different failure mode from snsPublicAccess (which flags Principal:*).",
+        "shortDesc": "Scope non-owner Allow statements to Publish/Subscribe only",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS access policy Actions]<https://docs.aws.amazon.com/sns/latest/api/API_Operations.html>"
+        ]
+    },
+    "snsSubscriptionUnauthenticatedConfirmation": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) have subscription(s) whose ConfirmationWasAuthenticated=false. The subscription was confirmed without signature validation — an attacker who intercepted the confirmation URL could point delivery at a rogue endpoint. Confirmed HTTP/S subscriptions specifically should always be authenticated.",
+        "shortDesc": "Re-confirm subscriptions with AuthenticateOnUnsubscribe=true",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS ConfirmSubscription API]<https://docs.aws.amazon.com/sns/latest/api/API_ConfirmSubscription.html>"
+        ]
+    },
+    "snsSubscriptionEndpointIsIPAddress": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) have HTTP/HTTPS subscription(s) whose endpoint is a raw IPv4 address rather than a hostname. Raw-IP endpoints break TLS SAN validation, cannot be moved without re-subscribing, and are typically an anti-pattern flagged in the SNS security best-practices guide.",
+        "shortDesc": "Use hostnames (with valid TLS certs) for HTTPS subscription endpoints",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS security best practices]<https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html>"
+        ]
+    },
+    "snsPlatformAppCertExpiringSoon": {
+        "category": "R",
+        "^description": "{$COUNT} SNS platform application(s) have credentials/certificates expiring within 30 days. When the APNs cert or FCM key expires, push notifications silently fail for every mobile app registered on this endpoint. Certificate expiry is reported once per region — the finding attaches to the first topic scanned.",
+        "shortDesc": "Rotate SNS platform application credentials before expiry",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS mobile push]<https://docs.aws.amazon.com/sns/latest/dg/sns-mobile-application-as-subscriber.html>"
+        ]
     }
 }

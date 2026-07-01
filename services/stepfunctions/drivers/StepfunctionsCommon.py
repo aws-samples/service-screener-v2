@@ -279,6 +279,168 @@ class StepfunctionsCommon(Evaluator):
             ]
 
     # ------------------------------------------------------------------ #
+    # 13. Task states with .waitForTaskToken but no HeartbeatSeconds
+    # ------------------------------------------------------------------ #
+    def _checkSfnNoHeartbeat(self):
+        if self._definition is None:
+            self.results['sfnNoHeartbeat'] = [0, "Could not parse state machine definition"]
+            return
+
+        missing = []
+        found = []
+        for fqName, stateDef in self._iterStates(self._definition):
+            if stateDef.get('Type') != 'Task':
+                continue
+            resource = stateDef.get('Resource') or ''
+            if '.waitForTaskToken' not in resource:
+                continue
+            found.append(fqName)
+            if 'HeartbeatSeconds' not in stateDef and 'HeartbeatSecondsPath' not in stateDef:
+                missing.append(fqName)
+
+        if not found:
+            self.results['sfnNoHeartbeat'] = [
+                1, "No .waitForTaskToken tasks in this state machine"
+            ]
+            return
+
+        if missing:
+            self.results['sfnNoHeartbeat'] = [
+                -1,
+                f"Callback task(s) without HeartbeatSeconds: {', '.join(missing[:8])}"
+                + (f" (+{len(missing)-8} more)" if len(missing) > 8 else "")
+            ]
+        else:
+            self.results['sfnNoHeartbeat'] = [
+                1, f"All {len(found)} .waitForTaskToken task(s) set HeartbeatSeconds"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 14. Large-payload risk (heuristic)
+    # ------------------------------------------------------------------ #
+    def _checkSfnLargePayloadRisk(self):
+        raw = self.sm.get('definition', '')
+        if not raw:
+            self.results['sfnLargePayloadRisk'] = [0, "Definition unavailable"]
+            return
+
+        # Serialise if we have a dict; otherwise use the raw string.
+        raw_str = raw if isinstance(raw, str) else json.dumps(raw)
+        size = len(raw_str)
+        has_s3 = ('arn:aws:s3' in raw_str) or ('s3:getObject' in raw_str.lower()) \
+                 or ('s3:putObject' in raw_str.lower())
+
+        if size > 50 * 1024 and not has_s3:
+            self.results['sfnLargePayloadRisk'] = [
+                0,
+                f"Definition is {size} bytes with no S3 integration reference "
+                "(inline payloads risk hitting the 256KB state I/O limit)"
+            ]
+        else:
+            self.results['sfnLargePayloadRisk'] = [
+                1,
+                f"Definition {size} bytes"
+                + (" (S3 offload pattern referenced)" if has_s3 else "")
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 15. Map states without MaxConcurrency
+    # ------------------------------------------------------------------ #
+    def _checkSfnMapNoConcurrencyLimit(self):
+        if self._definition is None:
+            self.results['sfnMapNoConcurrencyLimit'] = [
+                0, "Could not parse state machine definition"
+            ]
+            return
+
+        unbounded = []
+        found = 0
+        for fqName, stateDef in self._iterStates(self._definition):
+            if stateDef.get('Type') != 'Map':
+                continue
+            found += 1
+            if 'MaxConcurrency' not in stateDef and 'MaxConcurrencyPath' not in stateDef:
+                unbounded.append(fqName)
+
+        if found == 0:
+            self.results['sfnMapNoConcurrencyLimit'] = [
+                1, "No Map states in this state machine"
+            ]
+        elif unbounded:
+            self.results['sfnMapNoConcurrencyLimit'] = [
+                -1,
+                f"Map state(s) without MaxConcurrency: {', '.join(unbounded[:8])}"
+                + (f" (+{len(unbounded)-8} more)" if len(unbounded) > 8 else "")
+            ]
+        else:
+            self.results['sfnMapNoConcurrencyLimit'] = [
+                1, f"All {found} Map state(s) set MaxConcurrency"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 16. Task states without per-task timeout
+    # ------------------------------------------------------------------ #
+    def _checkSfnTaskNoTimeout(self):
+        if self._definition is None:
+            self.results['sfnTaskNoTimeout'] = [
+                0, "Could not parse state machine definition"
+            ]
+            return
+
+        missing = []
+        total = 0
+        for fqName, stateDef in self._iterStates(self._definition):
+            if stateDef.get('Type') != 'Task':
+                continue
+            total += 1
+            # Accept either TimeoutSeconds/TimeoutSecondsPath or HeartbeatSeconds/Path
+            has_timeout = any(k in stateDef for k in (
+                'TimeoutSeconds', 'TimeoutSecondsPath',
+                'HeartbeatSeconds', 'HeartbeatSecondsPath',
+            ))
+            if not has_timeout:
+                missing.append(fqName)
+
+        if total == 0:
+            self.results['sfnTaskNoTimeout'] = [
+                1, "No Task states in this state machine"
+            ]
+        elif missing:
+            self.results['sfnTaskNoTimeout'] = [
+                -1,
+                f"Task state(s) without TimeoutSeconds/HeartbeatSeconds: "
+                f"{', '.join(missing[:8])}"
+                + (f" (+{len(missing)-8} more)" if len(missing) > 8 else "")
+            ]
+        else:
+            self.results['sfnTaskNoTimeout'] = [
+                1, f"All {total} Task state(s) have TimeoutSeconds or HeartbeatSeconds"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # Helper: yield every state (fully-qualified name + definition dict)
+    # from the top-level state machine, recursing into Parallel.Branches
+    # and Map.Iterator/ItemProcessor.
+    # ------------------------------------------------------------------ #
+    def _iterStates(self, definition, prefix=''):
+        if not isinstance(definition, dict):
+            return
+        states = definition.get('States', {}) or {}
+        for name, stateDef in states.items():
+            if not isinstance(stateDef, dict):
+                continue
+            fq = f"{prefix}{name}" if prefix else name
+            yield fq, stateDef
+            stype = stateDef.get('Type')
+            if stype == 'Parallel':
+                for i, branch in enumerate(stateDef.get('Branches', []) or []):
+                    yield from self._iterStates(branch, prefix=f"{fq}.branch{i}.")
+            elif stype == 'Map':
+                sub = stateDef.get('ItemProcessor') or stateDef.get('Iterator')
+                if isinstance(sub, dict):
+                    yield from self._iterStates(sub, prefix=f"{fq}.iter.")
+
+    # ------------------------------------------------------------------ #
     # Helpers
     # ------------------------------------------------------------------ #
     @staticmethod
@@ -346,3 +508,279 @@ class StepfunctionsCommon(Evaluator):
         if dt.tzinfo is None:
             return dt.replace(tzinfo=datetime.timezone.utc)
         return dt
+
+    # ------------------------------------------------------------------ #
+    # 17. Definition validation errors (ValidateStateMachineDefinition)
+    # ------------------------------------------------------------------ #
+    def _checkSfnDefinitionValidationErrors(self):
+        vr = self.sm.get('_validationResult') or {}
+        diagnostics = vr.get('diagnostics') or []
+        errors = [d for d in diagnostics if d.get('severity') == 'ERROR']
+        if not vr:
+            self.results['sfnDefinitionValidationErrors'] = [
+                0, "Validation API could not be called"
+            ]
+            return
+        if errors:
+            codes = [d.get('code', '?') for d in errors[:5]]
+            self.results['sfnDefinitionValidationErrors'] = [
+                -1,
+                f"{len(errors)} validation error(s): {', '.join(codes)}"
+                + (f" (+{len(errors)-5} more)" if len(errors) > 5 else "")
+            ]
+        else:
+            self.results['sfnDefinitionValidationErrors'] = [
+                1, "No ERROR-severity validation diagnostics"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 18. Choice state without Default branch
+    # ------------------------------------------------------------------ #
+    def _checkSfnChoiceNoDefault(self):
+        if self._definition is None:
+            self.results['sfnChoiceNoDefault'] = [
+                0, "Could not parse state machine definition"
+            ]
+            return
+        missing = []
+        total = 0
+        for fq, s in self._iterStates(self._definition):
+            if s.get('Type') != 'Choice':
+                continue
+            total += 1
+            if not s.get('Default'):
+                missing.append(fq)
+
+        if total == 0:
+            self.results['sfnChoiceNoDefault'] = [1, "No Choice states"]
+        elif missing:
+            self.results['sfnChoiceNoDefault'] = [
+                -1,
+                f"Choice state(s) without Default: {', '.join(missing[:8])}"
+                + (f" (+{len(missing)-8} more)" if len(missing) > 8 else "")
+            ]
+        else:
+            self.results['sfnChoiceNoDefault'] = [
+                1, f"All {total} Choice state(s) have Default"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 19. Execution role does not exist
+    # ------------------------------------------------------------------ #
+    def _checkSfnRoleDoesNotExist(self):
+        status = self.sm.get('_roleExists')
+        roleArn = self.sm.get('roleArn', '(no role)')
+        if status == 'missing':
+            self.results['sfnRoleDoesNotExist'] = [
+                -1, f"IAM role does not exist: {roleArn}"
+            ]
+        elif status == 'exists':
+            self.results['sfnRoleDoesNotExist'] = [1, "Execution role exists"]
+        elif status == 'cross_account':
+            self.results['sfnRoleDoesNotExist'] = [
+                0, f"Cross-account role — cannot verify: {roleArn}"
+            ]
+        else:
+            self.results['sfnRoleDoesNotExist'] = [
+                0, "Could not verify role existence (permission or arn parse failure)"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 20. Unreachable states (graph reachability from StartAt)
+    # ------------------------------------------------------------------ #
+    def _checkSfnUnreachableStates(self):
+        if self._definition is None:
+            self.results['sfnUnreachableStates'] = [
+                0, "Could not parse state machine definition"
+            ]
+            return
+
+        unreachable = self._findUnreachableStates(self._definition)
+        if unreachable is None:
+            self.results['sfnUnreachableStates'] = [
+                0, "Could not compute reachability (missing StartAt)"
+            ]
+            return
+        if unreachable:
+            self.results['sfnUnreachableStates'] = [
+                -1,
+                f"Unreachable state(s): {', '.join(sorted(unreachable)[:8])}"
+                + (f" (+{len(unreachable)-8} more)" if len(unreachable) > 8 else "")
+            ]
+        else:
+            self.results['sfnUnreachableStates'] = [
+                1, "All states reachable from StartAt"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 21. Parallel state without Catch
+    # ------------------------------------------------------------------ #
+    def _checkSfnParallelNoCatch(self):
+        if self._definition is None:
+            self.results['sfnParallelNoCatch'] = [
+                0, "Could not parse state machine definition"
+            ]
+            return
+        missing = []
+        total = 0
+        for fq, s in self._iterStates(self._definition):
+            if s.get('Type') != 'Parallel':
+                continue
+            total += 1
+            if not s.get('Catch'):
+                missing.append(fq)
+        if total == 0:
+            self.results['sfnParallelNoCatch'] = [1, "No Parallel states"]
+        elif missing:
+            self.results['sfnParallelNoCatch'] = [
+                -1,
+                f"Parallel state(s) without Catch: {', '.join(missing[:8])}"
+            ]
+        else:
+            self.results['sfnParallelNoCatch'] = [
+                1, f"All {total} Parallel state(s) have Catch"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 22. Map state without Catch
+    # ------------------------------------------------------------------ #
+    def _checkSfnMapNoCatch(self):
+        if self._definition is None:
+            self.results['sfnMapNoCatch'] = [
+                0, "Could not parse state machine definition"
+            ]
+            return
+        missing = []
+        total = 0
+        for fq, s in self._iterStates(self._definition):
+            if s.get('Type') != 'Map':
+                continue
+            total += 1
+            if not s.get('Catch'):
+                missing.append(fq)
+        if total == 0:
+            self.results['sfnMapNoCatch'] = [1, "No Map states"]
+        elif missing:
+            self.results['sfnMapNoCatch'] = [
+                -1,
+                f"Map state(s) without Catch: {', '.join(missing[:8])}"
+            ]
+        else:
+            self.results['sfnMapNoCatch'] = [
+                1, f"All {total} Map state(s) have Catch"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 23. Retry configuration with no back-off and aggressive attempts
+    # ------------------------------------------------------------------ #
+    def _checkSfnRetryNoBackoff(self):
+        if self._definition is None:
+            self.results['sfnRetryNoBackoff'] = [
+                0, "Could not parse state machine definition"
+            ]
+            return
+        offenders = []
+        for fq, s in self._iterStates(self._definition):
+            for retry in (s.get('Retry') or []):
+                if not isinstance(retry, dict):
+                    continue
+                backoff = retry.get('BackoffRate')
+                # Only fail when BackoffRate is *explicitly* 1.0 AND MaxAttempts > 3.
+                try:
+                    br = float(backoff) if backoff is not None else None
+                except (TypeError, ValueError):
+                    br = None
+                try:
+                    ma = int(retry.get('MaxAttempts', 3))
+                except (TypeError, ValueError):
+                    ma = 3
+                if br is not None and br <= 1.0 and ma > 3:
+                    offenders.append(f"{fq}(BackoffRate={br},MaxAttempts={ma})")
+        if offenders:
+            self.results['sfnRetryNoBackoff'] = [
+                -1,
+                f"Retry without back-off: {', '.join(offenders[:5])}"
+                + (f" (+{len(offenders)-5} more)" if len(offenders) > 5 else "")
+            ]
+        else:
+            self.results['sfnRetryNoBackoff'] = [
+                1, "All Retry blocks use exponential back-off (or acceptable attempt counts)"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 24. Configured log group does not exist
+    # ------------------------------------------------------------------ #
+    def _checkSfnLogGroupDoesNotExist(self):
+        status = self.sm.get('_logGroupExists')
+        if status is None:
+            self.results['sfnLogGroupDoesNotExist'] = [
+                0, "No CloudWatch log destination configured"
+            ]
+        elif status is True:
+            self.results['sfnLogGroupDoesNotExist'] = [
+                1, "Configured log group exists"
+            ]
+        elif status is False:
+            self.results['sfnLogGroupDoesNotExist'] = [
+                -1, "Log group referenced by loggingConfiguration does not exist"
+            ]
+        else:
+            self.results['sfnLogGroupDoesNotExist'] = [
+                0, "Could not verify log group (permission or parse failure)"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # Reachability helper for check #20
+    # ------------------------------------------------------------------ #
+    def _findUnreachableStates(self, definition):
+        """
+        Return a set of state names not reachable from StartAt, or None
+        if the definition has no StartAt / no States. Reachability walks
+        Next, Default, Choice.Choices[*].Next, Catch[*].Next, and descends
+        into Parallel.Branches and Map.Iterator/ItemProcessor sub-workflows
+        (treating branches as reachable when the Parallel/Map is reachable).
+        """
+        if not isinstance(definition, dict):
+            return None
+        start = definition.get('StartAt')
+        states = definition.get('States') or {}
+        if not start or not states:
+            return None
+
+        reachable = set()
+        stack = [start]
+        while stack:
+            name = stack.pop()
+            if name in reachable or name not in states:
+                continue
+            reachable.add(name)
+            s = states.get(name) or {}
+            # Transitions
+            nxt = s.get('Next')
+            if nxt:
+                stack.append(nxt)
+            dflt = s.get('Default')
+            if dflt:
+                stack.append(dflt)
+            for c in (s.get('Choices') or []):
+                if isinstance(c, dict) and c.get('Next'):
+                    stack.append(c['Next'])
+            for c in (s.get('Catch') or []):
+                if isinstance(c, dict) and c.get('Next'):
+                    stack.append(c['Next'])
+            # Parallel / Map sub-workflows: their sub-states are reachable
+            # when the parent is reachable; walk sub-definitions and add
+            # their StartAt + all states (they can't be reached from the
+            # parent scope by name, but they ARE alive as long as the
+            # parent is).
+            if s.get('Type') == 'Parallel':
+                for branch in (s.get('Branches') or []):
+                    if isinstance(branch, dict):
+                        sub_states = branch.get('States') or {}
+                        reachable.update(sub_states.keys())
+            elif s.get('Type') == 'Map':
+                sub = s.get('ItemProcessor') or s.get('Iterator') or {}
+                if isinstance(sub, dict):
+                    sub_states = sub.get('States') or {}
+                    reachable.update(sub_states.keys())
+        return set(states.keys()) - reachable

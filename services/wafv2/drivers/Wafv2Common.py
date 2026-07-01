@@ -374,6 +374,145 @@ class Wafv2Common(Evaluator):
             ]
 
     # ------------------------------------------------------------------ #
+    # 13. Missing AWSManagedRulesAmazonIpReputationList
+    #
+    #    Only flagged when the ACL already uses ≥1 managed rule group.
+    #    Empty ACLs are covered by wafv2NoRules / wafv2NoManagedRuleGroups.
+    # ------------------------------------------------------------------ #
+    IP_REPUTATION_MANAGED_GROUP = 'AWSManagedRulesAmazonIpReputationList'
+
+    def _checkWafv2NoIpReputationList(self):
+        managed = self._managedRuleGroupNames()
+        if not managed:
+            self.results['wafv2NoIpReputationList'] = [
+                0, "No managed rule groups — see wafv2NoManagedRuleGroups"
+            ]
+            return
+        if self.IP_REPUTATION_MANAGED_GROUP in managed:
+            self.results['wafv2NoIpReputationList'] = [
+                1, f"{self.IP_REPUTATION_MANAGED_GROUP} attached"
+            ]
+        else:
+            self.results['wafv2NoIpReputationList'] = [
+                -1,
+                f"Managed groups present ({', '.join(sorted(managed)[:3])}) "
+                f"but no {self.IP_REPUTATION_MANAGED_GROUP}"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 14. No SQL-injection protection
+    # ------------------------------------------------------------------ #
+    SQLI_MANAGED_GROUP = 'AWSManagedRulesSQLiRuleSet'
+    SQLI_STATEMENT_KEY = 'SqliMatchStatement'
+
+    def _checkWafv2NoSqlInjectionProtection(self):
+        if not self.rules:
+            self.results['wafv2NoSqlInjectionProtection'] = [
+                0, "WebACL has no rules — see wafv2NoRules"
+            ]
+            return
+        managed = self._managedRuleGroupNames()
+        has_managed_sqli = self.SQLI_MANAGED_GROUP in managed
+        has_custom_sqli = any(
+            self._statementContainsKey(r.get('Statement') or {}, self.SQLI_STATEMENT_KEY)
+            for r in self.rules
+        )
+        if has_managed_sqli:
+            self.results['wafv2NoSqlInjectionProtection'] = [
+                1, f"{self.SQLI_MANAGED_GROUP} attached"
+            ]
+        elif has_custom_sqli:
+            self.results['wafv2NoSqlInjectionProtection'] = [
+                1, "Custom rule with SqliMatchStatement present"
+            ]
+        else:
+            self.results['wafv2NoSqlInjectionProtection'] = [
+                -1,
+                "No SQLi protection: neither AWSManagedRulesSQLiRuleSet nor "
+                "custom SqliMatchStatement"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 15. No XSS protection
+    # ------------------------------------------------------------------ #
+    XSS_STATEMENT_KEY = 'XssMatchStatement'
+    # Managed groups that cover XSS: CommonRuleSet includes cross-site rules
+    # in its body/query-string set. We accept it as XSS coverage.
+    XSS_MANAGED_GROUPS = ('AWSManagedRulesCommonRuleSet',)
+
+    def _checkWafv2NoXssProtection(self):
+        if not self.rules:
+            self.results['wafv2NoXssProtection'] = [
+                0, "WebACL has no rules — see wafv2NoRules"
+            ]
+            return
+        managed = self._managedRuleGroupNames()
+        managed_xss = [g for g in self.XSS_MANAGED_GROUPS if g in managed]
+        has_custom_xss = any(
+            self._statementContainsKey(r.get('Statement') or {}, self.XSS_STATEMENT_KEY)
+            for r in self.rules
+        )
+        if managed_xss:
+            self.results['wafv2NoXssProtection'] = [
+                1, f"XSS coverage via {', '.join(managed_xss)}"
+            ]
+        elif has_custom_xss:
+            self.results['wafv2NoXssProtection'] = [
+                1, "Custom rule with XssMatchStatement present"
+            ]
+        else:
+            self.results['wafv2NoXssProtection'] = [
+                -1,
+                "No XSS protection: no CommonRuleSet coverage and no "
+                "custom XssMatchStatement"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 16. Capacity usage > 80% of scope limit
+    # ------------------------------------------------------------------ #
+    WCU_LIMIT_BY_SCOPE = {'REGIONAL': 5000, 'CLOUDFRONT': 1500}
+    WCU_THRESHOLD = 0.80
+
+    def _checkWafv2HighCapacityUsage(self):
+        capacity = self.webAcl.get('Capacity')
+        if not isinstance(capacity, (int, float)) or capacity <= 0:
+            self.results['wafv2HighCapacityUsage'] = [
+                0, "Capacity not reported by GetWebACL"
+            ]
+            return
+
+        scope = self.acl.get('_scope', 'REGIONAL')
+        limit = self.WCU_LIMIT_BY_SCOPE.get(scope, 5000)
+        pct = capacity / limit
+        if pct >= self.WCU_THRESHOLD:
+            self.results['wafv2HighCapacityUsage'] = [
+                -1,
+                f"WCU usage {int(capacity)}/{limit} ({pct*100:.0f}%) — near {scope} limit"
+            ]
+        else:
+            self.results['wafv2HighCapacityUsage'] = [
+                1,
+                f"WCU usage {int(capacity)}/{limit} ({pct*100:.0f}%)"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # Helper: collect every ManagedRuleGroupStatement.Name in the WebACL
+    # (top-level rules only — nesting managed groups inside And/Or/Not is
+    # legal but rare, and CommonRuleSet et al. are always applied at top
+    # level in practice).
+    # ------------------------------------------------------------------ #
+    def _managedRuleGroupNames(self):
+        names = set()
+        for r in self.rules:
+            stmt = r.get('Statement') or {}
+            mrg = stmt.get(self.MANAGED_RG_KEY)
+            if isinstance(mrg, dict):
+                name = mrg.get('Name')
+                if name:
+                    names.add(name)
+        return names
+
+    # ------------------------------------------------------------------ #
     # Helpers
     # ------------------------------------------------------------------ #
     @staticmethod
@@ -437,3 +576,361 @@ class Wafv2Common(Evaluator):
                 return True
 
         return False
+
+    # ------------------------------------------------------------------ #
+    # 17. Managed rule group with ALL rules overridden to Count / excluded
+    # ------------------------------------------------------------------ #
+    def _checkWafv2ManagedRuleGroupAllCountOverride(self):
+        mrg_details = self.acl.get('_managedRuleGroupDetails') or {}
+        offenders = []
+        for r in self.rules:
+            stmt = r.get('Statement') or {}
+            mrg = stmt.get(self.MANAGED_RG_KEY)
+            if not isinstance(mrg, dict):
+                continue
+            name = mrg.get('Name')
+            vendor = mrg.get('VendorName')
+            key = (vendor, name)
+            info = mrg_details.get(key) or {}
+            total = info.get('total_rules')
+
+            excluded = mrg.get('ExcludedRules') or []
+            overrides = mrg.get('RuleActionOverrides') or []
+            count_overrides = [
+                o for o in overrides
+                if isinstance(o, dict) and 'Count' in (o.get('ActionToUse') or {})
+            ]
+
+            all_neutered = False
+            if isinstance(total, int) and total > 0:
+                affected = {e.get('Name') for e in excluded if isinstance(e, dict)}
+                affected.update({o.get('Name') for o in count_overrides if isinstance(o, dict)})
+                if len(affected) >= total:
+                    all_neutered = True
+            else:
+                # We couldn't count total rules; fall back to "override count is
+                # very large" heuristic — only fire when both lists together
+                # look excessive (>10 entries) as a conservative signal.
+                if len(excluded) + len(count_overrides) >= 20:
+                    all_neutered = True
+
+            if all_neutered:
+                offenders.append(f"{r.get('Name','?')}[{vendor}/{name}]")
+
+        if offenders:
+            self.results['wafv2ManagedRuleGroupAllCountOverride'] = [
+                -1,
+                f"Managed group(s) with every rule neutered: {', '.join(offenders[:3])}"
+                + (f" (+{len(offenders)-3} more)" if len(offenders) > 3 else "")
+            ]
+        else:
+            self.results['wafv2ManagedRuleGroupAllCountOverride'] = [
+                1, "No managed rule groups with blanket Count/Excluded overrides"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 18. Missing Core Rule Set
+    # ------------------------------------------------------------------ #
+    CORE_RULE_SET = 'AWSManagedRulesCommonRuleSet'
+
+    def _checkWafv2NoCoreRuleSet(self):
+        managed = self._managedRuleGroupNames()
+        if not managed:
+            self.results['wafv2NoCoreRuleSet'] = [
+                0, "No managed rule groups — see wafv2NoManagedRuleGroups"
+            ]
+            return
+        if self.CORE_RULE_SET in managed:
+            self.results['wafv2NoCoreRuleSet'] = [
+                1, f"{self.CORE_RULE_SET} attached"
+            ]
+        else:
+            self.results['wafv2NoCoreRuleSet'] = [
+                -1,
+                f"Managed groups present ({', '.join(sorted(managed)[:3])}) "
+                f"but no {self.CORE_RULE_SET}"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 19. Allow-action rule ordered before a managed rule group
+    # ------------------------------------------------------------------ #
+    def _checkWafv2AllowRuleBeforeManagedRules(self):
+        if not self.rules:
+            self.results['wafv2AllowRuleBeforeManagedRules'] = [
+                0, "WebACL has no rules"
+            ]
+            return
+
+        # Priority is an int; lower runs first.
+        managed_priorities = []
+        for r in self.rules:
+            stmt = r.get('Statement') or {}
+            if self.MANAGED_RG_KEY in stmt or 'RuleGroupReferenceStatement' in stmt:
+                p = r.get('Priority')
+                if isinstance(p, int):
+                    managed_priorities.append(p)
+        if not managed_priorities:
+            self.results['wafv2AllowRuleBeforeManagedRules'] = [
+                0, "No managed/reference rule groups to order against"
+            ]
+            return
+
+        earliest_managed = min(managed_priorities)
+        offenders = []
+        for r in self.rules:
+            action = r.get('Action') or {}
+            if 'Allow' not in action:
+                continue
+            p = r.get('Priority')
+            if isinstance(p, int) and p < earliest_managed:
+                offenders.append(f"{r.get('Name','?')}(prio={p})")
+
+        if offenders:
+            self.results['wafv2AllowRuleBeforeManagedRules'] = [
+                -1,
+                f"Allow rule(s) run BEFORE managed groups (earliest managed prio={earliest_managed}): "
+                + ", ".join(offenders[:5])
+            ]
+        else:
+            self.results['wafv2AllowRuleBeforeManagedRules'] = [
+                1, "All Allow rules run after managed groups"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 20. Managed rule group version pinned (with expiry escalation)
+    # ------------------------------------------------------------------ #
+    import datetime as _dt_module
+    PINNED_VERSION_EXPIRY_DAYS = 30
+
+    def _checkWafv2ManagedRuleGroupVersionPinned(self):
+        mrg_details = self.acl.get('_managedRuleGroupDetails') or {}
+        pinned = []           # (rule_name, group, version_name)
+        expiring = []         # (rule_name, group, version_name, days)
+        for r in self.rules:
+            stmt = r.get('Statement') or {}
+            mrg = stmt.get(self.MANAGED_RG_KEY)
+            if not isinstance(mrg, dict):
+                continue
+            ver = mrg.get('VersionName') or mrg.get('Version')
+            if not ver:
+                continue
+            vendor = mrg.get('VendorName')
+            name = mrg.get('Name')
+            pinned.append((r.get('Name', '?'), name, ver))
+
+            # Check expiry
+            info = mrg_details.get((vendor, name)) or {}
+            for v in info.get('versions', []) or []:
+                if v.get('Name') != ver:
+                    continue
+                exp = v.get('ExpiryTimestamp')
+                if not exp:
+                    break
+                exp_dt = self._parseAwsDatetime(exp)
+                if exp_dt is None:
+                    break
+                days = (exp_dt - self._dt_module.datetime.now(self._dt_module.timezone.utc)).days
+                if days <= self.PINNED_VERSION_EXPIRY_DAYS:
+                    expiring.append((r.get('Name', '?'), name, ver, days))
+                break
+
+        if expiring:
+            self.results['wafv2ManagedRuleGroupVersionPinned'] = [
+                -1,
+                "Pinned managed group version expiring soon: "
+                + ", ".join([f"{rn}[{g}={v},{d}d]" for rn, g, v, d in expiring[:3]])
+            ]
+        elif pinned:
+            self.results['wafv2ManagedRuleGroupVersionPinned'] = [
+                0,
+                f"{len(pinned)} managed group version(s) pinned (informational): "
+                + ", ".join([f"{rn}[{g}={v}]" for rn, g, v in pinned[:3]])
+            ]
+        else:
+            self.results['wafv2ManagedRuleGroupVersionPinned'] = [
+                1, "No pinned managed rule group versions"
+            ]
+
+    @classmethod
+    def _parseAwsDatetime(cls, val):
+        dt = cls._dt_module
+        if isinstance(val, dt.datetime):
+            return val if val.tzinfo else val.replace(tzinfo=dt.timezone.utc)
+        if isinstance(val, str):
+            try:
+                p = dt.datetime.fromisoformat(val.replace('Z', '+00:00'))
+                return p if p.tzinfo else p.replace(tzinfo=dt.timezone.utc)
+            except ValueError:
+                return None
+        return None
+
+    # ------------------------------------------------------------------ #
+    # 21. Bot Control not attached (informational for internet-facing ACLs)
+    # ------------------------------------------------------------------ #
+    BOT_CONTROL_GROUP = 'AWSManagedRulesBotControlRuleSet'
+
+    def _checkWafv2NoBotControl(self):
+        if not self.associatedResources:
+            self.results['wafv2NoBotControl'] = [
+                0, "WebACL is not associated with any resource (see wafv2NotAssociated)"
+            ]
+            return
+        if self.BOT_CONTROL_GROUP in self._managedRuleGroupNames():
+            self.results['wafv2NoBotControl'] = [
+                1, f"{self.BOT_CONTROL_GROUP} attached"
+            ]
+        else:
+            self.results['wafv2NoBotControl'] = [
+                0,
+                f"No {self.BOT_CONTROL_GROUP} on this internet-facing WebACL "
+                "(paid add-on — informational)"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 22. Rate-based rule threshold too high
+    # ------------------------------------------------------------------ #
+    RATE_LIMIT_THRESHOLD = 10000
+
+    def _checkWafv2RateBasedRuleThresholdTooHigh(self):
+        offenders = []
+        found = 0
+        for r in self.rules:
+            stmt = r.get('Statement') or {}
+            rb = stmt.get(self.RATE_BASED_KEY)
+            if not isinstance(rb, dict):
+                continue
+            found += 1
+            limit = rb.get('Limit')
+            if isinstance(limit, int) and limit > self.RATE_LIMIT_THRESHOLD:
+                offenders.append(f"{r.get('Name','?')}(limit={limit})")
+        if found == 0:
+            self.results['wafv2RateBasedRuleThresholdTooHigh'] = [
+                0, "No rate-based rules — see wafv2NoRateBasedRules"
+            ]
+        elif offenders:
+            self.results['wafv2RateBasedRuleThresholdTooHigh'] = [
+                -1,
+                f"Rate-based rule Limit > {self.RATE_LIMIT_THRESHOLD}: "
+                + ", ".join(offenders[:5])
+            ]
+        else:
+            self.results['wafv2RateBasedRuleThresholdTooHigh'] = [
+                1, f"All {found} rate-based rule Limit(s) ≤ {self.RATE_LIMIT_THRESHOLD}"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 23. LoggingFilter drops BLOCK-action requests
+    # ------------------------------------------------------------------ #
+    def _checkWafv2LoggingFilterDropsBlocked(self):
+        if not self.loggingConfig:
+            self.results['wafv2LoggingFilterDropsBlocked'] = [
+                0, "Logging not configured"
+            ]
+            return
+        lf = self.loggingConfig.get('LoggingFilter') or {}
+        if not lf:
+            self.results['wafv2LoggingFilterDropsBlocked'] = [
+                1, "No LoggingFilter (all traffic logged)"
+            ]
+            return
+        # A filter DROPS blocked requests if a Behavior=DROP filter matches
+        # on ActionCondition.Action=BLOCK.
+        drops_blocked = []
+        for f in lf.get('Filters', []) or []:
+            if f.get('Behavior') != 'DROP':
+                continue
+            for cond in (f.get('Conditions') or []):
+                ac = cond.get('ActionCondition')
+                if isinstance(ac, dict) and ac.get('Action') == 'BLOCK':
+                    drops_blocked.append(f)
+                    break
+        if drops_blocked:
+            self.results['wafv2LoggingFilterDropsBlocked'] = [
+                -1,
+                f"LoggingFilter DROPs BLOCK actions ({len(drops_blocked)} filter(s))"
+            ]
+        else:
+            self.results['wafv2LoggingFilterDropsBlocked'] = [
+                1, "LoggingFilter does not drop BLOCK actions"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 24. Allow-listed IP set with overly-broad CIDR
+    # ------------------------------------------------------------------ #
+    IPV4_BROAD_PREFIX = 8   # /8 or shorter is considered too broad
+    IPV6_BROAD_PREFIX = 32  # /32 or shorter is considered too broad for IPv6
+
+    def _checkWafv2IpSetOverlyPermissive(self):
+        ipsets = self.acl.get('_ipSets') or {}
+        if not ipsets:
+            self.results['wafv2IpSetOverlyPermissive'] = [
+                0, "No IP sets referenced by this WebACL"
+            ]
+            return
+
+        # Only inspect IPSets referenced by an ALLOW-action rule.
+        allow_ipset_arns = set()
+        for r in self.rules:
+            action = r.get('Action') or {}
+            if 'Allow' not in action:
+                continue
+            for arn in self._collectIpSetArns(r.get('Statement') or {}):
+                allow_ipset_arns.add(arn)
+        if not allow_ipset_arns:
+            self.results['wafv2IpSetOverlyPermissive'] = [
+                0, "IP sets present but none used in Allow-action rules"
+            ]
+            return
+
+        offenders = []
+        for arn in allow_ipset_arns:
+            ipset = ipsets.get(arn) or {}
+            name = ipset.get('Name', arn.split('/')[-2] if '/' in arn else arn)
+            for cidr in ipset.get('Addresses') or []:
+                if '/' not in cidr:
+                    continue
+                addr, _, prefix = cidr.partition('/')
+                try:
+                    prefix_i = int(prefix)
+                except ValueError:
+                    continue
+                if ':' in addr:
+                    if prefix_i <= self.IPV6_BROAD_PREFIX:
+                        offenders.append(f"{name}({cidr})")
+                else:
+                    if prefix_i <= self.IPV4_BROAD_PREFIX:
+                        offenders.append(f"{name}({cidr})")
+
+        if offenders:
+            self.results['wafv2IpSetOverlyPermissive'] = [
+                -1,
+                f"Allow-listed IP set with broad CIDR: {', '.join(offenders[:5])}"
+                + (f" (+{len(offenders)-5} more)" if len(offenders) > 5 else "")
+            ]
+        else:
+            self.results['wafv2IpSetOverlyPermissive'] = [
+                1, "All allow-listed IP set CIDRs are appropriately narrow"
+            ]
+
+    @staticmethod
+    def _collectIpSetArns(statement):
+        arns = set()
+        def walk(stmt):
+            if not isinstance(stmt, dict):
+                return
+            ipset = stmt.get('IPSetReferenceStatement')
+            if isinstance(ipset, dict) and ipset.get('ARN'):
+                arns.add(ipset['ARN'])
+            for k in ('AndStatement', 'OrStatement'):
+                sub = stmt.get(k)
+                if isinstance(sub, dict):
+                    for s in (sub.get('Statements') or []):
+                        walk(s)
+            nsub = stmt.get('NotStatement')
+            if isinstance(nsub, dict):
+                walk(nsub.get('Statement'))
+            rb = stmt.get('RateBasedStatement')
+            if isinstance(rb, dict):
+                walk(rb.get('ScopeDownStatement'))
+        walk(statement)
+        return arns

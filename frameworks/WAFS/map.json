@@ -62,7 +62,11 @@
         "iam.hasAccessKeyNoRotate30days",
         "iam.iamUsersWithFederationAvailable",
         "cognito.cognitoMfaNotEnforced",
-        "cognito.cognitoWeakPasswordPolicy"
+        "cognito.cognitoWeakPasswordPolicy",
+        "cognito.cognitoCompromisedCredentialProtection",
+        "cognito.cognitoClientImplicitGrantEnabled",
+        "cognito.cognitoClientTokenRevocationDisabled",
+        "cognito.cognitoAccountTakeoverProtectionWeak"
       ],
       "BP02": [
         "ec2.EC2IamProfile"
@@ -128,7 +132,8 @@
         "bedrock.bedrockAgentIamRoleOverprivileged",
         "bedrock.bedrockKBRoleOverprivileged",
         "bedrock.bedrockACRuntimeWildcardRole",
-        "sns.snsPublicAccess"
+        "sns.snsPublicAccess",
+        "sns.snsPolicyOverlyBroadActions"
       ],
       "BP03": [
         "iam.EnableConfigService",
@@ -278,7 +283,8 @@
       "BP01": [
         "ec2.EBSVolumeDataClassification",
         "efs.NoSensitiveDataInTags",
-        "bedrock.bedrockGuardrailNoPiiDetection"
+        "bedrock.bedrockGuardrailNoPiiDetection",
+        "sns.snsNoDataProtectionPolicy"
       ],
       "BP02": [
         "s3.BucketOwnerEnforced"
@@ -379,7 +385,17 @@
         "sns.snsInsecureSubscription",
         "wafv2.wafv2NoRules",
         "wafv2.wafv2NoManagedRuleGroups",
-        "wafv2.wafv2NoRateBasedRules"
+        "wafv2.wafv2NoRateBasedRules",
+        "wafv2.wafv2NoIpReputationList",
+        "wafv2.wafv2NoSqlInjectionProtection",
+        "wafv2.wafv2NoXssProtection",
+        "wafv2.wafv2ManagedRuleGroupAllCountOverride",
+        "wafv2.wafv2NoCoreRuleSet",
+        "wafv2.wafv2AllowRuleBeforeManagedRules",
+        "wafv2.wafv2IpSetOverlyPermissive",
+        "cognito.cognitoClientHttpCallbackUrl",
+        "cognito.cognitoClientHttpLogoutUrl",
+        "cognito.cognitoIdpHttpMetadataUrl"
       ],
       "BP03": [],
       "BP04": [

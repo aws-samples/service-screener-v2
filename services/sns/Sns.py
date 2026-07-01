@@ -25,6 +25,7 @@ class Sns(Service):
         super().__init__(region)
         ssBoto = self.ssBoto
         self.snsClient = ssBoto.client('sns', config=self.bConfig)
+        self._platformAppsCache = None
 
     # ------------------------------------------------------------------ #
     # Discovery
@@ -71,8 +72,75 @@ class Sns(Service):
             '_attributes': attrs,
             '_tags': tags,
             '_subscriptions': subscriptions,
+            '_dataProtectionPolicy': self._getDataProtectionPolicy(arn),
+            '_platformApps': self._listPlatformApps(),
+            '_currentAccount': self._currentAccount(),
         }
         return detail
+
+    def _currentAccount(self):
+        from utils.Config import Config
+        info = Config.get('stsInfo', {})
+        if isinstance(info, dict):
+            return info.get('Account')
+        return None
+
+    def _listPlatformApps(self):
+        """Fetch platform-application descriptors once per region, then reuse.
+
+        Each entry is a dict with 'PlatformApplicationArn' + attribute map.
+        Empty list means the account has no platform applications (mobile push).
+        """
+        if self._platformAppsCache is not None:
+            return self._platformAppsCache
+        apps = []
+        try:
+            marker = None
+            while True:
+                kwargs = {}
+                if marker:
+                    kwargs['NextToken'] = marker
+                resp = self.snsClient.list_platform_applications(**kwargs)
+                for entry in resp.get('PlatformApplications', []) or []:
+                    arn = entry.get('PlatformApplicationArn')
+                    if not arn:
+                        continue
+                    attrs = {}
+                    try:
+                        detail = self.snsClient.get_platform_application_attributes(
+                            PlatformApplicationArn=arn
+                        )
+                        attrs = detail.get('Attributes') or {}
+                    except botocore.exceptions.ClientError as e:
+                        self._logClientError(
+                            f'get_platform_application_attributes({arn})', e
+                        )
+                    apps.append({'PlatformApplicationArn': arn, 'Attributes': attrs})
+                marker = resp.get('NextToken')
+                if not marker:
+                    break
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', '')
+            # Some accounts / regions don't have mobile-push endpoints at all
+            if code not in ('AccessDenied', 'AccessDeniedException', 'AuthorizationError',
+                            'InvalidAction'):
+                self._logClientError('list_platform_applications', e)
+        self._platformAppsCache = apps
+        return apps
+
+    def _getDataProtectionPolicy(self, arn):
+        """Return the DataProtectionPolicy JSON string, or None if not set / call fails."""
+        try:
+            resp = self.snsClient.get_data_protection_policy(ResourceArn=arn)
+            return resp.get('DataProtectionPolicy')
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', '')
+            # SNS returns InvalidParameter when no policy is attached.
+            if code in ('InvalidParameter', 'InvalidParameterValue',
+                        'ResourceNotFoundException', 'NotFound'):
+                return None
+            self._logClientError(f'get_data_protection_policy({arn})', e)
+            return None
 
     def _listTags(self, arn):
         try:
@@ -83,18 +151,21 @@ class Sns(Service):
             return []
 
     def _listSubscriptions(self, arn):
-        """Return a list of subscription descriptors. For DLQ-eligible protocols,
-        also fetch subscription attributes to inspect RedrivePolicy."""
+        """Return a list of subscription descriptors. For every CONFIRMED
+        subscription we fetch the full attribute set (needed for
+        RedrivePolicy check #7 AND for ConfirmationWasAuthenticated check
+        #17). Pending-confirmation subs are returned with empty _attributes."""
         subs = []
         try:
             paginator = self.snsClient.get_paginator('list_subscriptions_by_topic')
             for page in paginator.paginate(TopicArn=arn):
                 for s in page.get('Subscriptions', []):
                     entry = dict(s)  # keys: SubscriptionArn, Protocol, Endpoint, Owner, TopicArn
-                    if s.get('Protocol') in self.DLQ_ELIGIBLE_PROTOCOLS and \
-                            s.get('SubscriptionArn', '').startswith('arn:'):
-                        entry['_attributes'] = self._getSubscriptionAttrs(s['SubscriptionArn'])
+                    subArn = s.get('SubscriptionArn', '')
+                    if subArn.startswith('arn:'):
+                        entry['_attributes'] = self._getSubscriptionAttrs(subArn)
                     else:
+                        # PendingConfirmation / "pending confirmation" — no attrs API.
                         entry['_attributes'] = {}
                     subs.append(entry)
         except botocore.exceptions.ClientError as e:

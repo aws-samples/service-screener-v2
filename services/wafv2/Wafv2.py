@@ -116,7 +116,110 @@ class Wafv2(Service):
         associated, lookupFailed = self._listAssociatedResources(arn, wid, scope)
         detail['_associatedResources'] = associated
         detail['_associationLookupFailed'] = lookupFailed
+        # Phase-1 extension data: fetch per-managed-group details + per-IP-set
+        # contents, only for entities actually referenced by this WebACL.
+        detail['_managedRuleGroupDetails'] = self._describeManagedGroupsFor(webAcl, scope)
+        detail['_ipSets'] = self._fetchReferencedIpSets(webAcl, scope)
         return detail
+
+    def _describeManagedGroupsFor(self, webAcl, scope):
+        """
+        Return a dict keyed by (VendorName, Name) -> {
+            'total_rules': int,            (from describe_managed_rule_group)
+            'versions': list of {Name, LastUpdateTimestamp, ExpiryTimestamp}
+                                            (from list_available_managed_rule_group_versions)
+        }
+        Only calls each API once per group referenced by this WebACL.
+        """
+        info = {}
+        rules = webAcl.get('Rules') or []
+        seen = set()
+        for r in rules:
+            stmt = r.get('Statement') or {}
+            mrg = stmt.get('ManagedRuleGroupStatement')
+            if not isinstance(mrg, dict):
+                continue
+            vendor = mrg.get('VendorName')
+            name = mrg.get('Name')
+            if not vendor or not name:
+                continue
+            key = (vendor, name)
+            if key in seen:
+                continue
+            seen.add(key)
+            entry = {'total_rules': None, 'versions': []}
+            try:
+                d = self.wafClient.describe_managed_rule_group(
+                    VendorName=vendor, Name=name, Scope=scope
+                )
+                entry['total_rules'] = len(d.get('Rules') or [])
+            except botocore.exceptions.ClientError as e:
+                self._logClientError(
+                    f'describe_managed_rule_group({vendor}/{name})', e
+                )
+            try:
+                v = self.wafClient.list_available_managed_rule_group_versions(
+                    VendorName=vendor, Name=name, Scope=scope
+                )
+                entry['versions'] = v.get('Versions') or []
+            except botocore.exceptions.ClientError as e:
+                self._logClientError(
+                    f'list_available_managed_rule_group_versions({vendor}/{name})', e
+                )
+            info[key] = entry
+        return info
+
+    def _fetchReferencedIpSets(self, webAcl, scope):
+        """Fetch every IPSet referenced by this WebACL. Keys are IPSet ARNs."""
+        out = {}
+        for arn in self._ipSetArnsInWebAcl(webAcl):
+            # ARN: arn:aws:wafv2:region:account:scope/ipset/<name>/<id>
+            parts = arn.split('/')
+            if len(parts) < 4 or 'ipset' not in parts:
+                continue
+            try:
+                name = parts[-2]
+                wid = parts[-1]
+            except IndexError:
+                continue
+            try:
+                resp = self.wafClient.get_ip_set(Name=name, Id=wid, Scope=scope)
+                ipset = resp.get('IPSet') or {}
+                out[arn] = {
+                    'Name': name,
+                    'IPAddressVersion': ipset.get('IPAddressVersion'),
+                    'Addresses': ipset.get('Addresses') or [],
+                }
+            except botocore.exceptions.ClientError as e:
+                self._logClientError(f'get_ip_set({name})', e)
+        return out
+
+    @staticmethod
+    def _ipSetArnsInWebAcl(webAcl):
+        """Walk every rule statement and collect ARNs from IPSetReferenceStatement."""
+        arns = set()
+        def walk(stmt):
+            if not isinstance(stmt, dict):
+                return
+            ipset = stmt.get('IPSetReferenceStatement')
+            if isinstance(ipset, dict):
+                a = ipset.get('ARN')
+                if a:
+                    arns.add(a)
+            for k in ('AndStatement', 'OrStatement'):
+                sub = stmt.get(k)
+                if isinstance(sub, dict):
+                    for s in (sub.get('Statements') or []):
+                        walk(s)
+            nsub = stmt.get('NotStatement')
+            if isinstance(nsub, dict):
+                walk(nsub.get('Statement'))
+            rb = stmt.get('RateBasedStatement')
+            if isinstance(rb, dict):
+                walk(rb.get('ScopeDownStatement'))
+        for r in (webAcl.get('Rules') or []):
+            walk(r.get('Statement'))
+        return arns
 
     def _getLoggingConfig(self, arn):
         """Return the LoggingConfiguration dict, or None if not configured."""
