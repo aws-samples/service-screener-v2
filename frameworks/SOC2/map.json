@@ -46,13 +46,13 @@
       "CC6.3 - Manages logical access": ["iam.supportRoleExists", "iam.noFullAdminPolicies"],
       "CC6.4 - Restricts physical access": [],
       "CC6.5 - Manages production changes": [],
-      "CC6.6 - Restricts logical access to information assets": ["s3.bucketEncryption", "s3.bucketPublicAccessBlock", "s3.bucketVersioning", "bedrock.bedrockAgentNoEncryptionKey", "bedrock.bedrockGuardrailNoEncryption", "bedrock.bedrockKBNoEncryption", "bedrock.bedrockACMemoryNoEncryption"],
+      "CC6.6 - Restricts logical access to information assets": ["s3.bucketEncryption", "s3.bucketPublicAccessBlock", "s3.bucketVersioning", "bedrock.bedrockAgentNoEncryptionKey", "bedrock.bedrockGuardrailNoEncryption", "bedrock.bedrockKBNoEncryption", "bedrock.bedrockACMemoryNoEncryption", "sns.snsEncryptionAtRest", "sns.snsPublicAccess"],
       "CC6.7 - Restricts the transmission, movement, and removal of information": ["s3.bucketLoggingEnabled", "s3.bucketPublicAccessBlock"],
       "CC6.8 - Manages endpoints": ["ec2.securityGroupsHasDescription", "ec2.securityGroupsRestrictedSSH", "ec2.securityGroupsRestrictedRDP"]
     },
     "CC7.0 - System Operations": {
       "CC7.1 - Manages infrastructure, software, and data": ["ec2.instanceDetailedMonitoringEnabled", "ec2.ebsOptimizedEnabled"],
-      "CC7.2 - Manages security incidents": ["guardduty.isEnabled", "securityhub.isEnabled", "bedrock.bedrockNoGuardrailsExist", "bedrock.bedrockAgentWithoutGuardrail", "bedrock.bedrockGuardrailNoPromptAttackFilter", "stepfunctions.sfnLoggingDisabled"],
+      "CC7.2 - Manages security incidents": ["guardduty.isEnabled", "securityhub.isEnabled", "bedrock.bedrockNoGuardrailsExist", "bedrock.bedrockAgentWithoutGuardrail", "bedrock.bedrockGuardrailNoPromptAttackFilter", "stepfunctions.sfnLoggingDisabled", "sns.snsDeliveryStatusLoggingDisabled"],
       "CC7.3 - Manages business continuity": ["backup.resourcesProtectedByBackupPlan", "rds.instanceBackupEnabled"],
       "CC7.4 - Recovers from incidents": ["rds.instanceMultiAZ", "ec2.instanceEbsBackupEnabled"]
     },

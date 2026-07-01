@@ -30,7 +30,7 @@
       "WKLD.05": [],
       "WKLD.06": [],
       "WKLD.07": [],
-      "WKLD.08": ["ec2.EBSEncrypted", "rds.StorageEncrypted", "bedrock.bedrockAgentNoEncryptionKey", "bedrock.bedrockGuardrailNoEncryption", "bedrock.bedrockKBNoEncryption", "bedrock.bedrockACMemoryNoEncryption", "stepfunctions.sfnEncryptionAtRest"],
+      "WKLD.08": ["ec2.EBSEncrypted", "rds.StorageEncrypted", "bedrock.bedrockAgentNoEncryptionKey", "bedrock.bedrockGuardrailNoEncryption", "bedrock.bedrockKBNoEncryption", "bedrock.bedrockACMemoryNoEncryption", "stepfunctions.sfnEncryptionAtRest", "sns.snsEncryptionAtRest"],
       "WKLD.09": [],
       "WKLD.10": [],
       "WKLD.11": ["ec2.SGSensitivePortOpenToAll", "ec2.SGTCPAllOpen", "ec2.SGAllOpen", "ec2.SGAllOpenToAll", "ec2.ELBListenerInsecure", "rds.PubliclyAccessible"],

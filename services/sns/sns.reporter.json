@@ -1,0 +1,161 @@
+{
+    "snsEncryptionAtRest": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) have no server-side encryption at rest (KmsMasterKeyId is not set). Unencrypted topics store messages in plaintext at the SNS service layer, which is unacceptable for regulated workloads and blocks CloudTrail-driven audit of key usage.",
+        "shortDesc": "Enable server-side encryption on every SNS topic",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS server-side encryption]<https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html>",
+            "[SNS security best practices]<https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html>"
+        ]
+    },
+    "snsEncryptionNotCMK": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) are encrypted with the default AWS-managed key (alias/aws/sns) rather than a customer-managed KMS key. AWS-managed keys are acceptable for many workloads but do not permit key rotation control, revocation, or cross-account audit. This is an advisory finding — organisations with CMK mandates should upgrade; others can suppress.",
+        "shortDesc": "Prefer a customer-managed KMS key over alias/aws/sns",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS server-side encryption]<https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html>",
+            "[AWS-managed vs customer-managed keys]<https://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#key-mgmt>"
+        ]
+    },
+    "snsPublicAccess": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) have a resource policy that grants access to Principal:* without a scoping Condition (aws:SourceAccount, aws:SourceArn, aws:PrincipalOrgID, or equivalent). A wildcard principal without a condition allows any AWS account to publish or subscribe, which is almost always a misconfiguration.",
+        "shortDesc": "Constrain wildcard Principal statements with a Condition",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS access policy]<https://docs.aws.amazon.com/sns/latest/dg/sns-access-policy-language-overview.html>",
+            "[SNS security best practices]<https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html>"
+        ]
+    },
+    "snsNoHttpsEnforcement": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) have no policy statement that denies non-TLS traffic (no Deny + aws:SecureTransport=false). Without this, publishers can send messages over HTTP and subscribers can be delivered over HTTP, leaving in-transit traffic unencrypted.",
+        "shortDesc": "Add a Deny statement with aws:SecureTransport=false",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Enforce HTTPS on SNS]<https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html>"
+        ]
+    },
+    "snsInsecureSubscription": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) have at least one subscription that uses the plain HTTP protocol (protocol=http). Messages delivered over HTTP are transmitted unencrypted. Note: email, email-json, and sms protocols are excluded from this check because they do not have TLS equivalents at the SNS layer.",
+        "shortDesc": "Migrate HTTP subscriptions to HTTPS",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS subscription protocols]<https://docs.aws.amazon.com/sns/latest/api/API_Subscribe.html>"
+        ]
+    },
+    "snsSignatureVersionOld": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) still use SignatureVersion=1 (SHA-1) for message signing. SHA-1 is cryptographically deprecated; SignatureVersion=2 (SHA-256) is the current recommended value.",
+        "shortDesc": "Upgrade topic SignatureVersion from 1 to 2",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS message signature version]<https://docs.aws.amazon.com/sns/latest/dg/sns-verify-signature-of-message.html>"
+        ]
+    },
+    "snsSubscriptionNoDlq": {
+        "category": "R",
+        "^description": "{$COUNT} SNS topic(s) have at least one sqs/lambda/firehose subscription without a RedrivePolicy (DLQ). Without a DLQ, messages that repeatedly fail delivery are dropped silently after the retry policy is exhausted. email/sms/http(s) subscriptions are excluded because they do not support DLQs.",
+        "shortDesc": "Configure a dead-letter queue on every async subscription",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS dead-letter queues]<https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html>"
+        ]
+    },
+    "snsPendingSubscription": {
+        "category": "R",
+        "^description": "{$COUNT} SNS topic(s) have at least one subscription in PendingConfirmation state. Pending subscriptions never receive messages until the owner confirms them; long-lived pending subscriptions usually indicate misconfigured or abandoned endpoints.",
+        "shortDesc": "Confirm or delete pending subscriptions",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS subscription confirmation]<https://docs.aws.amazon.com/sns/latest/dg/sns-message-and-json-formats.html#http-subscription-confirmation-json>"
+        ]
+    },
+    "snsDeliveryStatusLoggingDisabled": {
+        "category": "O",
+        "^description": "{$COUNT} SNS topic(s) have no delivery-status logging configured for any protocol (no *SuccessFeedbackRoleArn or *FailureFeedbackRoleArn attribute set). Without delivery-status logging, there is no CloudWatch record of which messages were successfully delivered vs. dropped, which blocks debugging and audit.",
+        "shortDesc": "Enable SNS delivery-status logging",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS delivery status logging]<https://docs.aws.amazon.com/sns/latest/dg/sns-topic-attributes.html>"
+        ]
+    },
+    "snsTracingDisabled": {
+        "category": "O",
+        "^description": "{$COUNT} SNS topic(s) have X-Ray tracing disabled (TracingConfig is not 'Active'). Without SNS tracing, cross-service traces stop at the publisher and cannot be correlated with downstream consumers.",
+        "shortDesc": "Set TracingConfig=Active for cross-service tracing",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS with X-Ray]<https://docs.aws.amazon.com/sns/latest/dg/sns-active-tracing.html>"
+        ]
+    },
+    "snsUnusedTopic": {
+        "category": "C",
+        "^description": "{$COUNT} SNS topic(s) have zero confirmed subscriptions (SubscriptionsConfirmed=0). Topics without subscribers publish messages that go nowhere; long-idle topics are typically orphaned deployments.",
+        "shortDesc": "Delete or subscribe to unused topics",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS best practices]<https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html>"
+        ]
+    },
+    "snsResourcesWithoutTags": {
+        "category": "C",
+        "^description": "{$COUNT} SNS topic(s) have no tags applied. Tags enable cost allocation, tag-based IAM, and lifecycle governance.",
+        "shortDesc": "Tag every SNS topic (owner, environment, cost-centre)",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>"
+        ]
+    }
+}

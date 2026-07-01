@@ -124,7 +124,8 @@
         "apigateway.LeastPrivilegeAccess",
         "bedrock.bedrockAgentIamRoleOverprivileged",
         "bedrock.bedrockKBRoleOverprivileged",
-        "bedrock.bedrockACRuntimeWildcardRole"
+        "bedrock.bedrockACRuntimeWildcardRole",
+        "sns.snsPublicAccess"
       ],
       "BP03": [
         "iam.EnableConfigService",
@@ -191,7 +192,8 @@
         "bedrock.bedrockModelInvocationLoggingDisabled",
         "bedrock.bedrockModelInvocationNoCloudWatch",
         "stepfunctions.sfnLoggingDisabled",
-        "stepfunctions.sfnTracingDisabled"
+        "stepfunctions.sfnTracingDisabled",
+        "sns.snsDeliveryStatusLoggingDisabled"
       ],
       "BP02": [
         "cloudwatch.missingCloudWatchDashboards",
@@ -323,7 +325,8 @@
         "bedrock.bedrockKBNoEncryption",
         "bedrock.bedrockACMemoryNoEncryption",
         "bedrock.bedrockACRuntimeNoEncryption",
-        "stepfunctions.sfnEncryptionAtRest"
+        "stepfunctions.sfnEncryptionAtRest",
+        "sns.snsEncryptionAtRest"
       ],
       "BP03": [],
       "BP04": [
@@ -366,7 +369,9 @@
         "glue.SslEnabled",
         "sagemaker.InterContainerEncryption",
         "apigateway.CORSConfiguration",
-        "bedrock.bedrockACRuntimeNoVPC"
+        "bedrock.bedrockACRuntimeNoVPC",
+        "sns.snsNoHttpsEnforcement",
+        "sns.snsInsecureSubscription"
       ],
       "BP03": [],
       "BP04": [

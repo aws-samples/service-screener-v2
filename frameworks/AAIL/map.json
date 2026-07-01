@@ -49,14 +49,16 @@
             "BP01": [
                 "bedrock.bedrockModelInvocationLoggingDisabled",
                 "cloudtrail.trailEnabled",
-                "stepfunctions.sfnTracingDisabled"
+                "stepfunctions.sfnTracingDisabled",
+                "sns.snsTracingDisabled"
             ],
             "BP03": [
                 "bedrock.bedrockModelInvocationNoCloudWatch",
                 "cloudwatch.$length",
                 "stepfunctions.sfnLoggingDisabled",
                 "stepfunctions.sfnLoggingLevelWeak",
-                "stepfunctions.sfnExpressWorkflowNoLogging"
+                "stepfunctions.sfnExpressWorkflowNoLogging",
+                "sns.snsDeliveryStatusLoggingDisabled"
             ],
             "BP04": [
                 "cloudwatch.alarmsWithoutSNS",
@@ -99,13 +101,15 @@
             "BP02": [
                 "iam.InlinePolicyFullAccessOneServ",
                 "iam.FullAdminAccess",
-                "lambda.lambdaRoleTooPermissive"
+                "lambda.lambdaRoleTooPermissive",
+                "sns.snsPublicAccess"
             ],
             "BP03": [
                 "bedrock.bedrockAgentNoEncryptionKey",
                 "bedrock.bedrockGuardrailNoEncryption",
                 "bedrock.bedrockKBNoEncryption",
-                "stepfunctions.sfnEncryptionAtRest"
+                "stepfunctions.sfnEncryptionAtRest",
+                "sns.snsEncryptionAtRest"
             ]
         },
         "AGENTSEC03": {
@@ -193,7 +197,8 @@
                 "sqs.DeadLetterQueue",
                 "lambda.lambdaDeadLetterQueueDisabled",
                 "stepfunctions.sfnNoRetryPolicy",
-                "stepfunctions.sfnNoCatchHandler"
+                "stepfunctions.sfnNoCatchHandler",
+                "sns.snsSubscriptionNoDlq"
             ]
         },
         "AGENTREL08": {

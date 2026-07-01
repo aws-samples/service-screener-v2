@@ -20,7 +20,7 @@
     "Data Protection": {
       "P2.1": ["s3.PublicAccessBlock" , "s3.PublicReadAccessBlock" , "s3.PublicWriteAccessBlock"],
       "P2.2": ["ec2.EBSSnapshot", "rds.Backup", "dynamodb.backupStatus", "dynamodb.enabledContinuousBackup", "efs.AutomatedBackup", "redshift.AutomaticSnapshots"],
-      "P2.3": ["s3.ServerSideEncrypted" , "s3.SSEWithKMS" , "ec2.EBSEncrypted" , "efs.EncryptedAtRest" , "rds.StorageEncrypted" , "redshift.EncryptedAtRest" , "redshift.EncryptedWithKMS" , "cloudfront.fieldLevelEncryption" , "apigateway.EncryptionAtRest" , "apigateway.EncryptionInTransit" , "bedrock.bedrockAgentNoEncryptionKey" , "bedrock.bedrockGuardrailNoEncryption" , "bedrock.bedrockKBNoEncryption" , "bedrock.bedrockACMemoryNoEncryption" , "stepfunctions.sfnEncryptionAtRest"],
+      "P2.3": ["s3.ServerSideEncrypted" , "s3.SSEWithKMS" , "ec2.EBSEncrypted" , "efs.EncryptedAtRest" , "rds.StorageEncrypted" , "redshift.EncryptedAtRest" , "redshift.EncryptedWithKMS" , "cloudfront.fieldLevelEncryption" , "apigateway.EncryptionAtRest" , "apigateway.EncryptionInTransit" , "bedrock.bedrockAgentNoEncryptionKey" , "bedrock.bedrockGuardrailNoEncryption" , "bedrock.bedrockKBNoEncryption" , "bedrock.bedrockACMemoryNoEncryption" , "stepfunctions.sfnEncryptionAtRest" , "sns.snsEncryptionAtRest"],
       "P2.4": ["s3.MacieToEnable" , "bedrock.bedrockGuardrailNoPiiDetection"],
       "P2.5": ["is3.TlsEnforced" , "redshift.EncryptedInTransit" , "rds.MSSQLorPG__TransportEncrpytionDisabled" , "opensearch.NodeToNodeEncryption" , "opensearch.TLSEnforced" , "elasticache.EncInTransitAndRest" , "ec2.SGEncryptionInTransit" , "cloudfront.viewerPolicyHttps"]
     },

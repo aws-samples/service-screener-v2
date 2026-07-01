@@ -102,7 +102,8 @@
         "bedrock.bedrockGuardrailNoEncryption",
         "bedrock.bedrockKBNoEncryption",
         "bedrock.bedrockACMemoryNoEncryption",
-        "stepfunctions.sfnEncryptionAtRest"
+        "stepfunctions.sfnEncryptionAtRest",
+        "sns.snsEncryptionAtRest"
       ]
     },
     "10.2": {
@@ -538,7 +539,8 @@
         "bedrock.bedrockModelInvocationLoggingDisabled",
         "bedrock.bedrockModelInvocationNoCloudWatch",
         "bedrock.bedrockModelInvocationNoS3",
-        "stepfunctions.sfnLoggingDisabled"
+        "stepfunctions.sfnLoggingDisabled",
+        "sns.snsDeliveryStatusLoggingDisabled"
       ],
       "7": [
         "cloudwatch.SetRetentionDays"

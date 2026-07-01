@@ -34,7 +34,7 @@
       "6": [],
       "7": [],
       "8": ["rds.DBwithoutSecretManager", "rds.DBwithSomeSecretsManagerOnly", "rds.Secret__NoRotation", "rds.Secret__NotUsed7days"],
-      "9": ["s3.ServerSideEncrypted", "bedrock.bedrockAgentNoEncryptionKey", "bedrock.bedrockGuardrailNoEncryption", "bedrock.bedrockKBNoEncryption", "bedrock.bedrockACMemoryNoEncryption", "stepfunctions.sfnEncryptionAtRest"],
+      "9": ["s3.ServerSideEncrypted", "bedrock.bedrockAgentNoEncryptionKey", "bedrock.bedrockGuardrailNoEncryption", "bedrock.bedrockKBNoEncryption", "bedrock.bedrockACMemoryNoEncryption", "stepfunctions.sfnEncryptionAtRest", "sns.snsEncryptionAtRest"],
       "10": ["lambda.lambdaPublicAccess"],
       "11": ["kms.KeyRotationEnabled"],
       "12": ["kms.AdminIsGrantor"],

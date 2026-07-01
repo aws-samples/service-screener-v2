@@ -243,7 +243,8 @@
         "bedrock.bedrockGuardrailNoEncryption",
         "bedrock.bedrockKBNoEncryption",
         "bedrock.bedrockACMemoryNoEncryption",
-        "stepfunctions.sfnEncryptionAtRest"
+        "stepfunctions.sfnEncryptionAtRest",
+        "sns.snsEncryptionAtRest"
       ],
       "SDAT-003.1": [
         "ec2.SGEncryptionInTransit",
