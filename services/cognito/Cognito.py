@@ -31,6 +31,8 @@ class Cognito(Service):
         # WAFv2 for user-pool WebACL association lookup (Cognito user pools
         # are REGIONAL resources so this client runs in the target region).
         self.wafClient = ssBoto.client('wafv2', config=self.bConfig)
+        # IAM for evaluating group-role policies (check #36).
+        self.iamClient = ssBoto.client('iam', config=self.bConfig)
 
     # ------------------------------------------------------------------ #
     # Discovery
@@ -61,6 +63,7 @@ class Cognito(Service):
                     detail['_wafWebAclArn'] = self._getAssociatedWebAcl(detail.get('Arn'))
                     detail['_logConfig'] = self._getLogDeliveryConfig(poolId)
                     detail['_identityProviders'] = self._listIdentityProviders(poolId)
+                    detail['_groups'] = self._listGroups(poolId)
 
                     _pi('Cognito', f"User pool: {detail.get('Name', poolId)}")
                     pools.append(detail)
@@ -186,6 +189,87 @@ class Cognito(Service):
         except botocore.exceptions.ClientError as e:
             self._logClientError(f'list_identity_providers({poolId})', e)
         return providers
+
+    def _listGroups(self, poolId):
+        """Return a list of user-pool group descriptors, each augmented with
+        _rolePolicies (list of policy documents) when a RoleArn is set.
+
+        The role policies are fetched inline + attached (attached policies use
+        the default policy version). Only same-account roles are inspected;
+        cross-account role ARNs are recorded with empty _rolePolicies + a
+        _crossAccount flag so the driver can degrade to INFO.
+        """
+        from utils.Config import Config
+        groups = []
+        try:
+            paginator = self.cognitoClient.get_paginator('list_groups')
+            for page in paginator.paginate(UserPoolId=poolId, Limit=60):
+                for g in page.get('Groups', []) or []:
+                    entry = dict(g)
+                    role_arn = g.get('RoleArn')
+                    if role_arn:
+                        me = (Config.get('stsInfo', {}) or {}).get('Account')
+                        parts = role_arn.split(':')
+                        acct = parts[4] if len(parts) >= 5 else ''
+                        entry['_rolePolicies'] = []
+                        entry['_crossAccount'] = bool(me and acct and acct != me)
+                        if not entry['_crossAccount']:
+                            entry['_rolePolicies'] = self._fetchRolePolicies(role_arn)
+                    groups.append(entry)
+        except botocore.exceptions.ClientError as e:
+            self._logClientError(f'list_groups({poolId})', e)
+        return groups
+
+    def _fetchRolePolicies(self, roleArn):
+        """Return a list of policy document dicts (parsed JSON) for the role's
+        inline + attached policies. Returns [] on any lookup error."""
+        import json as _json
+        if not roleArn or ':role/' not in roleArn:
+            return []
+        roleName = roleArn.split(':role/', 1)[1].split('/')[-1]
+        docs = []
+        try:
+            inline_resp = self.iamClient.list_role_policies(RoleName=roleName)
+            for policyName in inline_resp.get('PolicyNames', []) or []:
+                try:
+                    p = self.iamClient.get_role_policy(
+                        RoleName=roleName, PolicyName=policyName
+                    )
+                    doc = p.get('PolicyDocument')
+                    if isinstance(doc, str):
+                        try: doc = _json.loads(doc)
+                        except (ValueError, TypeError): doc = None
+                    if isinstance(doc, dict):
+                        docs.append(doc)
+                except botocore.exceptions.ClientError:
+                    continue
+            attached_resp = self.iamClient.list_attached_role_policies(RoleName=roleName)
+            for p in attached_resp.get('AttachedPolicies', []) or []:
+                policyArn = p.get('PolicyArn')
+                if not policyArn:
+                    continue
+                try:
+                    pol = self.iamClient.get_policy(PolicyArn=policyArn)
+                    versionId = (pol.get('Policy') or {}).get('DefaultVersionId')
+                    if not versionId:
+                        continue
+                    ver = self.iamClient.get_policy_version(
+                        PolicyArn=policyArn, VersionId=versionId
+                    )
+                    doc = (ver.get('PolicyVersion') or {}).get('Document')
+                    if isinstance(doc, str):
+                        try: doc = _json.loads(doc)
+                        except (ValueError, TypeError): doc = None
+                    if isinstance(doc, dict):
+                        docs.append(doc)
+                except botocore.exceptions.ClientError:
+                    continue
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', '')
+            if code not in ('AccessDenied', 'AccessDeniedException',
+                            'NoSuchEntity', 'NoSuchEntityException'):
+                self._logClientError(f'iam policy fetch for role {roleName}', e)
+        return docs
 
     # ------------------------------------------------------------------ #
     # Advise

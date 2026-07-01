@@ -42,6 +42,16 @@ class Wafv2(Service):
         self.wafClient = ssBoto.client('wafv2', config=self.bConfig)
         # CloudFront is global; used only for CLOUDFRONT-scoped resource lookups.
         self.cfClient = ssBoto.client('cloudfront', config=self.bConfig)
+        # Cross-service clients for coverage-gap checks (37-41). Constructed
+        # lazily-tolerant: any client whose service isn't available in this
+        # region will still work via boto3's shared endpoint config, and we
+        # wrap every call in try/except.
+        self.elbClient = ssBoto.client('elbv2', config=self.bConfig)
+        self.apigwClient = ssBoto.client('apigateway', config=self.bConfig)
+        self.appsyncClient = ssBoto.client('appsync', config=self.bConfig)
+        self.cognitoClient = ssBoto.client('cognito-idp', config=self.bConfig)
+        # Cached per-region: {'ipSets','regexPatternSets','ruleGroups','crossService'}
+        self._regionAssets = None
 
     # ------------------------------------------------------------------ #
     # Discovery
@@ -55,6 +65,18 @@ class Wafv2(Service):
         # report the same ACL once per region.
         if self.region == 'us-east-1':
             webAcls.extend(self._discoverScope('CLOUDFRONT'))
+
+        # Region-level assets (IP sets, regex sets, rule groups) + cross-service
+        # coverage. Fetched once per scan; injected into every ACL detail.
+        assets = self._collectRegionAssets(webAcls)
+        primary_marked = False
+        for acl in webAcls:
+            acl['_regionAssets'] = assets
+            if not primary_marked:
+                acl['_isPrimaryAcl'] = True
+                primary_marked = True
+            else:
+                acl['_isPrimaryAcl'] = False
 
         return webAcls
 
@@ -321,6 +343,318 @@ class Wafv2(Service):
         except botocore.exceptions.ClientError as e:
             self._logClientError(f'list_tags_for_resource({arn})', e)
         return tags
+
+    # ------------------------------------------------------------------ #
+    # Region-wide asset + cross-service coverage caching (checks 32-41)
+    # ------------------------------------------------------------------ #
+    def _collectRegionAssets(self, webAcls):
+        """
+        Build a shared dict injected into every WebACL detail:
+          {
+            'ipSets':           {arn: {'name','scope','addresses'}},
+            'regexPatternSets': {arn: {'name','scope','patterns'}},
+            'ruleGroups':       {arn: {'name','scope','ruleCount','description'}},
+            'crossService': {
+                'alb':        [{'arn','name','scheme','protected'}],
+                'apiGateway': [{'arn','name','protected'}],
+                'cloudfront': [{'id','arn','protected'}],
+                'appsync':    [{'arn','name','authType','protected'}],
+                'cognito':    [{'arn','id','name','protected'}],
+            }
+          }
+        Failures are absorbed silently — the corresponding checks degrade to
+        INFO when data is missing.
+        """
+        if self._regionAssets is not None:
+            return self._regionAssets
+
+        assets = {
+            'ipSets': {},
+            'regexPatternSets': {},
+            'ruleGroups': {},
+            'crossService': {
+                'alb': [], 'apiGateway': [], 'cloudfront': [],
+                'appsync': [], 'cognito': [],
+            },
+        }
+
+        scopes = ['REGIONAL']
+        if self.region == 'us-east-1':
+            scopes.append('CLOUDFRONT')
+
+        for scope in scopes:
+            self._collectIpSets(scope, assets)
+            self._collectRegexPatternSets(scope, assets)
+            self._collectRuleGroups(scope, assets)
+
+        # Cross-service coverage only makes sense when we have some WebACLs to
+        # attribute the finding to. But even if the account has zero WebACLs
+        # (a legitimate misconfiguration!) the coverage-gap check can't fire
+        # against a driver instance — the driver runs per-ACL. In that case
+        # the whole check surface simply isn't invoked.
+        self._collectAlbCoverage(assets)
+        self._collectApiGatewayCoverage(assets)
+        # CloudFront distributions are global — only probe when scanning us-east-1
+        # so a multi-region scan doesn't attribute the same distribution to
+        # every region.
+        if self.region == 'us-east-1':
+            self._collectCloudFrontCoverage(assets)
+        self._collectAppSyncCoverage(assets)
+        self._collectCognitoCoverage(assets)
+
+        self._regionAssets = assets
+        return assets
+
+    def _collectIpSets(self, scope, assets):
+        try:
+            marker = None
+            while True:
+                kw = {'Scope': scope, 'Limit': 100}
+                if marker:
+                    kw['NextMarker'] = marker
+                resp = self.wafClient.list_ip_sets(**kw)
+                for s in resp.get('IPSets', []) or []:
+                    name, wid, arn = s.get('Name'), s.get('Id'), s.get('ARN')
+                    if not (name and wid and arn):
+                        continue
+                    try:
+                        d = self.wafClient.get_ip_set(Name=name, Id=wid, Scope=scope)
+                        ipset = d.get('IPSet') or {}
+                        assets['ipSets'][arn] = {
+                            'name': name,
+                            'scope': scope,
+                            'addresses': ipset.get('Addresses') or [],
+                        }
+                    except botocore.exceptions.ClientError as e:
+                        self._logClientError(f'get_ip_set({name})', e)
+                marker = resp.get('NextMarker')
+                if not marker:
+                    break
+        except botocore.exceptions.ClientError as e:
+            self._logClientError(f'list_ip_sets({scope})', e)
+
+    def _collectRegexPatternSets(self, scope, assets):
+        try:
+            marker = None
+            while True:
+                kw = {'Scope': scope, 'Limit': 100}
+                if marker:
+                    kw['NextMarker'] = marker
+                resp = self.wafClient.list_regex_pattern_sets(**kw)
+                for s in resp.get('RegexPatternSets', []) or []:
+                    name, wid, arn = s.get('Name'), s.get('Id'), s.get('ARN')
+                    if not (name and wid and arn):
+                        continue
+                    try:
+                        d = self.wafClient.get_regex_pattern_set(
+                            Name=name, Id=wid, Scope=scope
+                        )
+                        rps = d.get('RegexPatternSet') or {}
+                        assets['regexPatternSets'][arn] = {
+                            'name': name,
+                            'scope': scope,
+                            'patterns': rps.get('RegularExpressionList') or [],
+                        }
+                    except botocore.exceptions.ClientError as e:
+                        self._logClientError(f'get_regex_pattern_set({name})', e)
+                marker = resp.get('NextMarker')
+                if not marker:
+                    break
+        except botocore.exceptions.ClientError as e:
+            self._logClientError(f'list_regex_pattern_sets({scope})', e)
+
+    def _collectRuleGroups(self, scope, assets):
+        try:
+            marker = None
+            while True:
+                kw = {'Scope': scope, 'Limit': 100}
+                if marker:
+                    kw['NextMarker'] = marker
+                resp = self.wafClient.list_rule_groups(**kw)
+                for s in resp.get('RuleGroups', []) or []:
+                    name, wid, arn = s.get('Name'), s.get('Id'), s.get('ARN')
+                    if not (name and wid and arn):
+                        continue
+                    try:
+                        d = self.wafClient.get_rule_group(
+                            Name=name, Id=wid, Scope=scope
+                        )
+                        rg = d.get('RuleGroup') or {}
+                        assets['ruleGroups'][arn] = {
+                            'name': name,
+                            'scope': scope,
+                            'ruleCount': len(rg.get('Rules') or []),
+                            'description': rg.get('Description', ''),
+                        }
+                    except botocore.exceptions.ClientError as e:
+                        self._logClientError(f'get_rule_group({name})', e)
+                marker = resp.get('NextMarker')
+                if not marker:
+                    break
+        except botocore.exceptions.ClientError as e:
+            self._logClientError(f'list_rule_groups({scope})', e)
+
+    def _collectAlbCoverage(self, assets):
+        """Enumerate ALBs + probe each for WebACL association."""
+        try:
+            paginator = self.elbClient.get_paginator('describe_load_balancers')
+            for page in paginator.paginate():
+                for lb in page.get('LoadBalancers', []) or []:
+                    if lb.get('Type') != 'application':
+                        continue
+                    arn = lb.get('LoadBalancerArn')
+                    if not arn:
+                        continue
+                    protected = self._probeAssociation(arn)
+                    assets['crossService']['alb'].append({
+                        'arn': arn,
+                        'name': lb.get('LoadBalancerName', arn),
+                        'scheme': lb.get('Scheme', 'unknown'),
+                        'protected': protected,
+                    })
+        except botocore.exceptions.ClientError as e:
+            self._logClientError('elbv2.describe_load_balancers', e)
+        except botocore.exceptions.EndpointConnectionError:
+            pass
+
+    def _collectApiGatewayCoverage(self, assets):
+        """REST APIs only — HTTP APIs (v2) use a different WAF mechanism."""
+        try:
+            marker = None
+            while True:
+                kw = {'limit': 500}
+                if marker:
+                    kw['position'] = marker
+                resp = self.apigwClient.get_rest_apis(**kw)
+                for api in resp.get('items', []) or []:
+                    api_id = api.get('id')
+                    if not api_id:
+                        continue
+                    try:
+                        stages_resp = self.apigwClient.get_stages(restApiId=api_id)
+                        stages = stages_resp.get('item', []) or []
+                    except botocore.exceptions.ClientError:
+                        stages = []
+                    for stage in stages:
+                        stage_name = stage.get('stageName')
+                        if not stage_name:
+                            continue
+                        # Construct the WAF resource ARN for the stage
+                        arn = (f"arn:aws:apigateway:{self.region}::/restapis/"
+                               f"{api_id}/stages/{stage_name}")
+                        protected = self._probeAssociation(arn)
+                        assets['crossService']['apiGateway'].append({
+                            'arn': arn,
+                            'name': f"{api.get('name', api_id)}/{stage_name}",
+                            'protected': protected,
+                        })
+                marker = resp.get('position')
+                if not marker:
+                    break
+        except botocore.exceptions.ClientError as e:
+            self._logClientError('apigateway.get_rest_apis', e)
+        except botocore.exceptions.EndpointConnectionError:
+            pass
+
+    def _collectCloudFrontCoverage(self, assets):
+        """Every CloudFront distribution — check DistributionConfig.WebACLId."""
+        try:
+            marker = None
+            while True:
+                kw = {}
+                if marker:
+                    kw['Marker'] = marker
+                resp = self.cfClient.list_distributions(**kw)
+                dl = resp.get('DistributionList') or {}
+                for item in dl.get('Items', []) or []:
+                    dist_id = item.get('Id')
+                    arn = item.get('ARN')
+                    if not (dist_id and arn):
+                        continue
+                    web_acl_id = item.get('WebACLId') or ''
+                    assets['crossService']['cloudfront'].append({
+                        'id': dist_id,
+                        'arn': arn,
+                        'protected': bool(web_acl_id),
+                    })
+                if dl.get('IsTruncated'):
+                    marker = dl.get('NextMarker')
+                    if not marker:
+                        break
+                else:
+                    break
+        except botocore.exceptions.ClientError as e:
+            self._logClientError('cloudfront.list_distributions', e)
+
+    def _collectAppSyncCoverage(self, assets):
+        """AppSync GraphQL APIs — WafWebAclArn is the association attribute."""
+        try:
+            token = None
+            while True:
+                kw = {}
+                if token:
+                    kw['nextToken'] = token
+                resp = self.appsyncClient.list_graphql_apis(**kw)
+                for api in resp.get('graphqlApis', []) or []:
+                    arn = api.get('arn')
+                    if not arn:
+                        continue
+                    protected = bool(api.get('wafWebAclArn'))
+                    assets['crossService']['appsync'].append({
+                        'arn': arn,
+                        'name': api.get('name', arn),
+                        'authType': api.get('authenticationType', 'UNKNOWN'),
+                        'protected': protected,
+                    })
+                token = resp.get('nextToken')
+                if not token:
+                    break
+        except botocore.exceptions.ClientError as e:
+            self._logClientError('appsync.list_graphql_apis', e)
+        except botocore.exceptions.EndpointConnectionError:
+            pass
+
+    def _collectCognitoCoverage(self, assets):
+        """Cognito user pools — probe each pool ARN for WebACL association."""
+        try:
+            paginator = self.cognitoClient.get_paginator('list_user_pools')
+            for page in paginator.paginate(MaxResults=60):
+                for pool in page.get('UserPools', []) or []:
+                    pool_id = pool.get('Id')
+                    if not pool_id:
+                        continue
+                    arn = (f"arn:aws:cognito-idp:{self.region}:"
+                           f"{self._currentAccount()}:userpool/{pool_id}")
+                    protected = self._probeAssociation(arn)
+                    assets['crossService']['cognito'].append({
+                        'arn': arn,
+                        'id': pool_id,
+                        'name': pool.get('Name', pool_id),
+                        'protected': protected,
+                    })
+        except botocore.exceptions.ClientError as e:
+            self._logClientError('cognito-idp.list_user_pools', e)
+
+    def _probeAssociation(self, resource_arn):
+        """Return True if a WebACL is associated with the given resource, False otherwise."""
+        try:
+            resp = self.wafClient.get_web_acl_for_resource(ResourceArn=resource_arn)
+            wac = resp.get('WebACL') or {}
+            return bool(wac.get('ARN'))
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', '')
+            if code == 'WAFNonexistentItemException':
+                return False
+            # Any other error — treat as "unknown" (assume protected to avoid
+            # false-positive floods; the association is really just "we don't know").
+            return True
+
+    def _currentAccount(self):
+        from utils.Config import Config
+        info = Config.get('stsInfo', {})
+        if isinstance(info, dict):
+            return info.get('Account', '')
+        return ''
 
     # ------------------------------------------------------------------ #
     # Advise

@@ -93,7 +93,8 @@
                 "bedrock.bedrockGuardrailNoPiiDetection",
                 "wafv2.wafv2RulesInCountMode",
                 "sns.snsNoDataProtectionPolicy",
-                "sns.snsPolicyOverlyBroadActions"
+                "sns.snsPolicyOverlyBroadActions",
+                "stepfunctions.sfnIAMRoleAllowsPassRole"
             ],
             "BP03": [
                 "bedrock.bedrockGuardrailNoGroundingFilter"
@@ -132,10 +133,13 @@
                 "cognito.cognitoCompromisedCredentialProtection",
                 "cognito.cognitoClientImplicitGrantEnabled",
                 "cognito.cognitoClientHttpCallbackUrl",
-                "cognito.cognitoAccountTakeoverProtectionWeak"
+                "cognito.cognitoAccountTakeoverProtectionWeak",
+                "cognito.cognitoCompromisedCredentialIncompleteFilter",
+                "cognito.cognitoGroupOverlyPermissiveRole"
             ],
             "BP02": [
-                "bedrock.bedrockKBRoleOverprivileged"
+                "bedrock.bedrockKBRoleOverprivileged",
+                "cognito.cognitoCustomAuthThreatProtectionDisabled"
             ]
         },
         "AGENTSEC04": {
@@ -172,7 +176,10 @@
                 "wafv2.wafv2NoSqlInjectionProtection",
                 "wafv2.wafv2ManagedRuleGroupAllCountOverride",
                 "wafv2.wafv2NoCoreRuleSet",
-                "wafv2.wafv2AllowRuleBeforeManagedRules"
+                "wafv2.wafv2AllowRuleBeforeManagedRules",
+                "wafv2.wafv2AlbWithoutWebAcl",
+                "wafv2.wafv2ApiGatewayWithoutWebAcl",
+                "wafv2.wafv2CloudFrontWithoutWebAcl"
             ],
             "BP02": [
                 "bedrock.bedrockGuardrailNoWordFilter",

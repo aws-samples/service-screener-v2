@@ -784,3 +784,148 @@ class StepfunctionsCommon(Evaluator):
                     sub_states = sub.get('States') or {}
                     reachable.update(sub_states.keys())
         return set(states.keys()) - reachable
+
+    # ==================================================================== #
+    # Phase 2 additions (checks 25-28)
+    # ==================================================================== #
+
+    # ------------------------------------------------------------------ #
+    # 25. Execution role grants iam:PassRole on a wildcard resource
+    # ------------------------------------------------------------------ #
+    def _checkSfnIAMRoleAllowsPassRole(self):
+        role_arn = self.sm.get('roleArn')
+        if not role_arn:
+            self.results['sfnIAMRoleAllowsPassRole'] = [
+                0, "No execution role to inspect"
+            ]
+            return
+        docs = self.sm.get('_rolePolicies') or []
+        if not docs:
+            self.results['sfnIAMRoleAllowsPassRole'] = [
+                0, "Role policies not available (cross-account or lookup failed)"
+            ]
+            return
+
+        offenders = []
+        for i, doc in enumerate(docs):
+            stmts = doc.get('Statement', [])
+            if isinstance(stmts, dict):
+                stmts = [stmts]
+            for stmt in stmts:
+                if not isinstance(stmt, dict) or stmt.get('Effect') != 'Allow':
+                    continue
+                actions = stmt.get('Action', [])
+                if isinstance(actions, str):
+                    actions = [actions]
+                actset = {a.lower() for a in actions if isinstance(a, str)}
+                if 'iam:passrole' not in actset and '*' not in actset:
+                    continue
+                resources = stmt.get('Resource', [])
+                if isinstance(resources, str):
+                    resources = [resources]
+                if '*' in resources or any('role/*' in r for r in resources if isinstance(r, str)):
+                    offenders.append(stmt.get('Sid', f'stmt{i}'))
+                    break
+
+        if offenders:
+            self.results['sfnIAMRoleAllowsPassRole'] = [
+                -1,
+                f"Role policy grants iam:PassRole on wildcard Resource: "
+                f"{', '.join(offenders[:3])}"
+            ]
+        else:
+            self.results['sfnIAMRoleAllowsPassRole'] = [
+                1, "No iam:PassRole with wildcard Resource found"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 26. No CloudWatch alarms on failure metrics
+    # ------------------------------------------------------------------ #
+    def _checkSfnNoCloudWatchAlarm(self):
+        status = self.sm.get('_hasFailureAlarms')
+        if status is None:
+            self.results['sfnNoCloudWatchAlarm'] = [
+                0, "Could not enumerate CloudWatch alarms (permission?)"
+            ]
+        elif status is True:
+            self.results['sfnNoCloudWatchAlarm'] = [
+                1, "At least one alarm on ExecutionsFailed/TimedOut/Aborted"
+            ]
+        else:
+            self.results['sfnNoCloudWatchAlarm'] = [
+                -1,
+                "No CloudWatch alarms on ExecutionsFailed / ExecutionsTimedOut / "
+                "ExecutionsAborted for this state machine"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 27. Execution data logged but state machine not CMK-encrypted
+    # ------------------------------------------------------------------ #
+    def _checkSfnLoggingWithoutEncryption(self):
+        log_cfg = self.sm.get('loggingConfiguration') or {}
+        enc_cfg = self.sm.get('encryptionConfiguration') or {}
+        includes_data = bool(log_cfg.get('includeExecutionData'))
+        is_cmk = enc_cfg.get('type') == 'CUSTOMER_MANAGED_KMS_KEY'
+
+        if not includes_data:
+            self.results['sfnLoggingWithoutEncryption'] = [
+                0, "includeExecutionData=false — data not written to logs"
+            ]
+        elif is_cmk:
+            self.results['sfnLoggingWithoutEncryption'] = [
+                1, "Execution data logged with CMK protection"
+            ]
+        else:
+            self.results['sfnLoggingWithoutEncryption'] = [
+                -1,
+                "includeExecutionData=true with AWS_OWNED_KEY encryption "
+                "(sensitive payloads logged without customer-managed key)"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 28. http:invoke Task with plain HTTP endpoint
+    # ------------------------------------------------------------------ #
+    def _checkSfnHttpTaskNoTLS(self):
+        if self._definition is None:
+            self.results['sfnHttpTaskNoTLS'] = [
+                0, "Could not parse state machine definition"
+            ]
+            return
+
+        http_offenders = []
+        dynamic_endpoints = 0
+        http_task_count = 0
+        for fq, s in self._iterStates(self._definition):
+            if s.get('Type') != 'Task':
+                continue
+            resource = s.get('Resource') or ''
+            if 'http:invoke' not in resource:
+                continue
+            http_task_count += 1
+            params = s.get('Parameters') or {}
+            static_endpoint = params.get('ApiEndpoint')
+            if static_endpoint and isinstance(static_endpoint, str):
+                if static_endpoint.lower().startswith('http://'):
+                    http_offenders.append(f"{fq}({static_endpoint})")
+            elif 'ApiEndpoint.$' in params:
+                dynamic_endpoints += 1
+
+        if http_task_count == 0:
+            self.results['sfnHttpTaskNoTLS'] = [
+                1, "No http:invoke Task states"
+            ]
+        elif http_offenders:
+            self.results['sfnHttpTaskNoTLS'] = [
+                -1,
+                f"http:invoke Task(s) with http:// endpoint: {', '.join(http_offenders[:3])}"
+            ]
+        elif dynamic_endpoints:
+            self.results['sfnHttpTaskNoTLS'] = [
+                0,
+                f"{dynamic_endpoints} http:invoke Task(s) use dynamic ApiEndpoint.$ "
+                "(cannot verify scheme statically)"
+            ]
+        else:
+            self.results['sfnHttpTaskNoTLS'] = [
+                1, f"All {http_task_count} http:invoke Task(s) use https:// endpoints"
+            ]

@@ -704,3 +704,122 @@ class SnsCommon(Evaluator):
             except (ValueError, TypeError):
                 return None
         return None
+
+    # ==================================================================== #
+    # Phase 2 additions (checks 20-23)
+    # ==================================================================== #
+
+    # ------------------------------------------------------------------ #
+    # 20. FIFO topic without content-based deduplication
+    # ------------------------------------------------------------------ #
+    def _checkSnsFifoContentDeduplicationDisabled(self):
+        if not self.topic.get('_isFifo'):
+            self.results['snsFifoContentDeduplicationDisabled'] = [
+                0, "Not a FIFO topic"
+            ]
+            return
+        cbd = str(self.attrs.get('ContentBasedDeduplication', 'false')).lower()
+        if cbd == 'true':
+            self.results['snsFifoContentDeduplicationDisabled'] = [
+                1, "ContentBasedDeduplication=true"
+            ]
+        else:
+            self.results['snsFifoContentDeduplicationDisabled'] = [
+                0,
+                "FIFO topic without ContentBasedDeduplication — publishers must "
+                "supply MessageDeduplicationId on every Publish (advisory)"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 21. SMS account-level spend limit unset
+    #
+    # This is an account-level finding. To avoid emitting the same FAIL on
+    # every topic in the region, we only surface it on the first topic
+    # discovered. Non-first topics report INFO deferring to it.
+    #
+    # We can't easily identify "the first topic" from within a driver
+    # instance — the driver is per-topic. Instead we check whether ANY
+    # subscription on the topic uses SMS; if so we surface the finding.
+    # If no topic in the account has SMS subs, the check reports INFO for
+    # every topic.
+    # ------------------------------------------------------------------ #
+    def _checkSnsSmsNoSpendLimit(self):
+        sms_attrs = self.topic.get('_smsAttributes') or {}
+        has_sms_sub = any(
+            (s.get('Protocol') == 'sms') for s in self.subscriptions
+        )
+
+        # The MonthlySpendLimit is returned as a string USD value. Missing key
+        # = unlimited (account default). Some new accounts hard-cap at $1.
+        limit_raw = sms_attrs.get('MonthlySpendLimit')
+        try:
+            limit = int(limit_raw) if limit_raw not in (None, '') else None
+        except (TypeError, ValueError):
+            limit = None
+
+        if not has_sms_sub:
+            self.results['snsSmsNoSpendLimit'] = [
+                0, "No SMS subscriptions on this topic"
+            ]
+            return
+
+        if limit is None:
+            self.results['snsSmsNoSpendLimit'] = [
+                -1,
+                "No account-level MonthlySpendLimit set for SMS (SMS-pumping risk)"
+            ]
+        elif limit >= 1000:
+            self.results['snsSmsNoSpendLimit'] = [
+                -1,
+                f"MonthlySpendLimit=${limit} is above the conservative $1000 threshold"
+            ]
+        else:
+            self.results['snsSmsNoSpendLimit'] = [
+                1, f"MonthlySpendLimit=${limit}"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 22. Topic policy uses deprecated 2008-10-17 version
+    # ------------------------------------------------------------------ #
+    def _checkSnsPolicyVersionOutdated(self):
+        if self._policy is None:
+            self.results['snsPolicyVersionOutdated'] = [
+                0, "No topic policy present"
+            ]
+            return
+        version = self._policy.get('Version')
+        if version == '2012-10-17':
+            self.results['snsPolicyVersionOutdated'] = [
+                1, "Policy Version=2012-10-17"
+            ]
+        elif version == '2008-10-17':
+            self.results['snsPolicyVersionOutdated'] = [
+                -1,
+                "Policy Version=2008-10-17 (deprecated; lacks policy variables)"
+            ]
+        else:
+            # No Version → AWS treats as 2008-10-17 for backward-compat
+            self.results['snsPolicyVersionOutdated'] = [
+                -1,
+                f"Policy Version missing/unknown ({version!r}) — treated as 2008-10-17"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 23. FIFO topic without ArchivePolicy
+    # ------------------------------------------------------------------ #
+    def _checkSnsFifoNoArchivePolicy(self):
+        if not self.topic.get('_isFifo'):
+            self.results['snsFifoNoArchivePolicy'] = [
+                0, "Not a FIFO topic"
+            ]
+            return
+        archive = self.attrs.get('ArchivePolicy')
+        if archive:
+            self.results['snsFifoNoArchivePolicy'] = [
+                1, "ArchivePolicy configured"
+            ]
+        else:
+            self.results['snsFifoNoArchivePolicy'] = [
+                0,
+                "FIFO topic without ArchivePolicy — no replay capability (advisory)"
+            ]

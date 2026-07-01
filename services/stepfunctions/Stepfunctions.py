@@ -29,6 +29,8 @@ class Stepfunctions(Service):
         self.iamClient = ssBoto.client('iam', config=self.bConfig)
         # CloudWatch Logs client for log-group existence probe (check #24).
         self.logsClient = ssBoto.client('logs', config=self.bConfig)
+        # CloudWatch client for alarm coverage check (#26).
+        self.cwClient = ssBoto.client('cloudwatch', config=self.bConfig)
 
     # ------------------------------------------------------------------ #
     # Discovery
@@ -60,6 +62,8 @@ class Stepfunctions(Service):
                     detail['_roleExists'] = self._roleExistsFor(detail.get('roleArn'))
                     detail['_logGroupExists'] = self._logGroupExistsFor(detail)
                     detail['_currentAccount'] = self._currentAccount()
+                    detail['_rolePolicies'] = self._fetchRolePolicies(detail.get('roleArn'))
+                    detail['_hasFailureAlarms'] = self._hasFailureAlarms(arn)
 
                     _pi('Stepfunctions', f"State machine: {detail.get('name', arn)}")
                     stateMachines.append(detail)
@@ -197,6 +201,83 @@ class Stepfunctions(Service):
         if isinstance(info, dict):
             return info.get('Account')
         return None
+
+    def _fetchRolePolicies(self, roleArn):
+        """Return a list of policy documents (parsed JSON) attached to the SM's role.
+        Same-account only; cross-account or missing roles → empty list."""
+        import json as _json
+        if not roleArn or ':role/' not in roleArn:
+            return []
+        parts = roleArn.split(':')
+        if len(parts) >= 5:
+            acct = parts[4]
+            me = self._currentAccount()
+            if me and acct and acct != me:
+                return []
+        roleName = roleArn.split(':role/', 1)[1].split('/')[-1]
+        docs = []
+        try:
+            inline = self.iamClient.list_role_policies(RoleName=roleName)
+            for policyName in inline.get('PolicyNames', []) or []:
+                try:
+                    p = self.iamClient.get_role_policy(
+                        RoleName=roleName, PolicyName=policyName
+                    )
+                    doc = p.get('PolicyDocument')
+                    if isinstance(doc, str):
+                        try: doc = _json.loads(doc)
+                        except (ValueError, TypeError): doc = None
+                    if isinstance(doc, dict):
+                        docs.append(doc)
+                except botocore.exceptions.ClientError:
+                    continue
+            attached = self.iamClient.list_attached_role_policies(RoleName=roleName)
+            for p in attached.get('AttachedPolicies', []) or []:
+                arn = p.get('PolicyArn')
+                if not arn:
+                    continue
+                try:
+                    pol = self.iamClient.get_policy(PolicyArn=arn)
+                    versionId = (pol.get('Policy') or {}).get('DefaultVersionId')
+                    if not versionId:
+                        continue
+                    ver = self.iamClient.get_policy_version(
+                        PolicyArn=arn, VersionId=versionId
+                    )
+                    doc = (ver.get('PolicyVersion') or {}).get('Document')
+                    if isinstance(doc, str):
+                        try: doc = _json.loads(doc)
+                        except (ValueError, TypeError): doc = None
+                    if isinstance(doc, dict):
+                        docs.append(doc)
+                except botocore.exceptions.ClientError:
+                    continue
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', '')
+            if code not in ('AccessDenied', 'AccessDeniedException',
+                            'NoSuchEntity', 'NoSuchEntityException'):
+                self._logClientError(f'iam policy fetch for role {roleName}', e)
+        return docs
+
+    def _hasFailureAlarms(self, smArn):
+        """Return True if there's at least one CloudWatch alarm on any of the
+        failure-related SFN metrics (ExecutionsFailed, ExecutionsTimedOut,
+        ExecutionsAborted) whose Dimensions target this state machine."""
+        for metric in ('ExecutionsFailed', 'ExecutionsTimedOut', 'ExecutionsAborted'):
+            try:
+                resp = self.cwClient.describe_alarms_for_metric(
+                    MetricName=metric,
+                    Namespace='AWS/States',
+                    Dimensions=[{'Name': 'StateMachineArn', 'Value': smArn}],
+                )
+                if resp.get('MetricAlarms') or resp.get('CompositeAlarms'):
+                    return True
+            except botocore.exceptions.ClientError as e:
+                code = e.response.get('Error', {}).get('Code', '')
+                if code in ('AccessDenied', 'AccessDeniedException'):
+                    return None  # unknown — driver degrades to INFO
+                self._logClientError(f'cloudwatch.describe_alarms_for_metric({metric})', e)
+        return False
 
     # ------------------------------------------------------------------ #
     # Advise

@@ -248,5 +248,57 @@
         "ref": [
             "[SNS mobile push]<https://docs.aws.amazon.com/sns/latest/dg/sns-mobile-application-as-subscriber.html>"
         ]
+    },
+    "snsFifoContentDeduplicationDisabled": {
+        "category": "R",
+        "^description": "{$COUNT} SNS FIFO topic(s) have ContentBasedDeduplication=false. Publishers must supply a MessageDeduplicationId on every Publish — a common source of duplicate delivery when the id-generation logic is forgotten or wrong. Advisory only.",
+        "shortDesc": "Enable ContentBasedDeduplication on FIFO topics where content is naturally unique",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS FIFO topics]<https://docs.aws.amazon.com/sns/latest/dg/sns-fifo-topics.html>"
+        ]
+    },
+    "snsSmsNoSpendLimit": {
+        "category": "C",
+        "^description": "SNS account-level SMS spend limit (`MonthlySpendLimit`) is either unset or at the AWS default ceiling. SMS pumping attacks can rack up thousands of dollars in hours; a conservative account-level cap is the single most effective mitigation.",
+        "shortDesc": "Set SNS MonthlySpendLimit to a conservative cap",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS SMS attributes]<https://docs.aws.amazon.com/sns/latest/dg/sms_publish-to-phone.html>"
+        ]
+    },
+    "snsPolicyVersionOutdated": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) use the deprecated policy language version 2008-10-17 instead of 2012-10-17. The older version lacks policy variables (e.g., ${aws:username}) and has different evaluation semantics for some conditions — a subtle but real security concern.",
+        "shortDesc": "Update topic policies to Version 2012-10-17",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[IAM policy versions]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_version.html>"
+        ]
+    },
+    "snsFifoNoArchivePolicy": {
+        "category": "R",
+        "^description": "{$COUNT} SNS FIFO topic(s) have no ArchivePolicy configured. Without an archive, messages published to the topic cannot be replayed for disaster recovery or downstream re-processing. Advisory only.",
+        "shortDesc": "Configure an ArchivePolicy on FIFO topics used for durable pipelines",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS message archive & replay]<https://docs.aws.amazon.com/sns/latest/dg/message-archiving-and-replay.html>"
+        ]
     }
 }

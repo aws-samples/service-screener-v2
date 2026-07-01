@@ -26,6 +26,8 @@ class Sns(Service):
         ssBoto = self.ssBoto
         self.snsClient = ssBoto.client('sns', config=self.bConfig)
         self._platformAppsCache = None
+        # SMS attributes are account-level; cache once per region.
+        self._smsAttributesCache = None
 
     # ------------------------------------------------------------------ #
     # Discovery
@@ -75,8 +77,29 @@ class Sns(Service):
             '_dataProtectionPolicy': self._getDataProtectionPolicy(arn),
             '_platformApps': self._listPlatformApps(),
             '_currentAccount': self._currentAccount(),
+            '_smsAttributes': self._getSmsAttributes(),
+            '_isFifo': arn.endswith('.fifo') or str(attrs.get('FifoTopic', 'false')).lower() == 'true',
         }
         return detail
+
+    def _getSmsAttributes(self):
+        """Fetch account-level SMS attributes once per region."""
+        if self._smsAttributesCache is not None:
+            return self._smsAttributesCache
+        attrs = {}
+        try:
+            resp = self.snsClient.get_sms_attributes()
+            attrs = resp.get('attributes', {}) or {}
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', '')
+            # Region may not support SMS at all
+            if code not in ('AccessDenied', 'AccessDeniedException',
+                            'AuthorizationError', 'InvalidAction'):
+                self._logClientError('get_sms_attributes', e)
+        except botocore.exceptions.EndpointConnectionError:
+            pass
+        self._smsAttributesCache = attrs
+        return attrs
 
     def _currentAccount(self):
         from utils.Config import Config

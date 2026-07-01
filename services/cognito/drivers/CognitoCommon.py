@@ -716,3 +716,353 @@ class CognitoCommon(Evaluator):
             self.results['cognitoIdpHttpMetadataUrl'] = [
                 1, f"All {len(providers)} identity provider(s) use https metadata"
             ]
+
+    # ==================================================================== #
+    # Phase 2 additions (checks 28-37)
+    # ==================================================================== #
+
+    # ------------------------------------------------------------------ #
+    # 28. Compromised-credentials event filter incomplete
+    # ------------------------------------------------------------------ #
+    REQUIRED_CC_EVENT_TYPES = {'SIGN_IN', 'SIGN_UP', 'PASSWORD_CHANGE'}
+
+    def _checkCognitoCompromisedCredentialIncompleteFilter(self):
+        add_ons = self.pool.get('UserPoolAddOns') or {}
+        adv_mode = add_ons.get('AdvancedSecurityMode', 'OFF')
+        if adv_mode == 'OFF':
+            self.results['cognitoCompromisedCredentialIncompleteFilter'] = [
+                0, "Advanced Security is OFF — see cognitoAdvancedSecurityNotEnforced"
+            ]
+            return
+
+        risk = self.pool.get('_riskConfiguration')
+        if not risk:
+            self.results['cognitoCompromisedCredentialIncompleteFilter'] = [
+                0, "No RiskConfiguration set"
+            ]
+            return
+
+        cc = risk.get('CompromisedCredentialsRiskConfiguration') or {}
+        actions = cc.get('Actions') or {}
+        event_action = actions.get('EventAction')
+        if not event_action:
+            self.results['cognitoCompromisedCredentialIncompleteFilter'] = [
+                0, "CompromisedCredentials risk config not enabled"
+            ]
+            return
+
+        event_filter = set(cc.get('EventFilter') or [])
+        missing = self.REQUIRED_CC_EVENT_TYPES - event_filter
+        if not event_filter:
+            # Empty EventFilter is treated by Cognito as "all event types"
+            self.results['cognitoCompromisedCredentialIncompleteFilter'] = [
+                1, "EventFilter empty (all event types covered)"
+            ]
+        elif missing:
+            self.results['cognitoCompromisedCredentialIncompleteFilter'] = [
+                -1,
+                f"CompromisedCredentials EventFilter missing: {', '.join(sorted(missing))}"
+            ]
+        else:
+            self.results['cognitoCompromisedCredentialIncompleteFilter'] = [
+                1, "EventFilter covers SIGN_IN, SIGN_UP, and PASSWORD_CHANGE"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 29. No LogDelivery for userAuthEvents
+    # ------------------------------------------------------------------ #
+    def _checkCognitoNoThreatProtectionLogging(self):
+        add_ons = self.pool.get('UserPoolAddOns') or {}
+        mode = add_ons.get('AdvancedSecurityMode', 'OFF')
+        if mode == 'OFF':
+            self.results['cognitoNoThreatProtectionLogging'] = [
+                0, "Advanced Security OFF — no threat events to log"
+            ]
+            return
+
+        cfg = self.pool.get('_logConfig') or {}
+        entries = cfg.get('LogConfigurations') or []
+        has_auth = any(e.get('EventSource') == 'userAuthEvents' for e in entries)
+        if has_auth:
+            self.results['cognitoNoThreatProtectionLogging'] = [
+                1, "LogDelivery configured for userAuthEvents"
+            ]
+        else:
+            self.results['cognitoNoThreatProtectionLogging'] = [
+                -1,
+                f"AdvancedSecurityMode={mode} but no LogDelivery entry for userAuthEvents"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 30. Temporary password validity too long
+    # ------------------------------------------------------------------ #
+    TEMP_PASSWORD_MAX_DAYS = 7
+
+    def _checkCognitoLongTemporaryPassword(self):
+        policies = self.pool.get('Policies') or {}
+        pw = policies.get('PasswordPolicy') or {}
+        val = pw.get('TemporaryPasswordValidityDays')
+        try:
+            days = int(val) if val is not None else 7
+        except (TypeError, ValueError):
+            self.results['cognitoLongTemporaryPassword'] = [
+                0, f"TemporaryPasswordValidityDays unparseable: {val}"
+            ]
+            return
+        if days > self.TEMP_PASSWORD_MAX_DAYS:
+            self.results['cognitoLongTemporaryPassword'] = [
+                -1,
+                f"TemporaryPasswordValidityDays={days} (> {self.TEMP_PASSWORD_MAX_DAYS})"
+            ]
+        else:
+            self.results['cognitoLongTemporaryPassword'] = [
+                1, f"TemporaryPasswordValidityDays={days}"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 31. Confidential app client without ClientSecret
+    # ------------------------------------------------------------------ #
+    def _checkCognitoClientNoSecret(self):
+        clients = self._appClients()
+        if not clients:
+            self.results['cognitoClientNoSecret'] = [0, "No app clients"]
+            return
+        offenders = []
+        confidential = 0
+        for c in clients:
+            flows = [f.lower() for f in (c.get('AllowedOAuthFlows') or [])]
+            # "client_credentials" flow is machine-to-machine and REQUIRES a secret.
+            if 'client_credentials' not in flows:
+                continue
+            confidential += 1
+            if not c.get('ClientSecret'):
+                offenders.append(self._clientLabel(c))
+        if confidential == 0:
+            self.results['cognitoClientNoSecret'] = [
+                0, "No confidential (client_credentials) app clients"
+            ]
+        elif offenders:
+            self.results['cognitoClientNoSecret'] = [
+                -1,
+                f"Confidential app client(s) without ClientSecret: "
+                f"{', '.join(offenders[:5])}"
+            ]
+        else:
+            self.results['cognitoClientNoSecret'] = [
+                1, f"All {confidential} confidential app client(s) have a ClientSecret"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 32. App client with excessive OAuth scopes
+    # ------------------------------------------------------------------ #
+    EXCESSIVE_SCOPE = 'aws.cognito.signin.user.admin'
+
+    def _checkCognitoClientExcessiveScopes(self):
+        clients = self._appClients()
+        if not clients:
+            self.results['cognitoClientExcessiveScopes'] = [0, "No app clients"]
+            return
+        offenders = []
+        for c in clients:
+            if not c.get('AllowedOAuthFlowsUserPoolClient'):
+                continue
+            if self.EXCESSIVE_SCOPE in (c.get('AllowedOAuthScopes') or []):
+                offenders.append(self._clientLabel(c))
+        if offenders:
+            self.results['cognitoClientExcessiveScopes'] = [
+                0,
+                f"App client(s) granting {self.EXCESSIVE_SCOPE}: "
+                f"{', '.join(offenders[:5])} (advisory)"
+            ]
+        else:
+            self.results['cognitoClientExcessiveScopes'] = [
+                1, f"No OAuth app clients grant {self.EXCESSIVE_SCOPE}"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 33. MFA required but no methods configured
+    # ------------------------------------------------------------------ #
+    def _checkCognitoNoMfaMethods(self):
+        mfa = self.pool.get('MfaConfiguration', 'OFF')
+        if mfa != 'ON':
+            self.results['cognitoNoMfaMethods'] = [
+                0, f"MfaConfiguration={mfa} — see cognitoMfaNotEnforced"
+            ]
+            return
+
+        sms_cfg = self.pool.get('SmsConfiguration') or {}
+        sms_ok = bool(sms_cfg.get('SnsCallerArn'))
+        totp_cfg = self.pool.get('SoftwareTokenMfaConfiguration') or {}
+        totp_ok = bool(totp_cfg.get('Enabled'))
+
+        if sms_ok or totp_ok:
+            methods = []
+            if sms_ok:  methods.append('SMS')
+            if totp_ok: methods.append('TOTP')
+            self.results['cognitoNoMfaMethods'] = [
+                1, f"MFA method(s) configured: {', '.join(methods)}"
+            ]
+        else:
+            self.results['cognitoNoMfaMethods'] = [
+                -1,
+                "MfaConfiguration=ON but neither SMS nor TOTP MFA is configured"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 34. SMS-only MFA (no TOTP)
+    # ------------------------------------------------------------------ #
+    def _checkCognitoSmsOnlyMfa(self):
+        mfa = self.pool.get('MfaConfiguration', 'OFF')
+        if mfa == 'OFF':
+            self.results['cognitoSmsOnlyMfa'] = [0, "MFA is OFF"]
+            return
+        sms_cfg = self.pool.get('SmsConfiguration') or {}
+        sms_ok = bool(sms_cfg.get('SnsCallerArn'))
+        totp_cfg = self.pool.get('SoftwareTokenMfaConfiguration') or {}
+        totp_ok = bool(totp_cfg.get('Enabled'))
+        if sms_ok and not totp_ok:
+            self.results['cognitoSmsOnlyMfa'] = [
+                0, "SMS MFA only (TOTP not enabled — advisory)"
+            ]
+        else:
+            self.results['cognitoSmsOnlyMfa'] = [
+                1, "TOTP MFA available (or MFA not configured)"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 35. AccountTakeover risk actions do not notify users
+    # ------------------------------------------------------------------ #
+    def _checkCognitoAccountTakeoverNoNotification(self):
+        add_ons = self.pool.get('UserPoolAddOns') or {}
+        mode = add_ons.get('AdvancedSecurityMode', 'OFF')
+        if mode == 'OFF':
+            self.results['cognitoAccountTakeoverNoNotification'] = [
+                0, "Advanced Security OFF"
+            ]
+            return
+        risk = self.pool.get('_riskConfiguration')
+        if not risk:
+            self.results['cognitoAccountTakeoverNoNotification'] = [
+                0, "No RiskConfiguration"
+            ]
+            return
+        ato = risk.get('AccountTakeoverRiskConfiguration') or {}
+        actions = ato.get('Actions') or {}
+        high = actions.get('HighAction') or {}
+        medium = actions.get('MediumAction') or {}
+        # If neither High nor Medium is configured, skip.
+        if not (high or medium):
+            self.results['cognitoAccountTakeoverNoNotification'] = [
+                0, "No High/Medium risk actions configured"
+            ]
+            return
+        no_notify = []
+        if high and not high.get('Notify', False):
+            no_notify.append('HighAction')
+        if medium and not medium.get('Notify', False):
+            no_notify.append('MediumAction')
+        if no_notify:
+            self.results['cognitoAccountTakeoverNoNotification'] = [
+                0,
+                f"Risk actions without user notification: {', '.join(no_notify)} (advisory)"
+            ]
+        else:
+            self.results['cognitoAccountTakeoverNoNotification'] = [
+                1, "Configured risk actions notify users"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 36. User pool group's IAM role is overly permissive
+    # ------------------------------------------------------------------ #
+    BROAD_GROUP_ACTIONS = {'*', 'iam:*', 's3:*', 'kms:*', 'dynamodb:*'}
+
+    def _checkCognitoGroupOverlyPermissiveRole(self):
+        groups = self.pool.get('_groups') or []
+        if not groups:
+            self.results['cognitoGroupOverlyPermissiveRole'] = [
+                0, "No user-pool groups"
+            ]
+            return
+
+        offenders = []
+        cross_account = []
+        for g in groups:
+            role_arn = g.get('RoleArn')
+            if not role_arn:
+                continue
+            name = g.get('GroupName', '?')
+            if g.get('_crossAccount'):
+                cross_account.append(name)
+                continue
+            for doc in g.get('_rolePolicies') or []:
+                if self._statementIsBroad(doc):
+                    offenders.append(name)
+                    break
+
+        if offenders:
+            msg = f"Overly permissive group role(s): {', '.join(sorted(set(offenders))[:5])}"
+            if cross_account:
+                msg += f" (skipped {len(cross_account)} cross-account role(s))"
+            self.results['cognitoGroupOverlyPermissiveRole'] = [-1, msg]
+        elif cross_account:
+            self.results['cognitoGroupOverlyPermissiveRole'] = [
+                0,
+                f"{len(cross_account)} group role(s) belong to another account and were not evaluated"
+            ]
+        else:
+            self.results['cognitoGroupOverlyPermissiveRole'] = [
+                1, "All group roles evaluated appear scoped"
+            ]
+
+    @classmethod
+    def _statementIsBroad(cls, policy_doc):
+        """True if the policy has a wildcard-action statement or a broad-action + wildcard-resource pair."""
+        if not isinstance(policy_doc, dict):
+            return False
+        stmts = policy_doc.get('Statement', [])
+        if isinstance(stmts, dict):
+            stmts = [stmts]
+        for stmt in stmts:
+            if not isinstance(stmt, dict) or stmt.get('Effect') != 'Allow':
+                continue
+            actions = stmt.get('Action', [])
+            if isinstance(actions, str):
+                actions = [actions]
+            resources = stmt.get('Resource', [])
+            if isinstance(resources, str):
+                resources = [resources]
+            actset = {a.lower() for a in actions if isinstance(a, str)}
+            if '*' in actset:
+                return True
+            if '*' in resources and (actset & cls.BROAD_GROUP_ACTIONS):
+                return True
+        return False
+
+    # ------------------------------------------------------------------ #
+    # 37. Custom auth Lambda triggers configured without Advanced Security
+    # ------------------------------------------------------------------ #
+    CUSTOM_AUTH_TRIGGERS = (
+        'DefineAuthChallenge', 'CreateAuthChallenge', 'VerifyAuthChallengeResponse'
+    )
+
+    def _checkCognitoCustomAuthThreatProtectionDisabled(self):
+        lambda_cfg = self.pool.get('LambdaConfig') or {}
+        has_custom = any(lambda_cfg.get(t) for t in self.CUSTOM_AUTH_TRIGGERS)
+        if not has_custom:
+            self.results['cognitoCustomAuthThreatProtectionDisabled'] = [
+                0, "No custom-auth Lambda triggers configured"
+            ]
+            return
+        add_ons = self.pool.get('UserPoolAddOns') or {}
+        mode = add_ons.get('AdvancedSecurityMode', 'OFF')
+        if mode == 'ENFORCED':
+            self.results['cognitoCustomAuthThreatProtectionDisabled'] = [
+                1, "Custom-auth triggers configured with AdvancedSecurityMode=ENFORCED"
+            ]
+        else:
+            configured = [t for t in self.CUSTOM_AUTH_TRIGGERS if lambda_cfg.get(t)]
+            self.results['cognitoCustomAuthThreatProtectionDisabled'] = [
+                -1,
+                f"Custom-auth triggers ({', '.join(configured)}) with "
+                f"AdvancedSecurityMode={mode}"
+            ]

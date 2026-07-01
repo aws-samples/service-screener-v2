@@ -317,5 +317,57 @@
         "ref": [
             "[Step Functions execution logging]<https://docs.aws.amazon.com/step-functions/latest/dg/cw-logs.html>"
         ]
+    },
+    "sfnIAMRoleAllowsPassRole": {
+        "category": "S",
+        "^description": "{$COUNT} Step Functions state machine(s) have an execution role whose IAM policies grant `iam:PassRole` on Resource='*' (or on a broad wildcard). PassRole enables the workflow to assume ANY role in the account — a canonical privilege-escalation vector.",
+        "shortDesc": "Scope iam:PassRole to specific target role ARNs",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Restricting iam:PassRole]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_passrole.html>"
+        ]
+    },
+    "sfnNoCloudWatchAlarm": {
+        "category": "O",
+        "^description": "{$COUNT} Step Functions state machine(s) have no CloudWatch alarm on any of the standard failure metrics (ExecutionsFailed, ExecutionsTimedOut, ExecutionsAborted). Silent workflow failures go unnoticed until users complain.",
+        "shortDesc": "Alarm on ExecutionsFailed/TimedOut/Aborted per state machine",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Step Functions CloudWatch metrics]<https://docs.aws.amazon.com/step-functions/latest/dg/procedure-cw-metrics.html>"
+        ]
+    },
+    "sfnLoggingWithoutEncryption": {
+        "category": "S",
+        "^description": "{$COUNT} Step Functions state machine(s) log execution data (loggingConfiguration.includeExecutionData=true) while running under AWS-owned encryption (no customer-managed KMS key). Sensitive payloads flowing through the workflow are written to CloudWatch Logs but the state machine itself has no CMK for revocation/audit — treat the combination as a data-protection gap.",
+        "shortDesc": "Encrypt with a CMK when logging includes execution data",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Step Functions encryption at rest]<https://docs.aws.amazon.com/step-functions/latest/dg/encryption-at-rest.html>"
+        ]
+    },
+    "sfnHttpTaskNoTLS": {
+        "category": "S",
+        "^description": "{$COUNT} Step Functions state machine(s) have a http:invoke Task whose ApiEndpoint is a plain http:// URL. Cleartext task invocations expose request/response bodies (including task tokens and credentials passed in Parameters) to any on-path attacker.",
+        "shortDesc": "Use https:// endpoints in every http:invoke Task",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Step Functions HTTP tasks]<https://docs.aws.amazon.com/step-functions/latest/dg/connect-http-task.html>"
+        ]
     }
 }

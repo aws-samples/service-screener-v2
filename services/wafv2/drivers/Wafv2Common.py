@@ -934,3 +934,511 @@ class Wafv2Common(Evaluator):
                 walk(rb.get('ScopeDownStatement'))
         walk(statement)
         return arns
+
+    # ------------------------------------------------------------------ #
+    # 25. No AWSManagedRulesATPRuleSet on login-facing WebACLs
+    # ------------------------------------------------------------------ #
+    ATP_RULE_SET = 'AWSManagedRulesATPRuleSet'
+
+    def _checkWafv2NoAccountTakeoverPrevention(self):
+        if not self.associatedResources:
+            self.results['wafv2NoAccountTakeoverPrevention'] = [
+                0, "WebACL not associated with any resource"
+            ]
+            return
+        managed = self._managedRuleGroupNames()
+        if self.ATP_RULE_SET in managed:
+            self.results['wafv2NoAccountTakeoverPrevention'] = [
+                1, f"{self.ATP_RULE_SET} attached"
+            ]
+        else:
+            self.results['wafv2NoAccountTakeoverPrevention'] = [
+                0,
+                f"No {self.ATP_RULE_SET} on this associated WebACL "
+                "(paid add-on — informational)"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 26. No AWSManagedRulesACFPRuleSet on sign-up-facing WebACLs
+    # ------------------------------------------------------------------ #
+    ACFP_RULE_SET = 'AWSManagedRulesACFPRuleSet'
+
+    def _checkWafv2NoAccountCreationFraudPrevention(self):
+        if not self.associatedResources:
+            self.results['wafv2NoAccountCreationFraudPrevention'] = [
+                0, "WebACL not associated with any resource"
+            ]
+            return
+        managed = self._managedRuleGroupNames()
+        if self.ACFP_RULE_SET in managed:
+            self.results['wafv2NoAccountCreationFraudPrevention'] = [
+                1, f"{self.ACFP_RULE_SET} attached"
+            ]
+        else:
+            self.results['wafv2NoAccountCreationFraudPrevention'] = [
+                0,
+                f"No {self.ACFP_RULE_SET} on this associated WebACL "
+                "(paid add-on — informational)"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 27. Paid managed rule group without ScopeDownStatement
+    # ------------------------------------------------------------------ #
+    PAID_MANAGED_GROUPS = (
+        'AWSManagedRulesBotControlRuleSet',
+        'AWSManagedRulesATPRuleSet',
+        'AWSManagedRulesACFPRuleSet',
+    )
+
+    def _checkWafv2PaidRuleGroupWithoutScopeDown(self):
+        offenders = []
+        found = 0
+        for r in self.rules:
+            stmt = r.get('Statement') or {}
+            mrg = stmt.get(self.MANAGED_RG_KEY)
+            if not isinstance(mrg, dict):
+                continue
+            name = mrg.get('Name')
+            if name not in self.PAID_MANAGED_GROUPS:
+                continue
+            found += 1
+            if not mrg.get('ScopeDownStatement'):
+                offenders.append(f"{r.get('Name','?')}[{name}]")
+
+        if found == 0:
+            self.results['wafv2PaidRuleGroupWithoutScopeDown'] = [
+                0, "No paid managed rule groups attached"
+            ]
+        elif offenders:
+            self.results['wafv2PaidRuleGroupWithoutScopeDown'] = [
+                -1,
+                f"Paid managed group(s) without ScopeDownStatement (every "
+                f"request billed): {', '.join(offenders[:3])}"
+            ]
+        else:
+            self.results['wafv2PaidRuleGroupWithoutScopeDown'] = [
+                1, f"All {found} paid managed group(s) use ScopeDownStatement"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 28. Managed rule group with >50% rules excluded/overridden
+    # ------------------------------------------------------------------ #
+    EXCESSIVE_OVERRIDE_FRACTION = 0.5
+
+    def _checkWafv2ManagedRuleGroupExcludedRulesExcessive(self):
+        details = self.acl.get('_managedRuleGroupDetails') or {}
+        offenders = []
+        checked = 0
+        for r in self.rules:
+            stmt = r.get('Statement') or {}
+            mrg = stmt.get(self.MANAGED_RG_KEY)
+            if not isinstance(mrg, dict):
+                continue
+            vendor = mrg.get('VendorName')
+            name = mrg.get('Name')
+            info = details.get((vendor, name)) or {}
+            total = info.get('total_rules')
+            if not isinstance(total, int) or total <= 0:
+                continue
+            checked += 1
+            excluded = mrg.get('ExcludedRules') or []
+            overrides = mrg.get('RuleActionOverrides') or []
+            count_overrides = [
+                o for o in overrides
+                if isinstance(o, dict) and 'Count' in (o.get('ActionToUse') or {})
+            ]
+            affected = {e.get('Name') for e in excluded if isinstance(e, dict)}
+            affected.update({o.get('Name') for o in count_overrides if isinstance(o, dict)})
+            frac = len(affected) / total
+            if frac > self.EXCESSIVE_OVERRIDE_FRACTION and len(affected) < total:
+                # frac < 1.0 keeps this distinct from wafv2ManagedRuleGroupAllCountOverride
+                offenders.append(f"{r.get('Name','?')}[{name}:{len(affected)}/{total}]")
+
+        if checked == 0:
+            self.results['wafv2ManagedRuleGroupExcludedRulesExcessive'] = [
+                0, "No managed rule groups with resolvable rule counts"
+            ]
+        elif offenders:
+            self.results['wafv2ManagedRuleGroupExcludedRulesExcessive'] = [
+                -1,
+                f"Managed group(s) with >50% rules overridden: "
+                + ", ".join(offenders[:3])
+            ]
+        else:
+            self.results['wafv2ManagedRuleGroupExcludedRulesExcessive'] = [
+                1, f"All {checked} managed group(s) preserve at least half their rules"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 29. No AWSManagedRulesKnownBadInputsRuleSet
+    # ------------------------------------------------------------------ #
+    KBI_RULE_SET = 'AWSManagedRulesKnownBadInputsRuleSet'
+
+    def _checkWafv2NoKnownBadInputsRuleSet(self):
+        managed = self._managedRuleGroupNames()
+        if not managed:
+            self.results['wafv2NoKnownBadInputsRuleSet'] = [
+                0, "No managed rule groups — see wafv2NoManagedRuleGroups"
+            ]
+            return
+        if self.KBI_RULE_SET in managed:
+            self.results['wafv2NoKnownBadInputsRuleSet'] = [
+                1, f"{self.KBI_RULE_SET} attached"
+            ]
+        else:
+            self.results['wafv2NoKnownBadInputsRuleSet'] = [
+                -1,
+                f"Managed groups present ({', '.join(sorted(managed)[:3])}) "
+                f"but no {self.KBI_RULE_SET}"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 30. No AWSManagedRulesAnonymousIpList
+    # ------------------------------------------------------------------ #
+    ANON_IP_LIST = 'AWSManagedRulesAnonymousIpList'
+
+    def _checkWafv2NoAnonymousIpList(self):
+        managed = self._managedRuleGroupNames()
+        if not managed:
+            self.results['wafv2NoAnonymousIpList'] = [
+                0, "No managed rule groups — see wafv2NoManagedRuleGroups"
+            ]
+            return
+        if self.ANON_IP_LIST in managed:
+            self.results['wafv2NoAnonymousIpList'] = [
+                1, f"{self.ANON_IP_LIST} attached"
+            ]
+        else:
+            self.results['wafv2NoAnonymousIpList'] = [
+                -1,
+                f"Managed groups present ({', '.join(sorted(managed)[:3])}) "
+                f"but no {self.ANON_IP_LIST}"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 31. Rate-based rules ordered AFTER paid managed groups
+    # ------------------------------------------------------------------ #
+    def _checkWafv2RulePriorityOrdering(self):
+        if not self.rules:
+            self.results['wafv2RulePriorityOrdering'] = [0, "WebACL has no rules"]
+            return
+
+        rate_priorities = []
+        paid_managed_priorities = []
+        for r in self.rules:
+            stmt = r.get('Statement') or {}
+            p = r.get('Priority')
+            if not isinstance(p, int):
+                continue
+            if self._statementContainsKey(stmt, self.RATE_BASED_KEY):
+                rate_priorities.append(p)
+            mrg = stmt.get(self.MANAGED_RG_KEY)
+            if isinstance(mrg, dict) and mrg.get('Name') in self.PAID_MANAGED_GROUPS:
+                paid_managed_priorities.append(p)
+
+        if not rate_priorities or not paid_managed_priorities:
+            self.results['wafv2RulePriorityOrdering'] = [
+                0, "No rate-based rule / paid managed group pair to order"
+            ]
+            return
+
+        earliest_rate = min(rate_priorities)
+        earliest_paid = min(paid_managed_priorities)
+        if earliest_rate > earliest_paid:
+            self.results['wafv2RulePriorityOrdering'] = [
+                -1,
+                f"Rate-based rules run AFTER paid managed groups "
+                f"(rate min prio={earliest_rate}, paid min prio={earliest_paid}). "
+                "Move rate-based rules to lower Priority number."
+            ]
+        else:
+            self.results['wafv2RulePriorityOrdering'] = [
+                1,
+                f"Rate-based rules run before paid managed groups "
+                f"(rate={earliest_rate} < paid={earliest_paid})"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 32. Referenced IP set is empty
+    # ------------------------------------------------------------------ #
+    def _checkWafv2IpSetEmpty(self):
+        assets = self.acl.get('_regionAssets') or {}
+        ipsets = assets.get('ipSets') or {}
+        if not ipsets:
+            self.results['wafv2IpSetEmpty'] = [
+                0, "No IP set inventory available"
+            ]
+            return
+
+        referenced = set()
+        for r in self.rules:
+            for arn in self._collectIpSetArns(r.get('Statement') or {}):
+                referenced.add(arn)
+        if not referenced:
+            self.results['wafv2IpSetEmpty'] = [
+                0, "No IP sets referenced by this WebACL"
+            ]
+            return
+
+        empty_referenced = []
+        for arn in referenced:
+            data = ipsets.get(arn)
+            if data is None:
+                continue
+            if not (data.get('addresses') or []):
+                empty_referenced.append(data.get('name', arn.split('/')[-2]))
+        if empty_referenced:
+            self.results['wafv2IpSetEmpty'] = [
+                -1,
+                f"Empty IP set(s) referenced by rules: {', '.join(empty_referenced[:5])}"
+            ]
+        else:
+            self.results['wafv2IpSetEmpty'] = [
+                1, f"All {len(referenced)} referenced IP set(s) contain addresses"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 33. Referenced regex pattern set is empty
+    # ------------------------------------------------------------------ #
+    def _checkWafv2RegexPatternSetEmpty(self):
+        assets = self.acl.get('_regionAssets') or {}
+        rps_map = assets.get('regexPatternSets') or {}
+        referenced = self._collectRegexPatternSetArns()
+        if not referenced:
+            self.results['wafv2RegexPatternSetEmpty'] = [
+                0, "No regex pattern sets referenced by this WebACL"
+            ]
+            return
+        empty = []
+        for arn in referenced:
+            data = rps_map.get(arn)
+            if data is None:
+                continue
+            if not (data.get('patterns') or []):
+                empty.append(data.get('name', arn.split('/')[-2]))
+        if empty:
+            self.results['wafv2RegexPatternSetEmpty'] = [
+                -1,
+                f"Empty regex pattern set(s) referenced: {', '.join(empty[:5])}"
+            ]
+        else:
+            self.results['wafv2RegexPatternSetEmpty'] = [
+                1, f"All {len(referenced)} referenced regex pattern set(s) are populated"
+            ]
+
+    def _collectRegexPatternSetArns(self):
+        arns = set()
+        def walk(stmt):
+            if not isinstance(stmt, dict):
+                return
+            for key in ('RegexPatternSetReferenceStatement',):
+                sub = stmt.get(key)
+                if isinstance(sub, dict) and sub.get('ARN'):
+                    arns.add(sub['ARN'])
+            for k in ('AndStatement', 'OrStatement'):
+                sub = stmt.get(k)
+                if isinstance(sub, dict):
+                    for s in (sub.get('Statements') or []):
+                        walk(s)
+            nsub = stmt.get('NotStatement')
+            if isinstance(nsub, dict):
+                walk(nsub.get('Statement'))
+            rb = stmt.get('RateBasedStatement')
+            if isinstance(rb, dict):
+                walk(rb.get('ScopeDownStatement'))
+        for r in self.rules:
+            walk(r.get('Statement') or {})
+        return arns
+
+    # ------------------------------------------------------------------ #
+    # 34. Custom rule group referenced but has zero rules
+    # ------------------------------------------------------------------ #
+    def _checkWafv2RuleGroupEmpty(self):
+        assets = self.acl.get('_regionAssets') or {}
+        rg_map = assets.get('ruleGroups') or {}
+        # Collect ARNs from RuleGroupReferenceStatement across every rule.
+        referenced = set()
+        for r in self.rules:
+            stmt = r.get('Statement') or {}
+            rgr = stmt.get('RuleGroupReferenceStatement')
+            if isinstance(rgr, dict) and rgr.get('ARN'):
+                referenced.add(rgr['ARN'])
+        if not referenced:
+            self.results['wafv2RuleGroupEmpty'] = [
+                0, "No custom rule groups referenced"
+            ]
+            return
+        empty = []
+        for arn in referenced:
+            data = rg_map.get(arn)
+            if data is None:
+                continue
+            if (data.get('ruleCount') or 0) == 0:
+                empty.append(data.get('name', arn.split('/')[-2]))
+        if empty:
+            self.results['wafv2RuleGroupEmpty'] = [
+                -1,
+                f"Empty custom rule group(s) referenced: {', '.join(empty[:5])}"
+            ]
+        else:
+            self.results['wafv2RuleGroupEmpty'] = [
+                1, f"All {len(referenced)} referenced rule group(s) contain rules"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 35. Logging configured but no RedactedFields
+    # ------------------------------------------------------------------ #
+    def _checkWafv2LoggingMissingRedactedFields(self):
+        if not self.loggingConfig:
+            self.results['wafv2LoggingMissingRedactedFields'] = [
+                0, "Logging not configured — see wafv2LoggingNotConfigured"
+            ]
+            return
+        redacted = self.loggingConfig.get('RedactedFields') or []
+        if not redacted:
+            self.results['wafv2LoggingMissingRedactedFields'] = [
+                -1,
+                "No RedactedFields — Authorization/Cookie/JWT-bearing fields "
+                "written to log destination in plaintext"
+            ]
+        else:
+            self.results['wafv2LoggingMissingRedactedFields'] = [
+                1, f"{len(redacted)} field(s) redacted from logs"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 36. Managed rule group version expiring within 30 days
+    #
+    # This overlaps with wafv2ManagedRuleGroupVersionPinned's own expiry
+    # escalation. Both fire when a pinned version is nearing expiry — the
+    # two check descriptions position them differently (pinned=informational
+    # posture; expiring=urgent action). Kept per spec.
+    # ------------------------------------------------------------------ #
+    EXPIRY_THRESHOLD_DAYS = 30
+
+    def _checkWafv2ManagedRuleGroupVersionExpiring(self):
+        details = self.acl.get('_managedRuleGroupDetails') or {}
+        expiring = []
+        now = self._dt_module.datetime.now(self._dt_module.timezone.utc)
+        for r in self.rules:
+            stmt = r.get('Statement') or {}
+            mrg = stmt.get(self.MANAGED_RG_KEY)
+            if not isinstance(mrg, dict):
+                continue
+            ver_name = mrg.get('VersionName') or mrg.get('Version')
+            if not ver_name:
+                continue
+            vendor = mrg.get('VendorName')
+            name = mrg.get('Name')
+            info = details.get((vendor, name)) or {}
+            for v in info.get('versions', []) or []:
+                if v.get('Name') != ver_name:
+                    continue
+                exp = v.get('ExpiryTimestamp')
+                if not exp:
+                    break
+                exp_dt = self._parseAwsDatetime(exp)
+                if exp_dt is None:
+                    break
+                days = (exp_dt - now).days
+                if days <= self.EXPIRY_THRESHOLD_DAYS:
+                    expiring.append(f"{r.get('Name','?')}[{name}={ver_name},{days}d]")
+                break
+
+        if expiring:
+            self.results['wafv2ManagedRuleGroupVersionExpiring'] = [
+                -1,
+                "Pinned managed group version(s) expiring: "
+                + ", ".join(expiring[:3])
+            ]
+        else:
+            self.results['wafv2ManagedRuleGroupVersionExpiring'] = [
+                1, "No pinned versions within 30 days of expiry"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # Cross-service coverage-gap checks (37-41)
+    #
+    # The account-wide coverage data lives on assets['crossService']. To avoid
+    # emitting the same FAIL on every WebACL, only the "primary" ACL emits
+    # the real finding; others report INFO deferring to it.
+    # ------------------------------------------------------------------ #
+    def _isPrimary(self):
+        return bool(self.acl.get('_isPrimaryAcl'))
+
+    def _coverageEntries(self, kind):
+        assets = self.acl.get('_regionAssets') or {}
+        return (assets.get('crossService') or {}).get(kind) or []
+
+    def _reportCoverage(self, key, kind, label, unprotected_filter=None,
+                         critical_if_no_resources=False):
+        entries = self._coverageEntries(kind)
+        if not entries:
+            # No resources of this type exist — check is not applicable
+            self.results[key] = [0 if not critical_if_no_resources else 1,
+                                  f"No {label} in this region"]
+            return
+
+        if not self._isPrimary():
+            self.results[key] = [
+                0, f"Coverage reported on primary WebACL for {label}"
+            ]
+            return
+
+        if unprotected_filter is None:
+            unprotected_filter = lambda e: not e.get('protected', True)
+        unprotected = [e for e in entries if unprotected_filter(e)]
+
+        if unprotected:
+            names = [e.get('name') or e.get('id') or e.get('arn', '?').split('/')[-1]
+                     for e in unprotected]
+            self.results[key] = [
+                -1,
+                f"{len(unprotected)} of {len(entries)} {label} unprotected: "
+                + ", ".join(names[:5])
+                + (f" (+{len(unprotected)-5} more)" if len(unprotected) > 5 else "")
+            ]
+        else:
+            self.results[key] = [
+                1, f"All {len(entries)} {label} have a WAF WebACL"
+            ]
+
+    # 37. ALBs without a WAF (internet-facing only)
+    def _checkWafv2AlbWithoutWebAcl(self):
+        self._reportCoverage(
+            'wafv2AlbWithoutWebAcl', 'alb', 'internet-facing ALB(s)',
+            unprotected_filter=lambda e: (e.get('scheme') == 'internet-facing'
+                                          and not e.get('protected', True)),
+        )
+
+    # 38. API Gateway REST stages without WAF
+    def _checkWafv2ApiGatewayWithoutWebAcl(self):
+        self._reportCoverage(
+            'wafv2ApiGatewayWithoutWebAcl', 'apiGateway',
+            'REST API stage(s)',
+        )
+
+    # 39. CloudFront distributions without WAF
+    def _checkWafv2CloudFrontWithoutWebAcl(self):
+        self._reportCoverage(
+            'wafv2CloudFrontWithoutWebAcl', 'cloudfront',
+            'CloudFront distribution(s)',
+        )
+
+    # 40. AppSync GraphQL APIs without WAF (only for non-PRIVATE auth)
+    def _checkWafv2AppSyncWithoutWebAcl(self):
+        # Skip private APIs (they can't be publicly abused).
+        self._reportCoverage(
+            'wafv2AppSyncWithoutWebAcl', 'appsync',
+            'AppSync GraphQL API(s)',
+            unprotected_filter=lambda e: (
+                e.get('authType') != 'PRIVATE' and not e.get('protected', True)
+            ),
+        )
+
+    # 41. Cognito user pools without WAF
+    def _checkWafv2CognitoUserPoolWithoutWebAcl(self):
+        self._reportCoverage(
+            'wafv2CognitoUserPoolWithoutWebAcl', 'cognito',
+            'Cognito user pool(s)',
+        )
