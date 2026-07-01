@@ -3,8 +3,8 @@
 ################################################################################
 # Cognito Service Screener - Test Resource Cleanup Script
 #
-# Deletes the user pool created by create_test_resources.sh. App clients are
-# deleted implicitly when the pool is deleted.
+# Deletes user pools + Lambda + IAM roles created by create_test_resources.sh.
+# App clients and groups are deleted implicitly when the pool is deleted.
 #
 # Usage:
 #   ./cleanup_test_resources.sh [RESOURCE_FILE] [--region REGION] [--force]
@@ -68,7 +68,7 @@ by_type() {
 }
 
 ################################################################################
-# Step 1: Delete app clients explicitly (also removed with pool, but be safe)
+# Step 1: Delete app clients (safety; also removed with pool)
 ################################################################################
 
 echo -e "\n${GREEN}=== Step 1: Delete app clients ===${NC}"
@@ -85,13 +85,12 @@ for ENTRY in $(by_type APP_CLIENT); do
 done
 
 ################################################################################
-# Step 2: Turn off deletion protection (safety, in case the user enabled it),
-#         then delete the user pool.
+# Step 2: Delete user pools
 ################################################################################
 
-echo -e "\n${GREEN}=== Step 2: Delete user pool ===${NC}"
+echo -e "\n${GREEN}=== Step 2: Delete user pools ===${NC}"
 for POOL_ID in $(by_type USER_POOL); do
-    # If deletion protection got flipped to ACTIVE, disable it first.
+    # If deletion protection got flipped to ACTIVE, disable it first
     aws cognito-idp update-user-pool \
         --user-pool-id "$POOL_ID" \
         --deletion-protection INACTIVE \
@@ -103,6 +102,49 @@ for POOL_ID in $(by_type USER_POOL); do
         --region "$REGION" 2>/dev/null \
         && echo -e "${GREEN}  ✓${NC}" \
         || echo -e "${YELLOW}  ⚠ already gone${NC}"
+done
+
+################################################################################
+# Step 3: Delete Lambda function
+################################################################################
+
+echo -e "\n${GREEN}=== Step 3: Delete Lambda function ===${NC}"
+for FN in $(by_type LAMBDA); do
+    echo "Deleting Lambda: $FN"
+    aws lambda delete-function \
+        --function-name "$FN" \
+        --region "$REGION" 2>/dev/null \
+        && echo -e "${GREEN}  ✓${NC}" \
+        || echo -e "${YELLOW}  ⚠ already gone${NC}"
+done
+
+################################################################################
+# Step 4: Delete IAM roles (Lambda exec role + Cognito group role)
+################################################################################
+
+echo -e "\n${GREEN}=== Step 4: Delete IAM roles ===${NC}"
+for ROLE_NAME in $(by_type IAM_ROLE); do
+    echo "Deleting: $ROLE_NAME"
+
+    attached=$(aws iam list-attached-role-policies \
+        --role-name "$ROLE_NAME" \
+        --query 'AttachedPolicies[].PolicyArn' \
+        --output text 2>/dev/null || true)
+    for arn in $attached; do
+        aws iam detach-role-policy --role-name "$ROLE_NAME" --policy-arn "$arn" 2>/dev/null || true
+    done
+
+    inline=$(aws iam list-role-policies \
+        --role-name "$ROLE_NAME" \
+        --query 'PolicyNames' \
+        --output text 2>/dev/null || true)
+    for pname in $inline; do
+        aws iam delete-role-policy --role-name "$ROLE_NAME" --policy-name "$pname" 2>/dev/null || true
+    done
+
+    aws iam delete-role --role-name "$ROLE_NAME" 2>/dev/null \
+        && echo -e "${GREEN}  ✓ deleted${NC}" \
+        || echo -e "${YELLOW}  ⚠ already gone or still referenced${NC}"
 done
 
 echo ""

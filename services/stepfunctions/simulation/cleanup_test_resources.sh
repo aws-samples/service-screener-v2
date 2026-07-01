@@ -4,8 +4,10 @@
 # Step Functions Service Screener - Test Resource Cleanup Script
 #
 # Reads the manifest emitted by create_test_resources.sh and deletes:
-#   1. state machines
-#   2. IAM role (detach + delete inline policies + delete role)
+#   1. state machines (up to four)
+#   2. EventBridge connection (Phase 2 HTTP-task support)
+#   3. CloudWatch log group (Phase 2 LOGGED-SM support)
+#   4. IAM role (detach + delete inline policies + delete role)
 #
 # Usage:
 #   ./cleanup_test_resources.sh [RESOURCE_FILE] [--region REGION] [--force]
@@ -91,14 +93,45 @@ for ARN in $(by_type STATE_MACHINE); do
         || echo -e "${YELLOW}  ⚠ already deleted or not found${NC}"
 done
 
-# Deletion is async; wait a few seconds so the role can be removed
+# Deletion is async; wait a few seconds so dependent resources can be removed
 sleep 5
 
 ################################################################################
-# Step 2: Delete IAM role
+# Step 2: Delete EventBridge connection(s)
 ################################################################################
 
-echo -e "\n${GREEN}=== Step 2: Deleting IAM role ===${NC}"
+echo -e "\n${GREEN}=== Step 2: Deleting EventBridge connections ===${NC}"
+for CARN in $(by_type CONNECTION); do
+    NAME=$(echo "$CARN" | awk -F'/' '{print $(NF-1)}')
+    # Fallback: parse connection/<name>/<id>
+    if [ -z "$NAME" ]; then NAME=$(echo "$CARN" | sed 's|.*connection/||' | cut -d/ -f1); fi
+    echo "Deleting: $NAME  ($CARN)"
+    aws events delete-connection \
+        --name "$NAME" \
+        --region "$REGION" > /dev/null 2>&1 \
+        && echo -e "${GREEN}  ✓${NC}" \
+        || echo -e "${YELLOW}  ⚠ already gone${NC}"
+done
+
+################################################################################
+# Step 3: Delete CloudWatch log groups
+################################################################################
+
+echo -e "\n${GREEN}=== Step 3: Deleting CloudWatch log groups ===${NC}"
+for LG in $(by_type LOG_GROUP); do
+    echo "Deleting: $LG"
+    aws logs delete-log-group \
+        --log-group-name "$LG" \
+        --region "$REGION" > /dev/null 2>&1 \
+        && echo -e "${GREEN}  ✓${NC}" \
+        || echo -e "${YELLOW}  ⚠ already gone${NC}"
+done
+
+################################################################################
+# Step 4: Delete IAM role
+################################################################################
+
+echo -e "\n${GREEN}=== Step 4: Deleting IAM role ===${NC}"
 for ROLE_NAME in $(by_type IAM_ROLE); do
     echo "Deleting: $ROLE_NAME"
 
@@ -120,7 +153,7 @@ for ROLE_NAME in $(by_type IAM_ROLE); do
 
     aws iam delete-role --role-name "$ROLE_NAME" 2>/dev/null \
         && echo -e "${GREEN}  ✓ deleted${NC}" \
-        || echo -e "${YELLOW}  ⚠ already deleted or role still referenced (retry after SM delete finalises)${NC}"
+        || echo -e "${YELLOW}  ⚠ role still referenced (retry cleanup after SM delete finalises)${NC}"
 done
 
 echo ""

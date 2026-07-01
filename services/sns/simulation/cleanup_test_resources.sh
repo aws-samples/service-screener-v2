@@ -3,7 +3,7 @@
 ################################################################################
 # SNS Service Screener - Test Resource Cleanup Script
 #
-# Deletes SNS topic + subscriptions + SQS subscriber queue.
+# Deletes SNS topics + subscriptions + SQS subscriber queue.
 # Usage: ./cleanup_test_resources.sh [RESOURCE_FILE] [--region REGION] [--force]
 ################################################################################
 
@@ -89,10 +89,10 @@ for URL in $(by_type SQS_QUEUE); do
 done
 
 ################################################################################
-# Step 3: Delete SNS topic (this also removes any pending subscriptions)
+# Step 3: Delete SNS topics (standard + FIFO) — pending subs are removed too
 ################################################################################
 
-echo -e "\n${GREEN}=== Step 3: Delete SNS topic ===${NC}"
+echo -e "\n${GREEN}=== Step 3: Delete SNS topics ===${NC}"
 for ARN in $(by_type TOPIC); do
     echo "Deleting: $ARN"
     aws sns delete-topic --topic-arn "$ARN" --region "$REGION" 2>/dev/null \

@@ -3,25 +3,28 @@
 ################################################################################
 # SNS Service Screener - Test Resource Creation Script
 #
-# Creates ONE intentionally-insecure SNS topic that triggers 9+ of the 12
-# checks:
-#   - No KmsMasterKeyId          (#1 snsEncryptionAtRest)
-#   - Policy Principal:* no Cond (#3 snsPublicAccess)
-#   - Policy without SecureTrans (#4 snsNoHttpsEnforcement)
-#   - HTTP subscription          (#5 snsInsecureSubscription)
-#   - SignatureVersion=1         (#6 snsSignatureVersionOld — default)
-#   - SQS sub without RedrivePol (#7 snsSubscriptionNoDlq)
-#   - No feedback role           (#9 snsDeliveryStatusLoggingDisabled)
-#   - TracingConfig!=Active      (#10 snsTracingDisabled — default)
-#   - No tags                    (#12 snsResourcesWithoutTags)
+# Creates two intentionally-insecure SNS topics that exercise every `sns*`
+# service-screener check that can be forced through the AWS API. Covers
+# Phase 1 (checks 13-19) plus Phase 2 (checks 20-23).
 #
-# NOT simulated:
-#   #2  snsEncryptionNotCMK    — mutually exclusive with #1 (would need CMK)
-#   #8  snsPendingSubscription — protocol=email creates a pending sub, but SNS
-#                                 sends confirmation to a real inbox; skip.
-#   #11 snsUnusedTopic          — we attach an HTTP subscription (unconfirmed
-#                                 URL) which STILL keeps SubscriptionsConfirmed=0,
-#                                 so this actually DOES fire (bonus).
+#   Topic #1 (STANDARD, non-FIFO)  — Phase 1 baseline:
+#     - no KmsMasterKeyId              → Phase 1 #13 snsEncryptionAtRest
+#     - Policy Principal:* no Cond     → Phase 1 #15 snsPublicAccess
+#     - Policy without SecureTransport → Phase 1 #16 snsNoHttpsEnforcement
+#     - HTTP subscription              → Phase 1 #17 snsInsecureSubscription
+#     - SignatureVersion=1             → Phase 1 #18 snsSignatureVersionOld
+#     - SQS sub without RedrivePolicy  → Phase 1 #19 snsSubscriptionNoDlq
+#     - No feedback role               → Phase 1 (delivery status logging)
+#     - TracingConfig=default          → Phase 1 (tracing disabled)
+#     - no tags                        → Phase 1 (untagged)
+#     - Policy Version="2008-10-17"    → Phase 2 #22 snsPolicyVersionOutdated
+#     - SMS subscription (placeholder) → Phase 2 #21 snsSmsNoSpendLimit
+#                                        (fires only if account has no
+#                                        MonthlySpendLimit set for SMS)
+#
+#   Topic #2 (FIFO, .fifo suffix)  — Phase 2 additions:
+#     - ContentBasedDeduplication=false → Phase 2 #20
+#     - no ArchivePolicy                → Phase 2 #23
 #
 # Usage:
 #   ./create_test_resources.sh [--region REGION] [--help]
@@ -32,6 +35,11 @@ set -u
 REGION="${AWS_REGION:-us-east-1}"
 PREFIX="ss-test"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+
+# Placeholder E.164 phone number for the SMS subscription. This is a
+# "555" (fictional-use) US number pattern; SNS accepts any well-formed
+# E.164 value. No SMS is ever published to it by this script.
+SMS_PLACEHOLDER="+15005550100"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -51,6 +59,7 @@ ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text 2>/dev/
 [ -z "${ACCOUNT_ID:-}" ] && { echo -e "${RED}No AWS credentials${NC}"; exit 1; }
 
 TOPIC_NAME="${PREFIX}-sns-topic-${TIMESTAMP}"
+FIFO_TOPIC_NAME="${PREFIX}-sns-fifo-${TIMESTAMP}.fifo"
 QUEUE_NAME="${PREFIX}-sns-dlq-source-${TIMESTAMP}"
 OUTPUT_FILE="created_resources_${TIMESTAMP}.txt"
 > "$OUTPUT_FILE"
@@ -62,10 +71,10 @@ echo "Region: $REGION | Account: $ACCOUNT_ID | Timestamp: $TIMESTAMP"
 echo ""
 
 ################################################################################
-# Step 1: Create SNS topic with default (insecure) config
+# Step 1: Create standard (non-FIFO) SNS topic with default (insecure) config
 ################################################################################
 
-echo -e "${GREEN}=== Step 1: Create SNS topic (no encryption, no tags, no tracing) ===${NC}"
+echo -e "${GREEN}=== Step 1: Create standard SNS topic (no encryption, no tags, no tracing) ===${NC}"
 
 TOPIC_JSON=$(aws sns create-topic \
     --name "$TOPIC_NAME" \
@@ -76,17 +85,19 @@ TOPIC_JSON=$(aws sns create-topic \
 
 TOPIC_ARN=$(echo "$TOPIC_JSON" | grep -o '"TopicArn": *"[^"]*"' | head -1 | sed 's/.*"TopicArn": *"\([^"]*\)".*/\1/')
 log "TOPIC:${TOPIC_ARN}"
-echo -e "${GREEN}✓ Topic: ${TOPIC_NAME}${NC}"
+echo -e "${GREEN}✓ Standard topic: ${TOPIC_NAME}${NC}"
 
 ################################################################################
-# Step 2: Set a public wildcard-principal policy (no Condition, no SecureTransport)
+# Step 2: Set a public wildcard-principal policy using outdated Version=2008-10-17
 ################################################################################
 
-echo -e "\n${GREEN}=== Step 2: Set overly permissive access policy ===${NC}"
+echo -e "\n${GREEN}=== Step 2: Set overly permissive access policy (Version=2008-10-17) ===${NC}"
 
+# The deprecated 2008-10-17 policy version fires Phase 2 #22 while the
+# wildcard Principal + no SecureTransport fires Phase 1 #15/#16.
 cat > /tmp/${PREFIX}-sns-policy.json <<EOF
 {
-  "Version": "2012-10-17",
+  "Version": "2008-10-17",
   "Statement": [
     {
       "Sid": "PublicPublishNoCondition",
@@ -104,7 +115,7 @@ aws sns set-topic-attributes \
     --attribute-name Policy \
     --attribute-value "$(cat /tmp/${PREFIX}-sns-policy.json | tr -d '\n')" \
     --region "$REGION"
-echo -e "${GREEN}✓ Public policy applied${NC}"
+echo -e "${GREEN}✓ Public policy applied (Version=2008-10-17 → fires Phase 2 #22)${NC}"
 
 ################################################################################
 # Step 3: Force SignatureVersion=1 explicitly (the deprecated SHA-1 default)
@@ -124,24 +135,23 @@ aws sns set-topic-attributes \
 
 echo -e "\n${GREEN}=== Step 4: Add HTTP subscription ===${NC}"
 
-# NOTE: SNS will attempt to confirm the subscription by POSTing to this URL.
-# example.com will 200 the POST but doesn't call ConfirmSubscription, so it
-# stays in PendingConfirmation. That's OK — the check inspects Protocol only.
 SUB_HTTP=$(aws sns subscribe \
     --topic-arn "$TOPIC_ARN" \
     --protocol http \
     --notification-endpoint "http://example.com/ss-test-sns" \
     --region "$REGION" \
-    --output json 2>&1) || echo -e "${YELLOW}⚠ HTTP subscription creation returned error (may still be logged as pending)${NC}"
+    --output json 2>&1) || echo -e "${YELLOW}⚠ HTTP subscription creation returned error${NC}"
 
 HTTP_SUB_ARN=$(echo "$SUB_HTTP" | grep -o '"SubscriptionArn": *"[^"]*"' | head -1 | sed 's/.*"SubscriptionArn": *"\([^"]*\)".*/\1/')
-if [ -n "${HTTP_SUB_ARN:-}" ] && [ "$HTTP_SUB_ARN" != "PendingConfirmation" ]; then
-    log "SUBSCRIPTION:${HTTP_SUB_ARN}"
-fi
+# Only log confirmed subscriptions — pending ones have no useful ARN and would
+# create malformed manifest entries.
+case "${HTTP_SUB_ARN:-}" in
+    arn:aws:*) log "SUBSCRIPTION:${HTTP_SUB_ARN}" ;;
+esac
 echo -e "${GREEN}✓ HTTP subscription created (state: ${HTTP_SUB_ARN})${NC}"
 
 ################################################################################
-# Step 5: Create SQS queue + subscribe it WITHOUT RedrivePolicy → triggers #7
+# Step 5: Create SQS queue + subscribe it WITHOUT RedrivePolicy → Phase 1 #19
 ################################################################################
 
 echo -e "\n${GREEN}=== Step 5: Create SQS subscriber without DLQ ===${NC}"
@@ -177,7 +187,7 @@ EOF
         --attributes "{\"Policy\":\"$(cat /tmp/${PREFIX}-sqs-policy.json | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))' | tr -d '"')\"}" \
         --region "$REGION" > /dev/null 2>&1 || true
 
-    # Subscribe (no RedrivePolicy → triggers #7 snsSubscriptionNoDlq)
+    # Subscribe (no RedrivePolicy → Phase 1 #19)
     SUB_SQS=$(aws sns subscribe \
         --topic-arn "$TOPIC_ARN" \
         --protocol sqs \
@@ -185,12 +195,61 @@ EOF
         --region "$REGION" \
         --output json 2>&1)
     SQS_SUB_ARN=$(echo "$SUB_SQS" | grep -o '"SubscriptionArn": *"[^"]*"' | head -1 | sed 's/.*"SubscriptionArn": *"\([^"]*\)".*/\1/')
-    if [ -n "${SQS_SUB_ARN:-}" ] && [ "$SQS_SUB_ARN" != "PendingConfirmation" ]; then
-        log "SUBSCRIPTION:${SQS_SUB_ARN}"
-    fi
+    case "${SQS_SUB_ARN:-}" in
+        arn:aws:*) log "SUBSCRIPTION:${SQS_SUB_ARN}" ;;
+    esac
     echo -e "${GREEN}✓ SQS subscription (no DLQ)${NC}"
 else
-    echo -e "${YELLOW}⚠ SQS queue creation failed — #7 will not fire${NC}"
+    echo -e "${YELLOW}⚠ SQS queue creation failed — Phase 1 #19 will not fire${NC}"
+fi
+
+################################################################################
+# Step 6: SMS subscription with placeholder E.164 number → Phase 2 #21
+################################################################################
+
+echo -e "\n${GREEN}=== Step 6: Add SMS subscription (Phase 2 #21 support) ===${NC}"
+
+# The SMS subscription tests Phase 2 #21 snsSmsNoSpendLimit. The check
+# fires only when (a) the topic has at least one SMS subscription and
+# (b) the account-level MonthlySpendLimit is unset (or >= $1000). We
+# never Publish, so no SMS is ever sent.
+SUB_SMS=$(aws sns subscribe \
+    --topic-arn "$TOPIC_ARN" \
+    --protocol sms \
+    --notification-endpoint "$SMS_PLACEHOLDER" \
+    --region "$REGION" \
+    --output json 2>&1) || echo -e "${YELLOW}⚠ SMS subscribe returned error (may be region without SMS)${NC}"
+
+SMS_SUB_ARN=$(echo "$SUB_SMS" | grep -o '"SubscriptionArn": *"[^"]*"' | head -1 | sed 's/.*"SubscriptionArn": *"\([^"]*\)".*/\1/')
+case "${SMS_SUB_ARN:-}" in
+    arn:aws:*) log "SUBSCRIPTION:${SMS_SUB_ARN}" ;;
+esac
+echo -e "${GREEN}✓ SMS subscription created (state: ${SMS_SUB_ARN:-none}, endpoint: ${SMS_PLACEHOLDER})${NC}"
+
+################################################################################
+# Step 7: FIFO topic (no ContentBasedDeduplication, no ArchivePolicy)
+################################################################################
+
+echo -e "\n${GREEN}=== Step 7: Create FIFO topic (Phase 2 #20 + #23) ===${NC}"
+
+# Attributes: FifoTopic=true, ContentBasedDeduplication=false (default),
+# no ArchivePolicy.
+FIFO_JSON=$(aws sns create-topic \
+    --name "$FIFO_TOPIC_NAME" \
+    --attributes '{"FifoTopic":"true","ContentBasedDeduplication":"false"}' \
+    --region "$REGION" \
+    --output json 2>&1) || {
+        echo -e "${YELLOW}⚠ FIFO topic create failed${NC}"; echo "$FIFO_JSON" | head -3;
+        FIFO_JSON=""
+    }
+
+if [ -n "$FIFO_JSON" ]; then
+    FIFO_ARN=$(echo "$FIFO_JSON" | grep -o '"TopicArn": *"[^"]*"' | head -1 | sed 's/.*"TopicArn": *"\([^"]*\)".*/\1/')
+    if [ -n "${FIFO_ARN:-}" ]; then
+        log "TOPIC:${FIFO_ARN}"
+        echo -e "${GREEN}✓ FIFO topic: ${FIFO_TOPIC_NAME}${NC}"
+        echo -e "  Fires: Phase 2 #20 (ContentBasedDeduplication=false), #23 (no ArchivePolicy)"
+    fi
 fi
 
 ################################################################################
