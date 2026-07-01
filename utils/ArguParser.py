@@ -23,7 +23,7 @@ class ArguParser:
         "services": {
             "required": False,
             "emptymsg": "Missing --services, using default value: $defaultValue",
-            "default": "rds,ec2,iam,s3,efs,lambda,guardduty,cloudfront,cloudtrail,elasticache,eks,dynamodb,opensearch,kms,cloudwatch,redshift,apigateway,sqs,glue,sagemaker,bedrock",
+            "default": "rds,ec2,iam,s3,efs,lambda,guardduty,cloudfront,cloudtrail,elasticache,eks,dynamodb,opensearch,kms,cloudwatch,redshift,apigateway,sqs,glue,sagemaker,bedrock,stepfunctions",
             "help": "--services ec2,iam"
         },
         "debug": {

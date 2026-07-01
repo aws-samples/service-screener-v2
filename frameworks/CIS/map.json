@@ -135,7 +135,8 @@
         "iam.missingPolicyConditions",
         "bedrock.bedrockAgentIamRoleOverprivileged",
         "bedrock.bedrockKBRoleOverprivileged",
-        "bedrock.bedrockACRuntimeWildcardRole"
+        "bedrock.bedrockACRuntimeWildcardRole",
+        "stepfunctions.sfnRoleOverprivileged"
       ],
       "3": [
         "iam.hasAccessKeyNoRotate90days"

@@ -20,7 +20,7 @@
     "Data Protection": {
       "P2.1": ["s3.PublicAccessBlock" , "s3.PublicReadAccessBlock" , "s3.PublicWriteAccessBlock"],
       "P2.2": ["ec2.EBSSnapshot", "rds.Backup", "dynamodb.backupStatus", "dynamodb.enabledContinuousBackup", "efs.AutomatedBackup", "redshift.AutomaticSnapshots"],
-      "P2.3": ["s3.ServerSideEncrypted" , "s3.SSEWithKMS" , "ec2.EBSEncrypted" , "efs.EncryptedAtRest" , "rds.StorageEncrypted" , "redshift.EncryptedAtRest" , "redshift.EncryptedWithKMS" , "cloudfront.fieldLevelEncryption" , "apigateway.EncryptionAtRest" , "apigateway.EncryptionInTransit" , "bedrock.bedrockAgentNoEncryptionKey" , "bedrock.bedrockGuardrailNoEncryption" , "bedrock.bedrockKBNoEncryption" , "bedrock.bedrockACMemoryNoEncryption"],
+      "P2.3": ["s3.ServerSideEncrypted" , "s3.SSEWithKMS" , "ec2.EBSEncrypted" , "efs.EncryptedAtRest" , "rds.StorageEncrypted" , "redshift.EncryptedAtRest" , "redshift.EncryptedWithKMS" , "cloudfront.fieldLevelEncryption" , "apigateway.EncryptionAtRest" , "apigateway.EncryptionInTransit" , "bedrock.bedrockAgentNoEncryptionKey" , "bedrock.bedrockGuardrailNoEncryption" , "bedrock.bedrockKBNoEncryption" , "bedrock.bedrockACMemoryNoEncryption" , "stepfunctions.sfnEncryptionAtRest"],
       "P2.4": ["s3.MacieToEnable" , "bedrock.bedrockGuardrailNoPiiDetection"],
       "P2.5": ["is3.TlsEnforced" , "redshift.EncryptedInTransit" , "rds.MSSQLorPG__TransportEncrpytionDisabled" , "opensearch.NodeToNodeEncryption" , "opensearch.TLSEnforced" , "elasticache.EncInTransitAndRest" , "ec2.SGEncryptionInTransit" , "cloudfront.viewerPolicyHttps"]
     },
@@ -33,7 +33,7 @@
       "P3.6": ["apigateway.WAFWACL"]
     },
     "Detection & Mitigation": {
-      "P4.1": ["cloudtrail.NeedToEnableCloudTrail", "cloudtrail.EnableCloudTrailLogging" , "cloudtrail.LogFileValidationEnabled" , "bedrock.bedrockModelInvocationLoggingDisabled" , "bedrock.bedrockModelInvocationNoCloudWatch" , "bedrock.bedrockModelInvocationNoS3"],
+      "P4.1": ["cloudtrail.NeedToEnableCloudTrail", "cloudtrail.EnableCloudTrailLogging" , "cloudtrail.LogFileValidationEnabled" , "bedrock.bedrockModelInvocationLoggingDisabled" , "bedrock.bedrockModelInvocationNoCloudWatch" , "bedrock.bedrockModelInvocationNoS3" , "stepfunctions.sfnLoggingDisabled"],
       "P4.2": ["guardduty.UsageStat" , "guardduty.Findings"],
       "P4.3": ["cloudtrail.EnableTrailS3BucketLogging"],
       "P4.4": ["cloudtrail.EnableTrailS3BucketMFADelete" , "cloudtrail.EnableTrailS3BucketVersioning" , "s3.MFADelete" , "s3.BucketVersioning" , "s3.ObjectLock"],

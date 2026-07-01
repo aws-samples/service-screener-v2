@@ -101,7 +101,8 @@
         "bedrock.bedrockAgentNoEncryptionKey",
         "bedrock.bedrockGuardrailNoEncryption",
         "bedrock.bedrockKBNoEncryption",
-        "bedrock.bedrockACMemoryNoEncryption"
+        "bedrock.bedrockACMemoryNoEncryption",
+        "stepfunctions.sfnEncryptionAtRest"
       ]
     },
     "10.2": {
@@ -257,7 +258,8 @@
         "iam.missingPolicyConditions",
         "bedrock.bedrockAgentIamRoleOverprivileged",
         "bedrock.bedrockKBRoleOverprivileged",
-        "bedrock.bedrockACRuntimeWildcardRole"
+        "bedrock.bedrockACRuntimeWildcardRole",
+        "stepfunctions.sfnRoleOverprivileged"
       ],
       "25": [
         "iam.rootHasAccessKey"
@@ -535,7 +537,8 @@
         "cloudtrail.CloudWatchLogsLogGroupArn",
         "bedrock.bedrockModelInvocationLoggingDisabled",
         "bedrock.bedrockModelInvocationNoCloudWatch",
-        "bedrock.bedrockModelInvocationNoS3"
+        "bedrock.bedrockModelInvocationNoS3",
+        "stepfunctions.sfnLoggingDisabled"
       ],
       "7": [
         "cloudwatch.SetRetentionDays"

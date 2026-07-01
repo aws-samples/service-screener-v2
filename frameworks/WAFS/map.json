@@ -88,7 +88,8 @@
         "iam.unnecessaryCustomPolicies",
         "kms.GrantOldAge",
         "bedrock.bedrockAgentIamRoleOverprivileged",
-        "bedrock.bedrockACRuntimeWildcardRole"
+        "bedrock.bedrockACRuntimeWildcardRole",
+        "stepfunctions.sfnRoleOverprivileged"
       ],
       "BP06": [
         "iam.userNotUsingGroup",
@@ -188,7 +189,9 @@
         "rds.EventSubscriptionNotConfigured",
         "s3.CloudWatchRequestMetrics",
         "bedrock.bedrockModelInvocationLoggingDisabled",
-        "bedrock.bedrockModelInvocationNoCloudWatch"
+        "bedrock.bedrockModelInvocationNoCloudWatch",
+        "stepfunctions.sfnLoggingDisabled",
+        "stepfunctions.sfnTracingDisabled"
       ],
       "BP02": [
         "cloudwatch.missingCloudWatchDashboards",
@@ -319,7 +322,8 @@
         "bedrock.bedrockGuardrailNoEncryption",
         "bedrock.bedrockKBNoEncryption",
         "bedrock.bedrockACMemoryNoEncryption",
-        "bedrock.bedrockACRuntimeNoEncryption"
+        "bedrock.bedrockACRuntimeNoEncryption",
+        "stepfunctions.sfnEncryptionAtRest"
       ],
       "BP03": [],
       "BP04": [

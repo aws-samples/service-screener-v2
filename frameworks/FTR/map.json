@@ -97,7 +97,8 @@
         "kms.GrantWildcardPrincipal",
         "bedrock.bedrockAgentIamRoleOverprivileged",
         "bedrock.bedrockKBRoleOverprivileged",
-        "bedrock.bedrockACRuntimeWildcardRole"
+        "bedrock.bedrockACRuntimeWildcardRole",
+        "stepfunctions.sfnRoleOverprivileged"
       ],
       "IAM-007.1": [
         "iam.consoleLastAccess90",
@@ -241,7 +242,8 @@
         "bedrock.bedrockAgentNoEncryptionKey",
         "bedrock.bedrockGuardrailNoEncryption",
         "bedrock.bedrockKBNoEncryption",
-        "bedrock.bedrockACMemoryNoEncryption"
+        "bedrock.bedrockACMemoryNoEncryption",
+        "stepfunctions.sfnEncryptionAtRest"
       ],
       "SDAT-003.1": [
         "ec2.SGEncryptionInTransit",

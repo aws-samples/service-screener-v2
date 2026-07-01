@@ -47,7 +47,8 @@
         "bedrock.bedrockAgentNoEncryptionKey",
         "bedrock.bedrockGuardrailNoEncryption",
         "bedrock.bedrockKBNoEncryption",
-        "bedrock.bedrockACMemoryNoEncryption"
+        "bedrock.bedrockACMemoryNoEncryption",
+        "stepfunctions.sfnEncryptionAtRest"
       ],
       "1.3": [
         "s3.TlsEnforced",
@@ -101,7 +102,8 @@
         "sqs.WildcardPrincipalDetection",
         "bedrock.bedrockAgentIamRoleOverprivileged",
         "bedrock.bedrockKBRoleOverprivileged",
-        "bedrock.bedrockACRuntimeWildcardRole"
+        "bedrock.bedrockACRuntimeWildcardRole",
+        "stepfunctions.sfnRoleOverprivileged"
       ],
       "2.4": [
         "iam.rootHasAccessKey"
@@ -159,7 +161,9 @@
         "s3.CloudWatchRequestMetrics",
         "bedrock.bedrockModelInvocationLoggingDisabled",
         "bedrock.bedrockModelInvocationNoCloudWatch",
-        "bedrock.bedrockModelInvocationNoS3"
+        "bedrock.bedrockModelInvocationNoS3",
+        "stepfunctions.sfnLoggingDisabled",
+        "stepfunctions.sfnTracingDisabled"
       ],
       "3.5": [
         "iam.enableGuardDuty",

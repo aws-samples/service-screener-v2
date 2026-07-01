@@ -18,7 +18,7 @@
       "1": []
     },
     "IAM.": {
-      "1": ["iam.ManagedPolicyFullAccessOneServ", "iam.FullAdminAccess", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "bedrock.bedrockAgentIamRoleOverprivileged", "bedrock.bedrockKBRoleOverprivileged", "bedrock.bedrockACRuntimeWildcardRole"],
+      "1": ["iam.ManagedPolicyFullAccessOneServ", "iam.FullAdminAccess", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "bedrock.bedrockAgentIamRoleOverprivileged", "bedrock.bedrockKBRoleOverprivileged", "bedrock.bedrockACRuntimeWildcardRole", "stepfunctions.sfnRoleOverprivileged"],
       "2": ["iam.rootConsoleLogin30days", "iam.rootConsoleLoginFail3x"],
       "3": ["iam.rootHasAccessKey"],
       "4": ["iam.rootMfaActive"],
@@ -34,7 +34,7 @@
       "6": [],
       "7": [],
       "8": ["rds.DBwithoutSecretManager", "rds.DBwithSomeSecretsManagerOnly", "rds.Secret__NoRotation", "rds.Secret__NotUsed7days"],
-      "9": ["s3.ServerSideEncrypted", "bedrock.bedrockAgentNoEncryptionKey", "bedrock.bedrockGuardrailNoEncryption", "bedrock.bedrockKBNoEncryption", "bedrock.bedrockACMemoryNoEncryption"],
+      "9": ["s3.ServerSideEncrypted", "bedrock.bedrockAgentNoEncryptionKey", "bedrock.bedrockGuardrailNoEncryption", "bedrock.bedrockKBNoEncryption", "bedrock.bedrockACMemoryNoEncryption", "stepfunctions.sfnEncryptionAtRest"],
       "10": ["lambda.lambdaPublicAccess"],
       "11": ["kms.KeyRotationEnabled"],
       "12": ["kms.AdminIsGrantor"],

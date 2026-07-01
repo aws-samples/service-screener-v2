@@ -48,11 +48,15 @@
         "AGENTOPS05": {
             "BP01": [
                 "bedrock.bedrockModelInvocationLoggingDisabled",
-                "cloudtrail.trailEnabled"
+                "cloudtrail.trailEnabled",
+                "stepfunctions.sfnTracingDisabled"
             ],
             "BP03": [
                 "bedrock.bedrockModelInvocationNoCloudWatch",
-                "cloudwatch.$length"
+                "cloudwatch.$length",
+                "stepfunctions.sfnLoggingDisabled",
+                "stepfunctions.sfnLoggingLevelWeak",
+                "stepfunctions.sfnExpressWorkflowNoLogging"
             ],
             "BP04": [
                 "cloudwatch.alarmsWithoutSNS",
@@ -89,7 +93,8 @@
             "BP01": [
                 "bedrock.bedrockAgentIamRoleOverprivileged",
                 "iam.InlinePolicyFullAdminAccess",
-                "bedrock.bedrockACRuntimeWildcardRole"
+                "bedrock.bedrockACRuntimeWildcardRole",
+                "stepfunctions.sfnRoleOverprivileged"
             ],
             "BP02": [
                 "iam.InlinePolicyFullAccessOneServ",
@@ -99,7 +104,8 @@
             "BP03": [
                 "bedrock.bedrockAgentNoEncryptionKey",
                 "bedrock.bedrockGuardrailNoEncryption",
-                "bedrock.bedrockKBNoEncryption"
+                "bedrock.bedrockKBNoEncryption",
+                "stepfunctions.sfnEncryptionAtRest"
             ]
         },
         "AGENTSEC03": {
@@ -170,7 +176,10 @@
         "AGENTREL02": {
             "BP01": [
                 "lambda.lambdaTimeoutNotOptimized",
-                "lambda.lambdaDeadLetterQueueDisabled"
+                "lambda.lambdaDeadLetterQueueDisabled",
+                "stepfunctions.sfnNoTimeout",
+                "stepfunctions.sfnNoRetryPolicy",
+                "stepfunctions.sfnNoCatchHandler"
             ]
         },
         "AGENTREL05": {
@@ -182,7 +191,9 @@
         "AGENTREL07": {
             "BP02": [
                 "sqs.DeadLetterQueue",
-                "lambda.lambdaDeadLetterQueueDisabled"
+                "lambda.lambdaDeadLetterQueueDisabled",
+                "stepfunctions.sfnNoRetryPolicy",
+                "stepfunctions.sfnNoCatchHandler"
             ]
         },
         "AGENTREL08": {

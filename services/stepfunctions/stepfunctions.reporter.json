@@ -1,0 +1,164 @@
+{
+    "sfnEncryptionAtRest": {
+        "category": "S",
+        "^description": "{$COUNT} Step Functions state machine(s) use the default AWS-owned encryption key (encryptionConfiguration.type=AWS_OWNED_KEY) instead of a customer-managed KMS key. CMKs are required for regulated workloads to control key rotation, revocation, and cross-account access, and to audit key usage through CloudTrail.",
+        "shortDesc": "Encrypt state machines with a customer-managed KMS key",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Step Functions data encryption at rest]<https://docs.aws.amazon.com/step-functions/latest/dg/encryption-at-rest.html>",
+            "[Step Functions best practices]<https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html>"
+        ]
+    },
+    "sfnRoleOverprivileged": {
+        "category": "S",
+        "^description": "{$COUNT} Step Functions state machine execution role(s) grant overly permissive policies (Action='*' or Resource='*' with broad actions). A state machine role executes every task in the workflow; wildcard permissions turn a workflow bug or hijack into a much larger blast radius.",
+        "shortDesc": "Apply least-privilege to state machine execution roles",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Step Functions IAM best practices]<https://docs.aws.amazon.com/step-functions/latest/dg/security-iam.html>",
+            "[IAM least-privilege best practices]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+        ]
+    },
+    "sfnLoggingDisabled": {
+        "category": "O",
+        "^description": "{$COUNT} Step Functions state machine(s) have CloudWatch Logs logging turned off (loggingConfiguration.level=OFF). Without execution logging, you have no record of state transitions, input/output payloads, or failures beyond what CloudWatch Metrics surfaces, which blocks debugging, audit, and incident response.",
+        "shortDesc": "Enable CloudWatch Logs for state machine executions",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Step Functions execution logging]<https://docs.aws.amazon.com/step-functions/latest/dg/cw-logs.html>",
+            "[Step Functions best practices]<https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html>"
+        ]
+    },
+    "sfnLoggingLevelWeak": {
+        "category": "O",
+        "^description": "{$COUNT} Step Functions state machine(s) log only ERROR- or FATAL-level events (loggingConfiguration.level in {ERROR,FATAL}) or omit execution data (includeExecutionData=false). Info-level logging with execution data is required to reconstruct workflow behaviour, correlate with downstream services, and satisfy typical audit requirements.",
+        "shortDesc": "Log at ALL level and include execution data",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Step Functions log levels]<https://docs.aws.amazon.com/step-functions/latest/dg/cloudwatch-log-level.html>"
+        ]
+    },
+    "sfnTracingDisabled": {
+        "category": "O",
+        "^description": "{$COUNT} Step Functions state machine(s) have X-Ray tracing disabled (tracingConfiguration.enabled=false). Without X-Ray, cross-service latency and failure attribution across Lambda, DynamoDB, and other integrations cannot be traced from the state machine level.",
+        "shortDesc": "Enable X-Ray tracing on state machines",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Step Functions with X-Ray]<https://docs.aws.amazon.com/step-functions/latest/dg/concepts-xray-tracing.html>"
+        ]
+    },
+    "sfnNoRetryPolicy": {
+        "category": "R",
+        "^description": "{$COUNT} Step Functions state machine(s) have one or more Task/Parallel/Map states with no Retry block. Without explicit Retry policies, transient failures in downstream services (Lambda throttles, DynamoDB provisioned-throughput errors, etc.) surface as workflow failures instead of being retried with backoff.",
+        "shortDesc": "Define Retry policies on Task/Parallel/Map states",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Step Functions error handling — Retry]<https://docs.aws.amazon.com/step-functions/latest/dg/concepts-error-handling.html#error-handling-retrying-after-an-error>",
+            "[Step Functions best practices]<https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html>"
+        ]
+    },
+    "sfnNoCatchHandler": {
+        "category": "R",
+        "^description": "{$COUNT} Step Functions state machine(s) have one or more Task/Parallel/Map states with no Catch block. Without Catch handlers, errors that exhaust Retry attempts terminate the entire execution rather than routing to a cleanup or notification branch.",
+        "shortDesc": "Add Catch handlers on Task/Parallel/Map states",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Step Functions error handling — Catch]<https://docs.aws.amazon.com/step-functions/latest/dg/concepts-error-handling.html#error-handling-fallback-states>"
+        ]
+    },
+    "sfnNoTimeout": {
+        "category": "R",
+        "^description": "{$COUNT} Step Functions state machine(s) have no top-level TimeoutSeconds set in the state machine definition. Without an execution-level timeout, a stuck or malformed workflow can run indefinitely (up to the service maximum of 1 year for STANDARD), leaving executions and resources hanging.",
+        "shortDesc": "Set an execution-level TimeoutSeconds in the definition",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Step Functions TimeoutSeconds]<https://docs.aws.amazon.com/step-functions/latest/dg/concepts-avoid-exec-failures.html>"
+        ]
+    },
+    "sfnExpressWorkflowNoLogging": {
+        "category": "O",
+        "^description": "{$COUNT} Step Functions EXPRESS state machine(s) have logging disabled. Unlike STANDARD workflows, EXPRESS workflows do not retain execution history in the Step Functions service — CloudWatch Logs is the only record of execution details. With logging off, there is no way to diagnose past executions.",
+        "shortDesc": "Enable CloudWatch Logs on every Express state machine",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Standard vs Express workflows]<https://docs.aws.amazon.com/step-functions/latest/dg/concepts-standard-vs-express.html>",
+            "[Step Functions best practices]<https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html>"
+        ]
+    },
+    "sfnStatusNotActive": {
+        "category": "O",
+        "^description": "{$COUNT} Step Functions state machine(s) are not in ACTIVE status (e.g., DELETING). Non-active state machines cannot serve executions and indicate an in-progress delete or a broken deployment.",
+        "shortDesc": "Investigate state machines not in ACTIVE status",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Step Functions state machine lifecycle]<https://docs.aws.amazon.com/step-functions/latest/apireference/API_DescribeStateMachine.html>"
+        ]
+    },
+    "sfnUnusedStateMachine": {
+        "category": "C",
+        "^description": "{$COUNT} Step Functions state machine(s) have not had any execution in the last 90 days (or have never been invoked). Unused workflows still consume account governance and Cost Explorer categorisation overhead; long-idle state machines are often orphaned deployments.",
+        "shortDesc": "Delete or archive unused state machines",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Step Functions best practices]<https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html>"
+        ]
+    },
+    "sfnResourcesWithoutTags": {
+        "category": "C",
+        "^description": "{$COUNT} Step Functions state machine(s) have no tags applied. Tags are required for consistent cost allocation, access control (tag-based IAM), and lifecycle governance.",
+        "shortDesc": "Tag every state machine (owner, environment, cost-centre)",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>",
+            "[Step Functions best practices]<https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html>"
+        ]
+    }
+}
