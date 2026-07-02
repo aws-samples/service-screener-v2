@@ -1,0 +1,557 @@
+{
+    "ecsClusterContainerInsightsEnabled": {
+        "category": "O",
+        "^description": "{$COUNT} ECS cluster(s) do not have Container Insights enabled (settings.containerInsights != 'enabled'). Container Insights collects, aggregates, and summarises metrics and logs from containerised applications. Without it, operators lack the diagnostic depth to troubleshoot task-level performance and resource usage. This is Security Hub control ECS.12 and AWS Config rule ecs-container-insights-enabled.",
+        "shortDesc": "Enable Container Insights on every ECS cluster",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Security Hub ECS.12]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecs-controls.html#ecs-12>",
+            "[Container Insights on Amazon ECS]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/deploy_servicelens_CloudWatch_agent_deploy_ECS.html>"
+        ]
+    },
+    "ecsClusterExecuteCommandLogging": {
+        "category": "S",
+        "^description": "{$COUNT} ECS cluster(s) have ECS Exec (execute-command) available but no audit logging configured (configuration.executeCommandConfiguration.logging = NONE or missing while at least one service has enableExecuteCommand=true). ECS Exec provides interactive shell access into running containers; without logging there is no record of who ran which command in production containers.",
+        "shortDesc": "Enable ECS Exec session logging (CloudWatch Logs or S3)",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Logging ECS Exec sessions]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-exec.html#ecs-exec-logging>"
+        ]
+    },
+    "ecsClusterExecuteCommandEncryption": {
+        "category": "S",
+        "^description": "{$COUNT} ECS cluster(s) have ECS Exec logging enabled but do not encrypt the session channel with a customer-managed KMS key (configuration.executeCommandConfiguration.kmsKeyId is empty). Sessions traverse TLS-encrypted transport by default; adding a CMK gives customer control over key rotation and cross-account access to audit logs.",
+        "shortDesc": "Configure a customer-managed KMS key for ECS Exec",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[KMS encryption for ECS Exec]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-exec.html#ecs-exec-kms>"
+        ]
+    },
+    "ecsClusterManagedStorageEncryption": {
+        "category": "S",
+        "^description": "{$COUNT} ECS cluster(s) do not configure a customer-managed KMS key for Fargate ephemeral storage or managed EBS volumes (configuration.managedStorageConfiguration.fargateEphemeralStorageKmsKeyId and .kmsKeyId are both empty). AWS still encrypts storage with an AWS-owned key, but a CMK is required for customer control over key rotation, revocation, and audit.",
+        "shortDesc": "Set a CMK for Fargate ephemeral storage and managed EBS volumes",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Fargate ephemeral storage encryption]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-storage.html>",
+            "[ECS managed storage encryption]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/managed-storage-encryption.html>"
+        ]
+    },
+    "ecsClusterDefaultCapacityProviderStrategy": {
+        "category": "R",
+        "^description": "{$COUNT} ECS cluster(s) have no default capacity provider strategy AND no capacity providers registered. Without capacity providers, tasks cannot be automatically distributed across Fargate/Fargate-Spot or EC2 auto-scaling groups, and services must specify launchType explicitly on every deployment.",
+        "shortDesc": "Register capacity providers and a default strategy",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[ECS capacity providers]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/cluster-capacity-providers.html>"
+        ]
+    },
+    "ecsClusterNoRunningTasks": {
+        "category": "O",
+        "^description": "{$COUNT} ECS cluster(s) have active services but no running tasks (runningTasksCount = 0 with activeServicesCount > 0). This indicates either a stuck deployment, capacity exhaustion, or a misconfigured task definition preventing scheduling.",
+        "shortDesc": "Investigate clusters with services but zero running tasks",
+        "criticality": "L",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Troubleshoot service scheduling]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_scheduler_errors.html>"
+        ]
+    },
+    "ecsClusterTagging": {
+        "category": "O",
+        "^description": "{$COUNT} ECS cluster(s) have no tags applied. Tags are required for consistent cost allocation, tag-based IAM access control, and lifecycle governance.",
+        "shortDesc": "Tag every ECS cluster (owner, environment, cost-centre)",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>"
+        ]
+    },
+    "ecsServicePublicIpDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} ECS service(s) launch tasks with a public IP address attached (networkConfiguration.awsvpcConfiguration.assignPublicIp = ENABLED). Tasks with public IPs are directly reachable from the internet; the recommended pattern is to place tasks in private subnets and route egress through a NAT gateway or VPC endpoints. This is Security Hub control ECS.2.",
+        "shortDesc": "Disable assignPublicIp on ECS services",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Security Hub ECS.2]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecs-controls.html#ecs-2>",
+            "[Task networking]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-networking-awsvpc.html>"
+        ]
+    },
+    "ecsServiceDeploymentCircuitBreakerEnabled": {
+        "category": "R",
+        "^description": "{$COUNT} ECS service(s) have the deployment circuit breaker disabled (deploymentConfiguration.deploymentCircuitBreaker.enable = false). Without the circuit breaker, a failing deployment rolls forward indefinitely, consuming task placement resources and extending customer-visible outages.",
+        "shortDesc": "Enable deployment circuit breaker on ECS services",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[ECS deployment circuit breaker]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/deployment-type-ecs.html#deployment-circuit-breaker>"
+        ]
+    },
+    "ecsServiceDeploymentCircuitBreakerRollback": {
+        "category": "R",
+        "^description": "{$COUNT} ECS service(s) have the deployment circuit breaker enabled but automatic rollback disabled (deploymentCircuitBreaker.rollback = false). The circuit breaker stops bad deployments but keeps the failed task-set active until an operator intervenes; enabling rollback restores service faster.",
+        "shortDesc": "Enable rollback on deployment circuit breaker",
+        "criticality": "L",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Rolling deployments with circuit breaker]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/deployment-type-ecs.html#deployment-circuit-breaker>"
+        ]
+    },
+    "ecsServiceFargateLatestPlatformVersion": {
+        "category": "S",
+        "^description": "{$COUNT} Fargate ECS service(s) pin an old platform version (platformVersion below the current LATEST — 1.4.0 for Linux). Older platform versions do not receive security patches; platform version 1.3.0 is retiring. This is Security Hub control ECS.10 and AWS Config rule ecs-fargate-latest-platform-version.",
+        "shortDesc": "Use platform version LATEST (or 1.4.0+) on Fargate services",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Security Hub ECS.10]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecs-controls.html#ecs-10>",
+            "[Fargate platform versions]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/platform_versions.html>"
+        ]
+    },
+    "ecsServiceAutoScalingConfigured": {
+        "category": "R",
+        "^description": "{$COUNT} ECS service(s) have no Application Auto Scaling target registered (application-autoscaling:DescribeScalableTargets returned no target for service/{cluster}/{service}). Without auto-scaling, services cannot respond to traffic spikes or reduce capacity during low load.",
+        "shortDesc": "Register an Application Auto Scaling target for ECS services",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Application Auto Scaling for ECS]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-auto-scaling.html>"
+        ]
+    },
+    "ecsServiceDesiredCountZero": {
+        "category": "O",
+        "^description": "{$COUNT} ACTIVE ECS service(s) have desiredCount = 0. This is either a scaled-down service (kept for future use) or an unintentional configuration; either way the service is currently serving no traffic.",
+        "shortDesc": "Investigate active services with desiredCount = 0",
+        "criticality": "L",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[ECS service definition parameters]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html>"
+        ]
+    },
+    "ecsServiceLoadBalancerHealthCheck": {
+        "category": "R",
+        "^description": "{$COUNT} ECS service(s) attached to a load balancer use overly permissive target-group health checks (healthyThresholdCount < 2, or unrealistically short intervals). Weak health-checks let unhealthy tasks continue to receive traffic before draining.",
+        "shortDesc": "Configure conservative target-group health-checks",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[ELB target group health checks]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/target-group-health-checks.html>"
+        ]
+    },
+    "ecsServiceEBSVolumeEncryption": {
+        "category": "S",
+        "^description": "{$COUNT} ECS service(s) attach managed EBS volumes to tasks without encryption (volumeConfigurations[].managedEBSVolume.encrypted = false or absent). Unencrypted volumes expose task-attached data at rest.",
+        "shortDesc": "Enable encryption on managed EBS volumes attached to ECS services",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[ECS managed EBS volumes]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ebs-volumes.html>"
+        ]
+    },
+    "ecsServiceMinimumHealthyPercent": {
+        "category": "R",
+        "^description": "{$COUNT} ECS service(s) use a REPLICA scheduling strategy with deploymentConfiguration.minimumHealthyPercent = 0. During a rolling deployment, all existing tasks can be stopped before new tasks come up — producing a full outage window.",
+        "shortDesc": "Set minimumHealthyPercent above 0 for REPLICA services",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Rolling deployment parameters]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/deployment-type-ecs.html>"
+        ]
+    },
+    "ecsServiceNetworkModeAwsvpc": {
+        "category": "S",
+        "^description": "{$COUNT} ECS service(s) reference task definitions that use networkMode 'bridge' or 'host' instead of 'awsvpc'. The awsvpc network mode gives each task its own ENI and security group, isolating tasks from each other and from the host. host mode shares the host network namespace and prevents per-task security-group isolation. Related to Security Hub ECS.3.",
+        "shortDesc": "Use awsvpc network mode on ECS task definitions",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[ECS task networking]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-networking.html>",
+            "[Security Hub ECS.3]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecs-controls.html#ecs-3>"
+        ]
+    },
+    "ecsTaskSetPublicIpDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} ECS task set(s) launch tasks with a public IP (networkConfiguration.awsvpcConfiguration.assignPublicIp = ENABLED). Task sets are used by services with the EXTERNAL deployment controller (e.g., CodeDeploy blue/green). Public IPs on task sets have the same exposure risk as on services. This is Security Hub control ECS.16.",
+        "shortDesc": "Disable assignPublicIp on ECS task sets",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Security Hub ECS.16]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecs-controls.html#ecs-16>"
+        ]
+    },
+    "ecsServicePropagateTags": {
+        "category": "O",
+        "^description": "{$COUNT} ECS service(s) do not propagate tags from either the task definition or the service to launched tasks (propagateTags = NONE or missing). Without propagation, individual tasks lack the tags needed for cost allocation and governance queries.",
+        "shortDesc": "Set propagateTags on ECS services (SERVICE or TASK_DEFINITION)",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Tagging ECS resources]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-using-tags.html>"
+        ]
+    },
+    "ecsTaskDefinitionNonRootUser": {
+        "category": "S",
+        "^description": "{$COUNT} ECS task definition(s) have one or more container(s) running as root (containerDefinitions[].user is empty, 'root', or '0'). Running containers as root amplifies the impact of any container-escape vulnerability. This is Security Hub control ECS.1.",
+        "shortDesc": "Set a non-root user on every container",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Security Hub ECS.1]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecs-controls.html#ecs-1>",
+            "[ECS task definition user]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_user>"
+        ]
+    },
+    "ecsTaskDefinitionNoPrivilegedContainers": {
+        "category": "S",
+        "^description": "{$COUNT} ECS task definition(s) have one or more container(s) running in privileged mode (containerDefinitions[].privileged = true). A privileged container has full access to the host kernel and devices; container escape becomes trivial. This is Security Hub control ECS.4 and AWS Config rule ecs-containers-nonprivileged.",
+        "shortDesc": "Set privileged=false on ECS container definitions",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Security Hub ECS.4]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecs-controls.html#ecs-4>"
+        ]
+    },
+    "ecsTaskDefinitionReadonlyRootFilesystem": {
+        "category": "S",
+        "^description": "{$COUNT} ECS task definition(s) have one or more container(s) with a writable root filesystem (containerDefinitions[].readonlyRootFilesystem = false or missing; default is false). A writable root filesystem allows attackers to persist malware, replace binaries, and modify configuration. This is Security Hub control ECS.5 and AWS Config rule ecs-containers-readonly-access.",
+        "shortDesc": "Set readonlyRootFilesystem=true on containers",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Security Hub ECS.5]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecs-controls.html#ecs-5>"
+        ]
+    },
+    "ecsTaskDefinitionLoggingConfigured": {
+        "category": "O",
+        "^description": "{$COUNT} ECS task definition(s) have container(s) without a logConfiguration. Without container logging, incident investigation, audit, and performance troubleshooting are impossible. This is Security Hub control ECS.9 and AWS Config rule ecs-task-definition-log-configuration.",
+        "shortDesc": "Configure logConfiguration on every container",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Security Hub ECS.9]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecs-controls.html#ecs-9>",
+            "[Container log configuration]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/using_awslogs.html>"
+        ]
+    },
+    "ecsTaskDefinitionNoSecretsInEnvVars": {
+        "category": "S",
+        "^description": "{$COUNT} ECS task definition(s) contain plaintext secret material in container environment variables (environment[] entries with names or values matching secret patterns such as AWS_SECRET_ACCESS_KEY, PASSWORD, TOKEN, API_KEY). Plaintext env vars are exposed via task metadata endpoint, describe-tasks API responses, the console, and CloudTrail. Secrets should be delivered via the secrets[] block referencing Secrets Manager or SSM Parameter Store. This is Security Hub control ECS.8.",
+        "shortDesc": "Move secrets from environment[] to secrets[] (Secrets Manager / SSM)",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Security Hub ECS.8]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecs-controls.html#ecs-8>",
+            "[Specifying sensitive data]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/specifying-sensitive-data.html>"
+        ]
+    },
+    "ecsTaskDefinitionHostNetworkModeUser": {
+        "category": "S",
+        "^description": "{$COUNT} ECS task definition(s) use host network mode with a non-privileged, root-user container (networkMode='host' AND privileged!=true AND user in {'','root','0'}). This is Security Hub control ECS.3 and AWS Config rule ecs-task-definition-user-for-host-mode-check. Host mode shares the host network namespace; combined with root user this yields unrestricted host network access.",
+        "shortDesc": "For host-mode tasks, run containers as a non-root user",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Security Hub ECS.3]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecs-controls.html#ecs-3>"
+        ]
+    },
+    "ecsTaskDefinitionSeparateTaskAndExecutionRoles": {
+        "category": "S",
+        "^description": "{$COUNT} ECS task definition(s) either share the same IAM role for both taskRoleArn and executionRoleArn, or omit the taskRoleArn entirely. The execution role is used by the ECS agent (pull images, push logs); the task role is what the workload uses to call AWS APIs. Using one role for both over-privileges the workload; omitting the task role leaves the workload with either no credentials or an over-privileged inheritance.",
+        "shortDesc": "Use separate IAM roles for taskRoleArn and executionRoleArn",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[ECS task IAM roles]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html>",
+            "[ECS task execution IAM role]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_execution_IAM_role.html>"
+        ]
+    },
+    "ecsTaskDefinitionHealthCheckDefined": {
+        "category": "R",
+        "^description": "{$COUNT} ECS task definition(s) do not declare any container-level healthCheck. Without a healthCheck, ECS relies solely on process exit codes to determine health, so a hung-but-alive container continues receiving traffic.",
+        "shortDesc": "Define containerDefinitions[].healthCheck on tasks",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 1,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Container health checks]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_healthcheck>"
+        ]
+    },
+    "ecsTaskDefinitionResourceLimits": {
+        "category": "P",
+        "^description": "{$COUNT} ECS task definition(s) do not set task-level cpu or memory limits. Fargate requires these; for EC2 launch type they are optional and often missing, allowing a runaway container to starve neighbours on the same instance.",
+        "shortDesc": "Set task-level cpu and memory on every task definition",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Task size]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#task_size>"
+        ]
+    },
+    "ecsTaskDefinitionNoHostPidMode": {
+        "category": "S",
+        "^description": "{$COUNT} ECS task definition(s) use host PID namespace (pidMode='host'). Host PID sharing lets containers see and signal every process on the host — a well-known container-escape vector.",
+        "shortDesc": "Do not set pidMode='host'",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[ECS task definition pidMode]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#task_definition_pidmode>"
+        ]
+    },
+    "ecsTaskDefinitionNoHostIpcMode": {
+        "category": "S",
+        "^description": "{$COUNT} ECS task definition(s) use host IPC namespace (ipcMode='host'). Host IPC sharing enables shared-memory and semaphore attacks between the container and host processes.",
+        "shortDesc": "Do not set ipcMode='host'",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[ECS task definition ipcMode]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#task_definition_ipcmode>"
+        ]
+    },
+    "ecsTaskDefinitionLinuxCapabilities": {
+        "category": "S",
+        "^description": "{$COUNT} ECS task definition(s) add dangerous Linux capabilities via linuxParameters.capabilities.add — one or more of SYS_ADMIN, NET_ADMIN, SYS_PTRACE, SYS_RAWIO, DAC_OVERRIDE, or NET_RAW. Added capabilities expand the container's kernel-level attack surface; SYS_ADMIN is nearly equivalent to running in privileged mode.",
+        "shortDesc": "Drop dangerous Linux capabilities from container definitions",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Linux capabilities in ECS]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_linuxparameters>"
+        ]
+    },
+    "ecsTaskDefinitionNoLatestTag": {
+        "category": "R",
+        "^description": "{$COUNT} ECS task definition(s) reference container images with the mutable ':latest' tag (or with no tag at all, which resolves to :latest). Mutable tags make deployments non-reproducible, complicate rollback, and increase supply-chain risk if an attacker can push new images to the same tag.",
+        "shortDesc": "Use immutable image tags (versioned or digest-pinned)",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[ECR image tag immutability]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-tag-mutability.html>"
+        ]
+    },
+    "ecsTaskDefinitionEcrImageSource": {
+        "category": "S",
+        "^description": "{$COUNT} ECS task definition(s) reference container images from registries other than Amazon ECR (Docker Hub, quay.io, ghcr.io, etc.). Public registries lack organisational access control, image-scanning integration, and immutability guarantees. ECR provides IAM-controlled access, image scanning, and tag immutability.",
+        "shortDesc": "Source container images from Amazon ECR",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[ECR pull-through cache]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache.html>"
+        ]
+    },
+    "ecsTaskDefinitionLogDriverAwslogs": {
+        "category": "O",
+        "^description": "{$COUNT} ECS task definition(s) have a logConfiguration.logDriver other than a durable driver (awslogs, awsfirelens, splunk). Drivers such as json-file or syslog store logs on the host, so logs are lost if the underlying host is terminated.",
+        "shortDesc": "Use awslogs (or awsfirelens/splunk) for durable container logs",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Supported log drivers]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_logconfiguration>"
+        ]
+    },
+    "ecsTaskDefinitionSecretReferences": {
+        "category": "R",
+        "^description": "{$COUNT} ECS task definition(s) reference secrets (containerDefinitions[].secrets[].valueFrom) whose ARN does not follow the expected Secrets Manager or SSM Parameter Store format, or which cannot be resolved. Broken secret references cause silent task-launch failures at deploy time.",
+        "shortDesc": "Verify every secrets[].valueFrom resolves to an existing secret",
+        "criticality": "L",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Passing sensitive data to a container]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/specifying-sensitive-data.html>"
+        ]
+    },
+    "ecsClusterServiceConnectDefaults": {
+        "category": "O",
+        "^description": "{$COUNT} ECS cluster(s) host multiple services but do not configure serviceConnectDefaults (no default Cloud Map namespace). Service Connect defaults reduce per-service boilerplate for service-to-service discovery.",
+        "shortDesc": "Configure serviceConnectDefaults on multi-service clusters",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[ECS Service Connect]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-connect.html>"
+        ]
+    },
+    "ecsServiceCapacityProviderFargateSpot": {
+        "category": "C",
+        "^description": "{$COUNT} ECS service(s) run exclusively on the FARGATE capacity provider with no FARGATE_SPOT in the strategy. Fargate Spot delivers up to ~70% cost savings for interruption-tolerant workloads (batch jobs, dev environments, stateless services with retry).",
+        "shortDesc": "Add FARGATE_SPOT to the capacity-provider strategy for spot-tolerant workloads",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Fargate Spot]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-capacity-providers.html>"
+        ]
+    },
+    "ecsServiceServiceDiscoveryConfigured": {
+        "category": "R",
+        "^description": "{$COUNT} ECS service(s) have no service-discovery mechanism configured — no Cloud Map registry, no Service Connect namespace, and no load balancer. Other services and clients cannot reliably locate the tasks.",
+        "shortDesc": "Attach a load balancer, Cloud Map service, or Service Connect namespace",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[ECS service discovery]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-discovery.html>"
+        ]
+    },
+    "ecsServiceStaleTaskDefinition": {
+        "category": "O",
+        "^description": "{$COUNT} ECS service(s) reference a task definition revision that is more than 5 revisions behind the latest ACTIVE revision in the same family. This is often a forgotten deployment or a service missing recent security patches.",
+        "shortDesc": "Roll services forward to a recent task-definition revision",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[ECS updating a service]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/update-service.html>"
+        ]
+    },
+    "ecsTaskDefinitionSensitiveHostPaths": {
+        "category": "S",
+        "^description": "{$COUNT} ECS task definition(s) bind-mount sensitive host paths into containers via volumes[].host.sourcePath — one or more of '/', '/etc', '/proc', '/sys', '/var/run/docker.sock', '/root'. Bind-mounting these paths gives the container direct access to host state and is a well-known escape route. (EC2 launch type only; Fargate rejects host bind-mounts.)",
+        "shortDesc": "Do not bind-mount sensitive host paths into containers",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[ECS volumes]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#volumes>"
+        ]
+    },
+    "ecsTaskDefinitionUlimitsConfigured": {
+        "category": "P",
+        "^description": "{$COUNT} ECS task definition(s) declare excessive ulimit hard limits (nofile > 65536 or nproc > 4096). Overly generous ulimits amplify the blast radius of resource-exhaustion attacks and rarely reflect real workload requirements.",
+        "shortDesc": "Right-size ulimits (nofile, nproc) to workload requirements",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Container ulimits]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task_definition_parameters.html#container_definition_ulimits>"
+        ]
+    },
+    "ecsTaskDefinitionEphemeralStorageEncryption": {
+        "category": "S",
+        "^description": "{$COUNT} Fargate ECS task definition(s) request ephemeral storage larger than the 20 GiB default (ephemeralStorage.sizeInGiB > 20) — an indication that non-trivial data is written to task-local scratch space. When enlarged ephemeral storage is used, cluster-level fargateEphemeralStorageKmsKeyId (a customer-managed KMS key) should protect the extra storage.",
+        "shortDesc": "For >20GiB Fargate ephemeral storage, use a CMK at the cluster level",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Fargate ephemeral storage]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-storage.html>"
+        ]
+    }
+}

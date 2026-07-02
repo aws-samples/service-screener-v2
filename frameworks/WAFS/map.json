@@ -270,7 +270,23 @@
         "iam.enableGuardDuty",
         "lambda.lambdaQuotasNotMonitored",
         "ec2.EC2ServiceQuotas",
-        "sagemaker.ModelContainerImageSource"
+        "sagemaker.ModelContainerImageSource",
+        "ecs.ecsServicePublicIpDisabled",
+        "ecs.ecsTaskSetPublicIpDisabled",
+        "ecs.ecsServiceFargateLatestPlatformVersion",
+        "ecs.ecsServiceNetworkModeAwsvpc",
+        "ecs.ecsTaskDefinitionNonRootUser",
+        "ecs.ecsTaskDefinitionNoPrivilegedContainers",
+        "ecs.ecsTaskDefinitionReadonlyRootFilesystem",
+        "ecs.ecsTaskDefinitionHostNetworkModeUser",
+        "ecs.ecsTaskDefinitionNoHostPidMode",
+        "ecs.ecsTaskDefinitionNoHostIpcMode",
+        "ecs.ecsTaskDefinitionLinuxCapabilities",
+        "ecs.ecsTaskDefinitionNoLatestTag",
+        "ecs.ecsTaskDefinitionEcrImageSource",
+        "ecs.ecsTaskDefinitionSensitiveHostPaths",
+        "ecs.ecsTaskDefinitionSeparateTaskAndExecutionRoles",
+        "ecs.ecsTaskDefinitionNoSecretsInEnvVars"
       ],
       "BP02": [
         "sagemaker.RootAccessDisabled",
@@ -312,7 +328,11 @@
         "firehose.firehoseSSEDisabled",
         "firehose.firehoseSSEDefaultKey",
         "firehose.firehoseS3DestinationNoEncryption",
-        "kinesis.kinesisKMSKeyRotationDisabled"
+        "kinesis.kinesisKMSKeyRotationDisabled",
+        "ecs.ecsClusterManagedStorageEncryption",
+        "ecs.ecsClusterExecuteCommandEncryption",
+        "ecs.ecsServiceEBSVolumeEncryption",
+        "ecs.ecsTaskDefinitionEphemeralStorageEncryption"
       ],
       "BP02": [
         "cloudtrail.RequiresKmsKey",

@@ -11,7 +11,16 @@
     "AGENTOPS01": {
       "BP01": [
         "bedrock.bedrockAgentNoInstruction",
-        "bedrock.bedrockAgentActionGroupNoSchema"
+        "bedrock.bedrockAgentActionGroupNoSchema",
+        "ecs.ecsClusterContainerInsightsEnabled",
+        "ecs.ecsClusterExecuteCommandLogging",
+        "ecs.ecsClusterTagging",
+        "ecs.ecsClusterServiceConnectDefaults",
+        "ecs.ecsServicePropagateTags",
+        "ecs.ecsServiceAutoScalingConfigured",
+        "ecs.ecsTaskDefinitionLoggingConfigured",
+        "ecs.ecsTaskDefinitionLogDriverAwslogs",
+        "ecs.ecsTaskDefinitionHealthCheckDefined"
       ],
       "BP02": [
         "bedrock.bedrockAgentGuardrailAttached",
@@ -168,7 +177,23 @@
         "ecr.ecrHighVulnerabilities",
         "ecr.ecrImageNeverScanned",
         "ecr.ecrRepoPublicAccess",
-        "ecr.ecrRepoCrossAccount"
+        "ecr.ecrRepoCrossAccount",
+        "ecs.ecsTaskDefinitionNonRootUser",
+        "ecs.ecsTaskDefinitionNoPrivilegedContainers",
+        "ecs.ecsTaskDefinitionReadonlyRootFilesystem",
+        "ecs.ecsTaskDefinitionHostNetworkModeUser",
+        "ecs.ecsTaskDefinitionNoHostPidMode",
+        "ecs.ecsTaskDefinitionNoHostIpcMode",
+        "ecs.ecsTaskDefinitionLinuxCapabilities",
+        "ecs.ecsTaskDefinitionNoLatestTag",
+        "ecs.ecsTaskDefinitionEcrImageSource",
+        "ecs.ecsTaskDefinitionSensitiveHostPaths",
+        "ecs.ecsTaskDefinitionSeparateTaskAndExecutionRoles",
+        "ecs.ecsTaskDefinitionNoSecretsInEnvVars",
+        "ecs.ecsServicePublicIpDisabled",
+        "ecs.ecsTaskSetPublicIpDisabled",
+        "ecs.ecsServiceFargateLatestPlatformVersion",
+        "ecs.ecsServiceNetworkModeAwsvpc"
       ],
       "BP02": [
         "bedrock.bedrockModelInvocationNoS3"
