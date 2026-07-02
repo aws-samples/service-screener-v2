@@ -207,7 +207,10 @@
         "stepfunctions.sfnTracingDisabled",
         "sns.snsDeliveryStatusLoggingDisabled",
         "wafv2.wafv2LoggingNotConfigured",
-        "wafv2.wafv2CloudWatchMetricsDisabled"
+        "wafv2.wafv2CloudWatchMetricsDisabled",
+        "route53.route53QueryLoggingNotEnabled",
+        "route53.route53ResolverQueryLoggingNotEnabled",
+        "route53.route53HealthCheckNoAlarm"
       ],
       "BP02": [
         "cloudwatch.missingCloudWatchDashboards",
@@ -258,7 +261,8 @@
         "redshift.SecurityGroups",
         "efs.MountTargetSecurityGroups",
         "sagemaker.NetworkIsolation",
-        "sagemaker.TrainingNetworkIsolation"
+        "sagemaker.TrainingNetworkIsolation",
+        "route53.route53ResolverDnsFirewallNotConfigured"
       ],
       "BP03": [],
       "BP04": [
@@ -308,7 +312,8 @@
         "ecr.ecrEncryptionKms",
         "ecr.ecrKmsDsseEncryption",
         "ecr.ecrRepoPublicAccess",
-        "ecr.ecrRepoCrossAccount"
+        "ecr.ecrRepoCrossAccount",
+        "route53.route53PublicZoneSensitiveNames"
       ],
       "BP02": [
         "s3.BucketOwnerEnforced"
@@ -451,7 +456,11 @@
         "cognito.cognitoClientHttpLogoutUrl",
         "cognito.cognitoIdpHttpMetadataUrl",
         "stepfunctions.sfnHttpTaskNoTLS",
-        "stepfunctions.sfnLoggingWithoutEncryption"
+        "stepfunctions.sfnLoggingWithoutEncryption",
+        "route53.route53DnssecNotEnabled",
+        "route53.route53ResolverDnssecValidationDisabled",
+        "route53.route53HealthCheckUsingHttp",
+        "route53.route53HealthCheckSniDisabled"
       ],
       "BP03": [],
       "BP04": [
@@ -465,7 +474,10 @@
       "BP01": [
         "bedrock.bedrockGuardrailNoPromptAttackFilter",
         "bedrock.bedrockGuardrailContentFilterDisabled",
-        "wafv2.wafv2RulesInCountMode"
+        "wafv2.wafv2RulesInCountMode",
+        "route53.route53DanglingDnsRecords",
+        "route53.route53DomainTransferLockDisabled",
+        "route53.route53DomainPrivacyDisabled"
       ],
       "BP02": [],
       "BP03": [],
