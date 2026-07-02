@@ -322,6 +322,12 @@ for acctId, cred in rolesCred.items():
         # Set back to cli options
         _cli_options['regions'] = regions
     
+    # Support --services ALL as a synonym for the full default services list
+    # (mirrors the --regions ALL behavior below).
+    if isinstance(_cli_options['services'], str) and _cli_options['services'].strip().upper() == 'ALL':
+        _cli_options['services'] = ArguParser.CLI_ARGUMENT_RULES['services']['default']
+        print("--services ALL detected. Using full default services list.")
+
     services = _cli_options['services'].split(',')
     regions = _cli_options['regions'].split(',')
     
