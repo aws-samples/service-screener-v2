@@ -288,7 +288,11 @@
         "ec2.EBSVolumeDataClassification",
         "efs.NoSensitiveDataInTags",
         "bedrock.bedrockGuardrailNoPiiDetection",
-        "sns.snsNoDataProtectionPolicy"
+        "sns.snsNoDataProtectionPolicy",
+        "ecr.ecrEncryptionKms",
+        "ecr.ecrKmsDsseEncryption",
+        "ecr.ecrRepoPublicAccess",
+        "ecr.ecrRepoCrossAccount"
       ],
       "BP02": [
         "s3.BucketOwnerEnforced"
@@ -383,7 +387,14 @@
         "acm.acmImportedCertNoAutoRenewal",
         "acm.acmCertPendingValidation",
         "acm.acmCertNotInUse",
-        "acm.acmCertNoTags"
+        "acm.acmCertNoTags",
+        "ecr.ecrScanOnPush",
+        "ecr.ecrEnhancedScanning",
+        "ecr.ecrScanFrequency",
+        "ecr.ecrCriticalVulnerabilities",
+        "ecr.ecrHighVulnerabilities",
+        "ecr.ecrImageNeverScanned",
+        "ecr.ecrScanFindingsStale"
       ],
       "BP02": [
         "cloudfront.viewerPolicyHttps",
@@ -452,6 +463,45 @@
       "BP06": [],
       "BP07": [],
       "BP08": []
+    },
+    "REL09": {
+      "BP01": [],
+      "BP02": [
+        "backup.backupNoPlanExists",
+        "backup.backupPlanNoRules",
+        "backup.backupPlanNotAssigned",
+        "backup.backupPlanNoLifecycle",
+        "backup.backupServiceOptInDisabled",
+        "backup.backupServiceManagementDisabled",
+        "backup.backupCriticalResourcesUnprotected",
+        "backup.backupVaultNoLock",
+        "backup.backupVaultNoAccessPolicy",
+        "backup.backupVaultDefaultEncryption",
+        "backup.backupVaultLockNotFinalized",
+        "backup.backupVaultEmpty",
+        "backup.backupRecoveryPointNotEncrypted",
+        "backup.backupRecoveryPointNoCMK",
+        "backup.backupRecoveryPointExpiredLifecycle",
+        "backup.backupPlanInfrequentSchedule",
+        "backup.backupPlanNoCompletionWindow",
+        "backup.backupPlanNoContinuousBackup",
+        "backup.backupNoLogicallyAirGappedVault"
+      ],
+      "BP03": [],
+      "BP04": []
+    },
+    "REL13": {
+      "BP01": [
+        "backup.backupPlanNoCrossRegionCopy",
+        "backup.backupCrossAccountDisabled",
+        "backup.backupRecoveryPointNeverRestored",
+        "backup.backupNoLogicallyAirGappedVault",
+        "backup.backupVaultLockNotFinalized"
+      ],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": []
     }
   }
 }

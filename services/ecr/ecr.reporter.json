@@ -1,0 +1,271 @@
+{
+    "ecrScanOnPush": {
+        "category": "S",
+        "^description": "{$COUNT} ECR repositor(y|ies) have no scan-on-push configured (repo-level scanOnPush=false and no registry-level scanning rule matches). Images pushed to these repos may reach production with unknown CVEs; ECR.1 requires scan-on-push. Enabling either the repo-level flag or a registry-level SCAN_ON_PUSH / CONTINUOUS_SCAN rule closes this gap.",
+        "shortDesc": "Enable scan-on-push (repo or registry rule)",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Image scanning]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning.html>",
+            "[Security Hub ECR.1]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecr-controls.html#ecr-1>"
+        ]
+    },
+    "ecrTagImmutability": {
+        "category": "S",
+        "^description": "{$COUNT} ECR repositor(y|ies) have imageTagMutability=MUTABLE. Mutable tags allow an existing tag (e.g. `latest`, `v1`) to be overwritten with a different image digest — enabling supply-chain attacks where a compromised push swaps a trusted tag out from under running deployments. ECR.2 requires immutability.",
+        "shortDesc": "Set imageTagMutability=IMMUTABLE",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Tag mutability]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-tag-mutability.html>",
+            "[Security Hub ECR.2]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecr-controls.html#ecr-2>"
+        ]
+    },
+    "ecrLifecyclePolicy": {
+        "category": "C",
+        "^description": "{$COUNT} ECR repositor(y|ies) have no lifecycle policy configured. Without lifecycle rules, old and untagged image layers accumulate indefinitely — increasing storage cost and expanding the attack surface (older base images are more likely to contain unpatched CVEs). ECR.3 requires a lifecycle policy.",
+        "shortDesc": "Attach a lifecycle policy that cleans up untagged / old images",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Lifecycle policies]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/LifecyclePolicies.html>",
+            "[Security Hub ECR.3]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecr-controls.html#ecr-3>"
+        ]
+    },
+    "ecrEncryptionKms": {
+        "category": "S",
+        "^description": "{$COUNT} ECR repositor(y|ies) are not encrypted with a customer-managed KMS key (encryptionType=AES256, or KMS with the AWS-managed `aws/ecr` alias). A customer-managed CMK gives you control over key rotation, key policy, and CloudTrail-audited access, and lets you revoke image access by disabling the key. ECR.5 requires KMS encryption.",
+        "shortDesc": "Recreate the repo with encryptionType=KMS and a customer-managed key",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[ECR encryption at rest]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/encryption-at-rest.html>",
+            "[Security Hub ECR.5]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecr-controls.html#ecr-5>"
+        ]
+    },
+    "ecrCriticalVulnerabilities": {
+        "category": "S",
+        "^description": "{$COUNT} ECR repositor(y|ies) contain image(s) with CRITICAL severity vulnerabilities in the last scan summary. CRITICAL findings are typically remote-exploitable and should be treated as a break-glass event — rebuild the base image with the current patch set or pin to a known-good digest.",
+        "shortDesc": "Rebuild and push new images to eliminate CRITICAL CVEs",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Reading scan findings]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning.html>",
+            "[Inspector vulnerabilities]<https://docs.aws.amazon.com/inspector/latest/user/findings-managing.html>"
+        ]
+    },
+    "ecrHighVulnerabilities": {
+        "category": "S",
+        "^description": "{$COUNT} ECR repositor(y|ies) contain image(s) with HIGH severity vulnerabilities in the last scan summary. HIGH findings should be scheduled for the next patch cycle; sustained HIGH count is a signal that base-image refresh cadence is too slow.",
+        "shortDesc": "Schedule a rebuild against the current patch set",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Reading scan findings]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning.html>"
+        ]
+    },
+    "ecrEnhancedScanning": {
+        "category": "S",
+        "^description": "The ECR registry in this region is running BASIC image scanning (Clair-only, scan-on-push snapshot). Enhanced scanning via Amazon Inspector adds continuous scanning of already-pushed images, OS + language-package coverage, and Security Hub integration. Basic scanning misses CVEs disclosed after the initial push.",
+        "shortDesc": "Enable Enhanced scanning (scanType=ENHANCED) on the registry",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Enhanced scanning]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning-enhanced.html>",
+            "[Inspector for ECR]<https://docs.aws.amazon.com/inspector/latest/user/scanning-ecr.html>"
+        ]
+    },
+    "ecrScanFrequency": {
+        "category": "S",
+        "^description": "The ECR registry in this region has no rule with scanFrequency=CONTINUOUS_SCAN. Without continuous scanning, images that were CVE-free at push time will not be re-evaluated as new vulnerabilities are disclosed — the finding surfaces only on the next push, which may never happen for pinned production images.",
+        "shortDesc": "Add a registry scanning rule with scanFrequency=CONTINUOUS_SCAN",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Registry scanning rules]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning-enhanced.html>"
+        ]
+    },
+    "ecrRepoPublicAccess": {
+        "category": "S",
+        "^description": "{$COUNT} ECR repositor(y|ies) have an Allow statement in the repository policy whose Principal is a wildcard (`*` or `{\"AWS\": \"*\"}`) without a scoping Condition. Unrestricted wildcard access lets any AWS account (in the worst case, unauthenticated pulls) fetch container images — potentially exposing proprietary code, embedded secrets, or internal build artefacts.",
+        "shortDesc": "Remove or scope wildcard-Principal Allow statements",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Repository policies]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/repository-policies.html>",
+            "[Policy examples]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/repository-policy-examples.html>"
+        ]
+    },
+    "ecrRepoCrossAccount": {
+        "category": "S",
+        "^description": "{$COUNT} ECR repositor(y|ies) grant Allow permissions to external AWS accounts in the repository policy without an aws:PrincipalOrgID Condition. Broad cross-account access widens blast radius: if any partner account is compromised, its identities can pull (and in some cases push) images. Restrict with aws:PrincipalOrgID or aws:SourceAccount.",
+        "shortDesc": "Constrain cross-account Allow with aws:PrincipalOrgID",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Policy examples]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/repository-policy-examples.html>",
+            "[aws:PrincipalOrgID]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html#condition-keys-principalorgid>"
+        ]
+    },
+    "ecrUntaggedImages": {
+        "category": "C",
+        "^description": "{$COUNT} ECR repositor(y|ies) contain untagged images — usually orphaned layers left behind when a tag was moved to a newer image. Untagged images continue to accrue storage cost, cannot be referenced by pull commands, and are typically safe to remove via a lifecycle rule targeting `tagStatus=untagged`.",
+        "shortDesc": "Add a lifecycle rule targeting tagStatus=untagged",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Lifecycle policy examples]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/lifecycle_policy_examples.html>"
+        ]
+    },
+    "ecrStaleImages": {
+        "category": "C",
+        "^description": "{$COUNT} ECR repositor(y|ies) contain image(s) that have not been pulled in 90+ days (or have no recorded pull time). Stale images occupy storage, may carry unpatched CVEs, and indicate deployments that no longer reference them. Consider a lifecycle rule that expires images past a pull-age threshold.",
+        "shortDesc": "Prune images that have not been pulled recently",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Lifecycle policy parameters]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/lifecycle_policy_parameters.html>"
+        ]
+    },
+    "ecrImageNeverScanned": {
+        "category": "S",
+        "^description": "{$COUNT} ECR repositor(y|ies) contain image(s) with no usable scan status (imageScanStatus is None, FAILED, UNSUPPORTED_IMAGE, or SCAN_ELIGIBILITY_EXPIRED). Images without scan results are a security blind spot — CVE posture is unknown. Re-trigger scans manually or push a fresh image tag to force a scan.",
+        "shortDesc": "Re-scan or rebuild these images",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Image scan filters]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning.html>"
+        ]
+    },
+    "ecrReplicationNotConfigured": {
+        "category": "R",
+        "^description": "The ECR registry in this region has no replication rules configured. In a regional outage or account-isolation scenario, container-based deployments in other regions cannot pull images. Cross-region replication produces a second copy of every push in the destination region(s).",
+        "shortDesc": "Configure cross-region ECR replication for critical repositories",
+        "criticality": "L",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[ECR replication]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/registry-settings-replication.html>"
+        ]
+    },
+    "ecrPullThroughCache": {
+        "category": "O",
+        "^description": "The ECR registry in this region has no pull-through cache rules. Without pull-through cache, deployments that reference upstream images (Docker Hub, Quay, public.ecr.aws, GitHub Container Registry, K8s registry) hit the external registry directly on every cache miss — subject to that registry's rate limits and availability. Pull-through cache in ECR gives you local mirroring, IAM-scoped pulls, and image-scanning coverage of the cached copies.",
+        "shortDesc": "Configure pull-through cache rules for external registries",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Pull-through cache]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/pull-through-cache.html>"
+        ]
+    },
+    "ecrImageAge": {
+        "category": "C",
+        "^description": "{$COUNT} ECR repositor(y|ies) contain image(s) pushed more than 365 days ago that have never been pulled (or have not been pulled in 90+ days). Very old, un-pulled images are strong candidates for cleanup — they contribute to storage cost and typically only exist because a lifecycle rule is missing.",
+        "shortDesc": "Add a lifecycle rule with countType=sinceImagePushed",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Lifecycle policy parameters]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/lifecycle_policy_parameters.html>"
+        ]
+    },
+    "ecrPublicRepoTagging": {
+        "category": "O",
+        "^description": "{$COUNT} ECR repositor(y|ies) have no tags applied. Tags drive cost allocation, ownership, environment separation, and access control (via aws:ResourceTag policy conditions). Absence of tags makes governance and chargeback impractical. ECR.4 requires public repositories to carry identifying tags.",
+        "shortDesc": "Apply owner / environment / cost-center tags to every repository",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Tagging ECR resources]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/ecr-using-tags.html>",
+            "[Security Hub ECR.4]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecr-controls.html#ecr-4>"
+        ]
+    },
+    "ecrKmsDsseEncryption": {
+        "category": "S",
+        "^description": "{$COUNT} ECR repositor(y|ies) are not using dual-layer server-side encryption (encryptionType != KMS_DSSE). KMS_DSSE applies two independent layers of AES-256 encryption to each object with two distinct KMS data keys; the feature is intended for workloads that need to satisfy specific regulatory profiles (FedRAMP High, DoD IL-5+). Not required for most environments — advisory only.",
+        "shortDesc": "Consider KMS_DSSE for regulated workloads",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Dual-layer encryption]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/encryption-at-rest.html>"
+        ]
+    },
+    "ecrLifecyclePolicyEffectiveness": {
+        "category": "C",
+        "^description": "{$COUNT} ECR repositor(y|ies) have a lifecycle policy configured but the ruleset is missing at least one of: (a) an `tagStatus=untagged` cleanup rule, or (b) a `countType=sinceImagePushed` age-based cleanup rule. Without both, either orphaned layers or aged tagged images will still accumulate.",
+        "shortDesc": "Add both untagged and age-based rules to the lifecycle policy",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Lifecycle policy examples]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/lifecycle_policy_examples.html>"
+        ]
+    },
+    "ecrScanFindingsStale": {
+        "category": "S",
+        "^description": "{$COUNT} ECR repositor(y|ies) have image(s) whose most-recent scan (imageScanCompletedAt) is older than 30 days. Stale scan data hides CVEs disclosed since the last scan. Enabling CONTINUOUS_SCAN (see ecrScanFrequency) refreshes findings automatically; otherwise re-scan periodically.",
+        "shortDesc": "Re-scan images with stale findings (or enable CONTINUOUS_SCAN)",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Image scanning]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning.html>"
+        ]
+    }
+}

@@ -1,321 +1,333 @@
 {
-    "metadata": {
-        "originator": "AWS",
-        "shortname": "AAIL",
-        "fullname": "AWS Well-Architected Framework - Agentic AI Lens",
-        "description": "This lens extends the AWS Well-Architected Framework with best practices for agentic AI systems on AWS. It covers operational excellence, security, reliability, performance efficiency, cost optimization, and sustainability considerations specific to agent-based architectures built on Amazon Bedrock and supporting services.",
-        "_": "https://docs.aws.amazon.com/wellarchitected/latest/agentic-ai-lens/welcome.html",
-        "emptyCheckDefaultMsg": "Manual review required \u2014 no automated check available"
+  "metadata": {
+    "originator": "AWS",
+    "shortname": "AAIL",
+    "fullname": "AWS Well-Architected Framework - Agentic AI Lens",
+    "description": "This lens extends the AWS Well-Architected Framework with best practices for agentic AI systems on AWS. It covers operational excellence, security, reliability, performance efficiency, cost optimization, and sustainability considerations specific to agent-based architectures built on Amazon Bedrock and supporting services.",
+    "_": "https://docs.aws.amazon.com/wellarchitected/latest/agentic-ai-lens/welcome.html",
+    "emptyCheckDefaultMsg": "Manual review required \u2014 no automated check available"
+  },
+  "mapping": {
+    "AGENTOPS01": {
+      "BP01": [
+        "bedrock.bedrockAgentNoInstruction",
+        "bedrock.bedrockAgentActionGroupNoSchema"
+      ],
+      "BP02": [
+        "bedrock.bedrockAgentGuardrailAttached",
+        "bedrock.bedrockAgentCollaborationDisabled"
+      ]
     },
-    "mapping": {
-        "AGENTOPS01": {
-            "BP01": [
-                "bedrock.bedrockAgentNoInstruction",
-                "bedrock.bedrockAgentActionGroupNoSchema"
-            ],
-            "BP02": [
-                "bedrock.bedrockAgentGuardrailAttached",
-                "bedrock.bedrockAgentCollaborationDisabled"
-            ]
-        },
-        "AGENTOPS02": {
-            "BP02": [
-                "bedrock.bedrockAgentExcessiveVersions"
-            ]
-        },
-        "AGENTOPS03": {
-            "BP01": [
-                "bedrock.bedrockAgentNotPrepared",
-                "bedrock.bedrockGuardrailStatusFailed",
-                "stepfunctions.sfnDefinitionValidationErrors",
-                "stepfunctions.sfnRoleDoesNotExist",
-                "stepfunctions.sfnLogGroupDoesNotExist"
-            ],
-            "BP03": [
-                "bedrock.bedrockServiceLimitAgents",
-                "bedrock.bedrockServiceLimitKnowledgeBases",
-                "bedrock.bedrockServiceLimitGuardrails",
-                "bedrock.bedrockACServiceLimitRuntimes"
-            ]
-        },
-        "AGENTOPS04": {
-            "BP01": [
-                "bedrock.bedrockAgentActionGroupNoSchema",
-                "bedrock.bedrockServiceLimitAgentActionGroups"
-            ],
-            "BP02": [
-                "bedrock.bedrockACGatewayNoTargets",
-                "bedrock.bedrockACGatewayTargetNoAuth"
-            ]
-        },
-        "AGENTOPS05": {
-            "BP01": [
-                "bedrock.bedrockModelInvocationLoggingDisabled",
-                "cloudtrail.trailEnabled",
-                "stepfunctions.sfnTracingDisabled",
-                "sns.snsTracingDisabled",
-                "wafv2.wafv2LoggingNotConfigured",
-                "wafv2.wafv2CloudWatchMetricsDisabled"
-            ],
-            "BP03": [
-                "bedrock.bedrockModelInvocationNoCloudWatch",
-                "cloudwatch.$length",
-                "stepfunctions.sfnLoggingDisabled",
-                "stepfunctions.sfnLoggingLevelWeak",
-                "stepfunctions.sfnExpressWorkflowNoLogging",
-                "sns.snsDeliveryStatusLoggingDisabled"
-            ],
-            "BP04": [
-                "cloudwatch.alarmsWithoutSNS",
-                "cloudwatch.missingCompositeAlarms"
-            ]
-        },
-        "AGENTOPS07": {
-            "BP01": [
-                "cloudwatch.missingBillingAlarms"
-            ]
-        },
-        "AGENTOPS06": {
-            "BP01": [
-                "bedrock.bedrockACNoEvaluator"
-            ]
-        },
-        "AGENTSEC01": {
-            "BP01": [
-                "dynamodb.encryptionAtRest",
-                "dynamodb.disabledPointInTimeRecovery",
-                "bedrock.bedrockAgentMemoryDisabled",
-                "bedrock.bedrockACMemoryNoEncryption",
-                "bedrock.bedrockACMemoryNoNamespace"
-            ],
-            "BP02": [
-                "bedrock.bedrockGuardrailContentFilterDisabled",
-                "bedrock.bedrockGuardrailNoPiiDetection",
-                "wafv2.wafv2RulesInCountMode",
-                "sns.snsNoDataProtectionPolicy",
-                "sns.snsPolicyOverlyBroadActions",
-                "stepfunctions.sfnIAMRoleAllowsPassRole"
-            ],
-            "BP03": [
-                "bedrock.bedrockGuardrailNoGroundingFilter"
-            ]
-        },
-        "AGENTSEC02": {
-            "BP01": [
-                "bedrock.bedrockAgentIamRoleOverprivileged",
-                "iam.InlinePolicyFullAdminAccess",
-                "bedrock.bedrockACRuntimeWildcardRole",
-                "stepfunctions.sfnRoleOverprivileged",
-                "cognito.cognitoWeakPasswordPolicy"
-            ],
-            "BP02": [
-                "iam.InlinePolicyFullAccessOneServ",
-                "iam.FullAdminAccess",
-                "lambda.lambdaRoleTooPermissive",
-                "sns.snsPublicAccess"
-            ],
-            "BP03": [
-                "bedrock.bedrockAgentNoEncryptionKey",
-                "bedrock.bedrockGuardrailNoEncryption",
-                "bedrock.bedrockKBNoEncryption",
-                "stepfunctions.sfnEncryptionAtRest",
-                "sns.snsEncryptionAtRest"
-            ]
-        },
-        "AGENTSEC03": {
-            "BP01": [
-                "iam.missingPermissionsBoundaries",
-                "bedrock.bedrockAgentIamRoleOverprivileged",
-                "bedrock.bedrockACNoIdentityProvider",
-                "bedrock.bedrockACApiKeyProviderUsed",
-                "cognito.cognitoMfaNotEnforced",
-                "cognito.cognitoAdvancedSecurityNotEnforced",
-                "cognito.cognitoCompromisedCredentialProtection",
-                "cognito.cognitoClientImplicitGrantEnabled",
-                "cognito.cognitoClientHttpCallbackUrl",
-                "cognito.cognitoAccountTakeoverProtectionWeak",
-                "cognito.cognitoCompromisedCredentialIncompleteFilter",
-                "cognito.cognitoGroupOverlyPermissiveRole"
-            ],
-            "BP02": [
-                "bedrock.bedrockKBRoleOverprivileged",
-                "cognito.cognitoCustomAuthThreatProtectionDisabled"
-            ]
-        },
-        "AGENTSEC04": {
-            "BP01": [
-                "bedrock.bedrockAgentGuardrailAttached",
-                "bedrock.bedrockGuardrailContentFilterDisabled",
-                "bedrock.bedrockGuardrailNoDeniedTopics",
-                "bedrock.bedrockNoGuardrailsExist",
-                "bedrock.bedrockACGatewayNoPolicy",
-                "bedrock.bedrockACNoPolicyEngine"
-            ],
-            "BP02": [
-                "bedrock.bedrockGuardrailOutputFilterDisabled",
-                "bedrock.bedrockGuardrailContentFilterWeak"
-            ]
-        },
-        "AGENTSEC05": {
-            "BP01": [
-                "bedrock.bedrockModelInvocationLoggingDisabled",
-                "cloudtrail.trailEnabled",
-                "cloudtrail.trailMultiRegion",
-                "ecr.ecrScanOnPush",
-                "ecr.ecrEnhancedScanning",
-                "ecr.ecrTagImmutability",
-                "ecr.ecrCriticalVulnerabilities",
-                "ecr.ecrHighVulnerabilities",
-                "ecr.ecrImageNeverScanned",
-                "ecr.ecrRepoPublicAccess",
-                "ecr.ecrRepoCrossAccount"
-            ],
-            "BP02": [
-                "bedrock.bedrockModelInvocationNoS3"
-            ]
-        },
-        "AGENTSEC08": {
-            "BP01": [
-                "bedrock.bedrockGuardrailNoPromptAttackFilter",
-                "bedrock.bedrockGuardrailNoPiiDetection",
-                "wafv2.wafv2NoRules",
-                "wafv2.wafv2NoManagedRuleGroups",
-                "wafv2.wafv2NoIpReputationList",
-                "wafv2.wafv2NoSqlInjectionProtection",
-                "wafv2.wafv2ManagedRuleGroupAllCountOverride",
-                "wafv2.wafv2NoCoreRuleSet",
-                "wafv2.wafv2AllowRuleBeforeManagedRules",
-                "wafv2.wafv2AlbWithoutWebAcl",
-                "wafv2.wafv2ApiGatewayWithoutWebAcl",
-                "wafv2.wafv2CloudFrontWithoutWebAcl"
-            ],
-            "BP02": [
-                "bedrock.bedrockGuardrailNoWordFilter",
-                "wafv2.wafv2RulesInCountMode"
-            ]
-        },
-        "AGENTSEC09": {
-            "BP01": [
-                "iam.enableGuardDuty",
-                "guardduty.$length"
-            ]
-        },
-        "AGENTSEC06": {
-            "BP02": [
-                "bedrock.bedrockACRuntimeNoGateway",
-                "bedrock.bedrockACGatewayNoPolicy"
-            ]
-        },
-        "AGENTREL01": {
-            "BP01": [
-                "sqs.DeadLetterQueue",
-                "sqs.EncryptionAtRest"
-            ],
-            "BP02": [
-                "bedrock.bedrockACRuntimeNoVPC"
-            ]
-        },
-        "AGENTREL02": {
-            "BP01": [
-                "lambda.lambdaTimeoutNotOptimized",
-                "lambda.lambdaDeadLetterQueueDisabled",
-                "stepfunctions.sfnNoTimeout",
-                "stepfunctions.sfnNoRetryPolicy",
-                "stepfunctions.sfnNoCatchHandler",
-                "stepfunctions.sfnNoHeartbeat",
-                "stepfunctions.sfnTaskNoTimeout",
-                "stepfunctions.sfnChoiceNoDefault",
-                "stepfunctions.sfnUnreachableStates",
-                "stepfunctions.sfnParallelNoCatch",
-                "stepfunctions.sfnMapNoCatch",
-                "kinesis.kinesisRetentionPeriodMinimum"
-            ]
-        },
-        "AGENTREL05": {
-            "BP03": [
-                "bedrock.bedrockKBNoDataSources",
-                "bedrock.bedrockKBDataSourceSyncStale"
-            ]
-        },
-        "AGENTREL07": {
-            "BP02": [
-                "sqs.DeadLetterQueue",
-                "lambda.lambdaDeadLetterQueueDisabled",
-                "stepfunctions.sfnNoRetryPolicy",
-                "stepfunctions.sfnNoCatchHandler",
-                "sns.snsSubscriptionNoDlq"
-            ]
-        },
-        "AGENTREL08": {
-            "BP01": [
-                "bedrock.bedrockServiceLimitAgents",
-                "bedrock.bedrockServiceLimitTPM",
-                "wafv2.wafv2NoRateBasedRules"
-            ]
-        },
-        "AGENTPERF01": {
-            "BP02": [
-                "bedrock.bedrockModelInvocationLoggingDisabled",
-                "bedrock.bedrockModelInvocationNoCloudWatch"
-            ]
-        },
-        "AGENTPERF03": {
-            "BP01": [
-                "bedrock.bedrockAgentMemoryDisabled",
-                "elasticache.encryptionInTransit"
-            ]
-        },
-        "AGENTPERF06": {
-            "BP01": [
-                "lambda.lambdaTimeoutNotOptimized",
-                "lambda.lambdaReservedConcurrencyDisabled"
-            ]
-        },
-        "AGENTPERF07": {
-            "BP01": [
-                "bedrock.bedrockServiceLimitTPM",
-                "bedrock.bedrockServiceLimitAgents",
-                "bedrock.bedrockACRuntimeNoVPC"
-            ]
-        },
-        "AGENTCOST01": {
-            "BP01": [
-                "bedrock.bedrockModelInvocationLoggingDisabled"
-            ]
-        },
-        "AGENTCOST03": {
-            "BP01": [
-                "bedrock.bedrockAgentIdleSessionTimeout"
-            ]
-        },
-        "AGENTCOST04": {
-            "BP01": [
-                "lambda.lambdaReservedConcurrencyDisabled"
-            ]
-        },
-        "AGENTCOST06": {
-            "BP02": [
-                "bedrock.bedrockAgentExcessiveVersions"
-            ]
-        },
-        "AGENTCOST07": {
-            "BP01": [
-                "bedrock.bedrockServiceLimitAgents",
-                "bedrock.bedrockServiceLimitKnowledgeBases",
-                "bedrock.bedrockServiceLimitGuardrails"
-            ]
-        },
-        "AGENTSUS01": {
-            "BP01": [
-                "bedrock.bedrockAgentIamRoleOverprivileged",
-                "bedrock.bedrockAgentNoInstruction",
-                "bedrock.bedrockACRuntimeWildcardRole"
-            ]
-        },
-        "AGENTSUS02": {
-            "BP04": [
-                "cloudwatch.missingBillingAlarms"
-            ]
-        }
+    "AGENTOPS02": {
+      "BP02": [
+        "bedrock.bedrockAgentExcessiveVersions"
+      ]
+    },
+    "AGENTOPS03": {
+      "BP01": [
+        "bedrock.bedrockAgentNotPrepared",
+        "bedrock.bedrockGuardrailStatusFailed",
+        "stepfunctions.sfnDefinitionValidationErrors",
+        "stepfunctions.sfnRoleDoesNotExist",
+        "stepfunctions.sfnLogGroupDoesNotExist"
+      ],
+      "BP03": [
+        "bedrock.bedrockServiceLimitAgents",
+        "bedrock.bedrockServiceLimitKnowledgeBases",
+        "bedrock.bedrockServiceLimitGuardrails",
+        "bedrock.bedrockACServiceLimitRuntimes"
+      ]
+    },
+    "AGENTOPS04": {
+      "BP01": [
+        "bedrock.bedrockAgentActionGroupNoSchema",
+        "bedrock.bedrockServiceLimitAgentActionGroups"
+      ],
+      "BP02": [
+        "bedrock.bedrockACGatewayNoTargets",
+        "bedrock.bedrockACGatewayTargetNoAuth"
+      ]
+    },
+    "AGENTOPS05": {
+      "BP01": [
+        "bedrock.bedrockModelInvocationLoggingDisabled",
+        "cloudtrail.trailEnabled",
+        "stepfunctions.sfnTracingDisabled",
+        "sns.snsTracingDisabled",
+        "wafv2.wafv2LoggingNotConfigured",
+        "wafv2.wafv2CloudWatchMetricsDisabled"
+      ],
+      "BP03": [
+        "bedrock.bedrockModelInvocationNoCloudWatch",
+        "cloudwatch.$length",
+        "stepfunctions.sfnLoggingDisabled",
+        "stepfunctions.sfnLoggingLevelWeak",
+        "stepfunctions.sfnExpressWorkflowNoLogging",
+        "sns.snsDeliveryStatusLoggingDisabled"
+      ],
+      "BP04": [
+        "cloudwatch.alarmsWithoutSNS",
+        "cloudwatch.missingCompositeAlarms"
+      ]
+    },
+    "AGENTOPS07": {
+      "BP01": [
+        "cloudwatch.missingBillingAlarms"
+      ]
+    },
+    "AGENTOPS06": {
+      "BP01": [
+        "bedrock.bedrockACNoEvaluator"
+      ]
+    },
+    "AGENTSEC01": {
+      "BP01": [
+        "dynamodb.encryptionAtRest",
+        "dynamodb.disabledPointInTimeRecovery",
+        "bedrock.bedrockAgentMemoryDisabled",
+        "bedrock.bedrockACMemoryNoEncryption",
+        "bedrock.bedrockACMemoryNoNamespace"
+      ],
+      "BP02": [
+        "bedrock.bedrockGuardrailContentFilterDisabled",
+        "bedrock.bedrockGuardrailNoPiiDetection",
+        "wafv2.wafv2RulesInCountMode",
+        "sns.snsNoDataProtectionPolicy",
+        "sns.snsPolicyOverlyBroadActions",
+        "stepfunctions.sfnIAMRoleAllowsPassRole"
+      ],
+      "BP03": [
+        "bedrock.bedrockGuardrailNoGroundingFilter"
+      ]
+    },
+    "AGENTSEC02": {
+      "BP01": [
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "iam.InlinePolicyFullAdminAccess",
+        "bedrock.bedrockACRuntimeWildcardRole",
+        "stepfunctions.sfnRoleOverprivileged",
+        "cognito.cognitoWeakPasswordPolicy"
+      ],
+      "BP02": [
+        "iam.InlinePolicyFullAccessOneServ",
+        "iam.FullAdminAccess",
+        "lambda.lambdaRoleTooPermissive",
+        "sns.snsPublicAccess"
+      ],
+      "BP03": [
+        "bedrock.bedrockAgentNoEncryptionKey",
+        "bedrock.bedrockGuardrailNoEncryption",
+        "bedrock.bedrockKBNoEncryption",
+        "stepfunctions.sfnEncryptionAtRest",
+        "sns.snsEncryptionAtRest"
+      ]
+    },
+    "AGENTSEC03": {
+      "BP01": [
+        "iam.missingPermissionsBoundaries",
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "bedrock.bedrockACNoIdentityProvider",
+        "bedrock.bedrockACApiKeyProviderUsed",
+        "cognito.cognitoMfaNotEnforced",
+        "cognito.cognitoAdvancedSecurityNotEnforced",
+        "cognito.cognitoCompromisedCredentialProtection",
+        "cognito.cognitoClientImplicitGrantEnabled",
+        "cognito.cognitoClientHttpCallbackUrl",
+        "cognito.cognitoAccountTakeoverProtectionWeak",
+        "cognito.cognitoCompromisedCredentialIncompleteFilter",
+        "cognito.cognitoGroupOverlyPermissiveRole"
+      ],
+      "BP02": [
+        "bedrock.bedrockKBRoleOverprivileged",
+        "cognito.cognitoCustomAuthThreatProtectionDisabled"
+      ]
+    },
+    "AGENTSEC04": {
+      "BP01": [
+        "bedrock.bedrockAgentGuardrailAttached",
+        "bedrock.bedrockGuardrailContentFilterDisabled",
+        "bedrock.bedrockGuardrailNoDeniedTopics",
+        "bedrock.bedrockNoGuardrailsExist",
+        "bedrock.bedrockACGatewayNoPolicy",
+        "bedrock.bedrockACNoPolicyEngine"
+      ],
+      "BP02": [
+        "bedrock.bedrockGuardrailOutputFilterDisabled",
+        "bedrock.bedrockGuardrailContentFilterWeak"
+      ]
+    },
+    "AGENTSEC05": {
+      "BP01": [
+        "bedrock.bedrockModelInvocationLoggingDisabled",
+        "cloudtrail.trailEnabled",
+        "cloudtrail.trailMultiRegion",
+        "ecr.ecrScanOnPush",
+        "ecr.ecrEnhancedScanning",
+        "ecr.ecrTagImmutability",
+        "ecr.ecrCriticalVulnerabilities",
+        "ecr.ecrHighVulnerabilities",
+        "ecr.ecrImageNeverScanned",
+        "ecr.ecrRepoPublicAccess",
+        "ecr.ecrRepoCrossAccount"
+      ],
+      "BP02": [
+        "bedrock.bedrockModelInvocationNoS3"
+      ]
+    },
+    "AGENTSEC08": {
+      "BP01": [
+        "bedrock.bedrockGuardrailNoPromptAttackFilter",
+        "bedrock.bedrockGuardrailNoPiiDetection",
+        "wafv2.wafv2NoRules",
+        "wafv2.wafv2NoManagedRuleGroups",
+        "wafv2.wafv2NoIpReputationList",
+        "wafv2.wafv2NoSqlInjectionProtection",
+        "wafv2.wafv2ManagedRuleGroupAllCountOverride",
+        "wafv2.wafv2NoCoreRuleSet",
+        "wafv2.wafv2AllowRuleBeforeManagedRules",
+        "wafv2.wafv2AlbWithoutWebAcl",
+        "wafv2.wafv2ApiGatewayWithoutWebAcl",
+        "wafv2.wafv2CloudFrontWithoutWebAcl"
+      ],
+      "BP02": [
+        "bedrock.bedrockGuardrailNoWordFilter",
+        "wafv2.wafv2RulesInCountMode"
+      ]
+    },
+    "AGENTSEC09": {
+      "BP01": [
+        "iam.enableGuardDuty",
+        "guardduty.$length"
+      ]
+    },
+    "AGENTSEC06": {
+      "BP02": [
+        "bedrock.bedrockACRuntimeNoGateway",
+        "bedrock.bedrockACGatewayNoPolicy"
+      ]
+    },
+    "AGENTREL01": {
+      "BP01": [
+        "sqs.DeadLetterQueue",
+        "sqs.EncryptionAtRest"
+      ],
+      "BP02": [
+        "bedrock.bedrockACRuntimeNoVPC"
+      ]
+    },
+    "AGENTREL02": {
+      "BP01": [
+        "lambda.lambdaTimeoutNotOptimized",
+        "lambda.lambdaDeadLetterQueueDisabled",
+        "stepfunctions.sfnNoTimeout",
+        "stepfunctions.sfnNoRetryPolicy",
+        "stepfunctions.sfnNoCatchHandler",
+        "stepfunctions.sfnNoHeartbeat",
+        "stepfunctions.sfnTaskNoTimeout",
+        "stepfunctions.sfnChoiceNoDefault",
+        "stepfunctions.sfnUnreachableStates",
+        "stepfunctions.sfnParallelNoCatch",
+        "stepfunctions.sfnMapNoCatch",
+        "kinesis.kinesisRetentionPeriodMinimum"
+      ]
+    },
+    "AGENTREL05": {
+      "BP03": [
+        "bedrock.bedrockKBNoDataSources",
+        "bedrock.bedrockKBDataSourceSyncStale"
+      ]
+    },
+    "AGENTREL07": {
+      "BP02": [
+        "sqs.DeadLetterQueue",
+        "lambda.lambdaDeadLetterQueueDisabled",
+        "stepfunctions.sfnNoRetryPolicy",
+        "stepfunctions.sfnNoCatchHandler",
+        "sns.snsSubscriptionNoDlq"
+      ]
+    },
+    "AGENTREL08": {
+      "BP01": [
+        "bedrock.bedrockServiceLimitAgents",
+        "bedrock.bedrockServiceLimitTPM",
+        "wafv2.wafv2NoRateBasedRules"
+      ]
+    },
+    "AGENTPERF01": {
+      "BP02": [
+        "bedrock.bedrockModelInvocationLoggingDisabled",
+        "bedrock.bedrockModelInvocationNoCloudWatch"
+      ]
+    },
+    "AGENTPERF03": {
+      "BP01": [
+        "bedrock.bedrockAgentMemoryDisabled",
+        "elasticache.encryptionInTransit"
+      ]
+    },
+    "AGENTPERF06": {
+      "BP01": [
+        "lambda.lambdaTimeoutNotOptimized",
+        "lambda.lambdaReservedConcurrencyDisabled"
+      ]
+    },
+    "AGENTPERF07": {
+      "BP01": [
+        "bedrock.bedrockServiceLimitTPM",
+        "bedrock.bedrockServiceLimitAgents",
+        "bedrock.bedrockACRuntimeNoVPC"
+      ]
+    },
+    "AGENTCOST01": {
+      "BP01": [
+        "bedrock.bedrockModelInvocationLoggingDisabled"
+      ]
+    },
+    "AGENTCOST03": {
+      "BP01": [
+        "bedrock.bedrockAgentIdleSessionTimeout"
+      ]
+    },
+    "AGENTCOST04": {
+      "BP01": [
+        "lambda.lambdaReservedConcurrencyDisabled"
+      ]
+    },
+    "AGENTCOST06": {
+      "BP02": [
+        "bedrock.bedrockAgentExcessiveVersions"
+      ]
+    },
+    "AGENTCOST07": {
+      "BP01": [
+        "bedrock.bedrockServiceLimitAgents",
+        "bedrock.bedrockServiceLimitKnowledgeBases",
+        "bedrock.bedrockServiceLimitGuardrails"
+      ]
+    },
+    "AGENTSUS01": {
+      "BP01": [
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "bedrock.bedrockAgentNoInstruction",
+        "bedrock.bedrockACRuntimeWildcardRole"
+      ]
+    },
+    "AGENTSUS02": {
+      "BP04": [
+        "cloudwatch.missingBillingAlarms"
+      ]
+    },
+    "AGENTREL03": {
+      "BP01": [
+        "backup.backupNoPlanExists",
+        "backup.backupPlanNotAssigned",
+        "backup.backupPlanNoCrossRegionCopy",
+        "backup.backupPlanNoLifecycle",
+        "backup.backupVaultNoLock",
+        "backup.backupVaultNoAccessPolicy",
+        "backup.backupCriticalResourcesUnprotected",
+        "backup.backupRecoveryPointNeverRestored"
+      ]
     }
+  }
 }
