@@ -187,7 +187,10 @@ class BedrockAgentCore(Evaluator):
             findings = _inspectRoleForBroadPolicies(
                 self.iamClient, roleName, self.BROAD_RUNTIME_ACTIONS
             )
-            if findings:
+            if findings is None:
+                unverified += 1  # Throttled — count as unverified
+                continue
+            elif findings:
                 offenders.append(f"{name}({'; '.join(findings)})")
             else:
                 scoped += 1
@@ -298,6 +301,7 @@ class BedrockAgentCore(Evaluator):
         all_targets = []
         for gw in self.gateways:
             for t in (gw.get('_targets') or []):
+                t = dict(t)  # shallow copy to avoid mutating shared data
                 t['_gatewayName'] = gw.get('name') or gw.get('gatewayId', 'unknown')
                 all_targets.append(t)
 

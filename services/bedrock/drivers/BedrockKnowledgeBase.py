@@ -150,7 +150,10 @@ class BedrockKnowledgeBase(Evaluator):
             return
 
         findings = _inspectRoleForBroadPolicies(self.iamClient, roleName, self.BROAD_ACTIONS)
-        if findings:
+        if findings is None:
+            # Throttled — cannot determine, report INFO
+            self.results['bedrockKBRoleOverprivileged'] = [0, "IAM inspection throttled — cannot verify role scope"]
+        elif findings:
             self.results['bedrockKBRoleOverprivileged'] = [
                 -1,
                 "Overly permissive: " + "; ".join(findings)

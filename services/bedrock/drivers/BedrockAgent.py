@@ -66,7 +66,10 @@ class BedrockAgent(Evaluator):
             return
 
         findings = _inspectRoleForBroadPolicies(self.iamClient, roleName, self.BROAD_ACTIONS)
-        if findings:
+        if findings is None:
+            # Throttled — cannot determine, report INFO instead of false PASS
+            self.results['bedrockAgentIamRoleOverprivileged'] = [0, "IAM inspection throttled — cannot verify role scope"]
+        elif findings:
             self.results['bedrockAgentIamRoleOverprivileged'] = [
                 -1,
                 "Overly permissive: " + "; ".join(findings)
@@ -268,6 +271,8 @@ def _inspectRoleForBroadPolicies(iamClient, roleName, broadActions):
                 continue
     except botocore.exceptions.ClientError as e:
         code = e.response.get('Error', {}).get('Code', '')
+        if code in ('Throttling', 'ThrottlingException', 'TooManyRequestsException', 'RequestLimitExceeded'):
+            return None  # Signal throttle — caller should report INFO, not PASS
         if code not in ('AccessDenied', 'AccessDeniedException', 'NoSuchEntity', 'NoSuchEntityException'):
             print(f"IAM inspection error on role {roleName}: {code}")
         # Treat unavailable inspection as no finding
