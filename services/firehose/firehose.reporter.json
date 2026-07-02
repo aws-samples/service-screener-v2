@@ -1,0 +1,108 @@
+{
+    "firehoseSSEDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} Amazon Data Firehose delivery stream(s) do not have server-side encryption enabled (DeliveryStreamEncryptionConfiguration.Status is not 'ENABLED'). Without stream-level SSE, records buffered inside Firehose are stored in plaintext, and downstream destinations cannot rely on Firehose for end-to-end key-managed encryption. Aligns with AWS Security Hub control DataFirehose.1.",
+        "shortDesc": "Enable server-side encryption on every Data Firehose delivery stream",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Data Firehose server-side encryption]<https://docs.aws.amazon.com/firehose/latest/dev/encryption.html>",
+            "[Security Hub DataFirehose.1]<https://docs.aws.amazon.com/securityhub/latest/userguide/data-firehose-controls.html>"
+        ]
+    },
+    "firehoseSSEDefaultKey": {
+        "category": "S",
+        "^description": "{$COUNT} Amazon Data Firehose delivery stream(s) are encrypted with an AWS-owned CMK (KeyType='AWS_OWNED_CMK') rather than a customer-managed CMK. AWS-owned keys satisfy encryption-at-rest but do not permit rotation control, key policy customization, revocation, or cross-account audit — properties often mandated by regulated workloads. Advisory for organisations with CMK controls; can be suppressed when AWS-owned keys are acceptable.",
+        "shortDesc": "Prefer a customer-managed KMS key over the AWS-owned CMK",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Data Firehose server-side encryption]<https://docs.aws.amazon.com/firehose/latest/dev/encryption.html>",
+            "[AWS-owned vs customer-managed keys]<https://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#key-mgmt>"
+        ]
+    },
+    "firehoseS3DestinationNoEncryption": {
+        "category": "S",
+        "^description": "{$COUNT} Amazon Data Firehose delivery stream(s) write to an S3 destination without KMS encryption configured on the destination (EncryptionConfiguration.KMSEncryptionConfig is absent, or NoEncryptionConfig='NoEncryption'). Even if stream-level SSE is enabled, records land in S3 using the bucket's default encryption — configuring an explicit KMS key on the Firehose destination makes the key contract auditable and portable.",
+        "shortDesc": "Configure KMS encryption on Firehose S3 destinations",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[S3 destination encryption]<https://docs.aws.amazon.com/firehose/latest/APIReference/API_EncryptionConfiguration.html>"
+        ]
+    },
+    "firehoseLoggingDisabled": {
+        "category": "O",
+        "^description": "{$COUNT} Amazon Data Firehose delivery stream(s) have CloudWatch error logging disabled on at least one destination (CloudWatchLoggingOptions.Enabled=false or absent). Without logging, delivery failures — bad Lambda transformation output, S3 PutObject errors, OpenSearch bulk-write errors, and so on — are invisible: records are retried or dropped with no operator-visible trail.",
+        "shortDesc": "Enable CloudWatch error logging on every Firehose destination",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Data Firehose monitoring]<https://docs.aws.amazon.com/firehose/latest/dev/monitoring-with-cloudwatch-logs.html>"
+        ]
+    },
+    "firehoseS3BackupDisabled": {
+        "category": "R",
+        "^description": "{$COUNT} Amazon Data Firehose delivery stream(s) have data transformation enabled (ProcessingConfiguration.Enabled=true) but S3 backup of the source records is disabled (S3BackupMode='Disabled'). Without backup, records that fail transformation cannot be recovered to their original form and must be re-emitted by upstream producers. Advisory when data transformation is active.",
+        "shortDesc": "Enable source-record S3 backup when data transformation is used",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Data transformation and backup]<https://docs.aws.amazon.com/firehose/latest/dev/data-transformation.html>"
+        ]
+    },
+    "firehoseBufferingSuboptimal": {
+        "category": "P",
+        "^description": "{$COUNT} Amazon Data Firehose delivery stream(s) buffer S3 output with IntervalInSeconds < 60 or SizeInMBs < 1. Aggressive flushing creates many small objects in S3, which materially increases Athena/Glue scan costs, S3 API costs, and downstream compaction effort. Defaults are 300s / 5MB; tune only when latency requires it.",
+        "shortDesc": "Increase Firehose S3 buffering interval or size to reduce small-object overhead",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Data Firehose buffering hints]<https://docs.aws.amazon.com/firehose/latest/dev/create-configure.html>"
+        ]
+    },
+    "firehoseNoTags": {
+        "category": "O",
+        "^description": "{$COUNT} Amazon Data Firehose delivery stream(s) have no user-defined tags applied. Tags enable cost allocation, tag-based IAM, and lifecycle governance.",
+        "shortDesc": "Tag every Data Firehose delivery stream (owner, environment, cost-centre)",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>"
+        ]
+    },
+    "firehoseStreamNotActive": {
+        "category": "R",
+        "^description": "{$COUNT} Amazon Data Firehose delivery stream(s) are in a non-active state (DeliveryStreamStatus in [CREATING_FAILED, DELETING_FAILED, SUSPENDED]). SUSPENDED typically means a KMS key became unavailable and Firehose paused delivery; CREATING_FAILED / DELETING_FAILED indicate the create / delete call hit an unrecoverable error, usually a mis-configured IAM role or destination.",
+        "shortDesc": "Investigate delivery streams in SUSPENDED / CREATING_FAILED / DELETING_FAILED",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[DescribeDeliveryStream API]<https://docs.aws.amazon.com/firehose/latest/APIReference/API_DescribeDeliveryStream.html>"
+        ]
+    }
+}

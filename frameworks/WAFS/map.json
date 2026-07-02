@@ -304,7 +304,10 @@
         "kms.KeyPolicyNoConditions",
         "kms.GrantMissingEncryptionContext",
         "kms.KeyCentralizedManagement",
-        "cloudtrail.KMSPolicySourceArn"
+        "cloudtrail.KMSPolicySourceArn",
+        "firehose.firehoseSSEDisabled",
+        "firehose.firehoseSSEDefaultKey",
+        "firehose.firehoseS3DestinationNoEncryption"
       ],
       "BP02": [
         "cloudtrail.RequiresKmsKey",
