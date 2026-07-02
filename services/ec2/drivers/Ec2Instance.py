@@ -423,7 +423,56 @@ class Ec2Instance(Evaluator):
         if self.ec2InstanceData.get('Tags') is None:
             self.results['EC2HasTag'] = [-1, '']
         return
-    
+
+    def _checkIMDSv2(self):
+        """Check if instance enforces IMDSv2 (HttpTokens = required)"""
+        instance = self.ec2InstanceData
+        metadataOptions = instance.get('MetadataOptions', {})
+        httpTokens = metadataOptions.get('HttpTokens', 'optional')
+        
+        if httpTokens != 'required':
+            self.results['EC2IMDSv2'] = [-1, 'Not enforced']
+        return
+
+    def _checkStoppedTooLong(self):
+        """Flag instances stopped for more than 30 days (still incurring EBS cost)"""
+        instance = self.ec2InstanceData
+        if instance['State']['Name'] != 'stopped':
+            return
+        
+        reason = instance.get('StateTransitionReason', '')
+        # Format: "User initiated (2024-01-15 10:30:00 GMT)"
+        if '(' in reason and ')' in reason:
+            import re
+            match = re.search(r'\((\d{4}-\d{2}-\d{2})', reason)
+            if match:
+                import datetime
+                stopped_date = datetime.datetime.strptime(match.group(1), '%Y-%m-%d').date()
+                days_stopped = (datetime.date.today() - stopped_date).days
+                if days_stopped > 30:
+                    self.results['EC2StoppedTooLong'] = [-1, f'{days_stopped} days']
+        return
+
+    def _checkTerminationProtection(self):
+        """Check if instance has termination protection enabled"""
+        instance = self.ec2InstanceData
+        
+        # Skip terminated/stopped instances
+        if instance['State']['Name'] in ('terminated', 'shutting-down'):
+            return
+        
+        try:
+            resp = self.ec2Client.describe_instance_attribute(
+                InstanceId=instance['InstanceId'],
+                Attribute='disableApiTermination'
+            )
+            protected = resp.get('DisableApiTermination', {}).get('Value', False)
+            if not protected:
+                self.results['EC2NoTerminationProtection'] = [-1, 'Disabled']
+        except Exception:
+            return
+        return
+
     def checkInstanceTypeAvailable(self, instanceType):
         resp = self.ec2Client.describe_instance_type_offerings(
             LocationType='region',

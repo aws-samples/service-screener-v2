@@ -26,6 +26,8 @@ from services.ec2.drivers.Ec2EbsSnapshot import Ec2EbsSnapshot
 from services.ec2.drivers.Ec2Vpc import Ec2Vpc
 from services.ec2.drivers.Ec2NACL import Ec2NACL
 from services.ec2.drivers.Ec2Regional import Ec2Regional
+from services.ec2.drivers.Ec2KeyPair import Ec2KeyPair
+from services.ec2.drivers.Ec2SSM import Ec2SSM
 
 class Ec2(Service):
     CHARTSTYPE = {
@@ -385,11 +387,47 @@ class Ec2(Service):
             result = self.ec2Client.describe_network_acls(
                 NextToken = result.get('NextToken')
             )
-            networkACLs = networkACLs + result.get('NetworkAcls')
+        networkACLs = networkACLs + result.get('NetworkAcls')
         return networkACLs
 
+    def getKeyPairs(self):
+        filters = []
+        if self.tags:
+            filters = self.tags
 
-    def getChartGenCost(self):
+        result = self.ec2Client.describe_key_pairs(
+            Filters=filters
+        )
+        return result.get('KeyPairs', [])
+
+    def getInstanceKeyNames(self, instances):
+        """Collect all key names actively used by running/stopped instances"""
+        keyNames = set()
+        for instanceArr in instances:
+            for instanceData in instanceArr['Instances']:
+                keyName = instanceData.get('KeyName')
+                if keyName:
+                    keyNames.add(keyName)
+        return keyNames
+
+    def getSSMManagedInstances(self):
+        """Get set of instance IDs managed by SSM"""
+        managedSet = set()
+        try:
+            results = self.ssmClient.describe_instance_information()
+            for info in results.get('InstanceInformationList', []):
+                managedSet.add(info['InstanceId'])
+            
+            while results.get('NextToken'):
+                results = self.ssmClient.describe_instance_information(
+                    NextToken=results['NextToken']
+                )
+                for info in results.get('InstanceInformationList', []):
+                    managedSet.add(info['InstanceId'])
+        except Exception:
+            pass
+        return managedSet
+
         '''
         Generate Chart by EC2 Instance Type & Region
         Provide customer insight on percentage of older generation EC2 Instance Type
@@ -664,6 +702,26 @@ class Ec2(Service):
             obj.run(self.__class__)
             objs[f"NACL::{nacl['NetworkAclId']}"] = obj.getInfo()
         
+        
+        # Key Pair Checks
+        keyPairs = self.getKeyPairs()
+        instanceKeyNames = self.getInstanceKeyNames(instances)
+        for kp in keyPairs:
+            _pi('EC2::Key Pair', kp['KeyName'])
+            obj = Ec2KeyPair(kp, instanceKeyNames)
+            obj.run(self.__class__)
+            objs[f"KeyPair::{kp['KeyName']}"] = obj.getInfo()
+        
+        # SSM Managed Instance Checks
+        ssmManagedSet = self.getSSMManagedInstances()
+        for instanceArr in instances:
+            for instanceData in instanceArr['Instances']:
+                if instanceData['State']['Name'] not in ('running', 'stopped'):
+                    continue
+                _pi('EC2::SSM Check', instanceData['InstanceId'])
+                obj = Ec2SSM(instanceData['InstanceId'], ssmManagedSet)
+                obj.run(self.__class__)
+                objs[f"SSM::{instanceData['InstanceId']}"] = obj.getInfo()
         
         if self.getChartGenCost():
             self.setChartData({"EC2 Instance Family Pricing": self.getChartGenCost()})
