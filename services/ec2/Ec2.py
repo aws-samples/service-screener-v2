@@ -428,6 +428,7 @@ class Ec2(Service):
             pass
         return managedSet
 
+    def getChartGenCost(self):
         '''
         Generate Chart by EC2 Instance Type & Region
         Provide customer insight on percentage of older generation EC2 Instance Type
