@@ -307,7 +307,8 @@
         "cloudtrail.KMSPolicySourceArn",
         "firehose.firehoseSSEDisabled",
         "firehose.firehoseSSEDefaultKey",
-        "firehose.firehoseS3DestinationNoEncryption"
+        "firehose.firehoseS3DestinationNoEncryption",
+        "kinesis.kinesisKMSKeyRotationDisabled"
       ],
       "BP02": [
         "cloudtrail.RequiresKmsKey",
@@ -344,7 +345,9 @@
         "bedrock.bedrockACMemoryNoEncryption",
         "bedrock.bedrockACRuntimeNoEncryption",
         "stepfunctions.sfnEncryptionAtRest",
-        "sns.snsEncryptionAtRest"
+        "sns.snsEncryptionAtRest",
+        "kinesis.kinesisSSEDisabled",
+        "kinesis.kinesisSSEDefaultKey"
       ],
       "BP03": [],
       "BP04": [

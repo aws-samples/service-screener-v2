@@ -160,7 +160,15 @@
             "BP01": [
                 "bedrock.bedrockModelInvocationLoggingDisabled",
                 "cloudtrail.trailEnabled",
-                "cloudtrail.trailMultiRegion"
+                "cloudtrail.trailMultiRegion",
+                "ecr.ecrScanOnPush",
+                "ecr.ecrEnhancedScanning",
+                "ecr.ecrTagImmutability",
+                "ecr.ecrCriticalVulnerabilities",
+                "ecr.ecrHighVulnerabilities",
+                "ecr.ecrImageNeverScanned",
+                "ecr.ecrRepoPublicAccess",
+                "ecr.ecrRepoCrossAccount"
             ],
             "BP02": [
                 "bedrock.bedrockModelInvocationNoS3"
@@ -219,7 +227,8 @@
                 "stepfunctions.sfnChoiceNoDefault",
                 "stepfunctions.sfnUnreachableStates",
                 "stepfunctions.sfnParallelNoCatch",
-                "stepfunctions.sfnMapNoCatch"
+                "stepfunctions.sfnMapNoCatch",
+                "kinesis.kinesisRetentionPeriodMinimum"
             ]
         },
         "AGENTREL05": {

@@ -1,0 +1,189 @@
+{
+    "kinesisSSEDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} Kinesis Data Streams have server-side encryption disabled (EncryptionType=NONE). Data at rest is stored in plaintext on the stream, blocking regulated workloads and audit of key usage. This is Security Hub control Kinesis.1.",
+        "shortDesc": "Enable server-side encryption on every Kinesis stream",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Kinesis Data Streams server-side encryption]<https://docs.aws.amazon.com/streams/latest/dev/what-is-sse.html>",
+            "[Security Hub Kinesis.1]<https://docs.aws.amazon.com/securityhub/latest/userguide/kinesis-controls.html#kinesis-1>"
+        ]
+    },
+    "kinesisSSEDefaultKey": {
+        "category": "S",
+        "^description": "{$COUNT} Kinesis Data Streams are encrypted with the default AWS-managed key (alias/aws/kinesis) rather than a customer-managed KMS key (CMK). AWS-managed keys are functional for many workloads but do not permit key policy customisation, cross-account access, or independent rotation control. Organisations with CMK mandates should upgrade.",
+        "shortDesc": "Prefer a customer-managed KMS key over alias/aws/kinesis",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Kinesis Data Streams server-side encryption]<https://docs.aws.amazon.com/streams/latest/dev/what-is-sse.html>",
+            "[AWS-managed vs customer-managed keys]<https://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#key-mgmt>"
+        ]
+    },
+    "kinesisKMSKeyRotationDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} Kinesis Data Streams use a customer-managed KMS key (CMK) with automatic key rotation disabled. Compliance frameworks (PCI-DSS, NIST SP 800-57) recommend annual rotation of symmetric encryption keys. AWS-managed keys and streams using alias/aws/kinesis are excluded from this check.",
+        "shortDesc": "Enable automatic key rotation on the customer-managed CMK",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[KMS key rotation]<https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html>"
+        ]
+    },
+    "kinesisRetentionPeriodMinimum": {
+        "category": "R",
+        "^description": "{$COUNT} Kinesis Data Streams have a retention period below the recommended 168 hours (7 days). Short retention increases the risk of data loss during downstream consumer outages, replay scenarios, or investigations. Minimum is 24 hours; maximum is 8760 hours (365 days). Security Hub Kinesis.3 recommends >= 168 hours.",
+        "shortDesc": "Increase RetentionPeriodHours to at least 168 (7 days)",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Kinesis retention period]<https://docs.aws.amazon.com/streams/latest/dev/kinesis-extended-retention.html>",
+            "[Security Hub Kinesis.3]<https://docs.aws.amazon.com/securityhub/latest/userguide/kinesis-controls.html#kinesis-3>"
+        ]
+    },
+    "kinesisNoTags": {
+        "category": "O",
+        "^description": "{$COUNT} Kinesis Data Streams have no user-defined tags (system tags with the aws: prefix are excluded). Tags are required for cost allocation, resource ownership tracking, and automated governance policies. This is Security Hub control Kinesis.2.",
+        "shortDesc": "Add owner, environment, and cost-centre tags to every stream",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Tagging Kinesis streams]<https://docs.aws.amazon.com/streams/latest/dev/tagging.html>",
+            "[Security Hub Kinesis.2]<https://docs.aws.amazon.com/securityhub/latest/userguide/kinesis-controls.html#kinesis-2>"
+        ]
+    },
+    "kinesisEnhancedMonitoringDisabled": {
+        "category": "O",
+        "^description": "{$COUNT} Kinesis Data Streams have enhanced (shard-level) monitoring disabled entirely. Without shard-level CloudWatch metrics you cannot identify hot shards, per-shard throttling, or uneven partition-key distribution — the most common troubleshooting scenarios for Kinesis.",
+        "shortDesc": "Enable shard-level metrics via EnableEnhancedMonitoring",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Kinesis enhanced shard-level metrics]<https://docs.aws.amazon.com/streams/latest/dev/monitoring-with-cloudwatch.html#kinesis-metrics-shard>"
+        ]
+    },
+    "kinesisStreamNotActive": {
+        "category": "R",
+        "^description": "{$COUNT} Kinesis Data Streams are not in ACTIVE state (currently CREATING, UPDATING, or DELETING). CREATING/UPDATING are normally transient — a stream stuck in either state for more than ~10 minutes indicates a service issue. DELETING may indicate failed cleanup that leaves an orphaned resource.",
+        "shortDesc": "Investigate streams stuck in non-ACTIVE states",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[DescribeStreamSummary]<https://docs.aws.amazon.com/kinesis/latest/APIReference/API_DescribeStreamSummary.html>"
+        ]
+    },
+    "kinesisProvisionedModeNoAutoScaling": {
+        "category": "P",
+        "^description": "{$COUNT} Kinesis Data Streams use PROVISIONED capacity mode. Provisioned mode requires manual shard management or an external Application Auto Scaling configuration; without either, spikes in producer traffic cause WriteProvisionedThroughputExceeded errors. This check is advisory — provisioned mode is optimal for predictable workloads with tight cost control.",
+        "shortDesc": "Confirm auto-scaling is configured or workload is predictable",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Kinesis capacity modes]<https://docs.aws.amazon.com/streams/latest/dev/how-do-i-size-a-stream.html>",
+            "[Application Auto Scaling for Kinesis]<https://docs.aws.amazon.com/streams/latest/dev/monitoring-with-cloudwatch.html>"
+        ]
+    },
+    "kinesisShardUtilizationHigh": {
+        "category": "R",
+        "^description": "{$COUNT} Kinesis Data Streams are in an account whose open-shard count has exceeded 80% of the account-wide service quota (from DescribeLimits, default 200). New stream creation or shard splits will fail once the limit is hit. Request a quota increase before reaching capacity.",
+        "shortDesc": "Request an open-shard quota increase or reduce shard count",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Kinesis quotas]<https://docs.aws.amazon.com/streams/latest/dev/service-sizes-and-limits.html>"
+        ]
+    },
+    "kinesisNoConsumers": {
+        "category": "C",
+        "^description": "{$COUNT} Kinesis Data Streams have zero enhanced fan-out (EFO) consumers registered and have been ACTIVE for more than 7 days. This is advisory: KCL consumers, Lambda triggers, and Firehose sources do NOT register as EFO consumers and therefore this check cannot definitively prove a stream is unused. Verify the stream is actually being read before deleting.",
+        "shortDesc": "Verify the stream is actively consumed or delete it",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Kinesis enhanced fan-out]<https://docs.aws.amazon.com/streams/latest/dev/enhanced-consumers.html>"
+        ]
+    },
+    "kinesisOnDemandPredictableWorkload": {
+        "category": "C",
+        "^description": "{$COUNT} Kinesis Data Streams have been in ON_DEMAND mode for more than 30 days. On-demand scales automatically but costs ~20% more than a right-sized provisioned stream for predictable throughput. This is purely informational — many organisations prefer on-demand for operational simplicity.",
+        "shortDesc": "Review whether provisioned mode is more cost-effective",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Kinesis pricing]<https://aws.amazon.com/kinesis/data-streams/pricing/>"
+        ]
+    },
+    "kinesisEnhancedMonitoringPartial": {
+        "category": "O",
+        "^description": "{$COUNT} Kinesis Data Streams have partial shard-level monitoring — some metrics are enabled but at least one of the critical operational metrics (IteratorAgeMilliseconds, WriteProvisionedThroughputExceeded, ReadProvisionedThroughputExceeded) is missing. Without these, throttling and consumer-lag incidents cannot be diagnosed per shard.",
+        "shortDesc": "Enable ALL shard-level metrics or at least the three critical ones",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Kinesis shard-level metrics]<https://docs.aws.amazon.com/streams/latest/dev/monitoring-with-cloudwatch.html#kinesis-metrics-shard>"
+        ]
+    },
+    "kinesisConsumerStuck": {
+        "category": "R",
+        "^description": "{$COUNT} Kinesis Data Streams have enhanced fan-out consumer(s) stuck in CREATING or DELETING state for more than 10 minutes. Consumer state transitions should complete within seconds — a stuck consumer typically indicates missing IAM permissions or an underlying service issue.",
+        "shortDesc": "Investigate and force-delete stuck EFO consumers",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[RegisterStreamConsumer]<https://docs.aws.amazon.com/kinesis/latest/APIReference/API_RegisterStreamConsumer.html>"
+        ]
+    },
+    "kinesisNoCloudWatchAlarms": {
+        "category": "O",
+        "^description": "{$COUNT} Kinesis Data Streams have no CloudWatch alarms configured on any of the critical operational metrics (GetRecords.IteratorAgeMilliseconds, WriteProvisionedThroughputExceeded, ReadProvisionedThroughputExceeded). Without alarms, throttling and consumer-lag incidents go undetected until downstream systems fail.",
+        "shortDesc": "Configure alarms on IteratorAge and throughput-exceeded metrics",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Monitoring Kinesis with CloudWatch]<https://docs.aws.amazon.com/streams/latest/dev/monitoring-with-cloudwatch.html>"
+        ]
+    }
+}
