@@ -1,0 +1,179 @@
+{
+  "acmCertExpiry30Days": {
+    "category": "S",
+    "^description": "You have {$COUNT} ACM certificate(s) expiring within 30 days. Certificates must be renewed before expiry to avoid service disruptions. For imported certificates, manually re-import the renewed certificate. For ACM-issued certificates, verify that DNS validation records are in place or respond to email validation requests.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "H",
+    "shortDesc": "Certificate expiring within 30 days",
+    "ref": [
+      "[ACM.1 Security Hub Control]<https://docs.aws.amazon.com/securityhub/latest/userguide/acm-controls.html>",
+      "[Check certificate renewal status]<https://docs.aws.amazon.com/acm/latest/userguide/check-certificate-renewal-status.html>"
+    ]
+  },
+  "acmCertExpired": {
+    "category": "S",
+    "^description": "[Critical] You have {$COUNT} expired ACM certificate(s). Expired certificates cannot secure connections and will cause service failures if still associated with resources. Replace immediately with a valid certificate.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "H",
+    "shortDesc": "Certificate has expired",
+    "ref": [
+      "[ACM Certificate Lifecycle]<https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate.html>",
+      "[Troubleshoot certificate renewal]<https://docs.aws.amazon.com/acm/latest/userguide/troubleshooting-renewal.html>"
+    ]
+  },
+  "acmRSAKeyLength": {
+    "category": "S",
+    "^description": "You have {$COUNT} ACM certificate(s) using RSA-1024 key algorithm, which is cryptographically deprecated. RSA keys must be at least 2048 bits. ECDSA (EC_prime256v1, EC_secp384r1) is preferred for better security and performance.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "criticality": "H",
+    "shortDesc": "RSA key too short (< 2048 bits)",
+    "ref": [
+      "[ACM.2 Security Hub Control]<https://docs.aws.amazon.com/securityhub/latest/userguide/acm-controls.html>",
+      "[ACM Supported Key Algorithms]<https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate.html>"
+    ]
+  },
+  "acmCertRenewalFailed": {
+    "category": "R",
+    "^description": "[Action Required] You have {$COUNT} ACM certificate(s) with failed renewal. ACM attempted auto-renewal but could not complete validation. Check DNS CNAME records, CAA records, or respond to email validation. Without intervention, the certificate will expire.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "H",
+    "shortDesc": "Certificate renewal failed",
+    "ref": [
+      "[Troubleshooting managed certificate renewal]<https://docs.aws.amazon.com/acm/latest/userguide/troubleshooting-renewal.html>",
+      "[Managed renewal for ACM certificates]<https://docs.aws.amazon.com/acm/latest/userguide/managed-renewal.html>"
+    ]
+  },
+  "acmCertRevoked": {
+    "category": "S",
+    "^description": "[Critical] You have {$COUNT} revoked ACM certificate(s). A revoked certificate may indicate a security incident (key compromise, CA compromise). Investigate the revocation reason, replace the certificate immediately, and rotate any potentially compromised credentials.",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "H",
+    "shortDesc": "Certificate has been revoked",
+    "ref": [
+      "[ACM Certificate Revocation]<https://docs.aws.amazon.com/acm/latest/userguide/revocation-reasons.html>"
+    ]
+  },
+  "acmCertExpiry90Days": {
+    "category": "O",
+    "^description": "You have {$COUNT} ACM certificate(s) expiring within 90 days. Plan renewal activities. For ACM-issued certificates with DNS validation, renewal should happen automatically at 60 days. For imported or email-validated certificates, manual action is required.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Certificate expiring within 90 days",
+    "ref": [
+      "[Managed renewal]<https://docs.aws.amazon.com/acm/latest/userguide/managed-renewal.html>"
+    ]
+  },
+  "acmCertNotInUse": {
+    "category": "O",
+    "^description": "You have {$COUNT} issued ACM certificate(s) not associated with any AWS resource. These may be orphaned certificates from decommissioned services. Review and delete if no longer needed. Private CA certificates incur cost even when unused.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Certificate not associated with any resource",
+    "ref": [
+      "[Delete certificates]<https://docs.aws.amazon.com/acm/latest/userguide/gs-acm-delete.html>"
+    ]
+  },
+  "acmCertPendingValidation": {
+    "category": "O",
+    "^description": "You have {$COUNT} ACM certificate(s) stuck in pending validation, timed out, or failed state. These represent incomplete certificate requests that should be cleaned up. Delete the request and re-create if still needed, ensuring DNS/email validation is properly configured.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Certificate validation stuck or failed",
+    "ref": [
+      "[Troubleshoot validation]<https://docs.aws.amazon.com/acm/latest/userguide/troubleshooting-validation.html>"
+    ]
+  },
+  "acmCertRenewalIneligible": {
+    "category": "O",
+    "^description": "You have {$COUNT} ACM-issued certificate(s) not eligible for automatic renewal. This typically means the certificate uses email validation. Migrate to DNS validation to enable automatic renewal and eliminate manual intervention risk.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Certificate not eligible for auto-renewal",
+    "ref": [
+      "[DNS validation]<https://docs.aws.amazon.com/acm/latest/userguide/dns-validation.html>",
+      "[Renewal eligibility]<https://docs.aws.amazon.com/acm/latest/userguide/managed-renewal.html>"
+    ]
+  },
+  "acmCertNoTags": {
+    "category": "O",
+    "^description": "You have {$COUNT} ACM certificate(s) without any tags. Tags are essential for cost allocation, ownership identification, automation, and attribute-based access control (ABAC). Add tags for environment, owner, application, and cost center at minimum.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "L",
+    "shortDesc": "Certificate has no tags",
+    "ref": [
+      "[ACM.3 Security Hub Control]<https://docs.aws.amazon.com/securityhub/latest/userguide/acm-controls.html>",
+      "[Tagging ACM Certificates]<https://docs.aws.amazon.com/acm/latest/userguide/tags.html>"
+    ]
+  },
+  "acmWildcardCert": {
+    "category": "S",
+    "^description": "[Informational] You have {$COUNT} wildcard ACM certificate(s). Wildcard certificates increase blast radius if compromised, can mask unauthorized subdomains, and may not meet compliance requirements (e.g., PCI DSS). Consider using specific domain certificates where feasible.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "L",
+    "shortDesc": "Wildcard certificate detected",
+    "ref": [
+      "[ACM Best Practices]<https://docs.aws.amazon.com/acm/latest/userguide/acm-bestpractices.html>"
+    ]
+  },
+  "acmCertTransparencyDisabled": {
+    "category": "S",
+    "^description": "You have {$COUNT} ACM certificate(s) with Certificate Transparency (CT) logging disabled. CT enables detection of mis-issued certificates. Browsers may show warnings for certificates not logged to CT. Enable CT logging unless there is a specific business reason to keep domain names private.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "M",
+    "shortDesc": "Certificate Transparency logging disabled",
+    "ref": [
+      "[Opting out of CT logging]<https://docs.aws.amazon.com/acm/latest/userguide/acm-bestpractices.html#best-practices-transparency>",
+      "[Certificate Transparency]<https://certificate.transparency.dev/>"
+    ]
+  },
+  "acmImportedCertNoAutoRenewal": {
+    "category": "O",
+    "^description": "You have {$COUNT} imported ACM certificate(s) approaching expiry that require manual renewal. ACM cannot auto-renew imported certificates. Plan to obtain a renewed certificate from your CA and re-import it before expiry. Consider replacing with ACM-issued certificates where possible.",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "criticality": "L",
+    "shortDesc": "Imported certificate requires manual renewal",
+    "ref": [
+      "[Reimport a certificate]<https://docs.aws.amazon.com/acm/latest/userguide/import-reimport.html>",
+      "[Monitor imported certificate expiration]<https://aws.amazon.com/blogs/security/how-to-monitor-expirations-of-imported-certificates-in-aws-certificate-manager-acm/>"
+    ]
+  }
+}

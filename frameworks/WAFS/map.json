@@ -364,7 +364,20 @@
     "SEC09": {
       "BP01": [
         "cloudfront.CustomSSLCertificate",
-        "cloudfront.SNIConfiguration"
+        "cloudfront.SNIConfiguration",
+        "acm.acmCertExpired",
+        "acm.acmCertExpiry30Days",
+        "acm.acmCertExpiry90Days",
+        "acm.acmCertRenewalFailed",
+        "acm.acmCertRenewalIneligible",
+        "acm.acmCertRevoked",
+        "acm.acmRSAKeyLength",
+        "acm.acmCertTransparencyDisabled",
+        "acm.acmWildcardCert",
+        "acm.acmImportedCertNoAutoRenewal",
+        "acm.acmCertPendingValidation",
+        "acm.acmCertNotInUse",
+        "acm.acmCertNoTags"
       ],
       "BP02": [
         "cloudfront.viewerPolicyHttps",
