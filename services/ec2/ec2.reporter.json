@@ -51,6 +51,75 @@
             "[Elastic IP Charges]<https://aws.amazon.com/premiumsupport/knowledge-center/elastic-ip-charges/>"       
         ]
     },
+    "EC2KeyPairNotInUse": {
+        "category": "S",
+        "^description": "Unused Key Pairs: {$COUNT} of your EC2 key pairs are not associated with any running instance. Remove unused key pairs to reduce the attack surface and improve security hygiene.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "needFullTest": 0,
+        "shortDesc": "Remove Unused Key Pairs",
+        "ref": [
+            "[Amazon EC2 key pairs]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html>",
+            "[Security best practices]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-security.html>"
+        ]
+    },
+    "EC2IMDSv2": {
+        "category": "S",
+        "^description": "IMDSv2 Not Enforced: {$COUNT} of your instances have not enforced IMDSv2 (Instance Metadata Service v2). IMDSv2 adds session-based authentication and mitigates SSRF attacks. Set HttpTokens to 'required' to enforce IMDSv2.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "H",
+        "needFullTest": 1,
+        "shortDesc": "Enforce IMDSv2",
+        "ref": [
+            "[Configure IMDSv2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html>",
+            "[IMDSv2 Best Practices]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-metadata-transition-to-version-2.html>"
+        ]
+    },
+    "EC2StoppedTooLong": {
+        "category": "C",
+        "^description": "Stopped Instances (>30 days): {$COUNT} of your instances have been in a stopped state for more than 30 days. Stopped instances still incur EBS storage costs. Consider creating an AMI and terminating the instance, or terminate if no longer needed.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Terminate Long-Stopped Instances",
+        "ref": [
+            "[Instance lifecycle]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-lifecycle.html>",
+            "[Stop and start instances]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Stop_Start.html>"
+        ]
+    },
+    "EC2NoTerminationProtection": {
+        "category": "R",
+        "^description": "No Termination Protection: {$COUNT} of your instances do not have termination protection enabled. Enable termination protection to prevent accidental deletion of critical instances.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Enable Termination Protection",
+        "ref": [
+            "[Enable termination protection]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_ChangingDisableAPITermination.html>"
+        ]
+    },
+    "EC2SSMNotManaged": {
+        "category": "O",
+        "^description": "SSM Not Managed: {$COUNT} of your instances are not managed by AWS Systems Manager. SSM provides patching, compliance visibility, remote access, and inventory management. Install the SSM agent and attach the required IAM role.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "M",
+        "needFullTest": 0,
+        "shortDesc": "Register with SSM",
+        "ref": [
+            "[Setting up Systems Manager]<https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-setting-up.html>",
+            "[SSM Agent]<https://docs.aws.amazon.com/systems-manager/latest/userguide/ssm-agent.html>"
+        ]
+    },
     "EC2MemoryMonitor": {
         "category": "P",
         "^description": "EC2 Memory Monitoring: Memory monitoring has not been enabled for {$COUNT} of your instances. Install CloudWatch agent and enable the monitoring",
