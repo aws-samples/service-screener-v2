@@ -1,6 +1,7 @@
 import boto3
 import botocore
 import datetime
+import re
 import time
 from utils.Config import Config
 
@@ -443,10 +444,8 @@ class Ec2Instance(Evaluator):
         reason = instance.get('StateTransitionReason', '')
         # Format: "User initiated (2024-01-15 10:30:00 GMT)"
         if '(' in reason and ')' in reason:
-            import re
             match = re.search(r'\((\d{4}-\d{2}-\d{2})', reason)
             if match:
-                import datetime
                 stopped_date = datetime.datetime.strptime(match.group(1), '%Y-%m-%d').date()
                 days_stopped = (datetime.date.today() - stopped_date).days
                 if days_stopped > 30:
@@ -454,10 +453,22 @@ class Ec2Instance(Evaluator):
         return
 
     def _checkTerminationProtection(self):
-        """Check if instance has termination protection enabled"""
+        """Check if instance has termination protection enabled.
+
+        Stopped instances are intentionally included: they can be critical
+        (e.g. reserved for DR failover) and still benefit from deletion
+        protection. Only terminated/shutting-down instances are skipped.
+
+        This uses describe_instance_attribute, which has no batch form and
+        is therefore called once per instance. The shared boto client is
+        configured with standard retry mode (max_attempts=5), so transient
+        throttling is retried automatically by botocore. If throttling still
+        surfaces after retries, the check is skipped (with a warning) rather
+        than emitting a misleading result.
+        """
         instance = self.ec2InstanceData
         
-        # Skip terminated/stopped instances
+        # Skip terminated/shutting-down instances (nothing left to protect)
         if instance['State']['Name'] in ('terminated', 'shutting-down'):
             return
         
@@ -469,6 +480,13 @@ class Ec2Instance(Evaluator):
             protected = resp.get('DisableApiTermination', {}).get('Value', False)
             if not protected:
                 self.results['EC2NoTerminationProtection'] = [-1, 'Disabled']
+        except botocore.exceptions.ClientError as e:
+            code = e.response['Error']['Code']
+            if code in ('RequestLimitExceeded', 'Throttling', 'ThrottlingException'):
+                _warn("Throttled while checking termination protection for {}; skipping.".format(instance['InstanceId']), forcePrint=False)
+            # Other client errors (e.g. permission) are skipped silently to
+            # avoid emitting a false 'Disabled' result.
+            return
         except Exception:
             return
         return

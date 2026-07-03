@@ -10,6 +10,7 @@ import json
 import time
 
 from utils.Tools import _pi
+from utils.Tools import _warn
 
 from utils.Config import Config
 from services.Service import Service
@@ -411,21 +412,35 @@ class Ec2(Service):
         return keyNames
 
     def getSSMManagedInstances(self):
-        """Get set of instance IDs managed by SSM"""
+        """Get set of instance IDs managed by SSM.
+
+        Returns a set of managed instance IDs on success, or None if the
+        SSM API call fails (e.g. missing ssm:DescribeInstanceInformation
+        permission, or SSM unavailable in the region). Returning None lets
+        the caller skip the SSM check entirely instead of flagging every
+        instance as unmanaged (false positives).
+        """
         managedSet = set()
         try:
-            results = self.ssmClient.describe_instance_information()
+            # MaxResults=50 is the API maximum — request full pages to
+            # minimize round-trips for large fleets.
+            results = self.ssmClient.describe_instance_information(MaxResults=50)
             for info in results.get('InstanceInformationList', []):
                 managedSet.add(info['InstanceId'])
             
             while results.get('NextToken'):
                 results = self.ssmClient.describe_instance_information(
+                    MaxResults=50,
                     NextToken=results['NextToken']
                 )
                 for info in results.get('InstanceInformationList', []):
                     managedSet.add(info['InstanceId'])
-        except Exception:
-            pass
+        except botocore.exceptions.ClientError as e:
+            _warn("Unable to retrieve SSM managed instances ({}); skipping SSM check to avoid false positives.".format(e.response['Error']['Code']))
+            return None
+        except Exception as e:
+            _warn("Unable to retrieve SSM managed instances ({}); skipping SSM check to avoid false positives.".format(e))
+            return None
         return managedSet
 
     def getChartGenCost(self):
@@ -715,14 +730,17 @@ class Ec2(Service):
         
         # SSM Managed Instance Checks
         ssmManagedSet = self.getSSMManagedInstances()
-        for instanceArr in instances:
-            for instanceData in instanceArr['Instances']:
-                if instanceData['State']['Name'] not in ('running', 'stopped'):
-                    continue
-                _pi('EC2::SSM Check', instanceData['InstanceId'])
-                obj = Ec2SSM(instanceData['InstanceId'], ssmManagedSet)
-                obj.run(self.__class__)
-                objs[f"SSM::{instanceData['InstanceId']}"] = obj.getInfo()
+        # Skip the SSM check entirely if the managed-instance lookup failed
+        # (getSSMManagedInstances returns None) to avoid false positives.
+        if ssmManagedSet is not None:
+            for instanceArr in instances:
+                for instanceData in instanceArr['Instances']:
+                    if instanceData['State']['Name'] not in ('running', 'stopped'):
+                        continue
+                    _pi('EC2::SSM Check', instanceData['InstanceId'])
+                    obj = Ec2SSM(instanceData['InstanceId'], ssmManagedSet)
+                    obj.run(self.__class__)
+                    objs[f"SSM::{instanceData['InstanceId']}"] = obj.getInfo()
         
         if self.getChartGenCost():
             self.setChartData({"EC2 Instance Family Pricing": self.getChartGenCost()})

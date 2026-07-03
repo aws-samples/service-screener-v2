@@ -1,4 +1,3 @@
-import boto3
 import botocore
 
 from services.Evaluator import Evaluator
