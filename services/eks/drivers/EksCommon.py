@@ -156,6 +156,41 @@ class EksCommon(Evaluator):
         
         return
     
+    def _checkPublicEndpointNoCidrRestriction(self):
+        # If the public endpoint is enabled, it should be restricted to
+        # specific CIDRs rather than open to the entire internet (0.0.0.0/0).
+        vpcConfig = self.clusterInfo.get('resourcesVpcConfig', {})
+        if not vpcConfig.get('endpointPublicAccess'):
+            return
+
+        publicAccessCidrs = vpcConfig.get('publicAccessCidrs', [])
+        if not publicAccessCidrs or '0.0.0.0/0' in publicAccessCidrs:
+            self.results['eksPublicEndpointNoCidrRestriction'] = [-1, 'Unrestricted (0.0.0.0/0)']
+
+        return
+
+    def _checkAuthenticationMode(self):
+        # Clusters should use the EKS access entries API for authentication
+        # (API or API_AND_CONFIG_MAP) rather than the legacy aws-auth
+        # ConfigMap (CONFIG_MAP), which is harder to audit and manage.
+        accessConfig = self.clusterInfo.get('accessConfig') or {}
+        authMode = accessConfig.get('authenticationMode')
+
+        # authMode is None on older API responses / very old clusters; only
+        # flag when we can positively confirm CONFIG_MAP is in use.
+        if authMode == 'CONFIG_MAP':
+            self.results['eksAuthModeConfigMap'] = [-1, 'CONFIG_MAP']
+
+        return
+
+    def _checkClusterTags(self):
+        # Clusters should be tagged for cost allocation and governance.
+        tags = self.clusterInfo.get('tags') or {}
+        if len(tags) == 0:
+            self.results['eksClusterNoTags'] = [-1, 'No tags']
+
+        return
+
     def _checkEnvelopeEncryption(self):
         if self.clusterInfo.get('encryptionConfig') is None:
             self.results['eksSecretsEncryption'] = [-1, 'Disabled']
