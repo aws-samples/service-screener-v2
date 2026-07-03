@@ -1,6 +1,7 @@
 import boto3
 import botocore
 import datetime
+import re
 import time
 from utils.Config import Config
 
@@ -423,7 +424,73 @@ class Ec2Instance(Evaluator):
         if self.ec2InstanceData.get('Tags') is None:
             self.results['EC2HasTag'] = [-1, '']
         return
-    
+
+    def _checkIMDSv2(self):
+        """Check if instance enforces IMDSv2 (HttpTokens = required)"""
+        instance = self.ec2InstanceData
+        metadataOptions = instance.get('MetadataOptions', {})
+        httpTokens = metadataOptions.get('HttpTokens', 'optional')
+        
+        if httpTokens != 'required':
+            self.results['EC2IMDSv2'] = [-1, 'Not enforced']
+        return
+
+    def _checkStoppedTooLong(self):
+        """Flag instances stopped for more than 30 days (still incurring EBS cost)"""
+        instance = self.ec2InstanceData
+        if instance['State']['Name'] != 'stopped':
+            return
+        
+        reason = instance.get('StateTransitionReason', '')
+        # Format: "User initiated (2024-01-15 10:30:00 GMT)"
+        if '(' in reason and ')' in reason:
+            match = re.search(r'\((\d{4}-\d{2}-\d{2})', reason)
+            if match:
+                stopped_date = datetime.datetime.strptime(match.group(1), '%Y-%m-%d').date()
+                days_stopped = (datetime.date.today() - stopped_date).days
+                if days_stopped > 30:
+                    self.results['EC2StoppedTooLong'] = [-1, f'{days_stopped} days']
+        return
+
+    def _checkTerminationProtection(self):
+        """Check if instance has termination protection enabled.
+
+        Stopped instances are intentionally included: they can be critical
+        (e.g. reserved for DR failover) and still benefit from deletion
+        protection. Only terminated/shutting-down instances are skipped.
+
+        This uses describe_instance_attribute, which has no batch form and
+        is therefore called once per instance. The shared boto client is
+        configured with standard retry mode (max_attempts=5), so transient
+        throttling is retried automatically by botocore. If throttling still
+        surfaces after retries, the check is skipped (with a warning) rather
+        than emitting a misleading result.
+        """
+        instance = self.ec2InstanceData
+        
+        # Skip terminated/shutting-down instances (nothing left to protect)
+        if instance['State']['Name'] in ('terminated', 'shutting-down'):
+            return
+        
+        try:
+            resp = self.ec2Client.describe_instance_attribute(
+                InstanceId=instance['InstanceId'],
+                Attribute='disableApiTermination'
+            )
+            protected = resp.get('DisableApiTermination', {}).get('Value', False)
+            if not protected:
+                self.results['EC2NoTerminationProtection'] = [-1, 'Disabled']
+        except botocore.exceptions.ClientError as e:
+            code = e.response['Error']['Code']
+            if code in ('RequestLimitExceeded', 'Throttling', 'ThrottlingException'):
+                _warn("Throttled while checking termination protection for {}; skipping.".format(instance['InstanceId']), forcePrint=False)
+            # Other client errors (e.g. permission) are skipped silently to
+            # avoid emitting a false 'Disabled' result.
+            return
+        except Exception:
+            return
+        return
+
     def checkInstanceTypeAvailable(self, instanceType):
         resp = self.ec2Client.describe_instance_type_offerings(
             LocationType='region',

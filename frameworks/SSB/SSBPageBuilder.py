@@ -2,7 +2,7 @@ from frameworks.FrameworkPageBuilder import FrameworkPageBuilder
 
 class SSBPageBuilder(FrameworkPageBuilder):
     def init(self):
-        super().__init__()
+        super().init()
         self.template = 'default'
         
     

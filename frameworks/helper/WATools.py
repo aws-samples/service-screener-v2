@@ -1,9 +1,9 @@
-import boto3, json, botocore
+import boto3, json, botocore, base64, os
 from botocore.exceptions import BotoCoreError
 from botocore.config import Config as bConfig
 from utils.Config import Config
 from datetime import datetime
-from utils.Tools import _warn
+from utils.Tools import _warn, _info
 import time
 
 ## --others '{"WA": {"region": "ap-southeast-1", "reportName":"SS_Report", "newMileStone":0}}'
@@ -151,6 +151,94 @@ class WATools():
         except BotoCoreError as e:
             print(f"An error occurred: {str(e)}")
             return None
+
+    def generateReviewReport(self, output_dirs=None, lensAlias=None):
+        """Generate a Well-Architected Framework Review report (PDF) for the workload
+        and save it to the provided output directories.
+
+        Args:
+            output_dirs (list[str]): list of absolute directory paths to save the PDF to.
+            lensAlias (str): lens alias/ARN. Defaults to the lens used by this workload.
+
+        Returns:
+            list[str]: list of absolute file paths that were written. Empty list on failure.
+        """
+        if self.HASPERMISSION is False:
+            _warn("[WATools] No permission to generate WA Review report, skipped")
+            return []
+
+        if not self.waInfo.get('WorkloadId'):
+            _warn("[WATools] No WorkloadId available, skip generating WA Review report")
+            return []
+
+        if not lensAlias:
+            lensAlias = self.waInfo.get('LensesAlias', 'wellarchitected')
+
+        if output_dirs is None:
+            output_dirs = []
+
+        # Build report file name with workload + timestamp + milestone (if any)
+        cdate = datetime.now().strftime('%Y%m%d-%H%M%S')
+        workload_name = self.cfg.get('reportName', self.DEFAULT_REPORTNAME)
+        milestoneNumber = self.waInfo.get('MilestoneNumber')
+
+        try:
+            apiArgs = {
+                'WorkloadId': self.waInfo['WorkloadId'],
+                'LensAlias': lensAlias
+            }
+            if milestoneNumber:
+                apiArgs['MilestoneNumber'] = milestoneNumber
+
+            _info(f"[WATools] Generating WA Review report (workload={workload_name}, lens={lensAlias})")
+            resp = self.waClient.get_lens_review_report(**apiArgs)
+        except botocore.exceptions.ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', '')
+            if error_code in ('AccessDeniedException', 'AccessDenied'):
+                _warn(f"[WATools] Access denied when calling GetLensReviewReport: {str(e)}")
+                self.HASPERMISSION = False
+            else:
+                _warn(f"[WATools] Failed to get lens review report: {str(e)}")
+            return []
+        except Exception as e:
+            _warn(f"[WATools] Unexpected error generating review report: {str(e)}")
+            return []
+
+        report = resp.get('LensReviewReport', {})
+        b64 = report.get('Base64String')
+        if not b64:
+            _warn("[WATools] GetLensReviewReport returned no Base64String content")
+            return []
+
+        try:
+            pdfBytes = base64.b64decode(b64)
+        except Exception as e:
+            _warn(f"[WATools] Failed to decode review report base64 content: {str(e)}")
+            return []
+
+        # Build sanitized filename
+        safe_name = ''.join(c if c.isalnum() or c in ('-', '_') else '_' for c in workload_name)
+        ms_part = f"-m{milestoneNumber}" if milestoneNumber else ""
+        filename = f"WAFR_{safe_name}{ms_part}_{cdate}.pdf"
+
+        written = []
+        for d in output_dirs:
+            try:
+                if not d:
+                    continue
+                os.makedirs(d, exist_ok=True)
+                full = os.path.join(d, filename)
+                with open(full, 'wb') as f:
+                    f.write(pdfBytes)
+                written.append(full)
+                _info(f"[WATools] WA Review report saved: {full}")
+            except Exception as e:
+                _warn(f"[WATools] Failed to save WA Review report to {d}: {str(e)}")
+
+        # Expose the latest filename so the page builder can render a download link
+        self.waInfo['LatestReportFilename'] = filename
+        self.waInfo['LatestReportPaths'] = written
+        return written
         
     def createMilestone(self):
         max_retries = 3

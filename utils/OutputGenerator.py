@@ -167,7 +167,7 @@ class OutputGenerator:
         # Generate framework pages and add framework data to API
         if len(self.frameworks) > 0:
             for framework in self.frameworks:
-                o = FrameworkPageBuilder(framework, api_result_array)
+                o = FrameworkPageBuilder.create(framework, api_result_array)
                 if o.getGateCheckStatus():
                     o.buildPage()
                     
