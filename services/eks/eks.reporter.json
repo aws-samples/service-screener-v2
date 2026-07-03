@@ -1,228 +1,268 @@
 {
-    "eksClusterVersionEol":{
+    "eksClusterVersionEol": {
         "category": "S",
-		"^description": "EKS version end of life: {$COUNT} of your clusters are close to end of life. Please proceed to upgrade your cluster.",
-		"shortDesc": "EKS cluster version end of life",
-		"criticality": "H",
-		"downtime": 1,
-		"slowness": 0,
-		"additionalCost": 0,
-		"needFullTest": 1,
-		"ref": [
-			"[EKS Kubernetes Release Calendar]<https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html#kubernetes-release-calendar>",
-			"[EKS Version Update]<https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html>"
-		]
+        "^description": "EKS version end of life: {$COUNT} of your clusters are close to end of life. Please proceed to upgrade your cluster.",
+        "shortDesc": "EKS cluster version end of life",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[EKS Kubernetes Release Calendar]<https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html#kubernetes-release-calendar>",
+            "[EKS Version Update]<https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html>"
+        ]
     },
-    "eksClusterVersionUpdate":{
+    "eksClusterVersionUpdate": {
         "category": "S",
-		"^description": "EKS new version: Newer version are available for {$COUNT} of your clusters. Please proceed to upgrade your cluster.",
-		"shortDesc": "EKS new version available",
-		"criticality": "M",
-		"downtime": 1,
-		"slowness": 0,
-		"additionalCost": 0,
-		"needFullTest": 1,
-		"ref": [
-			"[EKS Kubernetes Release Calendar]<https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html#kubernetes-release-calendar>",
-			"[EKS Version Update]<https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html>"
-		]
+        "^description": "EKS new version: Newer version are available for {$COUNT} of your clusters. Please proceed to upgrade your cluster.",
+        "shortDesc": "EKS new version available",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[EKS Kubernetes Release Calendar]<https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html#kubernetes-release-calendar>",
+            "[EKS Version Update]<https://docs.aws.amazon.com/eks/latest/userguide/update-cluster.html>"
+        ]
     },
-    "eksEndpointPublicAccess":{
+    "eksEndpointPublicAccess": {
         "category": "S",
-		"^description": "EKS public endpoint: {$COUNT} of your clusters have enabled public access for endpoint. Disable public access to minimize the security risks.",
-		"shortDesc": "EKS public endpoint enabled",
-		"criticality": "H",
-		"downtime": 1,
-		"slowness": 0,
-		"additionalCost": 0,
-		"needFullTest": 1,
-		"ref": [
-			"[EKS Endpoint Access Control]<https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html>"
-		]
+        "^description": "EKS public endpoint: {$COUNT} of your clusters have enabled public access for endpoint. Disable public access to minimize the security risks.",
+        "shortDesc": "EKS public endpoint enabled",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[EKS Endpoint Access Control]<https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html>"
+        ]
     },
-    "eksSecretsEncryption":{
+    "eksSecretsEncryption": {
         "category": "S",
-		"^description": "EKS secrets encryption: {$COUNT} of your clusters have disabled secrets encryption. Enable secrets encryption to protect your secrets in your clusters",
-		"shortDesc": "EKS secrets encryption disabled",
-		"criticality": "H",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": 1,
-		"needFullTest": 1,
-		"ref": [
-			"[EKS Secrets Encryption]<https://docs.aws.amazon.com/eks/latest/userguide/enable-kms.html>"
-		]
+        "^description": "EKS secrets encryption: {$COUNT} of your clusters have disabled secrets encryption. Enable secrets encryption to protect your secrets in your clusters",
+        "shortDesc": "EKS secrets encryption disabled",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[EKS Secrets Encryption]<https://docs.aws.amazon.com/eks/latest/userguide/enable-kms.html>"
+        ]
     },
-    "eksClusterLogging":{
+    "eksClusterLogging": {
         "category": "OS",
-		"^description": "EKS cluster logging: {$COUNT} of your clusters have disabled control plane logging. Enable control plane logging for better monitoring.",
-		"shortDesc": "EKS cluster logging disabled",
-		"criticality": "L",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": 1,
-		"needFullTest": 0,
-		"ref": [
-			"[EKS Control Plane Logging]<https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html>"
-		]
+        "^description": "EKS cluster logging: {$COUNT} of your clusters have disabled control plane logging. Enable control plane logging for better monitoring.",
+        "shortDesc": "EKS cluster logging disabled",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[EKS Control Plane Logging]<https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html>"
+        ]
     },
-    "eksClusterSGRestriction":{
+    "eksClusterSGRestriction": {
         "category": "S",
-		"^description": "EKS cluster security group: {$COUNT} of clusters' security groups have provided permission beyond minimal rules. Grant minimum rules to reduce security risks.",
-		"shortDesc": "EKS cluster security group minimum rules",
-		"criticality": "H",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": 0,
-		"needFullTest": 1,
-		"ref": [
-			"[EKS Security Group Requirements]<https://docs.aws.amazon.com/eks/latest/userguide/sec-group-reqs.html>"
-		]
+        "^description": "EKS cluster security group: {$COUNT} of clusters' security groups have provided permission beyond minimal rules. Grant minimum rules to reduce security risks.",
+        "shortDesc": "EKS cluster security group minimum rules",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[EKS Security Group Requirements]<https://docs.aws.amazon.com/eks/latest/userguide/sec-group-reqs.html>"
+        ]
     },
-    "eksClusterRoleLeastPrivilege":{
+    "eksClusterRoleLeastPrivilege": {
         "category": "S",
-		"^description": "EKS role: {$COUNT} of clusters' roles have full access to one or more services.Grant only required permission to reduce the security risks. ",
-		"shortDesc": "EKS rols full access",
-		"criticality": "H",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": 0,
-		"needFullTest": 1,
-		"ref": [
-			"[IAM Grant Least Privilege]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
-		]
+        "^description": "EKS role: {$COUNT} of clusters' roles have full access to one or more services.Grant only required permission to reduce the security risks. ",
+        "shortDesc": "EKS rols full access",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[IAM Grant Least Privilege]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+        ]
     },
-    "eksNoManagedNodeGroups":{
+    "eksNoManagedNodeGroups": {
         "category": "R",
-		"^description": "EKS managed node groups: {$COUNT} of your clusters have no managed node groups. Use managed node groups for automated provisioning and lifecycle management.",
-		"shortDesc": "No managed node groups configured",
-		"criticality": "H",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": 0,
-		"needFullTest": 1,
-		"ref": [
-			"[Managed node groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
-		]
+        "^description": "EKS managed node groups: {$COUNT} of your clusters have no managed node groups. Use managed node groups for automated provisioning and lifecycle management.",
+        "shortDesc": "No managed node groups configured",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Managed node groups]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html>"
+        ]
     },
-    "eksNodeGroupSingleAZ":{
+    "eksNodeGroupSingleAZ": {
         "category": "R",
-		"^description": "EKS node group availability: {$COUNT} of your node groups are deployed in a single availability zone. Deploy node groups across multiple AZs for high availability.",
-		"shortDesc": "Node group in single AZ",
-		"criticality": "H",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": 0,
-		"needFullTest": 1,
-		"ref": [
-			"[Node group networking]<https://docs.aws.amazon.com/eks/latest/userguide/network_reqs.html>"
-		]
+        "^description": "EKS node group availability: {$COUNT} of your node groups are deployed in a single availability zone. Deploy node groups across multiple AZs for high availability.",
+        "shortDesc": "Node group in single AZ",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Node group networking]<https://docs.aws.amazon.com/eks/latest/userguide/network_reqs.html>"
+        ]
     },
-    "eksClusterLoggingIncomplete":{
+    "eksClusterLoggingIncomplete": {
         "category": "S",
-		"^description": "EKS control plane logging: {$COUNT} of your clusters have incomplete control plane logging. Enable all log types (api, audit, authenticator, controllerManager, scheduler) for comprehensive monitoring.",
-		"shortDesc": "Incomplete control plane logging",
-		"criticality": "H",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": 1,
-		"needFullTest": 0,
-		"ref": [
-			"[Control plane logging]<https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html>"
-		]
+        "^description": "EKS control plane logging: {$COUNT} of your clusters have incomplete control plane logging. Enable all log types (api, audit, authenticator, controllerManager, scheduler) for comprehensive monitoring.",
+        "shortDesc": "Incomplete control plane logging",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Control plane logging]<https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html>"
+        ]
     },
-    "eksSecretsEncryptionNoKMS":{
+    "eksSecretsEncryptionNoKMS": {
         "category": "S",
-		"^description": "EKS secrets encryption: {$COUNT} of your clusters do not use customer-managed KMS keys for secrets encryption. Use customer-managed KMS keys for better control and compliance.",
-		"shortDesc": "No customer-managed KMS key for secrets",
-		"criticality": "H",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": 1,
-		"needFullTest": 1,
-		"ref": [
-			"[Encrypting secrets]<https://docs.aws.amazon.com/eks/latest/userguide/enable-kms.html>"
-		]
+        "^description": "EKS secrets encryption: {$COUNT} of your clusters do not use customer-managed KMS keys for secrets encryption. Use customer-managed KMS keys for better control and compliance.",
+        "shortDesc": "No customer-managed KMS key for secrets",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Encrypting secrets]<https://docs.aws.amazon.com/eks/latest/userguide/enable-kms.html>"
+        ]
     },
-    "eksNoSpotInstances":{
+    "eksNoSpotInstances": {
         "category": "C",
-		"^description": "EKS Spot instances: {$COUNT} of your clusters have no node groups using Spot instances. Use Spot instances for fault-tolerant workloads to achieve significant cost savings.",
-		"shortDesc": "No Spot instances configured",
-		"criticality": "M",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": -1,
-		"needFullTest": 0,
-		"ref": [
-			"[Managed node groups with Spot]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html#managed-node-group-capacity-types>"
-		]
+        "^description": "EKS Spot instances: {$COUNT} of your clusters have no node groups using Spot instances. Use Spot instances for fault-tolerant workloads to achieve significant cost savings.",
+        "shortDesc": "No Spot instances configured",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": -1,
+        "needFullTest": 0,
+        "ref": [
+            "[Managed node groups with Spot]<https://docs.aws.amazon.com/eks/latest/userguide/managed-node-groups.html#managed-node-group-capacity-types>"
+        ]
     },
-    "eksNoKarpenter":{
+    "eksNoKarpenter": {
         "category": "C",
-		"^description": "EKS Karpenter: {$COUNT} of your clusters do not have Karpenter add-on installed. Use Karpenter for efficient node provisioning and significant cost optimization.",
-		"shortDesc": "Karpenter add-on not installed",
-		"criticality": "M",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": -1,
-		"needFullTest": 0,
-		"ref": [
-			"[Karpenter]<https://karpenter.sh/>",
-			"[EKS Add-ons]<https://docs.aws.amazon.com/eks/latest/userguide/eks-add-ons.html>"
-		]
+        "^description": "EKS Karpenter: {$COUNT} of your clusters do not have Karpenter add-on installed. Use Karpenter for efficient node provisioning and significant cost optimization.",
+        "shortDesc": "Karpenter add-on not installed",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": -1,
+        "needFullTest": 0,
+        "ref": [
+            "[Karpenter]<https://karpenter.sh/>",
+            "[EKS Add-ons]<https://docs.aws.amazon.com/eks/latest/userguide/eks-add-ons.html>"
+        ]
     },
-    "eksAutoModeNotEnabled":{
+    "eksAutoModeNotEnabled": {
         "category": "R",
-		"^description": "EKS Auto Mode: {$COUNT} of your clusters do not have Auto Mode enabled. Use Auto Mode for fully managed compute, networking, and storage to reduce operational overhead.",
-		"shortDesc": "Auto Mode not enabled",
-		"criticality": "M",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": 0,
-		"needFullTest": 0,
-		"ref": [
-			"[EKS Auto Mode]<https://docs.aws.amazon.com/eks/latest/userguide/automode.html>"
-		]
+        "^description": "EKS Auto Mode: {$COUNT} of your clusters do not have Auto Mode enabled. Use Auto Mode for fully managed compute, networking, and storage to reduce operational overhead.",
+        "shortDesc": "Auto Mode not enabled",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[EKS Auto Mode]<https://docs.aws.amazon.com/eks/latest/userguide/automode.html>"
+        ]
     },
-    "eksNoIRSAConfigured":{
+    "eksNoIRSAConfigured": {
         "category": "S",
-		"^description": "EKS IRSA: {$COUNT} of your clusters do not have OIDC provider configured for IAM Roles for Service Accounts. Use IRSA for pod-level IAM permissions instead of node-level roles.",
-		"shortDesc": "IRSA not configured",
-		"criticality": "H",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": 0,
-		"needFullTest": 1,
-		"ref": [
-			"[IAM roles for service accounts]<https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html>"
-		]
+        "^description": "EKS IRSA: {$COUNT} of your clusters do not have OIDC provider configured for IAM Roles for Service Accounts. Use IRSA for pod-level IAM permissions instead of node-level roles.",
+        "shortDesc": "IRSA not configured",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[IAM roles for service accounts]<https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html>"
+        ]
     },
-    "eksNoAutoscaling":{
+    "eksNoAutoscaling": {
         "category": "C",
-		"^description": "EKS autoscaling: {$COUNT} of your clusters do not have autoscaling configured. Implement cluster autoscaling using Karpenter or node group autoscaling for cost optimization.",
-		"shortDesc": "No autoscaling configured",
-		"criticality": "M",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": -1,
-		"needFullTest": 0,
-		"ref": [
-			"[Autoscaling]<https://docs.aws.amazon.com/eks/latest/userguide/autoscaling.html>",
-			"[Karpenter]<https://karpenter.sh/>"
-		]
+        "^description": "EKS autoscaling: {$COUNT} of your clusters do not have autoscaling configured. Implement cluster autoscaling using Karpenter or node group autoscaling for cost optimization.",
+        "shortDesc": "No autoscaling configured",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": -1,
+        "needFullTest": 0,
+        "ref": [
+            "[Autoscaling]<https://docs.aws.amazon.com/eks/latest/userguide/autoscaling.html>",
+            "[Karpenter]<https://karpenter.sh/>"
+        ]
     },
-    "eksNoManagedStorageDrivers":{
+    "eksNoManagedStorageDrivers": {
         "category": "R",
-		"^description": "EKS storage drivers: {$COUNT} of your clusters do not have EBS or EFS CSI driver add-ons installed. Use managed storage drivers for persistent storage and data durability.",
-		"shortDesc": "No managed storage drivers",
-		"criticality": "M",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": 0,
-		"needFullTest": 0,
-		"ref": [
-			"[Amazon EBS CSI driver]<https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html>",
-			"[Amazon EFS CSI driver]<https://docs.aws.amazon.com/eks/latest/userguide/efs-csi.html>"
-		]
+        "^description": "EKS storage drivers: {$COUNT} of your clusters do not have EBS or EFS CSI driver add-ons installed. Use managed storage drivers for persistent storage and data durability.",
+        "shortDesc": "No managed storage drivers",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Amazon EBS CSI driver]<https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html>",
+            "[Amazon EFS CSI driver]<https://docs.aws.amazon.com/eks/latest/userguide/efs-csi.html>"
+        ]
+    },
+    "eksPublicEndpointNoCidrRestriction": {
+        "category": "S",
+        "^description": "EKS public endpoint unrestricted: {$COUNT} of your clusters expose the public API server endpoint to all IP addresses (0.0.0.0/0). Restrict public access to specific trusted CIDR ranges.",
+        "shortDesc": "EKS public endpoint not restricted to CIDRs",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[EKS Endpoint Access Control]<https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html>"
+        ]
+    },
+    "eksAuthModeConfigMap": {
+        "category": "S",
+        "^description": "EKS legacy authentication mode: {$COUNT} of your clusters use the legacy aws-auth ConfigMap (CONFIG_MAP) for authentication. Migrate to EKS access entries (API or API_AND_CONFIG_MAP) for more secure and auditable access management.",
+        "shortDesc": "EKS using legacy aws-auth ConfigMap",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[EKS Access Entries]<https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html>",
+            "[Cluster Authentication]<https://docs.aws.amazon.com/eks/latest/userguide/cluster-auth.html>"
+        ]
+    },
+    "eksClusterNoTags": {
+        "category": "O",
+        "^description": "EKS cluster without tags: {$COUNT} of your clusters have no tags. Tag your EKS clusters for cost allocation and governance.",
+        "shortDesc": "EKS cluster without tagging",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Tagging your Amazon EKS resources]<https://docs.aws.amazon.com/eks/latest/userguide/eks-using-tags.html>"
+        ]
     }
 }
