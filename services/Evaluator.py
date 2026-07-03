@@ -3,6 +3,8 @@ import botocore
 import time
 import os
 import math
+import csv
+import threading
 
 import concurrent.futures as cf
 
@@ -10,6 +12,30 @@ from utils.Config import Config
 from utils.Tools import _warn, _info
 from utils.CustomPage.CustomPage import CustomPage
 import constants as _C
+
+# Guards concurrent appends to the slow-checks log file.
+_slow_log_lock = threading.Lock()
+
+
+def _log_slow_check(tmp_obj, method_name, timeSpent):
+    """Append a row to the per-run slow_checks.log if configured.
+
+    Called whenever a check takes >= 3s. Best-effort — never raises.
+    Row format: service,resource,check,duration_s
+    """
+    log_path = Config.get('slow_log_path')
+    if not log_path:
+        return
+    try:
+        service = type(tmp_obj).__name__
+        resource = getattr(tmp_obj, '_resourceName', '') or ''
+        with _slow_log_lock:
+            with open(log_path, 'a', encoding='utf-8', newline='') as f:
+                csv.writer(f).writerow([service, resource, method_name, timeSpent])
+    except Exception:
+        # Never let logging break a scan.
+        pass
+
 
 def runSingleCheck(tmp_obj, method_name):
     debugFlag = Config.get('DEBUG')
@@ -24,6 +50,9 @@ def runSingleCheck(tmp_obj, method_name):
                 _warn("Long running checks {}s".format(timeSpent))
         elif timeSpent >= 3:
             _warn("[Slow] {} took {}s".format(method_name, timeSpent))
+
+        if timeSpent >= 3:
+            _log_slow_check(tmp_obj, method_name, timeSpent)
 
         return 'OK'
     except botocore.exceptions.ClientError as e:
@@ -102,10 +131,15 @@ class Evaluator():
                             print('--- --- fn: ' + method)
                             
                         getattr(self, method)()
+                        timeSpent = round(time.time() - startTime, 3)
                         if debugFlag:
-                            timeSpent = round(time.time() - startTime, 3)
                             if timeSpent >= 0.2:
                                 _warn("Long running checks {}s".format(timeSpent))
+                        elif timeSpent >= 3:
+                            _warn("[Slow] {} took {}s".format(method, timeSpent))
+
+                        if timeSpent >= 3:
+                            _log_slow_check(self, method, timeSpent)
                         
                     except botocore.exceptions.ClientError as e:
                         code = e.response['Error']['Code']

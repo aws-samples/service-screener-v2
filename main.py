@@ -5,6 +5,7 @@ import json
 import locale
 import logging
 import sys
+import csv
 from datetime import datetime
 from sys import platform
 
@@ -356,6 +357,20 @@ for acctId, cred in rolesCred.items():
     print("Processing the following account id: " + acctInfo['Account'])
     print("=================================================")
     print("")
+
+    # Initialize per-run slow-checks log. Overwritten on each scan start;
+    # Evaluator.runSingleCheck / Evaluator.run() append rows when a check
+    # takes >= 3s. Path is stored in Config so drivers can find it.
+    try:
+        slow_log_dir = Config.get('HTML_ACCOUNT_FOLDER_FULLPATH')
+        if slow_log_dir:
+            os.makedirs(slow_log_dir, exist_ok=True)
+            slow_log_path = os.path.join(slow_log_dir, 'slow_checks.log')
+            with open(slow_log_path, 'w', encoding='utf-8', newline='') as _slf:
+                csv.writer(_slf).writerow(['service', 'resource', 'check', 'duration_s'])
+            Config.set('slow_log_path', slow_log_path)
+    except Exception as _e:
+        _warn(f"Could not initialize slow_checks.log: {_e}")
     
     ## Build List of Accounts for dropdown...
     if acctLoop == 1:
@@ -555,6 +570,17 @@ shutil.make_archive('output', 'zip', adminlteDir)
 
 print("Pages generated, download \033[1;42moutput.zip\033[0m to view")
 print("CloudShell user, you may use this path: \033[1;42m =====> \033[0m /tmp/service-screener-v2/output.zip \033[1;42m <===== \033[0m")
+
+# Summarize slow-checks log if any entries beyond the header were written.
+_slow_log_path = Config.get('slow_log_path')
+if _slow_log_path and os.path.exists(_slow_log_path):
+    try:
+        with open(_slow_log_path, 'r', encoding='utf-8') as _slf:
+            _n_slow = max(0, sum(1 for _ in _slf) - 1)  # exclude header
+        if _n_slow > 0:
+            print("Performance report: {} slow checks logged to {}".format(_n_slow, _slow_log_path))
+    except Exception:
+        pass
 
 scriptTimeSpent = round(time.time() - scriptStartTime, 3)
 print("@ Thank you for using {}, script spent {}s to complete @".format(Config.ADVISOR['TITLE'], scriptTimeSpent))
