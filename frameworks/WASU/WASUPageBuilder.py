@@ -1,4 +1,4 @@
 from frameworks.WAFRBasePageBuilder import WAFRBasePageBuilder
 
-class WAFSPageBuilder(WAFRBasePageBuilder):
+class WASUPageBuilder(WAFRBasePageBuilder):
     pass

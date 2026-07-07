@@ -1,0 +1,136 @@
+{
+  "metadata": {
+    "originator": "AWS",
+    "shortname": "WACO",
+    "fullname": "AWS Well-Architected Framework - Cost Optimization Pillar",
+    "description": "The cost optimization pillar focuses on avoiding unnecessary costs. Key topics include understanding spending over time and controlling fund allocation, selecting resources of the right type and quantity, and scaling to meet business needs without overspending.",
+    "_": "https://docs.aws.amazon.com/wellarchitected/latest/cost-optimization-pillar/welcome.html",
+    "emptyCheckDefaultMsg": ""
+  },
+  "mapping": {
+    "COST01": {
+      "BP01": [
+        "iam.hasCostBudget",
+        "iam.CURReport"
+      ],
+      "BP02": [
+        "iam.hasCostBudget",
+        "cloudwatch.missingBillingAlarms",
+        "cloudwatch.missingServiceQuotaAlarms"
+      ],
+      "BP03": [
+        "ec2.EC2HasTag",
+        "ec2.EC2Tags",
+        "rds.HasTags",
+        "s3.BucketOwnerEnforced",
+        "sqs.TaggingStrategy",
+        "eks.ClusterTags",
+        "lambda.$length"
+      ]
+    },
+    "COST02": {
+      "BP01": [
+        "ec2.EC2LowUtilization",
+        "ec2.LowEBSLowUtilization",
+        "ec2.EBSAttachedStoppedEC2",
+        "ec2.EIPInUse",
+        "ec2.EC2StoppedTooLong",
+        "rds.FreeStorage",
+        "rds.HasDatabaseConnection",
+        "rds.CPUUtilization",
+        "lambda.lambdaFunctionInUsed",
+        "sqs.unusedQueues",
+        "dynamodb.UnusedResourcesGSIRead",
+        "dynamodb.UnusedResourcesGSIWrite",
+        "ec2.BlockInUse"
+      ],
+      "BP02": [
+        "ec2.RIRecommendations",
+        "ec2.SPRecommendations",
+        "ec2.EC2ComputeOptimizerEnabled",
+        "ec2.ComputeOptimizerRightsizingPrefs",
+        "rds.IsInstanceLatestGeneration",
+        "rds.IsOpenSource",
+        "elasticache.LatestInstanceFamily",
+        "opensearch.AutoTune"
+      ],
+      "BP03": [
+        "rds.ClusterSize",
+        "rds.HasStorageAutoscaling",
+        "dynamodb.AutoscalingStatus",
+        "dynamodb.CapacityMode",
+        "eks.NoAutoscaling",
+        "ec2.ASGTargetTrackingPolicy"
+      ]
+    },
+    "COST03": {
+      "BP01": [
+        "s3.IntelligentTiering",
+        "s3.Lifecycle",
+        "s3.StorageLens",
+        "dynamodb.TableClassOptimization",
+        "dynamodb.TimeToLiveStatus",
+        "opensearch.UltrawarmEnabled",
+        "opensearch.ColdStorage",
+        "ec2.EBSSnapshotFirstArchived",
+        "ec2.EBSSnapshotLatestArchived",
+        "ec2.EBSSnapshotComplianceArchive",
+        "rds.OldSnapshots",
+        "efs.StorageOptimization"
+      ],
+      "BP02": [
+        "ec2.EC2InstanceTypeGeneration",
+        "ec2.EC2AMD",
+        "ec2.EC2Graviton",
+        "lambda.lambdaArchitecturesIsArm",
+        "rds.HasGravitonOption",
+        "ec2.EC2EbsOptimized",
+        "ec2.EBSNewGenBlock"
+      ],
+      "BP03": [
+        "ec2.SQLServerEdition",
+        "ec2.WindowsServerEdition",
+        "rds.IsOpenSource",
+        "rds.EntSpecs",
+        "rds.NonEntSpecs"
+      ]
+    },
+    "COST04": {
+      "BP01": [
+        "ec2.EC2ComputeOptimizerEnabled",
+        "ec2.ComputeOptimizerEnhancedMetrics",
+        "ec2.ComputeOptimizerExportRecommendations",
+        "rds.RDSRecommendationsActive",
+        "redshift.AdvisorRecommendations"
+      ],
+      "BP02": [
+        "cloudwatch.missingBillingAlarms",
+        "iam.hasCostBudget",
+        "iam.CURReport"
+      ],
+      "BP03": [
+        "s3.StorageLens",
+        "ec2.RIRecommendations",
+        "ec2.SPRecommendations"
+      ]
+    },
+    "COST05": {
+      "BP01": [
+        "sagemaker.SpotInstancesEnabled",
+        "eks.NoSpotInstances",
+        "ec2.ASGTargetTrackingPolicy",
+        "ec2.ASGScalingCooldowns"
+      ],
+      "BP02": [
+        "lambda.lambdaMemoryOptimization",
+        "lambda.lambdaTimeoutOptimization",
+        "lambda.lambdaReservedConcurrencyForThrottling"
+      ],
+      "BP03": [
+        "rds.ClusterIOvsStorage",
+        "rds.IsOpenSource",
+        "rds.CheckIfAurora"
+      ]
+    }
+  }
+}

@@ -1,0 +1,146 @@
+{
+  "metadata": {
+    "originator": "AWS",
+    "shortname": "WAFO",
+    "fullname": "AWS Well-Architected Framework - Operational Excellence Pillar",
+    "description": "The operational excellence pillar focuses on running and monitoring systems, and continually improving processes and procedures. Key topics include automating changes, responding to events, and defining standards to manage daily operations.",
+    "_": "https://docs.aws.amazon.com/wellarchitected/latest/operational-excellence-pillar/welcome.html",
+    "emptyCheckDefaultMsg": ""
+  },
+  "mapping": {
+    "OPS01": {
+      "BP01": [
+        "iam.hasOrganization",
+        "iam.SCPEnabled",
+        "iam.scpBestPractices"
+      ],
+      "BP02": [
+        "cloudtrail.NeedToEnableCloudTrail",
+        "cloudtrail.HasOneMultiRegionTrail",
+        "iam.EnableConfigService"
+      ],
+      "BP03": [
+        "cloudwatch.alarmsWithoutSNS",
+        "cloudwatch.missingCompositeAlarms",
+        "cloudwatch.missingBillingAlarms"
+      ],
+      "BP04": [
+        "iam.hasAlternateContact",
+        "iam.hasOrganization"
+      ],
+      "BP05": []
+    },
+    "OPS02": {
+      "BP01": [
+        "cloudtrail.NeedToEnableCloudTrail",
+        "cloudtrail.HasOneMultiRegionTrail",
+        "iam.EnableConfigService"
+      ],
+      "BP02": [
+        "cloudwatch.missingCloudWatchDashboards",
+        "cloudwatch.missingCrossAccountDashboards",
+        "cloudwatch.missingVendedDashboards"
+      ],
+      "BP03": [
+        "cloudwatch.missingCustomMetrics",
+        "cloudwatch.missingXRayIntegration",
+        "cloudwatch.missingApplicationSignals"
+      ],
+      "BP04": [
+        "cloudwatch.alarmsWithoutSNS",
+        "cloudwatch.missingCompositeAlarms",
+        "cloudwatch.missingServiceQuotaAlarms"
+      ]
+    },
+    "OPS03": {
+      "BP01": [
+        "cloudtrail.NeedToEnableCloudTrail",
+        "cloudtrail.HasDataEventsCaptured",
+        "cloudtrail.HasInsightSelectors"
+      ],
+      "BP02": [
+        "cloudwatch.logGroupsWithoutLogInsightsUsage",
+        "cloudwatch.missingXRayIntegration",
+        "cloudwatch.missingApplicationSignals"
+      ],
+      "BP03": [
+        "cloudwatch.missingCloudWatchDashboards",
+        "cloudwatch.missingCrossAccountDashboards"
+      ],
+      "BP04": [
+        "eks.eksClusterLogging",
+        "eks.eksClusterLoggingIncomplete",
+        "rds.EventSubscriptionNotConfigured",
+        "apigateway.ExecutionLogging",
+        "cloudfront.accessLogging",
+        "s3.BucketLogging",
+        "lambda.lambdaNoCloudWatchAlarms",
+        "glue.JobLoggingEnabled",
+        "redshift.AuditLogging",
+        "opensearch.ApplicationLogs"
+      ]
+    },
+    "OPS04": {
+      "BP01": [
+        "cloudwatch.alarmsWithoutSNS",
+        "cloudwatch.missingCompositeAlarms",
+        "opensearch.CloudWatchAlarms",
+        "redshift.EventNotifications",
+        "apigateway.CloudWatchAlarms",
+        "lambda.lambdaNoCloudWatchAlarms",
+        "rds.EventSubscriptionNotConfigured",
+        "sqs.QueueMonitoring",
+        "cloudtrail.CloudWatchAlarmsConfigured"
+      ],
+      "BP02": [
+        "cloudwatch.missingCloudWatchDashboards",
+        "cloudwatch.missingCrossAccountDashboards",
+        "cloudwatch.missingVendedDashboards",
+        "s3.StorageLens",
+        "rds.RDSRecommendationsActive",
+        "redshift.AdvisorRecommendations"
+      ],
+      "BP03": [
+        "cloudwatch.missingXRayIntegration",
+        "cloudwatch.missingApplicationSignals",
+        "apigateway.PerformanceMonitoring"
+      ],
+      "BP04": [
+        "cloudwatch.missingCustomMetrics",
+        "ec2.VPCFlowLogEnabled",
+        "cloudtrail.HasDataEventsCaptured"
+      ]
+    },
+    "OPS05": {
+      "BP01": [
+        "apigateway.CanaryDeployment",
+        "apigateway.StageLifecycle"
+      ],
+      "BP02": [
+        "lambda.lambdaFunctionInUsed",
+        "ec2.EC2StoppedTooLong",
+        "sqs.unusedQueues"
+      ],
+      "BP03": [
+        "cloudtrail.NeedToEnableCloudTrail",
+        "iam.EnableConfigService",
+        "cloudwatch.alarmsWithoutSNS"
+      ]
+    },
+    "OPS06": {
+      "BP01": [
+        "cloudwatch.alarmsWithoutSNS",
+        "cloudwatch.missingCompositeAlarms",
+        "rds.EventSubscriptionNotConfigured",
+        "opensearch.CloudWatchAlarms",
+        "apigateway.CloudWatchAlarms",
+        "lambda.lambdaNoCloudWatchAlarms"
+      ],
+      "BP02": [
+        "cloudtrail.CloudWatchAlarmsConfigured",
+        "cloudwatch.logGroupsWithoutLogInsightsUsage"
+      ],
+      "BP03": []
+    }
+  }
+}

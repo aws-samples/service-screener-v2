@@ -1,0 +1,127 @@
+{
+  "metadata": {
+    "originator": "AWS",
+    "shortname": "WASU",
+    "fullname": "AWS Well-Architected Framework - Sustainability Pillar",
+    "description": "The sustainability pillar focuses on environmental impacts, especially energy consumption and efficiency. Key topics include understanding your impact, establishing sustainability goals, maximizing utilization, and anticipating and adopting new and more efficient hardware and software.",
+    "_": "https://docs.aws.amazon.com/wellarchitected/latest/sustainability-pillar/sustainability-pillar.html",
+    "emptyCheckDefaultMsg": ""
+  },
+  "mapping": {
+    "SUS01": {
+      "BP01": [
+        "ec2.EC2ComputeOptimizerEnabled",
+        "ec2.ComputeOptimizerEnhancedMetrics",
+        "iam.hasCostBudget",
+        "cloudwatch.missingBillingAlarms"
+      ],
+      "BP02": [
+        "ec2.EC2LowUtilization",
+        "ec2.LowEBSLowUtilization",
+        "rds.CPUUtilization",
+        "lambda.lambdaFunctionInUsed",
+        "sqs.unusedQueues",
+        "dynamodb.UnusedResourcesGSIRead",
+        "dynamodb.UnusedResourcesGSIWrite"
+      ]
+    },
+    "SUS02": {
+      "BP01": [
+        "ec2.EC2Graviton",
+        "ec2.EC2AMD",
+        "lambda.lambdaArchitecturesIsArm",
+        "rds.HasGravitonOption",
+        "ec2.EC2InstanceTypeGeneration",
+        "rds.IsInstanceLatestGeneration",
+        "elasticache.LatestInstanceFamily"
+      ],
+      "BP02": [
+        "ec2.EC2EbsOptimized",
+        "ec2.EBSNewGenBlock",
+        "efs.ElasticThroughput",
+        "efs.ThroughputModeOptimized",
+        "opensearch.AutoTune"
+      ],
+      "BP03": [
+        "sagemaker.SpotInstancesEnabled",
+        "eks.NoSpotInstances",
+        "ec2.ASGTargetTrackingPolicy",
+        "dynamodb.AutoscalingStatus",
+        "rds.HasStorageAutoscaling"
+      ],
+      "BP04": [
+        "ec2.EC2HighUtilization",
+        "ec2.EC2SpikyUtilization",
+        "lambda.lambdaMemoryOptimization",
+        "lambda.lambdaTimeoutOptimization"
+      ]
+    },
+    "SUS03": {
+      "BP01": [
+        "s3.IntelligentTiering",
+        "s3.Lifecycle",
+        "dynamodb.TimeToLiveStatus",
+        "dynamodb.TableClassOptimization",
+        "opensearch.UltrawarmEnabled",
+        "opensearch.ColdStorage",
+        "ec2.EBSSnapshotFirstArchived",
+        "ec2.EBSSnapshotLatestArchived",
+        "rds.OldSnapshots",
+        "efs.StorageOptimization"
+      ],
+      "BP02": [
+        "ec2.EBSAttachedStoppedEC2",
+        "ec2.EIPInUse",
+        "ec2.EC2StoppedTooLong",
+        "ec2.BlockInUse",
+        "lambda.lambdaFunctionInUsed",
+        "sqs.unusedQueues"
+      ],
+      "BP03": [
+        "cloudfront.CompressedObjects",
+        "cloudfront.OriginShieldEnabled",
+        "s3.TransferAcceleration"
+      ]
+    },
+    "SUS04": {
+      "BP01": [
+        "rds.IsOpenSource",
+        "rds.CheckIfAurora",
+        "glue.GlueVersionCurrent",
+        "eks.ClusterVersion",
+        "rds.AutoMinorVersionUpgrade",
+        "opensearch.ServiceSoftwareVersion",
+        "lambda.lambdaRuntime"
+      ],
+      "BP02": [
+        "glue.EncryptionAtRest",
+        "glue.S3Encryption",
+        "glue.MetadataEncryption"
+      ],
+      "BP03": [
+        "lambda.lambdaArchitecturesIsArm",
+        "ec2.EC2Graviton",
+        "rds.HasGravitonOption"
+      ]
+    },
+    "SUS05": {
+      "BP01": [
+        "ec2.SeparateOSDataVolumes",
+        "ec2.InstanceStoreUsage",
+        "rds.ClusterIOvsStorage",
+        "dynamodb.CapacityMode"
+      ],
+      "BP02": [
+        "lambda.lambdaMemoryOptimization",
+        "lambda.lambdaTimeoutOptimization",
+        "rds.CPUUtilization",
+        "rds.FreeMemory"
+      ],
+      "BP03": [
+        "cloudwatch.missingXRayIntegration",
+        "cloudwatch.missingApplicationSignals",
+        "lambda.lambdaTracingEnabled"
+      ]
+    }
+  }
+}
