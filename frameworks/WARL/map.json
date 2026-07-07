@@ -1,0 +1,154 @@
+{
+  "metadata": {
+    "originator": "AWS",
+    "shortname": "WARL",
+    "fullname": "AWS Well-Architected Framework - Reliability Pillar",
+    "description": "The reliability pillar focuses on workloads performing their intended functions and recovering quickly from failures. Key topics include distributed system design, recovery planning, and adapting to changing requirements.",
+    "_": "https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/welcome.html",
+    "emptyCheckDefaultMsg": ""
+  },
+  "mapping": {
+    "REL01": {
+      "BP01": [
+        "ec2.VPCMultiAZ",
+        "ec2.ELBMultiAZ",
+        "rds.DBSubnet3AZ",
+        "elasticache.MultiAZEnabled",
+        "eks.NodeGroupSingleAZ",
+        "efs.SingleAZ",
+        "opensearch.AvailabilityZones"
+      ],
+      "BP02": [
+        "ec2.EC2ServiceQuotas",
+        "lambda.lambdaQuotasNotMonitored",
+        "cloudwatch.missingServiceQuotaAlarms"
+      ],
+      "BP03": [
+        "iam.EnableConfigService",
+        "cloudtrail.NeedToEnableCloudTrail",
+        "cloudwatch.alarmsWithoutSNS"
+      ],
+      "BP04": [
+        "iam.hasOrganization",
+        "iam.SCPEnabled"
+      ]
+    },
+    "REL02": {
+      "BP01": [
+        "ec2.VPCMultiAZ",
+        "ec2.ELBMultiAZ",
+        "rds.HasMultiAZ",
+        "elasticache.MultiAZEnabled",
+        "opensearch.AvailabilityZones",
+        "eks.NodeGroupSingleAZ",
+        "efs.SingleAZ"
+      ],
+      "BP02": [
+        "ec2.ELBHealthCheckEnabled",
+        "ec2.TargetGroupELBAssociation",
+        "rds.HasStorageAutoscaling",
+        "dynamodb.AutoscalingStatus",
+        "eks.NoAutoscaling",
+        "ec2.ASGTargetTrackingPolicy"
+      ],
+      "BP03": [
+        "ec2.ASGMultiAZ",
+        "ec2.ASGTargetTrackingPolicy",
+        "rds.HasStorageAutoscaling",
+        "dynamodb.AutoscalingStatus"
+      ]
+    },
+    "REL03": {
+      "BP01": [
+        "rds.HasBackup",
+        "rds.CrossRegionBackup",
+        "dynamodb.PITRBackup",
+        "dynamodb.BackupStatus",
+        "s3.MfaDeleteAndVersioning",
+        "s3.BucketReplication",
+        "efs.BackupPolicy",
+        "efs.ReplicationEnabled",
+        "eks.NoManagedStorageDrivers",
+        "elasticache.BackupEnabled"
+      ],
+      "BP02": [
+        "rds.OldSnapshots",
+        "dynamodb.TrailDeleteBackup",
+        "s3.ObjectLock",
+        "s3.BucketVersioning"
+      ],
+      "BP03": [
+        "rds.HasMultiAZ",
+        "rds.CheckIfAurora",
+        "dynamodb.GlobalTableVersion",
+        "elasticache.GlobalDatastoreConfig",
+        "s3.BucketReplication"
+      ],
+      "BP04": [
+        "iam.AWSBackupPlans",
+        "rds.HasBackup",
+        "dynamodb.PITRBackup",
+        "dynamodb.BackupStatus",
+        "efs.BackupPolicy"
+      ]
+    },
+    "REL04": {
+      "BP01": [
+        "ec2.ELBHealthCheckEnabled",
+        "rds.DeleteProtection",
+        "dynamodb.DeleteProtection",
+        "ec2.EC2TerminationProtection"
+      ],
+      "BP02": [
+        "rds.HasMultiAZ",
+        "rds.CheckIfAurora",
+        "elasticache.MultiAZEnabled",
+        "opensearch.AvailabilityZones",
+        "ec2.ASGMultiAZ",
+        "ec2.ELBMultiAZ"
+      ],
+      "BP03": [
+        "cloudwatch.alarmsWithoutSNS",
+        "cloudwatch.missingCompositeAlarms",
+        "rds.EventSubscriptionNotConfigured",
+        "opensearch.CloudWatchAlarms",
+        "lambda.lambdaNoCloudWatchAlarms",
+        "sqs.QueueMonitoring"
+      ],
+      "BP04": [
+        "sqs.DeadLetterQueue",
+        "lambda.lambdaDeadLetterQueueDisabled",
+        "sqs.MaxReceiveCountDetection",
+        "rds.EventSubscriptionNotConfigured"
+      ],
+      "BP05": [
+        "rds.HasBackup",
+        "dynamodb.PITRBackup",
+        "s3.BucketVersioning",
+        "efs.BackupPolicy"
+      ]
+    },
+    "REL05": {
+      "BP01": [
+        "rds.AutoMinorVersionUpgrade",
+        "eks.ClusterVersion",
+        "elasticache.EngineVersion",
+        "opensearch.ServiceSoftwareVersion",
+        "lambda.lambdaRuntime"
+      ],
+      "BP02": [
+        "rds.HasPatches",
+        "eks.ClusterVersion",
+        "elasticache.EngineVersion",
+        "opensearch.ServiceSoftwareVersion",
+        "rds.AutoMinorVersionUpgrade"
+      ],
+      "BP03": [
+        "rds.DeleteProtection",
+        "dynamodb.DeleteProtection",
+        "ec2.EC2TerminationProtection",
+        "s3.ObjectLock"
+      ]
+    }
+  }
+}

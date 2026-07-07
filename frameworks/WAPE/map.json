@@ -1,0 +1,150 @@
+{
+  "metadata": {
+    "originator": "AWS",
+    "shortname": "WAPE",
+    "fullname": "AWS Well-Architected Framework - Performance Efficiency Pillar",
+    "description": "The performance efficiency pillar focuses on the efficient use of computing resources to meet requirements, and how to maintain efficiency as demand changes and technologies evolve.",
+    "_": "https://docs.aws.amazon.com/wellarchitected/latest/performance-efficiency-pillar/welcome.html",
+    "emptyCheckDefaultMsg": ""
+  },
+  "mapping": {
+    "PERF01": {
+      "BP01": [
+        "ec2.EC2InstanceTypeGeneration",
+        "ec2.EC2AMD",
+        "ec2.EC2Graviton",
+        "lambda.lambdaArchitecturesIsArm",
+        "rds.HasGravitonOption",
+        "eks.NoSpotInstances",
+        "elasticache.LatestInstanceFamily"
+      ],
+      "BP02": [
+        "ec2.EC2EbsOptimized",
+        "ec2.EBSNewGenBlock",
+        "efs.ThroughputModeOptimized",
+        "efs.PerformanceModeOptimized",
+        "opensearch.AutoTune",
+        "elasticache.RInstanceFamily",
+        "rds.IsInstanceLatestGeneration"
+      ],
+      "BP03": [
+        "ec2.EC2ComputeOptimizerEnabled",
+        "ec2.ComputeOptimizerEnhancedMetrics",
+        "ec2.ComputeOptimizerRightsizingPrefs",
+        "ec2.RIRecommendations",
+        "ec2.SPRecommendations"
+      ],
+      "BP04": [
+        "cloudfront.$length",
+        "cloudfront.OriginShieldEnabled",
+        "cloudfront.CompressedObjects"
+      ]
+    },
+    "PERF02": {
+      "BP01": [
+        "rds.ClusterIOvsStorage",
+        "rds.IsOpenSource",
+        "rds.IsInstanceLatestGeneration",
+        "opensearch.EbsStorageUtilisation",
+        "dynamodb.CapacityMode",
+        "dynamodb.TableClassOptimization"
+      ],
+      "BP02": [
+        "dynamodb.AutoscalingStatus",
+        "rds.HasStorageAutoscaling",
+        "eks.NoAutoscaling",
+        "ec2.ASGTargetTrackingPolicy"
+      ],
+      "BP03": [
+        "dynamodb.UnusedResourcesGSIRead",
+        "dynamodb.UnusedResourcesGSIWrite",
+        "opensearch.UltrawarmEnabled",
+        "opensearch.ColdStorage",
+        "s3.IntelligentTiering",
+        "dynamodb.TimeToLiveStatus"
+      ]
+    },
+    "PERF03": {
+      "BP01": [
+        "ec2.EC2LowUtilization",
+        "ec2.EC2HighUtilization",
+        "ec2.EC2SpikyUtilization",
+        "ec2.LowEBSLowUtilization",
+        "ec2.EC2ComputeOptimizerEnabled",
+        "rds.CPUUtilization",
+        "rds.FreeMemory",
+        "lambda.lambdaMemoryOptimization",
+        "lambda.lambdaTimeoutOptimization"
+      ],
+      "BP02": [
+        "ec2.EBSIops",
+        "efs.ElasticThroughput",
+        "efs.ThroughputModeOptimized",
+        "opensearch.EbsStorageUtilisation"
+      ],
+      "BP03": [
+        "cloudwatch.missingXRayIntegration",
+        "cloudwatch.missingApplicationSignals",
+        "apigateway.PerformanceMonitoring",
+        "rds.HasPerformanceInsightsEnabled",
+        "rds.HasEnhancedMonitoring",
+        "lambda.lambdaTracingEnabled",
+        "eks.eksClusterLogging",
+        "opensearch.SearchSlowLogs"
+      ],
+      "BP04": [
+        "cloudfront.OriginShieldEnabled",
+        "cloudfront.CompressedObjects",
+        "cloudfront.PriceClassOptimization",
+        "s3.TransferAcceleration"
+      ]
+    },
+    "PERF04": {
+      "BP01": [
+        "ec2.CWMemoryMetrics",
+        "ec2.CWDiskMetrics",
+        "ec2.EC2DetailedMonitoringEnabled",
+        "rds.HasEnhancedMonitoring",
+        "rds.HasPerformanceInsightsEnabled",
+        "rds.MonitoringIntervals",
+        "lambda.lambdaEnhancedMonitor",
+        "elasticache.SlowLog",
+        "opensearch.AutoTune"
+      ],
+      "BP02": [
+        "cloudwatch.missingCustomMetrics",
+        "cloudwatch.missingCloudWatchDashboards",
+        "s3.StorageLens",
+        "rds.RDSRecommendationsActive",
+        "redshift.AdvisorRecommendations"
+      ],
+      "BP03": [
+        "ec2.EC2ComputeOptimizerEnabled",
+        "ec2.ComputeOptimizerEnhancedMetrics",
+        "ec2.ComputeOptimizerExportRecommendations",
+        "lambda.lambdaMemoryOptimization",
+        "lambda.lambdaTimeoutOptimization"
+      ]
+    },
+    "PERF05": {
+      "BP01": [
+        "cloudfront.OriginShieldEnabled",
+        "cloudfront.CompressedObjects",
+        "s3.TransferAcceleration",
+        "apigateway.RequestThrottling",
+        "apigateway.UsagePlanThrottling"
+      ],
+      "BP02": [
+        "lambda.lambdaProvisionedConcurrency",
+        "lambda.lambdaReservedConcurrencyForThrottling",
+        "ec2.ASGTargetTrackingPolicy",
+        "dynamodb.AutoscalingStatus"
+      ],
+      "BP03": [
+        "elasticache.ClusterModeEnabled",
+        "opensearch.ReplicaShard",
+        "dynamodb.GlobalTableVersion"
+      ]
+    }
+  }
+}
