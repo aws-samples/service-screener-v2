@@ -580,7 +580,7 @@ if _slow_log_path and os.path.exists(_slow_log_path):
         if _n_slow > 0:
             print("Performance report: {} slow checks logged to {}".format(_n_slow, _slow_log_path))
     except Exception:
-        pass
+        pass  # nosec B110 — slow-check log init is best-effort
 
 scriptTimeSpent = round(time.time() - scriptStartTime, 3)
 print("@ Thank you for using {}, script spent {}s to complete @".format(Config.ADVISOR['TITLE'], scriptTimeSpent))

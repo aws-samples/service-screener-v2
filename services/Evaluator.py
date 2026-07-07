@@ -34,7 +34,7 @@ def _log_slow_check(tmp_obj, method_name, timeSpent):
                 csv.writer(f).writerow([service, resource, method_name, timeSpent])
     except Exception:
         # Never let logging break a scan.
-        pass
+        pass  # nosec B110
 
 
 def runSingleCheck(tmp_obj, method_name):
