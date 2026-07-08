@@ -17,6 +17,7 @@ logs/
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+*.pyc
 *$py.class
 .DS_Store
 *.xlsx
@@ -75,6 +76,11 @@ __pypackages__/
 env/
 venv/
 bin/
+include/
 ENV/
 env.bak/
 venv.bak/
+.kiro/
+
+# Additional ignores
+__fork/

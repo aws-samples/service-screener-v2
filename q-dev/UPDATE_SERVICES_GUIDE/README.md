@@ -199,7 +199,7 @@ All analysis documents are archived in:
 ### Project Documentation
 - `FINAL_PROJECT_SUMMARY.md` - Complete project overview
 - `IMPLEMENTATION_SUMMARY.md` - Glue & SageMaker details
-- `service-screener-v2/SIMULATION_TESTING.md` - Simulation guide
+- `service-screener-v2/docs/SIMULATION_TESTING.md` - Simulation guide
 
 ### Service-Specific
 - Each service has simulation README in `services/{service}/simulation/`

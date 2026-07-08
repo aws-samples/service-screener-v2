@@ -1,0 +1,4 @@
+# Runtime manifests written by create_test_resources.sh.
+# These record the ARNs the cleanup script needs to delete and should never
+# be committed.
+created_resources_*.txt

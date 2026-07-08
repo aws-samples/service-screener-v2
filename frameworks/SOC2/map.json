@@ -41,18 +41,18 @@
       "CC5.3 - Deploys through policies and procedures": ["iam.noRootUserAccessKey"]
     },
     "CC6.0 - Logical and Physical Access Controls": {
-      "CC6.1 - Restricts logical access to authorized users": ["iam.usersMfaEnabled", "iam.noInlinePolicy", "iam.noUserPolicies"],
-      "CC6.2 - Manages identification and authentication": ["iam.passwordPolicy"],
+      "CC6.1 - Restricts logical access to authorized users": ["iam.usersMfaEnabled", "iam.noInlinePolicy", "iam.noUserPolicies", "bedrock.bedrockAgentIamRoleOverprivileged", "bedrock.bedrockKBRoleOverprivileged", "bedrock.bedrockACRuntimeWildcardRole", "stepfunctions.sfnRoleOverprivileged", "cognito.cognitoMfaNotEnforced", "cognito.cognitoAdvancedSecurityNotEnforced"],
+      "CC6.2 - Manages identification and authentication": ["iam.passwordPolicy", "cognito.cognitoWeakPasswordPolicy", "cognito.cognitoMfaNotEnforced"],
       "CC6.3 - Manages logical access": ["iam.supportRoleExists", "iam.noFullAdminPolicies"],
       "CC6.4 - Restricts physical access": [],
       "CC6.5 - Manages production changes": [],
-      "CC6.6 - Restricts logical access to information assets": ["s3.bucketEncryption", "s3.bucketPublicAccessBlock", "s3.bucketVersioning"],
+      "CC6.6 - Restricts logical access to information assets": ["s3.bucketEncryption", "s3.bucketPublicAccessBlock", "s3.bucketVersioning", "bedrock.bedrockAgentNoEncryptionKey", "bedrock.bedrockGuardrailNoEncryption", "bedrock.bedrockKBNoEncryption", "bedrock.bedrockACMemoryNoEncryption", "sns.snsEncryptionAtRest", "sns.snsPublicAccess"],
       "CC6.7 - Restricts the transmission, movement, and removal of information": ["s3.bucketLoggingEnabled", "s3.bucketPublicAccessBlock"],
       "CC6.8 - Manages endpoints": ["ec2.securityGroupsHasDescription", "ec2.securityGroupsRestrictedSSH", "ec2.securityGroupsRestrictedRDP"]
     },
     "CC7.0 - System Operations": {
       "CC7.1 - Manages infrastructure, software, and data": ["ec2.instanceDetailedMonitoringEnabled", "ec2.ebsOptimizedEnabled"],
-      "CC7.2 - Manages security incidents": ["guardduty.isEnabled", "securityhub.isEnabled"],
+      "CC7.2 - Manages security incidents": ["guardduty.isEnabled", "securityhub.isEnabled", "bedrock.bedrockNoGuardrailsExist", "bedrock.bedrockAgentWithoutGuardrail", "bedrock.bedrockGuardrailNoPromptAttackFilter", "stepfunctions.sfnLoggingDisabled", "sns.snsDeliveryStatusLoggingDisabled", "wafv2.wafv2LoggingNotConfigured", "wafv2.wafv2RulesInCountMode"],
       "CC7.3 - Manages business continuity": ["backup.resourcesProtectedByBackupPlan", "rds.instanceBackupEnabled"],
       "CC7.4 - Recovers from incidents": ["rds.instanceMultiAZ", "ec2.instanceEbsBackupEnabled"]
     },
@@ -72,7 +72,7 @@
     },
     "C1.0 - Confidentiality": {
       "C1.1 - Identifies confidential information": ["s3.bucketTaggingEnabled"],
-      "C1.2 - Protects confidential information": ["s3.bucketEncryption", "rds.instanceEncryptionEnabled", "kms.cmkBackingKeyRotationEnabled"]
+      "C1.2 - Protects confidential information": ["s3.bucketEncryption", "rds.instanceEncryptionEnabled", "kms.cmkBackingKeyRotationEnabled", "bedrock.bedrockAgentNoEncryptionKey", "bedrock.bedrockGuardrailNoEncryption", "bedrock.bedrockKBNoEncryption", "bedrock.bedrockACMemoryNoEncryption", "bedrock.bedrockGuardrailNoPiiDetection"]
     },
     "P1.0 - Privacy": {
       "P1.1 - Communicates personal information policies": [],
@@ -107,7 +107,7 @@
       "PI1.1 - Processes inputs accurately, completely, and timely": ["cloudwatch.hasAlarms"],
       "PI1.2 - Maintains integrity during processing": ["cloudtrail.logFileValidationEnabled"],
       "PI1.3 - Processes outputs accurately and completely": ["cloudwatch.hasAlarms"],
-      "PI1.4 - Maintains integrity during storage": ["s3.bucketVersioning", "s3.bucketEncryption", "rds.instanceEncryptionEnabled"],
+      "PI1.4 - Maintains integrity during storage": ["s3.bucketVersioning", "s3.bucketEncryption", "rds.instanceEncryptionEnabled", "bedrock.bedrockKBNoEncryption", "bedrock.bedrockACMemoryNoEncryption"],
       "PI1.5 - Maintains integrity during transmission": ["cloudfront.viewerPolicyHttps", "apigateway.endpointTypesPrivate"]
     }
   }

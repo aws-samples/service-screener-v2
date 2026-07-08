@@ -97,7 +97,13 @@
       ],
       "28": [
         "sagemaker.EncryptionEnabled",
-        "sagemaker.VolumeAndOutputEncryption"
+        "sagemaker.VolumeAndOutputEncryption",
+        "bedrock.bedrockAgentNoEncryptionKey",
+        "bedrock.bedrockGuardrailNoEncryption",
+        "bedrock.bedrockKBNoEncryption",
+        "bedrock.bedrockACMemoryNoEncryption",
+        "stepfunctions.sfnEncryptionAtRest",
+        "sns.snsEncryptionAtRest"
       ]
     },
     "10.2": {
@@ -157,7 +163,9 @@
       "4": [
         "ec2.VPCFlowLogEnabled",
         "cloudtrail.OrganizationTrailEnabled",
-        "cloudtrail.CloudWatchAlarmsConfigured"
+        "cloudtrail.CloudWatchAlarmsConfigured",
+        "bedrock.bedrockModelInvocationLoggingDisabled",
+        "bedrock.bedrockModelInvocationNoCloudWatch"
       ]
     },
     "10.36": {
@@ -248,7 +256,11 @@
         "iam.FullAdminAccess",
         "iam.ManagedPolicyFullAccessOneServ",
         "iam.wildcardActionsDetection",
-        "iam.missingPolicyConditions"
+        "iam.missingPolicyConditions",
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "bedrock.bedrockKBRoleOverprivileged",
+        "bedrock.bedrockACRuntimeWildcardRole",
+        "stepfunctions.sfnRoleOverprivileged"
       ],
       "25": [
         "iam.rootHasAccessKey"
@@ -448,7 +460,10 @@
       ],
       "5": [
         "iam.FullAdminAccess",
-        "iam.ManagedPolicyFullAccessOneServ"
+        "iam.ManagedPolicyFullAccessOneServ",
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "bedrock.bedrockKBRoleOverprivileged",
+        "bedrock.bedrockACRuntimeWildcardRole"
       ],
       "6": [
         "iam.userNotUsingGroup"
@@ -458,12 +473,15 @@
     "10.53(c)(f)": {
       "1": [
         "iam.passwordPolicy",
-        "iam.passwordPolicyWeak"
+        "iam.passwordPolicyWeak",
+        "cognito.cognitoWeakPasswordPolicy"
       ]
     },
     "10.53(f)(h)": {
       "1": [
-        "iam.mfaActive"
+        "iam.mfaActive",
+        "cognito.cognitoMfaNotEnforced",
+        "cognito.cognitoAdvancedSecurityNotEnforced"
       ],
       "2": [],
       "3": [
@@ -472,7 +490,8 @@
     },
     "10.54": {
       "1": [
-        "iam.mfaActive"
+        "iam.mfaActive",
+        "cognito.cognitoMfaNotEnforced"
       ],
       "2": [],
       "3": [
@@ -520,7 +539,14 @@
         "iam.scpBestPractices"
       ],
       "6": [
-        "cloudtrail.CloudWatchLogsLogGroupArn"
+        "cloudtrail.CloudWatchLogsLogGroupArn",
+        "bedrock.bedrockModelInvocationLoggingDisabled",
+        "bedrock.bedrockModelInvocationNoCloudWatch",
+        "bedrock.bedrockModelInvocationNoS3",
+        "stepfunctions.sfnLoggingDisabled",
+        "sns.snsDeliveryStatusLoggingDisabled",
+        "wafv2.wafv2LoggingNotConfigured",
+        "wafv2.wafv2CloudWatchMetricsDisabled"
       ],
       "7": [
         "cloudwatch.SetRetentionDays"
@@ -638,7 +664,11 @@
       "18": [
         "redshift.EncryptedWithKMS",
         "sagemaker.EncryptionEnabled",
-        "sagemaker.VolumeAndOutputEncryption"
+        "sagemaker.VolumeAndOutputEncryption",
+        "bedrock.bedrockAgentNoEncryptionKey",
+        "bedrock.bedrockGuardrailNoEncryption",
+        "bedrock.bedrockKBNoEncryption",
+        "bedrock.bedrockACMemoryNoEncryption"
       ],
       "19": [
         "redshift.EncryptedInTransit"

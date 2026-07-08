@@ -1,0 +1,304 @@
+{
+    "snsEncryptionAtRest": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) have no server-side encryption at rest (KmsMasterKeyId is not set). Unencrypted topics store messages in plaintext at the SNS service layer, which is unacceptable for regulated workloads and blocks CloudTrail-driven audit of key usage.",
+        "shortDesc": "Enable server-side encryption on every SNS topic",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS server-side encryption]<https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html>",
+            "[SNS security best practices]<https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html>"
+        ]
+    },
+    "snsEncryptionNotCMK": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) are encrypted with the default AWS-managed key (alias/aws/sns) rather than a customer-managed KMS key. AWS-managed keys are acceptable for many workloads but do not permit key rotation control, revocation, or cross-account audit. This is an advisory finding — organisations with CMK mandates should upgrade; others can suppress.",
+        "shortDesc": "Prefer a customer-managed KMS key over alias/aws/sns",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS server-side encryption]<https://docs.aws.amazon.com/sns/latest/dg/sns-server-side-encryption.html>",
+            "[AWS-managed vs customer-managed keys]<https://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#key-mgmt>"
+        ]
+    },
+    "snsPublicAccess": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) have a resource policy that grants access to Principal:* without a scoping Condition (aws:SourceAccount, aws:SourceArn, aws:PrincipalOrgID, or equivalent). A wildcard principal without a condition allows any AWS account to publish or subscribe, which is almost always a misconfiguration.",
+        "shortDesc": "Constrain wildcard Principal statements with a Condition",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS access policy]<https://docs.aws.amazon.com/sns/latest/dg/sns-access-policy-language-overview.html>",
+            "[SNS security best practices]<https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html>"
+        ]
+    },
+    "snsNoHttpsEnforcement": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) have no policy statement that denies non-TLS traffic (no Deny + aws:SecureTransport=false). Without this, publishers can send messages over HTTP and subscribers can be delivered over HTTP, leaving in-transit traffic unencrypted.",
+        "shortDesc": "Add a Deny statement with aws:SecureTransport=false",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Enforce HTTPS on SNS]<https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html>"
+        ]
+    },
+    "snsInsecureSubscription": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) have at least one subscription that uses the plain HTTP protocol (protocol=http). Messages delivered over HTTP are transmitted unencrypted. Note: email, email-json, and sms protocols are excluded from this check because they do not have TLS equivalents at the SNS layer.",
+        "shortDesc": "Migrate HTTP subscriptions to HTTPS",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS subscription protocols]<https://docs.aws.amazon.com/sns/latest/api/API_Subscribe.html>"
+        ]
+    },
+    "snsSignatureVersionOld": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) still use SignatureVersion=1 (SHA-1) for message signing. SHA-1 is cryptographically deprecated; SignatureVersion=2 (SHA-256) is the current recommended value.",
+        "shortDesc": "Upgrade topic SignatureVersion from 1 to 2",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS message signature version]<https://docs.aws.amazon.com/sns/latest/dg/sns-verify-signature-of-message.html>"
+        ]
+    },
+    "snsSubscriptionNoDlq": {
+        "category": "R",
+        "^description": "{$COUNT} SNS topic(s) have at least one sqs/lambda/firehose subscription without a RedrivePolicy (DLQ). Without a DLQ, messages that repeatedly fail delivery are dropped silently after the retry policy is exhausted. email/sms/http(s) subscriptions are excluded because they do not support DLQs.",
+        "shortDesc": "Configure a dead-letter queue on every async subscription",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS dead-letter queues]<https://docs.aws.amazon.com/sns/latest/dg/sns-dead-letter-queues.html>"
+        ]
+    },
+    "snsPendingSubscription": {
+        "category": "R",
+        "^description": "{$COUNT} SNS topic(s) have at least one subscription in PendingConfirmation state. Pending subscriptions never receive messages until the owner confirms them; long-lived pending subscriptions usually indicate misconfigured or abandoned endpoints.",
+        "shortDesc": "Confirm or delete pending subscriptions",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS subscription confirmation]<https://docs.aws.amazon.com/sns/latest/dg/sns-message-and-json-formats.html#http-subscription-confirmation-json>"
+        ]
+    },
+    "snsDeliveryStatusLoggingDisabled": {
+        "category": "O",
+        "^description": "{$COUNT} SNS topic(s) have no delivery-status logging configured for any protocol (no *SuccessFeedbackRoleArn or *FailureFeedbackRoleArn attribute set). Without delivery-status logging, there is no CloudWatch record of which messages were successfully delivered vs. dropped, which blocks debugging and audit.",
+        "shortDesc": "Enable SNS delivery-status logging",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS delivery status logging]<https://docs.aws.amazon.com/sns/latest/dg/sns-topic-attributes.html>"
+        ]
+    },
+    "snsTracingDisabled": {
+        "category": "O",
+        "^description": "{$COUNT} SNS topic(s) have X-Ray tracing disabled (TracingConfig is not 'Active'). Without SNS tracing, cross-service traces stop at the publisher and cannot be correlated with downstream consumers.",
+        "shortDesc": "Set TracingConfig=Active for cross-service tracing",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS with X-Ray]<https://docs.aws.amazon.com/sns/latest/dg/sns-active-tracing.html>"
+        ]
+    },
+    "snsUnusedTopic": {
+        "category": "C",
+        "^description": "{$COUNT} SNS topic(s) have zero confirmed subscriptions (SubscriptionsConfirmed=0). Topics without subscribers publish messages that go nowhere; long-idle topics are typically orphaned deployments.",
+        "shortDesc": "Delete or subscribe to unused topics",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS best practices]<https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html>"
+        ]
+    },
+    "snsResourcesWithoutTags": {
+        "category": "C",
+        "^description": "{$COUNT} SNS topic(s) have no tags applied. Tags enable cost allocation, tag-based IAM, and lifecycle governance.",
+        "shortDesc": "Tag every SNS topic (owner, environment, cost-centre)",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>"
+        ]
+    },
+    "snsNoDataProtectionPolicy": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) have no Data Protection Policy configured. Without a DPP, personally-identifiable information (SSN, credit card, address, etc.) can flow through messages undetected and unmasked to every subscriber and every downstream log.",
+        "shortDesc": "Attach a Data Protection Policy to topics that carry sensitive data",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS message data protection]<https://docs.aws.amazon.com/sns/latest/dg/sns-message-data-protection.html>"
+        ]
+    },
+    "snsCrossAccountAccessNoCondition": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) allow cross-account principals (specific external account IDs, not '*') without an aws:PrincipalOrgID condition. Named external accounts are less risky than wildcard access (see snsPublicAccess) but still lack organisation-scoped audit — a compromised account remains authorised until manually revoked.",
+        "shortDesc": "Add aws:PrincipalOrgID to cross-account Allow statements",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Using aws:PrincipalOrgID]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html#condition-keys-principalorgid>"
+        ]
+    },
+    "snsNoDeliveryRetryPolicy": {
+        "category": "R",
+        "^description": "{$COUNT} SNS topic(s) rely on the default effective delivery retry policy. The default aggressive backoff (23 retries over ~4 hours) can overwhelm HTTP subscribers during transient failures. Customising DeliveryPolicy per subscription is recommended for high-volume topics. Informational only.",
+        "shortDesc": "Consider a topic-level DeliveryPolicy tuned for your subscribers",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS delivery retry policy]<https://docs.aws.amazon.com/sns/latest/dg/sns-message-delivery-retries.html>"
+        ]
+    },
+    "snsPolicyOverlyBroadActions": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) grant sensitive management actions (SNS:*, SNS:AddPermission, SNS:RemovePermission, SNS:SetTopicAttributes, SNS:DeleteTopic) to non-owner principals. Wildcard Action or admin actions given to another account effectively hand over topic ownership; different failure mode from snsPublicAccess (which flags Principal:*).",
+        "shortDesc": "Scope non-owner Allow statements to Publish/Subscribe only",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS access policy Actions]<https://docs.aws.amazon.com/sns/latest/api/API_Operations.html>"
+        ]
+    },
+    "snsSubscriptionUnauthenticatedConfirmation": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) have subscription(s) whose ConfirmationWasAuthenticated=false. The subscription was confirmed without signature validation — an attacker who intercepted the confirmation URL could point delivery at a rogue endpoint. Confirmed HTTP/S subscriptions specifically should always be authenticated.",
+        "shortDesc": "Re-confirm subscriptions with AuthenticateOnUnsubscribe=true",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS ConfirmSubscription API]<https://docs.aws.amazon.com/sns/latest/api/API_ConfirmSubscription.html>"
+        ]
+    },
+    "snsSubscriptionEndpointIsIPAddress": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) have HTTP/HTTPS subscription(s) whose endpoint is a raw IPv4 address rather than a hostname. Raw-IP endpoints break TLS SAN validation, cannot be moved without re-subscribing, and are typically an anti-pattern flagged in the SNS security best-practices guide.",
+        "shortDesc": "Use hostnames (with valid TLS certs) for HTTPS subscription endpoints",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS security best practices]<https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html>"
+        ]
+    },
+    "snsPlatformAppCertExpiringSoon": {
+        "category": "R",
+        "^description": "{$COUNT} SNS platform application(s) have credentials/certificates expiring within 30 days. When the APNs cert or FCM key expires, push notifications silently fail for every mobile app registered on this endpoint. Certificate expiry is reported once per region — the finding attaches to the first topic scanned.",
+        "shortDesc": "Rotate SNS platform application credentials before expiry",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[SNS mobile push]<https://docs.aws.amazon.com/sns/latest/dg/sns-mobile-application-as-subscriber.html>"
+        ]
+    },
+    "snsFifoContentDeduplicationDisabled": {
+        "category": "R",
+        "^description": "{$COUNT} SNS FIFO topic(s) have ContentBasedDeduplication=false. Publishers must supply a MessageDeduplicationId on every Publish — a common source of duplicate delivery when the id-generation logic is forgotten or wrong. Advisory only.",
+        "shortDesc": "Enable ContentBasedDeduplication on FIFO topics where content is naturally unique",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS FIFO topics]<https://docs.aws.amazon.com/sns/latest/dg/sns-fifo-topics.html>"
+        ]
+    },
+    "snsSmsNoSpendLimit": {
+        "category": "C",
+        "^description": "SNS account-level SMS spend limit (`MonthlySpendLimit`) is either unset or at the AWS default ceiling. SMS pumping attacks can rack up thousands of dollars in hours; a conservative account-level cap is the single most effective mitigation.",
+        "shortDesc": "Set SNS MonthlySpendLimit to a conservative cap",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS SMS attributes]<https://docs.aws.amazon.com/sns/latest/dg/sms_publish-to-phone.html>"
+        ]
+    },
+    "snsPolicyVersionOutdated": {
+        "category": "S",
+        "^description": "{$COUNT} SNS topic(s) use the deprecated policy language version 2008-10-17 instead of 2012-10-17. The older version lacks policy variables (e.g., ${aws:username}) and has different evaluation semantics for some conditions — a subtle but real security concern.",
+        "shortDesc": "Update topic policies to Version 2012-10-17",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[IAM policy versions]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_version.html>"
+        ]
+    },
+    "snsFifoNoArchivePolicy": {
+        "category": "R",
+        "^description": "{$COUNT} SNS FIFO topic(s) have no ArchivePolicy configured. Without an archive, messages published to the topic cannot be replayed for disaster recovery or downstream re-processing. Advisory only.",
+        "shortDesc": "Configure an ArchivePolicy on FIFO topics used for durable pipelines",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[SNS message archive & replay]<https://docs.aws.amazon.com/sns/latest/dg/message-archiving-and-replay.html>"
+        ]
+    }
+}

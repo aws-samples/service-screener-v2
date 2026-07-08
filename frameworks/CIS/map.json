@@ -132,7 +132,11 @@
       "1": [
         "iam.FullAdminAccess",
         "iam.wildcardActionsDetection",
-        "iam.missingPolicyConditions"
+        "iam.missingPolicyConditions",
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "bedrock.bedrockKBRoleOverprivileged",
+        "bedrock.bedrockACRuntimeWildcardRole",
+        "stepfunctions.sfnRoleOverprivileged"
       ],
       "3": [
         "iam.hasAccessKeyNoRotate90days"
@@ -142,13 +146,15 @@
       ],
       "5": [
         "iam.mfaActive",
-        "iam.iamUsersWithFederationAvailable"
+        "iam.iamUsersWithFederationAvailable",
+        "cognito.cognitoMfaNotEnforced"
       ],
       "9": [
         "iam.rootMfaActive"
       ],
       "15": [
-        "iam.passwordPolicyLength"
+        "iam.passwordPolicyLength",
+        "cognito.cognitoWeakPasswordPolicy"
       ],
       "16": [
         "iam.passwordPolicyReuse"

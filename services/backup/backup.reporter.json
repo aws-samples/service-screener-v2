@@ -1,0 +1,292 @@
+{
+    "backupVaultNoLock": {
+        "category": "S",
+        "^description": "{$COUNT} AWS Backup vault(s) do not have Vault Lock enabled. Without Vault Lock, any principal with sufficient IAM permissions can delete recovery points (accidentally or maliciously). Vault Lock provides WORM (write-once-read-many) immutability that satisfies compliance regimes such as SEC 17a-4 and HIPAA and is a primary defense against ransomware.",
+        "shortDesc": "Enable Vault Lock on every backup vault",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AWS Backup Vault Lock]<https://docs.aws.amazon.com/aws-backup/latest/devguide/vault-lock.html>",
+            "[Ransomware protection with AWS Backup]<https://docs.aws.amazon.com/aws-backup/latest/devguide/disaster-recovery-resiliency.html>"
+        ]
+    },
+    "backupVaultDefaultEncryption": {
+        "category": "S",
+        "^description": "{$COUNT} AWS Backup vault(s) are encrypted with an AWS-owned KMS key (EncryptionKeyType=AWS_OWNED_KMS_KEY) rather than a customer-managed KMS key (CMK). AWS-owned keys do not permit key-policy control, cross-account grant auditing, or custom rotation policies. Regulated workloads should use a CMK.",
+        "shortDesc": "Encrypt backup vaults with a customer-managed KMS key",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Backup encryption]<https://docs.aws.amazon.com/aws-backup/latest/devguide/encryption.html>",
+            "[Customer managed keys vs AWS managed keys]<https://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#key-mgmt>"
+        ]
+    },
+    "backupVaultNoAccessPolicy": {
+        "category": "S",
+        "^description": "{$COUNT} AWS Backup vault(s) have no access policy attached, or the attached policy grants access to Principal:* without a scoping Condition. Without a deny-based vault access policy that blocks backup:DeleteRecoveryPoint / backup:UpdateRecoveryPointLifecycle for non-admin principals, the vault relies entirely on IAM permissions — a single overly-permissive role can wipe recovery points.",
+        "shortDesc": "Attach a deny-based access policy to every backup vault",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AWS Backup vault access policies]<https://docs.aws.amazon.com/aws-backup/latest/devguide/create-a-vault-access-policy.html>"
+        ]
+    },
+    "backupNoPlanExists": {
+        "category": "R",
+        "^description": "The account has no AWS Backup plans in this region. Without a backup plan, no automated backups are being taken — every recovery scenario becomes manual and error-prone. This is the most fundamental backup-hygiene finding.",
+        "shortDesc": "Create at least one AWS Backup plan per region",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Creating a backup plan]<https://docs.aws.amazon.com/aws-backup/latest/devguide/creating-a-backup-plan.html>"
+        ]
+    },
+    "backupPlanNoRules": {
+        "category": "R",
+        "^description": "{$COUNT} AWS Backup plan(s) contain zero rules. A plan without rules creates zero recovery points — usually the result of manual rule removal that stopped short of plan deletion.",
+        "shortDesc": "Delete empty plans or add at least one rule",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Backup plan rules]<https://docs.aws.amazon.com/aws-backup/latest/devguide/creating-a-backup-plan.html#backup-plan-rules>"
+        ]
+    },
+    "backupPlanNoLifecycle": {
+        "category": "C",
+        "^description": "{$COUNT} AWS Backup plan(s) contain rule(s) with no Lifecycle.DeleteAfterDays configured. Recovery points without lifecycle expiration accumulate indefinitely — storage cost grows without bound and stale data lingers past its useful window.",
+        "shortDesc": "Set Lifecycle.DeleteAfterDays on every backup rule",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Backup lifecycle]<https://docs.aws.amazon.com/aws-backup/latest/devguide/creating-a-backup-plan.html#backup-plan-lifecycle>"
+        ]
+    },
+    "backupPlanNoCrossRegionCopy": {
+        "category": "R",
+        "^description": "{$COUNT} AWS Backup plan(s) have no cross-region CopyActions on any rule. Without a cross-region copy, a regional outage or region-scoped account compromise can destroy both primary data and backups. At least one rule should copy to a different region for disaster recovery.",
+        "shortDesc": "Add a cross-region CopyAction to at least one rule",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Cross-region backup copy]<https://docs.aws.amazon.com/aws-backup/latest/devguide/cross-region-backup.html>"
+        ]
+    },
+    "backupPlanNotAssigned": {
+        "category": "R",
+        "^description": "{$COUNT} AWS Backup plan(s) have no resource selections attached. A plan with rules but no selections protects zero resources — a common 'looks good on paper' misconfiguration.",
+        "shortDesc": "Attach at least one backup selection to every plan",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Assigning resources to a backup plan]<https://docs.aws.amazon.com/aws-backup/latest/devguide/assigning-resources.html>"
+        ]
+    },
+    "backupCrossAccountDisabled": {
+        "category": "R",
+        "^description": "AWS Backup cross-account backup is disabled at the Organizations level (isCrossAccountBackupEnabled=false). Cross-account backup provides isolation from account compromise — if an attacker gains admin access to one account, backups stored in a separate account remain safe. Required for a robust Organizations-level DR posture.",
+        "shortDesc": "Enable cross-account backup at the Organizations level",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Cross-account backup]<https://docs.aws.amazon.com/aws-backup/latest/devguide/create-cross-account-backup.html>"
+        ]
+    },
+    "backupServiceOptInDisabled": {
+        "category": "R",
+        "^description": "{$COUNT} critical service(s) have ResourceTypeOptInPreference=false in this region. When a service is not opted-in, AWS Backup silently ignores resources of that type even when they appear in a backup selection. Critical services tracked: DynamoDB, EBS, EC2, EFS, RDS, Aurora, S3, FSx.",
+        "shortDesc": "Opt every critical service into AWS Backup",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Backup region settings]<https://docs.aws.amazon.com/aws-backup/latest/devguide/opt-in.html>"
+        ]
+    },
+    "backupRecoveryPointNotEncrypted": {
+        "category": "S",
+        "^description": "{$COUNT} AWS Backup vault(s) contain recovery point(s) with IsEncrypted=false. Unencrypted recovery points expose the underlying data at rest. Maps directly to Security Hub control [Backup.1].",
+        "shortDesc": "Ensure every recovery point is encrypted at rest",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Security Hub Backup.1]<https://docs.aws.amazon.com/securityhub/latest/userguide/backup-controls.html#backup-1>"
+        ]
+    },
+    "backupVaultEmpty": {
+        "category": "R",
+        "^description": "{$COUNT} AWS Backup vault(s) contain zero recovery points and were created more than 7 days ago. Either the associated plan is misconfigured, backup jobs are failing, or the vault has been abandoned. Not always a failure, but worth verifying.",
+        "shortDesc": "Investigate empty vaults older than a week",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Backup jobs]<https://docs.aws.amazon.com/aws-backup/latest/devguide/monitoring.html>"
+        ]
+    },
+    "backupPlanInfrequentSchedule": {
+        "category": "R",
+        "^description": "{$COUNT} AWS Backup plan(s) contain rule(s) whose schedule fires less than once every 24 hours. For production workloads, an RPO greater than 24 hours may not meet business-continuity requirements. Advisory — not every workload needs daily backup, so review and suppress where appropriate.",
+        "shortDesc": "Consider a daily-or-better schedule for production workloads",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Schedule expressions]<https://docs.aws.amazon.com/aws-backup/latest/devguide/creating-a-backup-plan.html>"
+        ]
+    },
+    "backupPlanNoCompletionWindow": {
+        "category": "O",
+        "^description": "{$COUNT} AWS Backup plan(s) contain rule(s) with no CompletionWindowMinutes set. The default of 10080 minutes (7 days) is excessive — a hung job can run for a week before AWS Backup cancels it, blocking the next backup window and delaying operator alerts.",
+        "shortDesc": "Set a bounded CompletionWindowMinutes on every rule",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Backup plan windows]<https://docs.aws.amazon.com/aws-backup/latest/devguide/creating-a-backup-plan.html>"
+        ]
+    },
+    "backupPlanNoContinuousBackup": {
+        "category": "R",
+        "^description": "{$COUNT} AWS Backup plan(s) have no rule with EnableContinuousBackup=true. Continuous backup enables Point-in-Time Recovery (PITR) for supported resources (RDS, Aurora, S3, DynamoDB). Without it, RPO is limited to snapshot frequency. Advisory — only meaningful when the plan protects a PITR-capable resource.",
+        "shortDesc": "Enable continuous backup for PITR-capable resources",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Point-in-time recovery]<https://docs.aws.amazon.com/aws-backup/latest/devguide/point-in-time-recovery.html>"
+        ]
+    },
+    "backupRecoveryPointNeverRestored": {
+        "category": "R",
+        "^description": "{$COUNT} AWS Backup vault(s) have no recovery point that has ever been restored (LastRestoreTime is null for every sampled point). Backups that have never been restored may not be recoverable — Well-Architected REL13 explicitly recommends regular restore testing.",
+        "shortDesc": "Perform a scheduled restore test against every vault",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[REL13 Plan for disaster recovery]<https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_planning_for_recovery_disaster_recovery.html>",
+            "[Restore testing with AWS Backup]<https://docs.aws.amazon.com/aws-backup/latest/devguide/restore-testing.html>"
+        ]
+    },
+    "backupRecoveryPointExpiredLifecycle": {
+        "category": "C",
+        "^description": "{$COUNT} AWS Backup vault(s) contain recovery point(s) whose Status=EXPIRED. Expired points past their lifecycle that are still present indicate either lifecycle-processing issues or a vault lock preventing deletion. Cost leak unless the retention is intentional.",
+        "shortDesc": "Investigate expired recovery points that persist in the vault",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Recovery point lifecycle]<https://docs.aws.amazon.com/aws-backup/latest/devguide/API_Lifecycle.html>"
+        ]
+    },
+    "backupVaultLockNotFinalized": {
+        "category": "S",
+        "^description": "{$COUNT} AWS Backup vault(s) have Vault Lock enabled in GOVERNANCE mode (no LockDate) or in COMPLIANCE mode still inside the cooling-off period (LockDate in the future). In these states the lock can be removed by anyone with sufficient IAM permissions — true immutability requires COMPLIANCE mode with a past LockDate.",
+        "shortDesc": "Transition Vault Lock to COMPLIANCE mode past its LockDate",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Vault Lock modes]<https://docs.aws.amazon.com/aws-backup/latest/devguide/vault-lock.html>"
+        ]
+    },
+    "backupServiceManagementDisabled": {
+        "category": "R",
+        "^description": "{$COUNT} AWS-Backup-manageable service(s) have ResourceTypeManagementPreference=false (DynamoDB or EFS). When management preference is off, AWS Backup does not fully manage the backup lifecycle (e.g. DynamoDB PITR must be managed separately). Enabling it centralises control in AWS Backup.",
+        "shortDesc": "Enable full-service management for DynamoDB and EFS",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Advanced DynamoDB backup features]<https://docs.aws.amazon.com/aws-backup/latest/devguide/advanced-ddb-backup.html>"
+        ]
+    },
+    "backupCriticalResourcesUnprotected": {
+        "category": "R",
+        "^description": "{$COUNT} production resource(s) (RDS instances, DynamoDB tables, EFS filesystems, EBS volumes) are not protected by AWS Backup in this region. Cross-referenced against list_protected_resources — resources that appear in the account but not in the protected set have zero recovery-point coverage.",
+        "shortDesc": "Assign every production resource to a backup plan",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[list_protected_resources]<https://docs.aws.amazon.com/aws-backup/latest/devguide/API_ListProtectedResources.html>",
+            "[Assign resources to a backup plan]<https://docs.aws.amazon.com/aws-backup/latest/devguide/assigning-resources.html>"
+        ]
+    },
+    "backupRecoveryPointNoCMK": {
+        "category": "S",
+        "^description": "{$COUNT} AWS Backup vault(s) contain recovery point(s) with EncryptionKeyType=AWS_OWNED_KMS_KEY. Similar to the vault-level check, but at the recovery-point level — AWS-owned keys do not allow cross-account sharing or custom rotation policies. Often redundant with backupVaultDefaultEncryption; useful for older points created before a vault migration.",
+        "shortDesc": "Re-encrypt recovery points onto a customer-managed KMS key",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Backup encryption]<https://docs.aws.amazon.com/aws-backup/latest/devguide/encryption.html>"
+        ]
+    },
+    "backupNoLogicallyAirGappedVault": {
+        "category": "S",
+        "^description": "The account has no AWS Backup logically air-gapped vault (VaultType=LOGICALLY_AIR_GAPPED_BACKUP_VAULT) in this region. Logically air-gapped vaults provide the highest level of backup isolation via an AWS-managed second account and are the recommended defense-in-depth layer for ransomware-critical workloads. Advisory — not every account needs one.",
+        "shortDesc": "Create a logically air-gapped vault for ransomware-critical workloads",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Logically air-gapped vaults]<https://docs.aws.amazon.com/aws-backup/latest/devguide/logicallyairgappedvault.html>"
+        ]
+    }
+}

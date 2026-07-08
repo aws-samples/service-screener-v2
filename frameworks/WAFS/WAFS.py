@@ -53,7 +53,7 @@ class WAFS(Framework):
 
         newChecks = "<h4>{}</h4>{}".format(self.getDescription(titleNum, paired), checks) 
 
-        titleKey = self.WATools.answerSets.get(titleNum, [None])[0]
+        titleKey = self.WATools.answerSets.get(titleNum, [None])[0] if isinstance(self.WATools.answerSets.get(titleNum), list) else None
         if not titleKey in self.ResultCache:
             self.ResultCache[titleKey] = {
                 "0": [],
@@ -62,16 +62,21 @@ class WAFS(Framework):
             }
 
         if not titleKey == None:
+            entry = self.WATools.answerSets.get(paired)
+            if not isinstance(entry, list):
+                entry = [None, None]
+            elif len(entry) < 2:
+                entry = list(entry) + [None] * (2 - len(entry))
             if comp == 1:
-                choice = self.WATools.answerSets.get(paired, [None])[0]
+                choice = entry[0]
                 if choice and choice not in self.ResultCache[titleKey]["1"]:
                     self.ResultCache[titleKey]["1"].append(choice)
             elif comp == -1:
-                choice = self.WATools.answerSets.get(paired, [None, None])[1]
+                choice = entry[1]
                 if choice and choice not in self.ResultCache[titleKey]["-1"]:
                     self.ResultCache[titleKey]["-1"].append(choice)
             else:
-                choice = self.WATools.answerSets.get(paired, [None])[0]
+                choice = entry[0]
                 if choice and choice not in self.ResultCache[titleKey]["0"]:
                     self.ResultCache[titleKey]["0"].append(choice)
 
@@ -127,8 +132,19 @@ class WAFS(Framework):
         return match.group() if match else None
     
     def getDescription(self, titleNum, paired):
-        titleStr = self.WATools.answerSets.get(titleNum, [None])[1]
-        sectStr = self.WATools.answerSets.get(paired, [None])[1]
+        # Safe lookup — REL09/REL13 keys added to the WAFS map are not part
+        # of the Security-pillar WA Tool answerSets, so the lookup may return
+        # [None] (a length-1 list) or None. Fall back to the raw identifier.
+        titleEntry = self.WATools.answerSets.get(titleNum)
+        if isinstance(titleEntry, list) and len(titleEntry) >= 2:
+            titleStr = titleEntry[1]
+        else:
+            titleStr = titleNum
+        sectEntry = self.WATools.answerSets.get(paired)
+        if isinstance(sectEntry, list) and len(sectEntry) >= 2:
+            sectStr = sectEntry[1]
+        else:
+            sectStr = paired
         return f"{titleStr} - {sectStr}"
 
     def _hookPostBuildContentDetail(self):

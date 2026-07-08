@@ -1,0 +1,543 @@
+{
+    "wafv2NoRules": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have zero rules configured. An empty WebACL applies only its DefaultAction to every request — if DefaultAction=Allow, the WAF is a pass-through that provides no protection. Empty WebACLs still cost the base $5/month.",
+        "shortDesc": "Add rules (managed or custom) to every WebACL",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Managing rules in a web ACL]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-editing.html>",
+            "[AWS WAF security best practices]<https://docs.aws.amazon.com/waf/latest/developerguide/security-best-practices.html>"
+        ]
+    },
+    "wafv2NoManagedRuleGroups": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) contain no managed rule groups (AWS or Marketplace). Managed rule groups protect against OWASP Top 10 risks, known bad inputs, bots, and reputation-based threats. Hand-rolled rules alone rarely provide equivalent coverage. Advisory: teams that front their traffic with a third-party WAF (Cloudflare, Akamai, Imperva, F5) may run AWS WAF only as a defence-in-depth layer with custom rules — suppress this finding if that is your architecture.",
+        "shortDesc": "Attach at least one AWS-managed rule group",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[AWS Managed Rules for AWS WAF]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups.html>",
+            "[AWS WAF core rule set (CRS)]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-baseline.html>"
+        ]
+    },
+    "wafv2NoRateBasedRules": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have no rate-based rules. Rate-based rules count requests per 5-minute window per IP (or forwarded IP / custom aggregate key) and are the primary defence against brute-force login, credential stuffing, scraping, and volumetric application-layer DDoS. Advisory: teams that rely on a third-party WAF, CloudFront/Shield Advanced rate limiting, or upstream API-Gateway usage plans for rate control may suppress this finding.",
+        "shortDesc": "Add a rate-based rule sized for your traffic profile",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Rate-based rule statement]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-rate-based.html>"
+        ]
+    },
+    "wafv2RulesInCountMode": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have one or more CUSTOM (non-managed) rules with Action=Count. COUNT mode is intended for tuning — matched requests are logged and metered but NOT blocked. Custom rules left in COUNT after tuning provide zero protection despite appearing configured. Advisory: managed rule groups with OverrideAction=Count are handled by wafv2NoManagedRuleGroups and are not double-flagged here. Third-party WAF users who use AWS WAF only for observability may deliberately keep custom rules in Count — suppress if that is your architecture.",
+        "shortDesc": "Move tuned custom rules from COUNT to BLOCK / CAPTCHA / CHALLENGE",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Testing rules with Count]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-testing.html>",
+            "[Overriding a managed rule group action]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-group-override-options.html>"
+        ]
+    },
+    "wafv2DefaultActionAllow": {
+        "category": "R",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have DefaultAction=Allow AND no rule that Blocks/Captchas/Challenges anything. This is a pass-through WAF: every request that doesn't explicitly match an Allow rule still hits the origin unfiltered. Either flip to DefaultAction=Block with explicit Allow rules, or add real Block/Captcha/Challenge rules.",
+        "shortDesc": "Do not run a WebACL with DefaultAction=Allow and no blocking rules",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Web ACL default action]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-default-action.html>"
+        ]
+    },
+    "wafv2LoggingNotConfigured": {
+        "category": "O",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have no logging configuration (GetLoggingConfiguration returns WAFNonexistentItemException). Without logging, blocked/allowed requests cannot be audited, false positives cannot be triaged, and incident response has no forensic trail.",
+        "shortDesc": "Enable logging to CloudWatch Logs / S3 / Firehose",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Logging web ACL traffic]<https://docs.aws.amazon.com/waf/latest/developerguide/logging.html>"
+        ]
+    },
+    "wafv2LoggingFilterAllDrop": {
+        "category": "O",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have logging configured but the LoggingFilter has DefaultBehavior=DROP with no explicit KEEP filters (or the filters KEEP nothing). Effectively no traffic is logged — the illusion of logging without any actual records.",
+        "shortDesc": "Fix LoggingFilter — either remove it or KEEP the traffic you care about",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Logging filter configuration]<https://docs.aws.amazon.com/waf/latest/developerguide/logging-management.html>"
+        ]
+    },
+    "wafv2CloudWatchMetricsDisabled": {
+        "category": "O",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have CloudWatchMetricsEnabled=false at the WebACL level. Without CloudWatch metrics, you cannot alarm on blocked-request spikes, cannot dashboard block/allow ratios, and cannot detect attacks in near-real-time.",
+        "shortDesc": "Enable CloudWatchMetricsEnabled=true on VisibilityConfig",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Web ACL and rule visibility configuration]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-basic-configuration.html>"
+        ]
+    },
+    "wafv2SampledRequestsDisabled": {
+        "category": "O",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have SampledRequestsEnabled=false. Without sampled requests, the console cannot show which requests matched a rule — making false-positive triage and rule tuning nearly impossible.",
+        "shortDesc": "Enable SampledRequestsEnabled=true on VisibilityConfig",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Viewing a sample of web requests]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-testing.html>"
+        ]
+    },
+    "wafv2RuleVisibilityDisabled": {
+        "category": "O",
+        "^description": "{$COUNT} WAFv2 WebACL(s) contain individual rule(s) with CloudWatchMetricsEnabled=false or SampledRequestsEnabled=false in their per-rule VisibilityConfig. Without per-rule metrics you cannot compare rule effectiveness, and without per-rule sampled requests you cannot see which requests any given rule matched.",
+        "shortDesc": "Enable CloudWatchMetricsEnabled and SampledRequestsEnabled on every rule",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Web ACL and rule visibility configuration]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-basic-configuration.html>"
+        ]
+    },
+    "wafv2NotAssociated": {
+        "category": "C",
+        "^description": "{$COUNT} WAFv2 WebACL(s) are not associated with any resource (ALB / API Gateway / AppSync / Cognito user pool / App Runner for REGIONAL; CloudFront distribution for CLOUDFRONT). Unassociated WebACLs still incur the ~$5/month base charge and the per-rule charge without providing any protection. Note: for CLOUDFRONT-scoped WebACLs the scanner uses cloudfront:ListDistributionsByWebACLId; if that permission is missing, the check is downgraded to INFO instead of failing.",
+        "shortDesc": "Associate the WebACL with a resource, or delete it",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Associating a web ACL with a resource]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-associating-aws-resource.html>",
+            "[AWS WAF pricing]<https://aws.amazon.com/waf/pricing/>"
+        ]
+    },
+    "wafv2ResourcesWithoutTags": {
+        "category": "C",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have no tags applied. Tags enable cost allocation across environments, tag-based IAM (aws:ResourceTag/... conditions), and lifecycle governance.",
+        "shortDesc": "Tag every WebACL (owner, environment, cost-centre)",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>",
+            "[Tagging AWS WAF resources]<https://docs.aws.amazon.com/waf/latest/developerguide/tagging.html>"
+        ]
+    },
+    "wafv2NoIpReputationList": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have managed rule groups configured but do NOT include AWSManagedRulesAmazonIpReputationList. This managed group blocks requests from IPs recently observed in AWS-tracked malicious activity — the lowest-cost, highest-signal reputation defense AWS offers. Only flagged when the ACL already uses at least one managed group; empty ACLs are covered by wafv2NoRules / wafv2NoManagedRuleGroups.",
+        "shortDesc": "Add AWSManagedRulesAmazonIpReputationList to WebACLs",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AWSManagedRulesAmazonIpReputationList]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-ip-rep.html>"
+        ]
+    },
+    "wafv2NoSqlInjectionProtection": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have no SQL-injection protection: neither AWSManagedRulesSQLiRuleSet nor any custom rule with SqliMatchStatement (statements nested inside And/Or/Not/RateBased are checked recursively).",
+        "shortDesc": "Add SQLi protection (managed SQLi ruleset or custom SqliMatchStatement)",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AWSManagedRulesSQLiRuleSet]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-list.html#aws-managed-rule-groups-use-case-sql-db>",
+            "[OWASP A03: Injection]<https://owasp.org/Top10/A03_2021-Injection/>"
+        ]
+    },
+    "wafv2NoXssProtection": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have no XSS protection: no AWS-managed group that covers XSS (CommonRuleSet includes XSS body rules) AND no custom rule with XssMatchStatement. Recursive statement walk applied.",
+        "shortDesc": "Add XSS protection (Common Rule Set or custom XssMatchStatement)",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AWSManagedRulesCommonRuleSet]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-list.html#aws-managed-rule-groups-baseline>"
+        ]
+    },
+    "wafv2HighCapacityUsage": {
+        "category": "P",
+        "^description": "{$COUNT} WAFv2 WebACL(s) consume >80% of the WCU (Web ACL Capacity Unit) limit for their scope. REGIONAL WebACLs are capped at 5000 WCUs; CLOUDFRONT WebACLs at 1500 WCUs. Approaching the limit blocks adding new rules and can cause updates to fail.",
+        "shortDesc": "Reduce WebACL capacity — request a limit increase or split rules",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[WAF Capacity Units]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-waf-capacity-units.html>",
+            "[Service quotas — WAF]<https://docs.aws.amazon.com/waf/latest/developerguide/limits.html>"
+        ]
+    },
+    "wafv2ManagedRuleGroupAllCountOverride": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) contain managed rule group(s) whose entire rule set is neutered: every rule is either in ExcludedRules or has a RuleActionOverride to Count. The managed group is effectively disabled while looking configured.",
+        "shortDesc": "Remove blanket Count/Excluded overrides from managed rule groups",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Managed rule group overrides]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-groups.html>"
+        ]
+    },
+    "wafv2NoCoreRuleSet": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) attach at least one managed rule group but do NOT include AWSManagedRulesCommonRuleSet. The Core Rule Set is the foundational (free) AWS managed group covering OWASP baseline patterns (Body, URI, Query-string, XSS surface) and should be present on every internet-facing WebACL.",
+        "shortDesc": "Add AWSManagedRulesCommonRuleSet to every WebACL",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AWSManagedRulesCommonRuleSet]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-list.html#aws-managed-rule-groups-baseline>"
+        ]
+    },
+    "wafv2AllowRuleBeforeManagedRules": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have a custom Allow-action rule at a lower Priority (runs earlier) than a managed rule group. Traffic matched by the Allow rule bypasses every managed rule downstream — a common misconfiguration when a hasty IP allow-list is added above the managed baseline.",
+        "shortDesc": "Move Allow rules AFTER managed rule groups (higher Priority number)",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[WAF rule priorities]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-rule-order.html>"
+        ]
+    },
+    "wafv2ManagedRuleGroupVersionPinned": {
+        "category": "O",
+        "^description": "{$COUNT} WAFv2 WebACL(s) pin a specific version of a managed rule group (VersionName set) instead of using the default auto-updating alias. Pinned versions have an ExpiryTimestamp — a pinned-and-expired managed group stops receiving updates and eventually starts throwing errors when queried. Escalates to FAIL when the pinned version expires within 30 days.",
+        "shortDesc": "Unpin managed rule group versions or rotate before expiry",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Managed rule group versions]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-group-versioning.html>"
+        ]
+    },
+    "wafv2NoBotControl": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) protect internet-facing resources but do not attach AWSManagedRulesBotControlRuleSet. Bot Control is a paid add-on and not appropriate everywhere, but resource-facing ACLs with credential-stuffing / scraping exposure should consider it. Informational only.",
+        "shortDesc": "Consider AWSManagedRulesBotControlRuleSet for internet-facing WebACLs",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[AWSManagedRulesBotControlRuleSet]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-bot.html>"
+        ]
+    },
+    "wafv2RateBasedRuleThresholdTooHigh": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have rate-based rule(s) with Limit > 10000 requests per 5 minutes. At that threshold most credential-stuffing / abuse traffic never trips the rule. Common baseline is 2000 req/5min per IP.",
+        "shortDesc": "Tune rate-based rule Limit downward (2000-5000 per 5min is typical)",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Rate-based rule statement]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-rate-based.html>"
+        ]
+    },
+    "wafv2LoggingFilterDropsBlocked": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have a LoggingFilter that drops BLOCK-action requests. Attack traffic that the WAF actually stops is exactly the evidence you need for forensics — dropping it means the WAF looks clean while incidents go unrecorded.",
+        "shortDesc": "Keep BLOCK actions in LoggingFilter",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[WAF logging filters]<https://docs.aws.amazon.com/waf/latest/developerguide/logging.html>"
+        ]
+    },
+    "wafv2IpSetOverlyPermissive": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) reference an IP set (in an Allow-action rule) whose Addresses contain overly-broad CIDRs (/8 or shorter for IPv4). A broad allow-list defeats the WAF for everything inside the CIDR range.",
+        "shortDesc": "Restrict allow-list IP sets to specific CIDRs",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[WAF IP sets]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-ip-set-managing.html>"
+        ]
+    },
+    "wafv2NoAccountTakeoverPrevention": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) associated with login-serving resources have no AWSManagedRulesATPRuleSet. ATP (paid) detects credential-stuffing signals (velocity, credential reuse, sign-in timing). Advisory only — the group has per-request pricing; enable it when the associated resource actually hosts a sign-in flow.",
+        "shortDesc": "Consider AWSManagedRulesATPRuleSet on login-facing WebACLs",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[AWSManagedRulesATPRuleSet]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-atp.html>"
+        ]
+    },
+    "wafv2NoAccountCreationFraudPrevention": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) associated with resources exposing sign-up flows have no AWSManagedRulesACFPRuleSet. ACFP (paid) detects synthetic-account-creation bots. Advisory only — enable when the associated resource actually hosts registration flows.",
+        "shortDesc": "Consider AWSManagedRulesACFPRuleSet on sign-up-facing WebACLs",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[AWSManagedRulesACFPRuleSet]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-acfp.html>"
+        ]
+    },
+    "wafv2PaidRuleGroupWithoutScopeDown": {
+        "category": "C",
+        "^description": "{$COUNT} WAFv2 WebACL(s) attach a paid managed rule group (BotControl / ATP / ACFP) without a ScopeDownStatement. Paid managed groups are priced per-request; without scope-down, EVERY request incurs the cost. Common pattern is to scope down to `/login`, `/signup`, etc.",
+        "shortDesc": "Add ScopeDownStatement to every paid managed rule group",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": -1,
+        "needFullTest": 1,
+        "ref": [
+            "[Managed rule group scope-down]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-statement-type-managed-rule-group.html>",
+            "[WAF pricing]<https://aws.amazon.com/waf/pricing/>"
+        ]
+    },
+    "wafv2ManagedRuleGroupExcludedRulesExcessive": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) contain managed rule group(s) with over 50% of the group's rules excluded or overridden to Count. Different from wafv2ManagedRuleGroupAllCountOverride (which requires ALL rules disabled) — this catches groups that are majority-neutered by accident during tuning.",
+        "shortDesc": "Trim excessive ExcludedRules / RuleActionOverrides on managed groups",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Managed rule group overrides]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-groups.html>"
+        ]
+    },
+    "wafv2NoKnownBadInputsRuleSet": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) attach managed rule groups but do NOT include AWSManagedRulesKnownBadInputsRuleSet. This free managed group blocks known exploit patterns (Log4Shell, Java deserialization, etc.) — a baseline that every WAF should include.",
+        "shortDesc": "Add AWSManagedRulesKnownBadInputsRuleSet to every WebACL",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AWSManagedRulesKnownBadInputsRuleSet]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-list.html#aws-managed-rule-groups-baseline>"
+        ]
+    },
+    "wafv2NoAnonymousIpList": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) attach managed rule groups but do NOT include AWSManagedRulesAnonymousIpList. This free managed group detects requests from VPN / Tor / anonymising services / hosting providers.",
+        "shortDesc": "Add AWSManagedRulesAnonymousIpList for anonymising-network defense",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[AWSManagedRulesAnonymousIpList]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-list.html#aws-managed-rule-groups-anonymous>"
+        ]
+    },
+    "wafv2RulePriorityOrdering": {
+        "category": "C",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have rate-based rule(s) evaluated AFTER paid managed rule groups. Because WAF charges per-request for paid groups, running paid groups before cheap rate-limits wastes budget on abusive traffic that a rate-based rule would have blocked upstream.",
+        "shortDesc": "Order rate-based rules with lower Priority than paid managed groups",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": -1,
+        "needFullTest": 1,
+        "ref": [
+            "[WAF rule priority]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-rule-order.html>"
+        ]
+    },
+    "wafv2IpSetEmpty": {
+        "category": "O",
+        "^description": "{$COUNT} WAFv2 WebACL(s) reference IP set(s) whose Addresses list is empty. Empty IP sets result in rules that can never match — they consume WCU allocation and clutter the ACL for no benefit. Advisory.",
+        "shortDesc": "Populate or remove empty IP sets referenced by WebACL rules",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[WAF IP sets]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-ip-set-managing.html>"
+        ]
+    },
+    "wafv2RegexPatternSetEmpty": {
+        "category": "O",
+        "^description": "{$COUNT} WAFv2 WebACL(s) reference regex pattern set(s) whose RegularExpressionList is empty. Same failure mode as empty IP sets: unmatchable rules that still consume WCU.",
+        "shortDesc": "Populate or remove empty regex pattern sets",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[WAF regex pattern sets]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-regex-pattern-set-managing.html>"
+        ]
+    },
+    "wafv2RuleGroupEmpty": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) reference a custom rule group that contains zero rules. The referenced group consumes WCU capacity but provides no protection — the WebACL is silently under-protected.",
+        "shortDesc": "Populate the referenced rule group or remove the reference",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[WAF rule groups]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-groups.html>"
+        ]
+    },
+    "wafv2LoggingMissingRedactedFields": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) have logging configured but with no RedactedFields set. Authorization headers, cookies with session tokens, and query strings carrying credentials are written to the log destination in plaintext — a compliance issue in regulated environments.",
+        "shortDesc": "Redact Authorization/Cookie/JWT-carrying fields in WAF logs",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[WAF logging redaction]<https://docs.aws.amazon.com/waf/latest/developerguide/logging.html>"
+        ]
+    },
+    "wafv2ManagedRuleGroupVersionExpiring": {
+        "category": "S",
+        "^description": "{$COUNT} WAFv2 WebACL(s) pin a managed rule group version whose ExpiryTimestamp is within 30 days. Once expired, AWS force-upgrades the pinned version — updates you may not have validated against your traffic. Rotate the pinned version or unpin to auto-updating.",
+        "shortDesc": "Rotate expiring pinned managed rule group versions",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Managed rule group versioning]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-group-versioning.html>"
+        ]
+    },
+    "wafv2AlbWithoutWebAcl": {
+        "category": "S",
+        "^description": "{$COUNT} internet-facing Application Load Balancer(s) in the account have no WAF WebACL associated. ALBs facing the internet without WAF have no baseline application-layer defense. Reported once per region regardless of how many WebACLs exist.",
+        "shortDesc": "Associate a WAFv2 WebACL with every internet-facing ALB",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[WAF with ALB]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-associating-aws-resource.html>"
+        ]
+    },
+    "wafv2ApiGatewayWithoutWebAcl": {
+        "category": "S",
+        "^description": "{$COUNT} API Gateway REST API stage(s) in the account have no WAF WebACL associated. REST API stages are the most common target for credential-stuffing and enumeration attacks — WAF is the standard defense.",
+        "shortDesc": "Associate a WAFv2 WebACL with every REST API Gateway stage",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[WAF with API Gateway]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-associating-aws-resource.html>"
+        ]
+    },
+    "wafv2CloudFrontWithoutWebAcl": {
+        "category": "S",
+        "^description": "{$COUNT} CloudFront distribution(s) in the account have no WAF WebACL configured (WebACLId is empty). Distributions serving arbitrary origins are the exact traffic profile WAF was designed to protect.",
+        "shortDesc": "Set WebACLId on every CloudFront distribution",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[WAF with CloudFront]<https://docs.aws.amazon.com/waf/latest/developerguide/cloudfront-features.html>"
+        ]
+    },
+    "wafv2AppSyncWithoutWebAcl": {
+        "category": "S",
+        "^description": "{$COUNT} AppSync GraphQL API(s) in the account have no WAF WebACL configured (wafWebAclArn empty). Public GraphQL endpoints are a common target for query-of-death and abuse — WAF's rate-based + managed rules address both.",
+        "shortDesc": "Set wafWebAclArn on public-facing AppSync APIs",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[WAF with AppSync]<https://docs.aws.amazon.com/appsync/latest/devguide/WAF-Integration.html>"
+        ]
+    },
+    "wafv2CognitoUserPoolWithoutWebAcl": {
+        "category": "S",
+        "^description": "{$COUNT} Cognito user pool(s) in the account have no WAF WebACL associated. Overlaps with cognitoNoWafAssociation but reported from the WAFv2 coverage-gap perspective: 'what resources are we missing WAF on'.",
+        "shortDesc": "Associate a WAFv2 WebACL with every Cognito user pool serving public traffic",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[WAF with Cognito user pools]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-waf.html>"
+        ]
+    }
+}

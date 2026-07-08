@@ -31,7 +31,9 @@
         "cloudwatch.alarmsWithoutSNS",
         "cloudwatch.missingCompositeAlarms",
         "cloudwatch.missingServiceQuotaAlarms",
-        "cloudwatch.missingBillingAlarms"
+        "cloudwatch.missingBillingAlarms",
+        "bedrock.bedrockModelInvocationLoggingDisabled",
+        "bedrock.bedrockNoGuardrailsExist"
       ],
       "BP04": [
         "iam.enableGuardDuty",
@@ -58,7 +60,15 @@
         "iam.passwordPolicyWeak",
         "iam.passwordLastChange90",
         "iam.hasAccessKeyNoRotate30days",
-        "iam.iamUsersWithFederationAvailable"
+        "iam.iamUsersWithFederationAvailable",
+        "cognito.cognitoMfaNotEnforced",
+        "cognito.cognitoWeakPasswordPolicy",
+        "cognito.cognitoCompromisedCredentialProtection",
+        "cognito.cognitoClientImplicitGrantEnabled",
+        "cognito.cognitoClientTokenRevocationDisabled",
+        "cognito.cognitoAccountTakeoverProtectionWeak",
+        "cognito.cognitoCompromisedCredentialIncompleteFilter",
+        "cognito.cognitoLongTemporaryPassword"
       ],
       "BP02": [
         "ec2.EC2IamProfile"
@@ -71,7 +81,8 @@
       "BP04": [
         "iam.hasSSORoles",
         "iam.hasExternalIdentityProvider",
-        "iam.iamUsersWithFederationAvailable"
+        "iam.iamUsersWithFederationAvailable",
+        "cognito.cognitoAdvancedSecurityNotEnforced"
       ],
       "BP05": [
         "iam.passwordLastChange90",
@@ -84,7 +95,10 @@
         "ec2.EC2IamProfile",
         "iam.unusedCustomerManagedPolicy",
         "iam.unnecessaryCustomPolicies",
-        "kms.GrantOldAge"
+        "kms.GrantOldAge",
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "bedrock.bedrockACRuntimeWildcardRole",
+        "stepfunctions.sfnRoleOverprivileged"
       ],
       "BP06": [
         "iam.userNotUsingGroup",
@@ -116,7 +130,14 @@
         "lambda.lambdaRoleTooPermissive",
         "sqs.WildcardPrincipalDetection",
         "s3.WildcardPrincipalsActions",
-        "apigateway.LeastPrivilegeAccess"
+        "apigateway.LeastPrivilegeAccess",
+        "bedrock.bedrockAgentIamRoleOverprivileged",
+        "bedrock.bedrockKBRoleOverprivileged",
+        "bedrock.bedrockACRuntimeWildcardRole",
+        "sns.snsPublicAccess",
+        "sns.snsPolicyOverlyBroadActions",
+        "stepfunctions.sfnIAMRoleAllowsPassRole",
+        "cognito.cognitoGroupOverlyPermissiveRole"
       ],
       "BP03": [
         "iam.EnableConfigService",
@@ -179,7 +200,17 @@
         "apigateway.CloudWatchAlarms",
         "lambda.lambdaNoCloudWatchAlarms",
         "rds.EventSubscriptionNotConfigured",
-        "s3.CloudWatchRequestMetrics"
+        "s3.CloudWatchRequestMetrics",
+        "bedrock.bedrockModelInvocationLoggingDisabled",
+        "bedrock.bedrockModelInvocationNoCloudWatch",
+        "stepfunctions.sfnLoggingDisabled",
+        "stepfunctions.sfnTracingDisabled",
+        "sns.snsDeliveryStatusLoggingDisabled",
+        "wafv2.wafv2LoggingNotConfigured",
+        "wafv2.wafv2CloudWatchMetricsDisabled",
+        "route53.route53QueryLoggingNotEnabled",
+        "route53.route53ResolverQueryLoggingNotEnabled",
+        "route53.route53HealthCheckNoAlarm"
       ],
       "BP02": [
         "cloudwatch.missingCloudWatchDashboards",
@@ -230,7 +261,8 @@
         "redshift.SecurityGroups",
         "efs.MountTargetSecurityGroups",
         "sagemaker.NetworkIsolation",
-        "sagemaker.TrainingNetworkIsolation"
+        "sagemaker.TrainingNetworkIsolation",
+        "route53.route53ResolverDnsFirewallNotConfigured"
       ],
       "BP03": [],
       "BP04": [
@@ -242,7 +274,23 @@
         "iam.enableGuardDuty",
         "lambda.lambdaQuotasNotMonitored",
         "ec2.EC2ServiceQuotas",
-        "sagemaker.ModelContainerImageSource"
+        "sagemaker.ModelContainerImageSource",
+        "ecs.ecsServicePublicIpDisabled",
+        "ecs.ecsTaskSetPublicIpDisabled",
+        "ecs.ecsServiceFargateLatestPlatformVersion",
+        "ecs.ecsServiceNetworkModeAwsvpc",
+        "ecs.ecsTaskDefinitionNonRootUser",
+        "ecs.ecsTaskDefinitionNoPrivilegedContainers",
+        "ecs.ecsTaskDefinitionReadonlyRootFilesystem",
+        "ecs.ecsTaskDefinitionHostNetworkModeUser",
+        "ecs.ecsTaskDefinitionNoHostPidMode",
+        "ecs.ecsTaskDefinitionNoHostIpcMode",
+        "ecs.ecsTaskDefinitionLinuxCapabilities",
+        "ecs.ecsTaskDefinitionNoLatestTag",
+        "ecs.ecsTaskDefinitionEcrImageSource",
+        "ecs.ecsTaskDefinitionSensitiveHostPaths",
+        "ecs.ecsTaskDefinitionSeparateTaskAndExecutionRoles",
+        "ecs.ecsTaskDefinitionNoSecretsInEnvVars"
       ],
       "BP02": [
         "sagemaker.RootAccessDisabled",
@@ -258,7 +306,14 @@
     "SEC07": {
       "BP01": [
         "ec2.EBSVolumeDataClassification",
-        "efs.NoSensitiveDataInTags"
+        "efs.NoSensitiveDataInTags",
+        "bedrock.bedrockGuardrailNoPiiDetection",
+        "sns.snsNoDataProtectionPolicy",
+        "ecr.ecrEncryptionKms",
+        "ecr.ecrKmsDsseEncryption",
+        "ecr.ecrRepoPublicAccess",
+        "ecr.ecrRepoCrossAccount",
+        "route53.route53PublicZoneSensitiveNames"
       ],
       "BP02": [
         "s3.BucketOwnerEnforced"
@@ -274,7 +329,15 @@
         "kms.KeyPolicyNoConditions",
         "kms.GrantMissingEncryptionContext",
         "kms.KeyCentralizedManagement",
-        "cloudtrail.KMSPolicySourceArn"
+        "cloudtrail.KMSPolicySourceArn",
+        "firehose.firehoseSSEDisabled",
+        "firehose.firehoseSSEDefaultKey",
+        "firehose.firehoseS3DestinationNoEncryption",
+        "kinesis.kinesisKMSKeyRotationDisabled",
+        "ecs.ecsClusterManagedStorageEncryption",
+        "ecs.ecsClusterExecuteCommandEncryption",
+        "ecs.ecsServiceEBSVolumeEncryption",
+        "ecs.ecsTaskDefinitionEphemeralStorageEncryption"
       ],
       "BP02": [
         "cloudtrail.RequiresKmsKey",
@@ -304,7 +367,16 @@
         "sagemaker.EncryptionEnabled",
         "sagemaker.VolumeAndOutputEncryption",
         "eks.eksSecretsEncryptionNoKMS",
-        "dynamodb.encryptionAtRest"
+        "dynamodb.encryptionAtRest",
+        "bedrock.bedrockAgentNoEncryptionKey",
+        "bedrock.bedrockGuardrailNoEncryption",
+        "bedrock.bedrockKBNoEncryption",
+        "bedrock.bedrockACMemoryNoEncryption",
+        "bedrock.bedrockACRuntimeNoEncryption",
+        "stepfunctions.sfnEncryptionAtRest",
+        "sns.snsEncryptionAtRest",
+        "kinesis.kinesisSSEDisabled",
+        "kinesis.kinesisSSEDefaultKey"
       ],
       "BP03": [],
       "BP04": [
@@ -327,7 +399,27 @@
     "SEC09": {
       "BP01": [
         "cloudfront.CustomSSLCertificate",
-        "cloudfront.SNIConfiguration"
+        "cloudfront.SNIConfiguration",
+        "acm.acmCertExpired",
+        "acm.acmCertExpiry30Days",
+        "acm.acmCertExpiry90Days",
+        "acm.acmCertRenewalFailed",
+        "acm.acmCertRenewalIneligible",
+        "acm.acmCertRevoked",
+        "acm.acmRSAKeyLength",
+        "acm.acmCertTransparencyDisabled",
+        "acm.acmWildcardCert",
+        "acm.acmImportedCertNoAutoRenewal",
+        "acm.acmCertPendingValidation",
+        "acm.acmCertNotInUse",
+        "acm.acmCertNoTags",
+        "ecr.ecrScanOnPush",
+        "ecr.ecrEnhancedScanning",
+        "ecr.ecrScanFrequency",
+        "ecr.ecrCriticalVulnerabilities",
+        "ecr.ecrHighVulnerabilities",
+        "ecr.ecrImageNeverScanned",
+        "ecr.ecrScanFindingsStale"
       ],
       "BP02": [
         "cloudfront.viewerPolicyHttps",
@@ -346,7 +438,29 @@
         "efs.TLSRequired",
         "glue.SslEnabled",
         "sagemaker.InterContainerEncryption",
-        "apigateway.CORSConfiguration"
+        "apigateway.CORSConfiguration",
+        "bedrock.bedrockACRuntimeNoVPC",
+        "sns.snsNoHttpsEnforcement",
+        "sns.snsInsecureSubscription",
+        "wafv2.wafv2NoRules",
+        "wafv2.wafv2NoManagedRuleGroups",
+        "wafv2.wafv2NoRateBasedRules",
+        "wafv2.wafv2NoIpReputationList",
+        "wafv2.wafv2NoSqlInjectionProtection",
+        "wafv2.wafv2NoXssProtection",
+        "wafv2.wafv2ManagedRuleGroupAllCountOverride",
+        "wafv2.wafv2NoCoreRuleSet",
+        "wafv2.wafv2AllowRuleBeforeManagedRules",
+        "wafv2.wafv2IpSetOverlyPermissive",
+        "cognito.cognitoClientHttpCallbackUrl",
+        "cognito.cognitoClientHttpLogoutUrl",
+        "cognito.cognitoIdpHttpMetadataUrl",
+        "stepfunctions.sfnHttpTaskNoTLS",
+        "stepfunctions.sfnLoggingWithoutEncryption",
+        "route53.route53DnssecNotEnabled",
+        "route53.route53ResolverDnssecValidationDisabled",
+        "route53.route53HealthCheckUsingHttp",
+        "route53.route53HealthCheckSniDisabled"
       ],
       "BP03": [],
       "BP04": [
@@ -357,7 +471,14 @@
       ]
     },
     "SEC10": {
-      "BP01": [],
+      "BP01": [
+        "bedrock.bedrockGuardrailNoPromptAttackFilter",
+        "bedrock.bedrockGuardrailContentFilterDisabled",
+        "wafv2.wafv2RulesInCountMode",
+        "route53.route53DanglingDnsRecords",
+        "route53.route53DomainTransferLockDisabled",
+        "route53.route53DomainPrivacyDisabled"
+      ],
       "BP02": [],
       "BP03": [],
       "BP04": [],
@@ -374,6 +495,45 @@
       "BP06": [],
       "BP07": [],
       "BP08": []
+    },
+    "REL09": {
+      "BP01": [],
+      "BP02": [
+        "backup.backupNoPlanExists",
+        "backup.backupPlanNoRules",
+        "backup.backupPlanNotAssigned",
+        "backup.backupPlanNoLifecycle",
+        "backup.backupServiceOptInDisabled",
+        "backup.backupServiceManagementDisabled",
+        "backup.backupCriticalResourcesUnprotected",
+        "backup.backupVaultNoLock",
+        "backup.backupVaultNoAccessPolicy",
+        "backup.backupVaultDefaultEncryption",
+        "backup.backupVaultLockNotFinalized",
+        "backup.backupVaultEmpty",
+        "backup.backupRecoveryPointNotEncrypted",
+        "backup.backupRecoveryPointNoCMK",
+        "backup.backupRecoveryPointExpiredLifecycle",
+        "backup.backupPlanInfrequentSchedule",
+        "backup.backupPlanNoCompletionWindow",
+        "backup.backupPlanNoContinuousBackup",
+        "backup.backupNoLogicallyAirGappedVault"
+      ],
+      "BP03": [],
+      "BP04": []
+    },
+    "REL13": {
+      "BP01": [
+        "backup.backupPlanNoCrossRegionCopy",
+        "backup.backupCrossAccountDisabled",
+        "backup.backupRecoveryPointNeverRestored",
+        "backup.backupNoLogicallyAirGappedVault",
+        "backup.backupVaultLockNotFinalized"
+      ],
+      "BP02": [],
+      "BP03": [],
+      "BP04": [],
+      "BP05": []
     }
   }
 }

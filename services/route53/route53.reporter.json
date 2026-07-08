@@ -1,0 +1,321 @@
+{
+    "route53DnssecNotEnabled": {
+        "category": "S",
+        "^description": "{$COUNT} Route 53 public hosted zone(s) do not have DNSSEC signing enabled (get_dnssec.Status.ServeSignature != 'SIGNING'). Without DNSSEC, resolvers cannot verify the authenticity of DNS responses, which enables cache-poisoning and man-in-the-middle attacks against your domain. DNSSEC is required by many compliance frameworks (e.g., US Federal, PCI-DSS interpretations).",
+        "shortDesc": "Enable DNSSEC signing on every public hosted zone",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Configuring DNSSEC signing in Route 53]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec.html>",
+            "[Route 53 security best practices]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/security-best-practices.html>"
+        ]
+    },
+    "route53QueryLoggingNotEnabled": {
+        "category": "S",
+        "^description": "{$COUNT} Route 53 public hosted zone(s) have no DNS query logging configuration (list_query_logging_configs returns empty). Without query logging, there is no CloudWatch Logs record of who resolved what — blocking incident response, threat hunting, and audit. This is Security Hub control Route53.2.",
+        "shortDesc": "Enable DNS query logging for every public hosted zone",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Logging DNS queries]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/query-logs.html>",
+            "[Security Hub Route53.2]<https://docs.aws.amazon.com/securityhub/latest/userguide/route53-controls.html#route53-2>"
+        ]
+    },
+    "route53DomainAutoRenewDisabled": {
+        "category": "R",
+        "^description": "{$COUNT} Route 53-registered domain(s) have AutoRenew=false. Without automatic renewal the domain will expire on the ExpirationDate; expired domains are auction-listed and can be registered by attackers within days of expiry, enabling full DNS/email takeover.",
+        "shortDesc": "Enable AutoRenew on every registered domain",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Enabling/disabling automatic renewal]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/domain-enable-disable-auto-renewal.html>"
+        ]
+    },
+    "route53DomainTransferLockDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} Route 53-registered domain(s) do not have the clientTransferProhibited EPP status set (transfer lock disabled). Without a transfer lock, a compromised registrar credential or successful social-engineering can move the domain to another registrar, giving the attacker full control of DNS and email.",
+        "shortDesc": "Enable transfer lock (clientTransferProhibited) on every domain",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Locking a domain to prevent unauthorized transfer]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/domain-lock.html>"
+        ]
+    },
+    "route53DomainPrivacyDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} Route 53-registered domain(s) have at least one contact type (Admin, Registrant, or Tech) without privacy protection enabled. Without privacy, WHOIS records expose the contact's name, email, phone, and postal address — feeding phishing, social-engineering, and spam campaigns targeting your organisation.",
+        "shortDesc": "Enable privacy protection on all contact types",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Enabling privacy protection for contact information]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/domain-privacy-protection.html>"
+        ]
+    },
+    "route53DomainExpiringSoon": {
+        "category": "R",
+        "^description": "{$COUNT} Route 53-registered domain(s) will expire within the next 90 days. Even with AutoRenew enabled, payment failures or expired credit cards can still cause loss of the domain; when AutoRenew is disabled the risk is severe. Domains within 30 days of expiry are flagged as HIGH severity.",
+        "shortDesc": "Renew domains that are within 90 days of expiry",
+        "criticality": "H",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Renewing registration for a domain]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/domain-renew.html>"
+        ]
+    },
+    "route53HealthCheckUsingHttp": {
+        "category": "S",
+        "^description": "{$COUNT} Route 53 health check(s) probe endpoints over plain HTTP (Type=HTTP or HTTP_STR_MATCH). HTTP health probes transmit host headers and any string-match payload in cleartext, and can be tampered with by an on-path attacker to force spurious failover or hide real outages.",
+        "shortDesc": "Migrate HTTP health checks to HTTPS",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Health check types]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-failover-determining-health-of-endpoints.html>"
+        ]
+    },
+    "route53HealthCheckNoAlarm": {
+        "category": "O",
+        "^description": "{$COUNT} Route 53 endpoint health check(s) (HTTP/HTTPS/TCP) have no associated CloudWatch alarm (CloudWatchAlarmConfiguration is absent). Without an alarm, health-check state transitions (Healthy → Unhealthy) go unnoticed until users complain, defeating the operational value of the health check.",
+        "shortDesc": "Attach a CloudWatch alarm to every endpoint health check",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Monitoring health check status with CloudWatch]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/monitoring-health-checks.html>"
+        ]
+    },
+    "route53ResolverDnsFirewallNotConfigured": {
+        "category": "S",
+        "^description": "{$COUNT} region(s) have no Route 53 Resolver DNS Firewall rule group associations. Without DNS Firewall, VPC-originated DNS queries can freely resolve C2, malware, and data-exfiltration domains — DNS is one of the most common egress channels used by attackers once inside a VPC.",
+        "shortDesc": "Attach a DNS Firewall rule group to every VPC",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Route 53 Resolver DNS Firewall]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-dns-firewall.html>",
+            "[AWS-managed domain lists]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-dns-firewall-managed-domain-lists.html>"
+        ]
+    },
+    "route53ResolverQueryLoggingNotEnabled": {
+        "category": "S",
+        "^description": "{$COUNT} region(s) have no Route 53 Resolver query logging enabled (either no ResolverQueryLogConfigs exist, or configs exist without any VPC associations). Resolver query logging captures every DNS query made from every VPC — the single most valuable data source for detecting DNS-tunnel exfiltration, C2 beaconing, and lateral movement.",
+        "shortDesc": "Enable Resolver query logging for every VPC",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Resolving DNS query logging]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-query-logs.html>"
+        ]
+    },
+    "route53ResolverDnssecValidationDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} region(s) have no Route 53 Resolver DNSSEC validation configs with ValidationStatus=ENABLED. Without validation, VPC resolvers will accept unsigned or invalidly-signed responses even for DNSSEC-signed zones, which negates the protection DNSSEC would otherwise provide against cache poisoning.",
+        "shortDesc": "Enable DNSSEC validation on Route 53 Resolver for each VPC",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Enabling DNSSEC validation in Route 53 Resolver]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-dnssec-validation.html>"
+        ]
+    },
+    "route53HostedZoneUnused": {
+        "category": "C",
+        "^description": "{$COUNT} Route 53 hosted zone(s) contain only the default NS + SOA records and no user-defined records. Empty zones cost $0.50/month each and expose an attack surface (any dangling NS delegation) with no business value. New zones created in the last 24h are excluded from this check.",
+        "shortDesc": "Delete unused hosted zones",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Deleting a hosted zone]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/DeleteHostedZone.html>",
+            "[Route 53 pricing]<https://aws.amazon.com/route53/pricing/>"
+        ]
+    },
+    "route53HealthCheckSlowInterval": {
+        "category": "R",
+        "^description": "{$COUNT} Route 53 health check(s) use the 30-second (standard) RequestInterval. The 10-second (fast) interval detects failures 3x faster at $1/month per check instead of $0.50 — a small cost premium for meaningfully faster failover on production endpoints. Advisory only; suppress for non-critical checks.",
+        "shortDesc": "Consider 10-second RequestInterval for production health checks",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Health check request interval]<https://docs.aws.amazon.com/Route53/latest/APIReference/API_HealthCheckConfig.html>"
+        ]
+    },
+    "route53HealthCheckLowFailureThreshold": {
+        "category": "R",
+        "^description": "{$COUNT} Route 53 health check(s) have FailureThreshold=1. A threshold of 1 means a single transient failure (packet loss, brief connection error) will flip the check to Unhealthy and trigger failover — causing unnecessary flapping. The default and recommended minimum is 3.",
+        "shortDesc": "Set FailureThreshold to at least 3 on Route 53 health checks",
+        "criticality": "L",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Health check failure threshold]<https://docs.aws.amazon.com/Route53/latest/APIReference/API_HealthCheckConfig.html>"
+        ]
+    },
+    "route53CnameAtZoneApex": {
+        "category": "R",
+        "^description": "{$COUNT} Route 53 hosted zone(s) contain a CNAME record at the zone apex (record name equals the zone name). RFC 1034 prohibits CNAME co-existing with the mandatory NS and SOA records at the apex — the configuration breaks email delivery (MX resolution) and often causes intermittent resolution failures. Route 53 alias records solve this without a CNAME.",
+        "shortDesc": "Replace apex CNAME with a Route 53 alias record",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Choosing between alias and non-alias records]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resource-record-sets-choosing-alias-non-alias.html>",
+            "[RFC 1034 § 3.6.2]<https://www.rfc-editor.org/rfc/rfc1034#section-3.6.2>"
+        ]
+    },
+    "route53MxWithoutSpfDmarc": {
+        "category": "S",
+        "^description": "{$COUNT} Route 53 hosted zone(s) publish MX records for a domain but lack SPF (TXT with v=spf1) or DMARC (TXT at _dmarc.<domain>). Missing email authentication allows attackers to spoof messages 'From:' your domain in phishing campaigns; failure to publish DMARC also blocks the receipt of aggregate abuse reports.",
+        "shortDesc": "Publish SPF and DMARC TXT records for every domain with MX",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Configuring SPF]<https://docs.aws.amazon.com/ses/latest/dg/send-email-authentication-spf.html>",
+            "[Configuring DMARC]<https://docs.aws.amazon.com/ses/latest/dg/send-email-dmarc.html>"
+        ]
+    },
+    "route53HealthCheckDisabled": {
+        "category": "R",
+        "^description": "{$COUNT} Route 53 health check(s) have HealthCheckConfig.Disabled=true. A disabled health check always reports Healthy — records that use it for failover will never fail over, and the check cost ($0.50-$1/month) continues to accrue. Either re-enable or delete.",
+        "shortDesc": "Re-enable or delete disabled health checks",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Disabling and enabling health checks]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/health-checks-monitor-view-status.html>"
+        ]
+    },
+    "route53RecordNoHealthCheck": {
+        "category": "R",
+        "^description": "{$COUNT} Route 53 hosted zone(s) contain records with an explicit routing policy (Failover, Weighted, Latency, MultiValueAnswer, or Geo) but no HealthCheckId. Without a health check the routing policy cannot decide when to fail traffic away from an unhealthy endpoint, so the record continues to answer with dead endpoints indefinitely.",
+        "shortDesc": "Attach a health check to every routing-policy record",
+        "criticality": "L",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Health checks and DNS failover]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-failover.html>"
+        ]
+    },
+    "route53DanglingDnsRecords": {
+        "category": "S",
+        "^description": "{$COUNT} Route 53 hosted zone(s) contain CNAME or alias records pointing at *.cloudfront.net, *.elb.amazonaws.com, *.s3-website-*.amazonaws.com, or *.elasticbeanstalk.com targets that no longer exist in the same account. Dangling references are the entry point for subdomain-takeover attacks: an attacker can register the abandoned target and serve arbitrary content under your domain.",
+        "shortDesc": "Delete dangling DNS records or re-provision the target",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Preventing subdomain takeover]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/DNSDangling.html>",
+            "[MITRE ATT&CK T1584.001]<https://attack.mitre.org/techniques/T1584/001/>"
+        ]
+    },
+    "route53LowTtlOnStableRecords": {
+        "category": "P",
+        "^description": "{$COUNT} Route 53 hosted zone(s) contain non-alias records with TTL < 60 seconds and no routing policy. Very-low TTL amplifies query volume (higher $/million cost) and defeats resolver caching; it is only justified for records that must fail over quickly or are actively being cut over.",
+        "shortDesc": "Raise TTL to ≥ 300s for stable, single-endpoint records",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 1,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Choosing a TTL value]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resource-record-sets-values-basic.html>"
+        ]
+    },
+    "route53PublicZoneSensitiveNames": {
+        "category": "S",
+        "^description": "{$COUNT} Route 53 public hosted zone(s) contain records with names such as internal.*, private.*, staging.*, dev.*, vpn.*, admin.*, db.*, or database.* published to the public internet. Public disclosure of internal infrastructure names provides reconnaissance value to an attacker — advisory only; move to a private hosted zone or split-horizon DNS if these names are meant to be internal.",
+        "shortDesc": "Move internal-only names to a private hosted zone",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Public and private hosted zones]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/hosted-zones-comparison.html>"
+        ]
+    },
+    "route53HealthCheckSniDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} Route 53 HTTPS health check(s) have EnableSNI=false. Without SNI, TLS servers hosting multiple certificates (CloudFront, ALB with SNI, CDN vendors) cannot select the correct certificate for the probe — the check may validate a wrong or default certificate and produce misleading Healthy results.",
+        "shortDesc": "Enable SNI on every HTTPS health check",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Health check EnableSNI]<https://docs.aws.amazon.com/Route53/latest/APIReference/API_HealthCheckConfig.html>"
+        ]
+    },
+    "route53EmptyHostedZone": {
+        "category": "C",
+        "^description": "{$COUNT} Route 53 hosted zone(s) report ResourceRecordSetCount = 2 (only the mandatory NS + SOA), indicating the zone has never been populated. Fast-path variant of route53HostedZoneUnused using get_hosted_zone.ResourceRecordSetCount instead of a full record listing.",
+        "shortDesc": "Delete empty hosted zones",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Deleting a hosted zone]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/DeleteHostedZone.html>"
+        ]
+    },
+    "route53NoRecordRoutingPolicy": {
+        "category": "R",
+        "^description": "{$COUNT} Route 53 hosted zone(s) contain A/AAAA records with no routing policy (no Failover, Weight, Region, MultiValueAnswer, or GeoLocation). Records pointing directly at a single IP without a routing policy are single-point-of-failure records — most legitimate deployments front the endpoint with an ELB/CloudFront alias or use a routing policy. Advisory only, high false-positive rate.",
+        "shortDesc": "Consider routing policies for redundancy on direct-IP records",
+        "criticality": "L",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Choosing a routing policy]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy.html>"
+        ]
+    }
+}

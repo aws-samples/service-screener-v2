@@ -18,12 +18,12 @@
       "1": []
     },
     "IAM.": {
-      "1": ["iam.ManagedPolicyFullAccessOneServ", "iam.FullAdminAccess", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess"],
+      "1": ["iam.ManagedPolicyFullAccessOneServ", "iam.FullAdminAccess", "iam.InlinePolicyFullAccessOneServ", "iam.InlinePolicyFullAdminAccess", "bedrock.bedrockAgentIamRoleOverprivileged", "bedrock.bedrockKBRoleOverprivileged", "bedrock.bedrockACRuntimeWildcardRole", "stepfunctions.sfnRoleOverprivileged"],
       "2": ["iam.rootConsoleLogin30days", "iam.rootConsoleLoginFail3x"],
       "3": ["iam.rootHasAccessKey"],
       "4": ["iam.rootMfaActive"],
-      "5": [],
-      "6": []
+      "5": ["cognito.cognitoMfaNotEnforced", "cognito.cognitoWeakPasswordPolicy"],
+      "6": ["cognito.cognitoAdvancedSecurityNotEnforced"]
     },
     "DP.": {
       "1": ["s3.MacieToEnable"],
@@ -34,7 +34,7 @@
       "6": [],
       "7": [],
       "8": ["rds.DBwithoutSecretManager", "rds.DBwithSomeSecretsManagerOnly", "rds.Secret__NoRotation", "rds.Secret__NotUsed7days"],
-      "9": ["s3.ServerSideEncrypted"],
+      "9": ["s3.ServerSideEncrypted", "bedrock.bedrockAgentNoEncryptionKey", "bedrock.bedrockGuardrailNoEncryption", "bedrock.bedrockKBNoEncryption", "bedrock.bedrockACMemoryNoEncryption", "stepfunctions.sfnEncryptionAtRest", "sns.snsEncryptionAtRest"],
       "10": ["lambda.lambdaPublicAccess"],
       "11": ["kms.KeyRotationEnabled"],
       "12": ["kms.AdminIsGrantor"],
@@ -45,7 +45,7 @@
     },
     "LM.": {
       "1": [],
-      "2": ["cloudtrail.NeedToEnableCloudTrail"],
+      "2": ["cloudtrail.NeedToEnableCloudTrail", "bedrock.bedrockModelInvocationLoggingDisabled", "bedrock.bedrockModelInvocationNoCloudWatch", "bedrock.bedrockModelInvocationNoS3"],
       "3": [],
       "4": ["cloudtrail.CloudWatchLogsLogGroupArn"],
       "5": ["cloudtrail.HasOneMultiRegionTrail"],
@@ -67,7 +67,7 @@
       "4": [],
       "5": ["ec2.EC2InstanceAutoPublicIP"],
       "6": ["ec2.EC2SubnetAutoPublicIP"],
-      "7": ["cloudfront.WAFAssociation", "ec2.ELBEnableWAF"],
+      "7": ["cloudfront.WAFAssociation", "ec2.ELBEnableWAF", "wafv2.wafv2NoRules", "wafv2.wafv2NoManagedRuleGroups", "wafv2.wafv2NoRateBasedRules"],
       "8": ["cloudtrail.EnableTrailS3BucketMFADelete"],
       "9": ["rds.DBwithoutSecretManager", "rds.DBwithSomeSecretsManagerOnly", "rds.Secret__NoRotation", "rds.Secret__NotUsed7days"],
       "10": ["ec2.SGDefaultDisallowTraffic", "rds.SecurityGroupDefault"],

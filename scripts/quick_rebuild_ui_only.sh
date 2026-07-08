@@ -2,6 +2,9 @@
 # Quick UI-only rebuild script for Cloudscape UI development
 # Rebuilds React app and regenerates HTML using existing data (no content enrichment fetch)
 
+# Always run from project root regardless of caller's CWD
+cd "$(dirname "$0")/.."
+
 echo "🔄 Quick rebuilding Cloudscape UI (UI changes only)..."
 
 # Step 1: Build React app

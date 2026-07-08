@@ -158,7 +158,7 @@ When adding a new service, create a `simulation/` directory with:
 2. `cleanup_test_resources.sh` - Removes all test resources
 3. `README.md` - Documents resources, costs, and usage
 
-See `../SIMULATION_TESTING.md` for detailed documentation and examples.
+See `../docs/SIMULATION_TESTING.md` for detailed documentation and examples.
 
 **Cost Warning:** ⚠️ Simulation testing creates real AWS resources that may incur costs. Always run cleanup scripts immediately after testing. Most simulations cost < $0.50 per run, but some resources (like Glue Dev Endpoints) can cost ~$0.44/hour.
 

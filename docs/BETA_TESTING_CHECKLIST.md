@@ -6,7 +6,7 @@ Use this checklist to validate the Cloudscape UI before announcing to users.
 
 ### ✅ Build System Testing
 
-- [ ] **Quick Rebuild**: `./quick_rebuild.sh` completes successfully
+- [ ] **Quick Rebuild**: `./scripts/quick_rebuild.sh` completes successfully
 - [ ] **Full Pipeline**: `screener --regions region --services s3 --beta 1` works
 - [ ] **Bundle Size**: Generated HTML < 5MB (target: ~2MB)
 - [ ] **Build Time**: React build completes in <5 seconds

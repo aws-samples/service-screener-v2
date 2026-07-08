@@ -68,13 +68,13 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install boto3
 
 # Create a new service (example: S3)
-python3 CreateService.py -s s3
+python3 scripts/CreateService.py -s s3
 ```
 
 The script accepts any AWS service name from boto3's available services. You can see all available services by running:
 
 ```bash
-python3 CreateService.py --help
+python3 scripts/CreateService.py --help
 ```
 
 #### Step 2: What Gets Generated

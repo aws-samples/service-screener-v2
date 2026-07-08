@@ -1,7 +1,12 @@
 import os
+import sys
 import shutil
 import boto3
 import argparse
+
+# Make project root importable when this script is invoked from anywhere
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import constants as _C
 
 

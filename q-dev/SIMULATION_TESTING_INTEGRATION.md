@@ -95,7 +95,7 @@ When developing new services with Q Developer:
 
 ## Files Referenced
 
-- `service-screener-v2/SIMULATION_TESTING.md` - Master simulation documentation
+- `service-screener-v2/docs/SIMULATION_TESTING.md` - Master simulation documentation
 - `service-screener-v2/services/glue/simulation/` - Example simulation
 - `service-screener-v2/services/sagemaker/simulation/` - Example simulation
 
