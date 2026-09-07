@@ -275,7 +275,7 @@ class ExcelBuilder:
         for p in arr:
             o = p.find("href='")
             e = p.find("'>")
-            r = p[o+6:e-6]
+            r = p[o+6:e]
             w = p[e+2:-4]
             recomm.append(f"{w}, {r}")
         return '\n'.join(recomm)
