@@ -276,8 +276,13 @@ class S3Bucket(Evaluator):
                 Bucket=self.bucket
             )
         except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] ==  'ObjectLockConfigurationNotFoundError':
+            code = e.response['Error']['Code']
+            if code == 'ObjectLockConfigurationNotFoundError':
                 self.results['ObjectLock'] = [-1, 'Off']
+            else:
+                # Any other error (AccessDenied, throttle, ...) is not a pass.
+                print("[{}] Unable to get Object Lock config ({}), skip".format(self.bucket, code))
+                self.results['ObjectLock'] = [0, 'Unable to check']
 
     def _checkBucketReplication(self):
         try:
@@ -305,8 +310,13 @@ class S3Bucket(Evaluator):
                         self.results['CrossRegionReplication'] = [1, 'On']
                         
         except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] == 'ReplicationConfigurationNotFoundError':
+            code = e.response['Error']['Code']
+            if code == 'ReplicationConfigurationNotFoundError':
                 self.results['BucketReplication'] = [-1, 'Off']
+            else:
+                # Any other error (AccessDenied, throttle, ...) is not a pass.
+                print("[{}] Unable to get Replication config ({}), skip".format(self.bucket, code))
+                self.results['BucketReplication'] = [0, 'Unable to check']
 
     def _checkLifecycle(self):
         self.results['BucketLifecycle'] = [1, 'On']
@@ -315,8 +325,13 @@ class S3Bucket(Evaluator):
                 Bucket=self.bucket
             )
         except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] ==  'NoSuchLifecycleConfiguration':
+            code = e.response['Error']['Code']
+            if code == 'NoSuchLifecycleConfiguration':
                 self.results['BucketLifecycle'] = [-1, 'Off']
+            else:
+                # Any other error (AccessDenied, throttle, ...) is not a pass.
+                print("[{}] Unable to get Lifecycle config ({}), skip".format(self.bucket, code))
+                self.results['BucketLifecycle'] = [0, 'Unable to check']
 
     def _checkLogging(self):
         self.results['BucketLogging'] = [1, 'On']
@@ -328,16 +343,40 @@ class S3Bucket(Evaluator):
             if not ele:
                 self.results['BucketLogging'] = [-1, 'Off']
         except botocore.exceptions.ClientError as e:
-            print("[{}] Unable to get Logging Informaton, skip".format(self.bucket))
+            # A real error must not be reported as a pass. Record "unable to check"
+            # and surface the actual error code instead of leaving the [1,'On'] default.
+            code = e.response['Error']['Code']
+            print("[{}] Unable to get Logging config ({}), skip".format(self.bucket, code))
+            self.results['BucketLogging'] = [0, 'Unable to check']
     
     def _checkEventNotif(self):
+        # Default to Off, then upgrade if any notification destination is configured.
+        # NOTE (bugfix): get_bucket_notification_configuration returns HTTP 200 with an
+        # empty container when notifications are off -- it does NOT raise, and there is
+        # no 'NoSuchNotificationConfiguration' error code. The previous implementation
+        # only set a result inside an except branch for that non-existent code, so the
+        # response was never inspected and EventNotification was effectively never set.
+        self.results['EventNotification'] = [-1, 'Off']
         try:
             resp = self.s3Client.get_bucket_notification_configuration(
                 Bucket=self.bucket
             )
+            # Any non-empty destination list means event notifications are enabled.
+            notificationKeys = [
+                'TopicConfigurations',
+                'QueueConfigurations',
+                'LambdaFunctionConfigurations',
+                'EventBridgeConfiguration',
+            ]
+            for key in notificationKeys:
+                if resp.get(key):
+                    self.results['EventNotification'] = [1, 'On']
+                    break
         except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] ==  'NoSuchNotificationConfiguration':
-                self.results['EventNotification'] = [-1, 'Off']
+            # A real error (AccessDenied, throttle, etc.) is NOT the same as "Off".
+            code = e.response['Error']['Code']
+            print("[{}] Unable to get Event Notification config ({}), skip".format(self.bucket, code))
+            self.results['EventNotification'] = [0, 'Unable to check']
     
     def _checkIntelligentTiering(self): 
         try:
@@ -360,7 +399,8 @@ class S3Bucket(Evaluator):
             self.results['ObjectsInIntelligentTier'] = [1, f'Sample of {len(contents)} objects in Intelligent Tiering']
             
         except botocore.exceptions.ClientError as e:
-            print("[{}] Unable to get Tier Information, skip".format(self.bucket))
+            code = e.response['Error']['Code']
+            print("[{}] Unable to get Tier Information ({}), skip".format(self.bucket, code))
             self.results['ObjectsInIntelligentTier'] = [0, 'Unable to check']
             
     def _checkTls(self):
