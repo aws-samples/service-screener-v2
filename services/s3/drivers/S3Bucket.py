@@ -1,5 +1,6 @@
 import urllib.parse
 from datetime import date
+import threading
 
 import boto3
 import botocore
@@ -10,14 +11,71 @@ from utils.Policy import Policy
 from services.Evaluator import Evaluator
 
 class S3Bucket(Evaluator):
+    # Sentinel to distinguish "policy not yet fetched" from "fetched, no policy (None)"
+    _POLICY_NOT_FETCHED = object()
+    # Sentinels for the encryption cache: "not fetched yet" vs "fetched, not configured"
+    _ENCRYPTION_NOT_FETCHED = object()
+    _ENCRYPTION_NOT_CONFIGURED = object()
+
     def __init__(self, bucket, s3Client):
         super().__init__()
         self.bucket = bucket
         self.s3Client = s3Client
 
         self._resourceName = bucket
-        
+
+        # Cache for the bucket policy so we only call get_bucket_policy once per bucket
+        # (used by _checkAccess, _checkTls and _checkWildcardPrincipalsActions).
+        # The sentinel lets us cache a None result.
+        self._bucketPolicy = S3Bucket._POLICY_NOT_FETCHED
+
+        # Cache for the bucket encryption config so we only call get_bucket_encryption
+        # once per bucket (used by both _checkEncrypted and _checkSSECBlocking).
+        # Stores the raw response on success, or _ENCRYPTION_NOT_CONFIGURED when S3
+        # reports ServerSideEncryptionConfigurationNotFoundError.
+        self._bucketEncryption = S3Bucket._ENCRYPTION_NOT_FETCHED
+
+        # Checks run concurrently (ThreadPoolExecutor in Evaluator.run by default),
+        # so multiple checks can hit these cached accessors at the same time.
+        # Per-instance locks make the fetch-and-cache atomic so each underlying
+        # API call happens exactly once per bucket instead of racing.
+        self._policyLock = threading.Lock()
+        self._encryptionLock = threading.Lock()
+
         self.init()
+
+    def getBucketEncryption(self):
+        """
+        Fetch the bucket's default-encryption config once and cache it.
+
+        Returns:
+          - the raw get_bucket_encryption response dict on success
+          - None when encryption is not configured
+            (ServerSideEncryptionConfigurationNotFoundError)
+        Re-raises any other ClientError to preserve the original per-check behaviour
+        (where non-'not found' errors propagated to the Evaluator).
+        """
+        # Fast path: already cached (no lock needed for a plain reference read).
+        if self._bucketEncryption is not S3Bucket._ENCRYPTION_NOT_FETCHED:
+            return None if self._bucketEncryption is S3Bucket._ENCRYPTION_NOT_CONFIGURED \
+                else self._bucketEncryption
+
+        with self._encryptionLock:
+            # Double-check inside the lock: another thread may have fetched while we waited.
+            if self._bucketEncryption is not S3Bucket._ENCRYPTION_NOT_FETCHED:
+                return None if self._bucketEncryption is S3Bucket._ENCRYPTION_NOT_CONFIGURED \
+                    else self._bucketEncryption
+
+            try:
+                resp = self.s3Client.get_bucket_encryption(Bucket=self.bucket)
+                self._bucketEncryption = resp
+                return resp
+            except botocore.exceptions.ClientError as e:
+                if e.response['Error']['Code'] == 'ServerSideEncryptionConfigurationNotFoundError':
+                    self._bucketEncryption = S3Bucket._ENCRYPTION_NOT_CONFIGURED
+                    return None
+                # Any other error: cache nothing and re-raise, matching original behaviour.
+                raise
 
     def policyAllowsPublicRead(self, policy_document):
         """
@@ -82,14 +140,33 @@ class S3Bucket(Evaluator):
             return False
 
     def getBucketPolicy(self):
-        try:
-            policy = self.s3Client.get_bucket_policy(
-                Bucket=self.bucket
-            )
-            return policy['Policy']
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] == 'NoSuchBucketPolicy':
-                return None
+        # Fast path: already cached (including a cached None).
+        if self._bucketPolicy is not S3Bucket._POLICY_NOT_FETCHED:
+            return self._bucketPolicy
+
+        with self._policyLock:
+            # Double-check inside the lock: another thread may have fetched while we waited.
+            if self._bucketPolicy is not S3Bucket._POLICY_NOT_FETCHED:
+                return self._bucketPolicy
+
+            # Default to None so any error path caches/returns None, matching the
+            # original implicit `return None` behaviour.
+            policy_result = None
+            try:
+                policy = self.s3Client.get_bucket_policy(
+                    Bucket=self.bucket
+                )
+                policy_result = policy['Policy']
+            except botocore.exceptions.ClientError as e:
+                # Original behaviour: NoSuchBucketPolicy -> None; any other ClientError
+                # also fell through to None (the default above).
+                if e.response['Error']['Code'] == 'NoSuchBucketPolicy':
+                    policy_result = None
+
+            # Publish to the cache only once, after it's fully computed, so other
+            # threads never observe a transient/partial value.
+            self._bucketPolicy = policy_result
+            return self._bucketPolicy
     
     def aclAllowsPublicRead(self, bucket_acl):
         acl_allows_public_read = False
@@ -109,15 +186,20 @@ class S3Bucket(Evaluator):
 
     def _checkEncrypted(self):
         self.results['ServerSideEncrypted'] = [1, 'On']
+        # Shared cached fetch; returns None when encryption is not configured
+        # (equivalent to the original ServerSideEncryptionConfigurationNotFoundError path).
+        # Keep the original behaviour of swallowing any other ClientError here.
         try:
-            resp = self.s3Client.get_bucket_encryption(
-                Bucket=self.bucket
-            )
-            if "kms" not in resp.get('ServerSideEncryptionConfiguration').get('Rules')[0].get('ApplyServerSideEncryptionByDefault').get('SSEAlgorithm'):
-                self.results['SSEWithKMS'] = [1, 'On']
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] == 'ServerSideEncryptionConfigurationNotFoundError':
-                self.results['ServerSideEncrypted'] = [-1, 'Off']
+            resp = self.getBucketEncryption()
+        except botocore.exceptions.ClientError:
+            return
+
+        if resp is None:
+            self.results['ServerSideEncrypted'] = [-1, 'Off']
+            return
+
+        if "kms" not in resp.get('ServerSideEncryptionConfiguration').get('Rules')[0].get('ApplyServerSideEncryptionByDefault').get('SSEAlgorithm'):
+            self.results['SSEWithKMS'] = [1, 'On']
 
     def _checkAccess(self):
         self.results['PublicAccessBlock'] = [-1, 'Off']
@@ -490,16 +572,19 @@ class S3Bucket(Evaluator):
                 print(f"[{self.bucket}] Unable to parse bucket policy for SSE-C check: {e}")
         
         # Check if default encryption is configured (SSE-S3 or SSE-KMS)
+        # Shared cached fetch; None means not configured (previously the
+        # ServerSideEncryptionConfigurationNotFoundError branch -> has_default_encryption stays False).
         has_default_encryption = False
         try:
-            resp = self.s3Client.get_bucket_encryption(Bucket=self.bucket)
-            rules = resp.get('ServerSideEncryptionConfiguration', {}).get('Rules', [])
-            
-            if rules:
-                sse_algorithm = rules[0].get('ApplyServerSideEncryptionByDefault', {}).get('SSEAlgorithm', '')
-                if sse_algorithm in ['AES256', 'aws:kms']:
-                    has_default_encryption = True
-                    
+            resp = self.getBucketEncryption()
+            if resp is not None:
+                rules = resp.get('ServerSideEncryptionConfiguration', {}).get('Rules', [])
+
+                if rules:
+                    sse_algorithm = rules[0].get('ApplyServerSideEncryptionByDefault', {}).get('SSEAlgorithm', '')
+                    if sse_algorithm in ['AES256', 'aws:kms']:
+                        has_default_encryption = True
+
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] != 'ServerSideEncryptionConfigurationNotFoundError':
                 print(f"[{self.bucket}] Unable to get encryption config: {e.response['Error']['Code']}")
