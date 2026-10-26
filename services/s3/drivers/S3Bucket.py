@@ -217,8 +217,10 @@ class S3Bucket(Evaluator):
             if pab_all_true:
                 self.results['PublicAccessBlock'] = [1, 'On']
         except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] == 'NoSuchPublicAccessBlockConfiguration':
-                return
+            # No PAB config = no restriction; stay [-1, 'Off'] and still
+            # evaluate ACL/policy below so read/write exposure is reported
+            if e.response['Error']['Code'] != 'NoSuchPublicAccessBlockConfiguration':
+                print(f"get_public_access_block failed for {self.bucket}: {e.response['Error']['Code']}")
 
         public_acl_restricted = False
         bucket_acl = None
