@@ -6,15 +6,29 @@ This service module implements comprehensive IAM security and operational checks
 
 ## Statistics
 
-- **Total Checks:** 43
+- **Total Checks:** 45
 - **Coverage:** ~65% of AWS IAM best practices
-- **Security Checks:** 29
+- **Security Checks:** 31
 - **Operational Checks:** 8
 - **Cost Optimization Checks:** 2
 - **Reliability Checks:** 1
 - **Multi-Pillar Checks:** 3
 
-## Recent Updates (2025-02-25)
+## Recent Updates (2026-10-27)
+
+Added 2 checks for long-term Amazon Bedrock API keys (LLMjacking):
+
+1. **bedrockLongTermApiKey** (Security, High)
+   - Detects IAM users named `BedrockAPIKey-*` (created by the Bedrock console) or holding service-specific credentials for `bedrock.amazonaws.com`
+   - Reports each active key's age and expiry, or flags leftover users with no active key
+   - Users missing from a cached credential report (regenerated at most every 4 hours) are still evaluated for this check
+
+2. **bedrockApiKeyNoExpiry** (Security, High)
+   - Detects active long-term Bedrock API keys without an expiration date
+
+Both checks use one `iam:ListServiceSpecificCredentials` call (`AllUsers=True`), covered by `ReadOnlyAccess`.
+
+## Updates (2025-02-25)
 
 Added 4 new Tier 1 checks to improve coverage from 53% to 65%:
 
