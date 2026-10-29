@@ -94,6 +94,8 @@
                 "cognito.cognitoTokenValidityTooLong",
                 "iam.roleLongSession",
                 "appsync.appsyncApiKeyNoExpiry",
+                "iam.bedrockApiKeyNoExpiry",
+                "iam.bedrockLongTermApiKey",
                 "appsync.appsyncApiKeyExpiringSoon"
             ],
             "BP03": [

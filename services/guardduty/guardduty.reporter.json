@@ -235,7 +235,7 @@
         "slowness": 0,
         "remediation": null,
         "remediation_risk": null,
-        "additionalCost": 0,
+        "additionalCost": 1,
         "criticality": "H",
         "shortDesc": "Verify the AI Protection CloudTrail channel is active",
         "ref": [

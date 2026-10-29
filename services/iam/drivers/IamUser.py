@@ -179,8 +179,9 @@ class IamUser(IamCommon):
                 continue
             activeKeys.append(cred)
 
+        # Deleting or expiring a key leaves the IAM user and its Bedrock permissions in place
         if not activeKeys:
-            self.results['bedrockLongTermApiKey'] = [-1, 'No active key (unused Bedrock API key user)']
+            self.results['bedrockApiKeyUnusedUser'] = [-1, 'No active key (unused Bedrock API key user)']
             return
 
         details = []
