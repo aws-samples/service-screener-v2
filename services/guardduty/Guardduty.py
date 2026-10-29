@@ -13,6 +13,8 @@ class Guardduty(Service):
         
         ssBoto = self.ssBoto
         self.guardduty_client = ssBoto.client('guardduty', config=self.bConfig)
+        self.bedrock_client = ssBoto.client('bedrock', config=self.bConfig)
+        self.cloudtrail_client = ssBoto.client('cloudtrail', config=self.bConfig)
 
     def get_resources(self):
         try:
@@ -28,7 +30,7 @@ class Guardduty(Service):
         detectors = self.get_resources()
         for detector in detectors:
             _pi("GuardDuty", detector)
-            obj = GuarddutyDriver(detector, self.guardduty_client, self.region)
+            obj = GuarddutyDriver(detector, self.guardduty_client, self.region, self.bedrock_client, self.cloudtrail_client)
             obj.run(self.__class__)
             objs[f"Detector::{detector}"] = obj.getInfo()
         return objs

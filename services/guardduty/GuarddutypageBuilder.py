@@ -1,4 +1,5 @@
 import re
+from html import escape
 from collections import defaultdict
 
 from services.PageBuilder import PageBuilder
@@ -9,6 +10,17 @@ class GuarddutypageBuilder(PageBuilder):
         'FlowLogs', 'CloudTrail', 'DnsLogs', 'S3Logs', ['Kubernetes', 'AuditLogs'],
         ['MalwareProtection', 'ScanEc2InstanceWithFindings']
     ]
+    CUSTOM_PAGE_CHECKS = ['Findings', 'UsageStat', 'FreeTrial', 'Settings', 'FailMeetingCompliances', 'AiProtectionStatus']
+    AI_PROTECTION_CHECKS = {
+        'AiProtectionDisabled': 'AI Protection enabled',
+        'AiProtectionNoEventChannel': 'Bedrock data events streamed (AnomalousModelInvocation, CostHarvesting)',
+        'AiProtectionPromptInjectionNotDetected': 'Prompt attack guardrail enforced (PromptInjection.Direct)'
+    }
+    AI_STATUS_DISPLAY = {
+        1: ('check-circle', 'Pass'),
+        -1: ('ban', 'Action required'),
+        0: ('info-circle', 'Not evaluated')
+    }
     SERVICESUMMARY_DEFAULT = {
         'EC2': 0,
         'IAMUser': 0,
@@ -251,7 +263,39 @@ class GuarddutypageBuilder(PageBuilder):
         items = [[card, '']]
     
         output.append(self.generateRowWithCol(12, items, "data-context='settingTable'"))
-    
+
+        # AI Protection status, including passing checks (Reporter drops those from cardSummary)
+        aiRows = []
+        for region, detectors in self.reporter.getDetail().items():
+            for detectorId, detector in detectors.items():
+                status = (detector.get('AiProtectionStatus') or {}).get('value') or {}
+                for key, label in self.AI_PROTECTION_CHECKS.items():
+                    if key not in status:
+                        continue
+                    result, value = status[key]
+                    icon, text = self.AI_STATUS_DISPLAY.get(result, self.AI_STATUS_DISPLAY[0])
+                    aiRows.append(f"<tr><td>{region}</td><td>{label}</td><td><i class='nav-icon fas fa-{icon}'></i> {text}</td><td>{escape(str(value))}</td></tr>")
+
+        if aiRows:
+            tableHtml = "<table class='table table-sm'><thead><tr><th>Region</th><th>Check</th><th>Status</th><th>Detail</th></tr></thead><tbody>" + ''.join(aiRows) + "</tbody></table>"
+            card = self.generateCard(self.getHtmlId('aiProtectionTable'), tableHtml, cardClass='info', title='AI Protection finding type coverage', collapse=False)
+            output.append(self.generateRowWithCol(12, [[card, '']], "data-context='aiProtectionTable'"))
+
+        # Protection plan recommendations (e.g. AI Protection), rendered as standard summary cards.
+        # Findings/UsageStat/FreeTrial/Settings/FailMeetingCompliances feed the custom sections above.
+        items = []
+        for label, attrs in self.reporter.cardSummary.items():
+            if label in self.CUSTOM_PAGE_CHECKS:
+                continue
+            body = self.generateSummaryCardContent(attrs)
+            badge = self.generatePriorityPrefix(attrs['criticality'], "style='float:right'") + ' ' + self.generateCategoryBadge(attrs['__categoryMain'], "style='float:right'")
+            card = self.generateCard(pid="SUMMARY_" + self.getHtmlId(label), html=body, cardClass='', title=label, titleBadge=badge, collapse=9, noPadding=False)
+            items.append([card, ''])
+
+        if items:
+            output.append("<h5 class='mt-4 mb-2'>Protection plan recommendations</h5>")
+            output.append(self.generateRowWithCol(size=4, items=items, rowHtmlAttr="data-context='summary'"))
+
         return output
     
     def buildContentDetail(self):

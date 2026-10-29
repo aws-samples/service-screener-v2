@@ -7,12 +7,15 @@ from .IamCommon import IamCommon
 class IamUser(IamCommon):
     ENUM_NO_INFO = ['not_supported', 'no_information']
     
-    def __init__(self, user, iamClient, authDetails=None, policyDocumentMap=None):
+    BEDROCK_API_KEY_USER_PREFIX = 'bedrockapikey'
+
+    def __init__(self, user, iamClient, authDetails=None, policyDocumentMap=None, bedrockCredentialMap=None):
         super().__init__()
         self.user = user
         self.iamClient = iamClient
         self._authDetails = authDetails
         self._policyDocumentMap = policyDocumentMap or {}
+        self._bedrockCredentialMap = bedrockCredentialMap or {}
         self._prefetchedUserDetail = None
         
         # Look up prefetched user detail by username
@@ -154,3 +157,44 @@ class IamUser(IamCommon):
                     
             if daysAccesskey >= 90 and daySinceLastLogin >= 90:
                 self.results['userNoActivity90days'] = [-1, '']
+
+    def _checkBedrockLongTermApiKey(self):
+        user = self.user['user']
+        if user == '<root_account>':
+            return
+
+        # Bedrock console creates the IAM user as BedrockAPIKey-xxxx; keys created via the API can use any user name
+        isBedrockKeyUser = self.BEDROCK_API_KEY_USER_PREFIX in user.lower()
+        creds = self._bedrockCredentialMap.get(user, [])
+        if not isBedrockKeyUser and not creds:
+            return
+
+        now = datetime.datetime.now(tzlocal())
+        activeKeys = []
+        for cred in creds:
+            if cred.get('Status') != 'Active':
+                continue
+            expiry = cred.get('ExpirationDate')
+            if expiry and expiry <= now:
+                continue
+            activeKeys.append(cred)
+
+        # Deleting or expiring a key leaves the IAM user and its Bedrock permissions in place
+        if not activeKeys:
+            self.results['bedrockApiKeyUnusedUser'] = [-1, 'No active key (unused Bedrock API key user)']
+            return
+
+        details = []
+        noExpiry = 0
+        for cred in activeKeys:
+            ageDays = (now - cred['CreateDate']).days
+            expiry = cred.get('ExpirationDate')
+            if expiry:
+                details.append('{}: {} days old, expires {}'.format(cred['ServiceSpecificCredentialId'], ageDays, expiry.strftime('%Y-%m-%d')))
+            else:
+                noExpiry += 1
+                details.append('{}: {} days old, never expires'.format(cred['ServiceSpecificCredentialId'], ageDays))
+
+        self.results['bedrockLongTermApiKey'] = [-1, '; '.join(details)]
+        if noExpiry > 0:
+            self.results['bedrockApiKeyNoExpiry'] = [-1, '{} active key(s) without expiry'.format(noExpiry)]
