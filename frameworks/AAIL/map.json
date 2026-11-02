@@ -96,10 +96,12 @@
                 "bedrock.bedrockAgentMemoryDisabled",
                 "bedrock.bedrockACMemoryNoEncryption",
                 "bedrock.bedrockACMemoryNoNamespace",
-                "guardduty.AiProtectionDisabled"
+                "guardduty.AiProtectionDisabled",
+                "guardduty.AiProtectionNoEventChannel"
             ],
             "BP02": [
                 "bedrock.bedrockGuardrailContentFilterDisabled",
+                "guardduty.AiProtectionPromptInjectionNotDetected",
                 "bedrock.bedrockGuardrailNoPiiDetection",
                 "wafv2.wafv2RulesInCountMode",
                 "sns.snsNoDataProtectionPolicy",
@@ -138,6 +140,9 @@
                 "bedrock.bedrockAgentIamRoleOverprivileged",
                 "bedrock.bedrockACNoIdentityProvider",
                 "bedrock.bedrockACApiKeyProviderUsed",
+                "iam.bedrockLongTermApiKey",
+                "iam.bedrockApiKeyNoExpiry",
+                "iam.bedrockApiKeyUnusedUser",
                 "cognito.cognitoMfaNotEnforced",
                 "cognito.cognitoAdvancedSecurityNotEnforced",
                 "cognito.cognitoCompromisedCredentialProtection",

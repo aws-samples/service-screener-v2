@@ -212,18 +212,68 @@
     },
     "AiProtectionDisabled": {
         "category": "S",
-        "^description": "{$COUNT} GuardDuty detector(s) have AI Protection disabled. AI Protection monitors generative AI workloads \u2014 Bedrock model invocation activity in particular \u2014 for the anomalous access patterns that indicate a stolen credential being used against a model endpoint, or an unusual volume of invocations consistent with abuse. This feature is newer than the published Security Hub control set, so it has no corresponding control; the check exists because the API reports the feature and its absence is a genuine monitoring gap for accounts running Bedrock.",
+        "^description": "{$COUNT} GuardDuty detector(s) have AI Protection disabled. AI Protection analyzes CloudTrail data events from Amazon Bedrock, Amazon Bedrock AgentCore and Amazon SageMaker AI to generate the AI Protection finding types: <b>Impact:IAMUser/AnomalousModelInvocation</b> (model invocations that deviate from an identity's baseline, such as a stolen credential used from an unusual IP or against an unusual model), <b>Impact:IAMUser/CostHarvesting</b> (computationally expensive inputs that inflate token consumption, a common LLMjacking pattern) and <b>Impact:IAMUser/PromptInjection.Direct</b> (prompt attacks detected by Amazon Bedrock Guardrails). Without AI Protection, none of these finding types are generated for this account and region.",
         "downtime": 0,
         "slowness": 0,
         "additionalCost": 1,
         "criticality": "M",
         "shortDesc": "Enable GuardDuty AI Protection",
         "ref": [
-            "[GuardDuty Protection Plans]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty-features-activation-model.html>",
-            "[Amazon Bedrock security]<https://docs.aws.amazon.com/bedrock/latest/userguide/security.html>"
+            "[GuardDuty AI Protection]<https://docs.aws.amazon.com/guardduty/latest/ug/ai-protection.html>",
+            "[AI Protection finding types]<https://docs.aws.amazon.com/guardduty/latest/ug/findings-ai-protection.html>",
+            "[Enabling AI Protection for a standalone account]<https://docs.aws.amazon.com/guardduty/latest/ug/ai-protection-enable-standalone-account.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/guardduty/latest/ug/guardduty-features-activation-model.html"
+        "remediation_doc": "https://docs.aws.amazon.com/guardduty/latest/ug/ai-protection-enable-standalone-account.html",
+        "needFullTest": 0
+    },
+    "AiProtectionNoEventChannel": {
+        "category": "S",
+        "^description": "{$COUNT} GuardDuty detector(s) have AI Protection enabled, but no GuardDuty service-linked CloudTrail channel is streaming Amazon Bedrock data events in this region. AI Protection relies on this channel to build invocation baselines, so <b>Impact:IAMUser/AnomalousModelInvocation</b> and <b>Impact:IAMUser/CostHarvesting</b> findings cannot be generated without it. Verify the channel under CloudTrail Settings, Service-linked channels, and re-enable AI Protection if it is missing.",
+        "downtime": 0,
+        "slowness": 0,
+        "remediation": null,
+        "remediation_risk": null,
+        "additionalCost": 1,
+        "criticality": "H",
+        "shortDesc": "Verify the AI Protection CloudTrail channel is active",
+        "ref": [
+            "[How AI Protection works]<https://docs.aws.amazon.com/guardduty/latest/ug/ai-protection.html#ai-protection-how-it-works>",
+            "[CloudTrail service-linked channels]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-service-linked-channels.html>"
+        ],
+        "remediation_doc": "https://docs.aws.amazon.com/guardduty/latest/ug/ai-protection-enable-standalone-account.html",
+        "needFullTest": 0
+    },
+    "AiProtectionPromptInjectionNotDetected": {
+        "category": "S",
+        "^description": "{$COUNT} GuardDuty detector(s) have AI Protection enabled, but <b>Impact:IAMUser/PromptInjection.Direct</b> findings will not be generated for all model invocations. GuardDuty only creates this finding when an Amazon Bedrock Guardrail with an active prompt attack filter (input strength not NONE) evaluates the prompt. Either no such guardrail exists in this region, or it is not enforced at account level, so only requests that explicitly apply it are covered. Enforce a guardrail with a prompt attack filter for every model invocation, using account-level enforcement or AWS Organizations Amazon Bedrock policies. Organization-enforced guardrails are not evaluated by this check.",
+        "downtime": 0,
+        "slowness": -1,
+        "remediation": null,
+        "remediation_risk": null,
+        "additionalCost": 1,
+        "criticality": "M",
+        "shortDesc": "Enforce a Bedrock Guardrail prompt attack filter",
+        "ref": [
+            "[Impact:IAMUser/PromptInjection.Direct]<https://docs.aws.amazon.com/guardduty/latest/ug/findings-ai-protection.html#ai-protection-promptinjection-direct>",
+            "[Enforce guardrails]<https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-enforcements.html>",
+            "[Prompt attack filters]<https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-prompt-attack.html>"
+        ],
+        "remediation_doc": "https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-enforcements.html",
+        "needFullTest": 1
+    },
+    "AiProtectionStatus": {
+        "category": "T",
+        "^description": "Custom Page Usage",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "criticality": "L",
+        "shortDesc": "AI Protection status",
+        "ref": [],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": null
     }
 }

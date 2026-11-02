@@ -35,7 +35,30 @@ class Iam(Service):
         # Bulk pre-fetched IAM data
         self._authDetails = None
         self._policyDocumentMap = None
-    
+        self._bedrockCredentialMap = None
+
+    def _prefetchBedrockApiKeys(self):
+        """List long-term Amazon Bedrock API keys (service-specific credentials) for all users in one call"""
+        if self._bedrockCredentialMap is not None:
+            return
+
+        self._bedrockCredentialMap = {}
+        try:
+            marker = None
+            while True:
+                params = {'ServiceName': 'bedrock.amazonaws.com', 'AllUsers': True}
+                if marker:
+                    params['Marker'] = marker
+                results = self.iamClient.list_service_specific_credentials(**params)
+                for cred in results.get('ServiceSpecificCredentials', []):
+                    self._bedrockCredentialMap.setdefault(cred['UserName'], []).append(cred)
+
+                marker = results.get('Marker')
+                if not results.get('IsTruncated') or not marker:
+                    break
+        except botocore.exceptions.ClientError as e:
+            print('Unable to list Bedrock API keys: ', e.response['Error']['Code'])
+
     def _prefetchAll(self):
         """Bulk fetch all IAM data in one paginated API call"""
         if self._authDetails is not None:
@@ -176,6 +199,36 @@ class Iam(Service):
             
         return finalArr
         
+    def _getBedrockKeyUsersMissingFromReport(self, users):
+        """
+        The credential report is regenerated at most every 4 hours, so recently created
+        Bedrock API key users may be missing. Build placeholder rows for them so the
+        Bedrock API key check still runs; other user checks skip 'no_information' values.
+        """
+        reported = set(u['user'] for u in users)
+        candidates = set(self._bedrockCredentialMap.keys())
+        for u in self._authDetails.get('users', []):
+            if IamUser.BEDROCK_API_KEY_USER_PREFIX in u['UserName'].lower():
+                candidates.add(u['UserName'])
+
+        arr = []
+        for name in sorted(candidates - reported):
+            detail = next((u for u in self._authDetails.get('users', []) if u['UserName'] == name), {})
+            if self.tags and not self.resourceHasTags(detail.get('Tags', [])):
+                continue
+
+            print('IAM User {} not yet in credential report, scanning Bedrock API key only'.format(name))
+            arr.append({
+                'user': name,
+                'mfa_active': 'false',
+                'password_enabled': 'false',
+                'password_last_used': 'no_information',
+                'password_last_changed': 'no_information',
+                'access_key_1_active': 'false',
+                'access_key_2_active': 'false'
+            })
+        return arr
+
     def advise(self):
         objs = {}
         users = {}
@@ -183,14 +236,15 @@ class Iam(Service):
         
         # Bulk fetch all IAM data upfront
         self._prefetchAll()
-        
+        self._prefetchBedrockApiKeys()
+
         users = self.getUsers()
         if self.getUserFlag == False:
             return objs
         
-        for user in users:
+        for user in users + self._getBedrockKeyUsersMissingFromReport(users):
             _pi('IAM::User', user['user'])
-            obj = IamUser(user, self.iamClient, self._authDetails, self._policyDocumentMap)
+            obj = IamUser(user, self.iamClient, self._authDetails, self._policyDocumentMap, self._bedrockCredentialMap)
             obj.run(self.__class__)
             
             identifier = "<b>root_id</b>" if user['user'] == "<root_account>" else user['user']
