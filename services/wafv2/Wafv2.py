@@ -58,6 +58,7 @@ class Wafv2(Service):
     # ------------------------------------------------------------------ #
     def getResources(self):
         webAcls = []
+        self._anyPending = False
 
         webAcls.extend(self._discoverScope('REGIONAL'))
 
@@ -68,7 +69,20 @@ class Wafv2(Service):
 
         # Region-level assets (IP sets, regex sets, rule groups) + cross-service
         # coverage. Fetched once per scan; injected into every ACL detail.
-        assets = self._collectRegionAssets(webAcls)
+        #
+        # Checks 32-41 (the only consumers of this data) are all read lazily
+        # inside _check* methods, never in Wafv2Common.__init__ - so if every
+        # discovered WebACL is a checkpoint cache-hit, Evaluator.run() bails
+        # out before any check method runs, meaning nothing this run would
+        # ever read _regionAssets. Safe to skip the whole collection then.
+        if self._anyPending or not webAcls:
+            assets = self._collectRegionAssets(webAcls)
+        else:
+            assets = {
+                'ipSets': {}, 'regexPatternSets': {}, 'ruleGroups': {},
+                'crossService': {'alb': [], 'apiGateway': [], 'cloudfront': [],
+                                  'appsync': [], 'cognito': []},
+            }
         primary_marked = False
         for acl in webAcls:
             acl['_regionAssets'] = assets
@@ -89,7 +103,31 @@ class Wafv2(Service):
                 if marker:
                     kwargs['NextMarker'] = marker
                 resp = self.wafClient.list_web_acls(**kwargs)
-                for summary in resp.get('WebACLs', []) or []:
+                summaries = resp.get('WebACLs', []) or []
+
+                ## idFn must match Wafv2Common._resourceName exactly (acl.get('_name', 'unknown'),
+                ## and _name is always set from summary['Name'] in the fresh path below).
+                pendingNames = {s.get('Name', 'unknown') for s in self.registerItems(
+                    'Wafv2Common', summaries, idFn=lambda s: s.get('Name', 'unknown')
+                )}
+
+                for summary in summaries:
+                    name = summary.get('Name', 'unknown')
+
+                    if name not in pendingNames:
+                        ## Already checkpointed - a resource is only ever checkpointed
+                        ## after passing the tag filter below, so it's safe to skip
+                        ## the tag re-fetch too. Minimal placeholder built entirely
+                        ## from the cheap list_web_acls summary, no extra API calls.
+                        acls.append({
+                            '_name': name,
+                            '_arn': summary.get('ARN'),
+                            '_id': summary.get('Id'),
+                            '_scope': scope,
+                        })
+                        continue
+
+                    self._anyPending = True
                     detail = self._describeWebAcl(summary, scope)
                     if detail is None:
                         continue

@@ -206,7 +206,9 @@ screener --regions ap-southeast-1 --services sagemaker --resume 0
 
 If a leftover checkpoint exists but doesn't match the current command (different services/regions), Service Screener won't prompt — it just discards it and starts fresh, since resuming would resume the wrong scan.
 
-**Current scope:** checkpointing is wired into the SageMaker service only. Other services still restart from scratch on failure; more services will get this incrementally.
+**Current scope:** the check-skip half of checkpointing (don't re-run rule logic for an already-scanned resource) works for every service automatically. The API-call-skip half (don't re-fetch resource detail either) is wired into 20 services: sagemaker, sns, kms, acm, kinesis, firehose, secretsmanager, eventbridge, emr, eks, stepfunctions, athena, iam, cognito, bedrock, backup, wafv2, ecs, route53, codebuild.
+
+For the remaining services, either their list call already returns full detail in one shot (ec2, rds, and most others — nothing extra to skip, `Evaluator.run()`'s check-skip is the whole win) or wiring the API-call-skip was investigated and deliberately not done, because it would risk silently wrong or missing findings rather than just wasted API calls — dynamodb and opensearch have driver-level calls outside any gateable check method, sqs's per-queue call feeds a cross-queue DLQ computation, and inspector has no per-resource enumeration to gate at all.
 
 ## Other parameters
 

@@ -24,6 +24,7 @@ API_JSON = FORK_DIR + '/api.json'
 CACHE_DIR = ROOT_DIR + '/.cache'
 TA_CACHE_DIR = CACHE_DIR + '/ta'
 COH_CACHE_DIR = CACHE_DIR + '/coh'
+IAM_ROLE_CACHE_DIR = CACHE_DIR + '/iam_role'
 
 GENERAL_CONF_PATH = SERVICE_DIR + '/general.reporter.json'
 

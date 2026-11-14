@@ -40,10 +40,23 @@ class Stepfunctions(Service):
         try:
             paginator = self.sfnClient.get_paginator('list_state_machines')
             for page in paginator.paginate():
-                for summary in page.get('stateMachines', []):
+                summaries = page.get('stateMachines', [])
+                pendingArns = {sm.get('stateMachineArn') for sm in self.registerItems(
+                    ## idFn must match StepfunctionsCommon._resourceName exactly (name, falling back to ARN)
+                    'StepfunctionsCommon', summaries, idFn=lambda s: s.get('name') or s.get('stateMachineArn', 'unknown')
+                )}
+
+                for summary in summaries:
                     arn = summary.get('stateMachineArn')
                     if not arn:
                         continue
+
+                    if arn not in pendingArns:
+                        ## Already checkpointed - keep the lightweight summary, skip
+                        ## describe_state_machine plus the tag/execution/role/log/alarm enrichment calls.
+                        stateMachines.append(summary)
+                        continue
+
                     detail = self._describeStateMachine(arn)
                     if detail is None:
                         continue

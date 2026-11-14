@@ -27,7 +27,21 @@ class Kms(Service):
             self.checkKmsKey(resp)
         
     def checkKmsKey(self, resp):
-        for key in resp['Keys']:
+        keys = resp['Keys']
+        pendingArns = {k['KeyArn'] for k in self.registerItems(
+            'KmsCommon', keys, idFn=lambda k: k['KeyArn']
+        )}
+
+        for key in keys:
+            if key['KeyArn'] not in pendingArns:
+                ## Already checkpointed - keep a minimal placeholder so advise() still
+                ## builds the driver; Evaluator.run() serves the cached result.
+                self.kmsCustomerManagedKeys.append({
+                    'KeyId': key['KeyId'],
+                    'Arn': key['KeyArn'],
+                })
+                continue
+
             res = self.kmsClient.describe_key(KeyId = key['KeyId'])
             metadata = res.get('KeyMetadata')
             if metadata['KeyManager'] != 'AWS':

@@ -45,7 +45,7 @@ class Sagemaker(Service):
             for page in paginator.paginate():
                 summaries = page.get('NotebookInstances', [])
                 pendingNames = {n['NotebookInstanceName'] for n in self.registerItems(
-                    'NotebookDriver', summaries, idFn=lambda n: n['NotebookInstanceName']
+                    'NotebookDriver', summaries, idFn=lambda n: f"Notebook::{n['NotebookInstanceName']}"
                 )}
 
                 for notebook in summaries:
@@ -89,7 +89,7 @@ class Sagemaker(Service):
             for page in paginator.paginate():
                 summaries = page.get('TrainingJobSummaries', [])
                 pendingNames = {j['TrainingJobName'] for j in self.registerItems(
-                    'TrainingJobDriver', summaries, idFn=lambda j: j['TrainingJobName']
+                    'TrainingJobDriver', summaries, idFn=lambda j: f"TrainingJob::{j['TrainingJobName']}"
                 )}
 
                 for job in summaries:
@@ -131,7 +131,7 @@ class Sagemaker(Service):
             for page in paginator.paginate():
                 summaries = page.get('Models', [])
                 pendingNames = {m['ModelName'] for m in self.registerItems(
-                    'ModelDriver', summaries, idFn=lambda m: m['ModelName']
+                    'ModelDriver', summaries, idFn=lambda m: f"Model::{m['ModelName']}"
                 )}
 
                 for model in summaries:
@@ -173,7 +173,7 @@ class Sagemaker(Service):
             for page in paginator.paginate():
                 summaries = page.get('EndpointConfigs', [])
                 pendingNames = {c['EndpointConfigName'] for c in self.registerItems(
-                    'EndpointConfigDriver', summaries, idFn=lambda c: c['EndpointConfigName']
+                    'EndpointConfigDriver', summaries, idFn=lambda c: f"EndpointConfig::{c['EndpointConfigName']}"
                 )}
 
                 for config in summaries:
@@ -215,7 +215,7 @@ class Sagemaker(Service):
             for page in paginator.paginate():
                 summaries = page.get('Endpoints', [])
                 pendingNames = {e['EndpointName'] for e in self.registerItems(
-                    'EndpointDriver', summaries, idFn=lambda e: e['EndpointName']
+                    'EndpointDriver', summaries, idFn=lambda e: f"Endpoint::{e['EndpointName']}"
                 )}
 
                 for endpoint in summaries:
@@ -257,7 +257,7 @@ class Sagemaker(Service):
             for page in paginator.paginate():
                 summaries = page.get('HyperParameterTuningJobSummaries', [])
                 pendingNames = {t['HyperParameterTuningJobName'] for t in self.registerItems(
-                    'TuningJobDriver', summaries, idFn=lambda t: t['HyperParameterTuningJobName']
+                    'TuningJobDriver', summaries, idFn=lambda t: f"TuningJob::{t['HyperParameterTuningJobName']}"
                 )}
 
                 for tuningJob in summaries:

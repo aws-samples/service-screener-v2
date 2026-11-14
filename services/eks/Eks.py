@@ -42,24 +42,33 @@ class Eks(Service):
     def advise(self):
         objs = {}
         clusters = self.getClusters()
-        
+        pendingClusters = set(self.registerItems('EksCommon', clusters))
+
         for cluster in clusters:
             _pi('EKS:Cluster', cluster)
+
+            if cluster not in pendingClusters:
+                ## Already checkpointed - skip describe_cluster, Evaluator.run() serves the cached result.
+                obj = EksCommon(cluster, None, self.eksClient, self.ec2Client, self.iamClient)
+                obj.run(self.__class__)
+                objs['Cluster::' + cluster] = obj.getInfo()
+                continue
+
             clusterInfo = self.describeCluster(cluster)
-            
+
             #if clusterInfo.get('status') == 'CREATING':
             #    print(cluster + " cluster is creating. Skipped")
             #    continue
-            
+
             if self.tags:
                 resp = self.eksClient.list_tags_for_resource(resourceArn=clusterInfo['arn'])
                 nTags = self.convertKeyPairTagToTagFormat(resp.get('tags'))
                 if self.resourceHasTags(nTags) == False:
                     continue
-            
+
             obj = EksCommon(cluster, clusterInfo, self.eksClient, self.ec2Client, self.iamClient)
             obj.run(self.__class__)
             objs['Cluster::' + cluster] = obj.getInfo()
-            
+
         return objs
         

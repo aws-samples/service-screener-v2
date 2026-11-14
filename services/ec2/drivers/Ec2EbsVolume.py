@@ -10,11 +10,12 @@ from services.Evaluator import Evaluator
 class Ec2EbsVolume(Evaluator):
     OLDGENBLOCK = ('gp2', 'io1')
     
-    def __init__(self, ebsVolumeData,ec2Client,cwClient):
+    def __init__(self, ebsVolumeData,ec2Client,cwClient,instancesById=None):
         super().__init__()
         self.ec2Client = ec2Client
         self.ebsVolumeData = ebsVolumeData
         self.cwClient = cwClient
+        self.instancesById = instancesById or {}
 
         self._resourceName = ebsVolumeData['VolumeId']
 
@@ -88,9 +89,17 @@ class Ec2EbsVolume(Evaluator):
         
         for attachment in self.ebsVolumeData['Attachments']:
             instance_id = attachment['InstanceId']
-            
-            instance_response = self.ec2Client.describe_instances(InstanceIds=[instance_id])
-            instance_state = instance_response['Reservations'][0]['Instances'][0]['State']['Name']
+
+            # Ec2.advise() already fetched every instance once before processing
+            # volumes - reuse it instead of describe_instances per volume.
+            # Fall back to a direct call only if the instance isn't in that map
+            # (e.g. filtered out by a tag filter that didn't apply to volumes).
+            instanceData = self.instancesById.get(instance_id)
+            if instanceData is not None:
+                instance_state = instanceData['State']['Name']
+            else:
+                instance_response = self.ec2Client.describe_instances(InstanceIds=[instance_id])
+                instance_state = instance_response['Reservations'][0]['Instances'][0]['State']['Name']
 
             # all ec2 attached have to be in stopped/stopping state
             if instance_state not in ('stopped', 'stopping'):

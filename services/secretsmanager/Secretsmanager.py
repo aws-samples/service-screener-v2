@@ -41,11 +41,24 @@ class Secretsmanager(Service):
             # IncludePlannedDeletion surfaces secrets with DeletedDate set, which
             # smPendingDeletion needs; without it they are invisible to the scan.
             for page in paginator.paginate(IncludePlannedDeletion=True):
-                for summary in page.get('SecretList', []) or []:
+                summaries = page.get('SecretList', []) or []
+                pendingNames = {s.get('Name') for s in self.registerItems(
+                    'SecretsmanagerCommon', summaries, idFn=lambda s: s.get('Name')
+                )}
+
+                for summary in summaries:
                     arn = summary.get('ARN')
                     name = summary.get('Name')
                     if not arn or not name:
                         continue
+
+                    if name not in pendingNames:
+                        ## Already checkpointed - a light stand-in carrying just the
+                        ## synthetic keys advise()/the driver need, so we skip
+                        ## describe_secret/get_resource_policy for this secret.
+                        secrets.append({'_name': name, '_arn': arn})
+                        continue
+
                     detail = self._describeSecret(arn, name, summary)
                     if detail is None:
                         continue

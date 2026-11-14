@@ -81,10 +81,26 @@ class Backup(Service):
         try:
             paginator = self.backupClient.get_paginator('list_backup_vaults')
             for page in paginator.paginate():
-                for summary in page.get('BackupVaultList', []) or []:
-                    name = summary.get('BackupVaultName')
-                    if not name:
+                summaries = [s for s in (page.get('BackupVaultList', []) or []) if s.get('BackupVaultName')]
+                pendingNames = {s['BackupVaultName'] for s in self.registerItems(
+                    'BackupVault', summaries, idFn=lambda s: s.get('BackupVaultName', 'unknown')
+                )}
+
+                for summary in summaries:
+                    name = summary['BackupVaultName']
+
+                    if name not in pendingNames:
+                        ## Already checkpointed - BackupAccount is a singleton, never
+                        ## gated itself, and reads _vaultType off every vault in _vaults
+                        ## for the air-gapped-vault check regardless of checkpoint state.
+                        ## Keep that field; everything else is safe to skip since
+                        ## BackupVault's own checks are fully served from cache.
+                        vaults.append({
+                            '_name': name,
+                            '_vaultType': summary.get('VaultType') or 'BACKUP_VAULT',
+                        })
                         continue
+
                     detail = self._describeVault(name, summary)
                     if detail is None:
                         continue
@@ -173,10 +189,27 @@ class Backup(Service):
         try:
             paginator = self.backupClient.get_paginator('list_backup_plans')
             for page in paginator.paginate():
-                for summary in page.get('BackupPlansList', []) or []:
-                    plan_id = summary.get('BackupPlanId')
-                    if not plan_id:
+                summaries = [s for s in (page.get('BackupPlansList', []) or []) if s.get('BackupPlanId')]
+                pendingIds = {s['BackupPlanId'] for s in self.registerItems(
+                    'BackupPlan', summaries,
+                    idFn=lambda s: s.get('BackupPlanName') or s.get('BackupPlanId', 'unknown')
+                )}
+
+                for summary in summaries:
+                    plan_id = summary['BackupPlanId']
+
+                    if plan_id not in pendingIds:
+                        ## Already checkpointed - BackupAccount only needs len(_plans),
+                        ## no per-plan field access. Selections are internal-only to
+                        ## BackupPlan's own checks (no separate selection-level driver
+                        ## exists), which are fully served from cache for this plan -
+                        ## safe to skip get_backup_plan + _listSelections() entirely.
+                        plans.append({
+                            '_id': plan_id,
+                            '_name': summary.get('BackupPlanName') or plan_id,
+                        })
                         continue
+
                     detail = self._describePlan(plan_id, summary)
                     if detail is None:
                         continue

@@ -70,9 +70,27 @@ class Ecs(Service):
             arns = []
             for page in paginator.paginate():
                 arns.extend(page.get('clusterArns', []) or [])
+
+            ## Cluster name isn't known until describe_clusters, but ECS cluster ARNs
+            ## are arn:...:cluster/{clusterName} - the name is derivable up front, so
+            ## idFn can match EcsCluster._resourceName without needing the describe call.
+            pendingArns = {a['clusterArn'] for a in self.registerItems(
+                'EcsCluster', [{'clusterArn': a} for a in arns],
+                idFn=lambda item: f"Cluster::{item['clusterArn'].rsplit('/', 1)[-1]}"
+            )}
+
+            for arn in arns:
+                if arn not in pendingArns:
+                    ## Already checkpointed - skip describe_clusters for this one.
+                    self._clusters.append({
+                        'clusterArn': arn,
+                        'clusterName': arn.rsplit('/', 1)[-1],
+                    })
+
+            toDescribe = [a for a in arns if a in pendingArns]
             # describe_clusters accepts up to 100 per call
-            for i in range(0, len(arns), 100):
-                chunk = arns[i:i+100]
+            for i in range(0, len(toDescribe), 100):
+                chunk = toDescribe[i:i+100]
                 try:
                     resp = self.ecsClient.describe_clusters(
                         clusters=chunk,
@@ -95,14 +113,35 @@ class Ecs(Service):
             cluster_arn = cluster.get('clusterArn')
             if not cluster_arn:
                 continue
+            cluster_name = cluster.get('clusterName') or cluster_arn
             try:
                 paginator = self.ecsClient.get_paginator('list_services')
                 service_arns = []
                 for page in paginator.paginate(cluster=cluster_arn):
                     service_arns.extend(page.get('serviceArns', []) or [])
+
+                ## Service name isn't known until describe_services, but ECS service
+                ## ARNs are arn:...:service/{clusterName}/{serviceName} - derivable up
+                ## front, matching EcsService._resourceName without the describe call.
+                pendingArns = {a['serviceArn'] for a in self.registerItems(
+                    'EcsService', [{'serviceArn': a} for a in service_arns],
+                    idFn=lambda item, cn=cluster_name: f"Service::{cn}/{item['serviceArn'].rsplit('/', 1)[-1]}"
+                )}
+
+                for arn in service_arns:
+                    if arn not in pendingArns:
+                        ## Already checkpointed - skip describe_services and the
+                        ## task-set lookup for this one.
+                        self._services.append({
+                            'serviceName': arn.rsplit('/', 1)[-1],
+                            '_cluster': cluster,
+                            '_taskSets': [],
+                        })
+
+                toDescribe = [a for a in service_arns if a in pendingArns]
                 # describe_services accepts up to 10 per call
-                for i in range(0, len(service_arns), 10):
-                    chunk = service_arns[i:i+10]
+                for i in range(0, len(toDescribe), 10):
+                    chunk = toDescribe[i:i+10]
                     try:
                         resp = self.ecsClient.describe_services(
                             cluster=cluster_arn,
@@ -169,6 +208,21 @@ class Ecs(Service):
                         rev_num = None
                     if rev_num is not None:
                         self._latestRevisions[family] = rev_num
+
+                    ## family+revision are both known from the cheap list_task_definitions
+                    ## call above, before describe_task_definition - matches
+                    ## EcsTaskDefinition._resourceName without needing the describe call.
+                    pending = self.registerItems(
+                        'EcsTaskDefinition', [{'family': family, 'rev': rev_num}],
+                        idFn=lambda item: f"TaskDef::{item['family']}:{item['rev']}"
+                    )
+                    if not pending:
+                        self._taskDefs.append({
+                            'family': family,
+                            'revision': rev_num,
+                            '_tags': [],
+                        })
+                        continue
 
                     try:
                         td_resp = self.ecsClient.describe_task_definition(

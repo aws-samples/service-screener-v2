@@ -95,12 +95,46 @@ class Route53(Service):
     # ------------------------------------------------------------------ #
     # Discovery — Hosted Zones + Records
     # ------------------------------------------------------------------ #
+    def _hostedZoneKey(self, summary):
+        """Matches Route53HostedZone._resourceName exactly (name, falling back to
+        zone id) - Name/Id are both already present on the cheap list_hosted_zones
+        summary, no need for the expensive per-zone describe calls to compute this."""
+        name = (summary.get('Name') or '').rstrip('.')
+        if name:
+            return name
+        zid_full = summary.get('Id', '')
+        return zid_full.replace('/hostedzone/', '') if zid_full else ''
+
     def getHostedZones(self):
         zones = []
         try:
             paginator = self.route53Client.get_paginator('list_hosted_zones')
             for page in paginator.paginate():
-                for zone in page.get('HostedZones', []) or []:
+                summaries = page.get('HostedZones', []) or []
+                pendingKeys = {self._hostedZoneKey(s) for s in self.registerItems(
+                    'Route53HostedZone', summaries, idFn=self._hostedZoneKey
+                )}
+
+                for zone in summaries:
+                    if self._hostedZoneKey(zone) not in pendingKeys:
+                        ## Already checkpointed - skip get_dnssec/list_query_logging_configs/
+                        ## get_hosted_zone/list_resource_record_sets for this zone.
+                        zid_full = zone.get('Id', '')
+                        zid = zid_full.replace('/hostedzone/', '') if zid_full else ''
+                        config = zone.get('Config', {}) or {}
+                        zones.append({
+                            '_zoneId': zid,
+                            '_name': zone.get('Name', ''),
+                            '_isPrivate': bool(config.get('PrivateZone', False)),
+                            '_resourceRecordSetCount': int(zone.get('ResourceRecordSetCount', 0) or 0),
+                            '_config': config,
+                            '_dnssecStatus': None,
+                            '_queryLoggingConfigs': [],
+                            '_records': [],
+                            '_getHostedZoneMeta': None,
+                        })
+                        continue
+
                     detail = self._describeHostedZone(zone)
                     if detail is None:
                         continue
@@ -207,9 +241,16 @@ class Route53(Service):
         try:
             paginator = self.domainsClient.get_paginator('list_domains')
             for page in paginator.paginate():
-                for dom in page.get('Domains', []) or []:
-                    name = dom.get('DomainName')
-                    if not name:
+                summaries = [d for d in (page.get('Domains', []) or []) if d.get('DomainName')]
+                pendingNames = {s['DomainName'] for s in self.registerItems(
+                    'Route53Domain', summaries, idFn=lambda s: s['DomainName']
+                )}
+
+                for dom in summaries:
+                    name = dom['DomainName']
+                    if name not in pendingNames:
+                        ## Already checkpointed - skip get_domain_detail for this one.
+                        domains.append({'_name': name, 'DomainName': name})
                         continue
                     detail = self._describeDomain(name)
                     if detail is not None:

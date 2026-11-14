@@ -1,5 +1,7 @@
 import json
 
+from utils import PolicyPrincipal
+
 # Define sensitive actions that should have security conditions
 SENSITIVE_ACTIONS = {
     'iam_modifications': [
@@ -148,17 +150,12 @@ class Policy:
         
     def inspectPrinciple(self):
         doc = self.doc
-        for statement in doc['Statement']:
-            if statement['Effect'] != 'Allow':
-                continue
-            
-            principals = statement['Principal']
-            principals = principals if isinstance(principals, list) else [principals]
-            
-            for principal in principals:
-                if principal == '*':
-                    self.publicAccess = True
-                    return
+        # Handles "*", {"AWS": "*"}, {"AWS": ["*"]} and NotPrincipal, and
+        # ignores statements restricted by a scoping Condition.
+        for statement in PolicyPrincipal.iterStatements(doc):
+            if PolicyPrincipal.statementIsPublic(statement):
+                self.publicAccess = True
+                return
                 
         return False
     

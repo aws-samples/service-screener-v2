@@ -54,14 +54,13 @@ class Rds(Service):
         results = self.rdsClient.describe_db_instances(**p)
         
         arr = results.get('DBInstances')
-        while results.get('Maker') is not None:
-            p['Maker'] = results.get('Maker')
+        while results.get('Marker') is not None:
+            p['Marker'] = results.get('Marker')
             results = self.rdsClient.describe_db_instances(**p)
             arr = arr + results.get('DBInstances')
-        
-        for k, v in enumerate(arr):
-            if v['DBInstanceStatus'].lower() in ['deleting', 'failed', 'restore-error', 'failed'] or v['DBInstanceStatus'].lower().startswith('incompatible'):
-                del arr[k]
+
+        arr = [v for v in arr if v['DBInstanceStatus'].lower() not in ('deleting', 'failed', 'restore-error')
+               and not v['DBInstanceStatus'].lower().startswith('incompatible')]
         
         if not self.tags:
             return arr
@@ -78,8 +77,8 @@ class Rds(Service):
         results = self.rdsClient.describe_db_clusters(**p)
         
         arr = results.get('DBClusters')
-        while results.get('Maker') is not None:
-            p['Maker'] = results.get('Maker')
+        while results.get('Marker') is not None:
+            p['Marker'] = results.get('Marker')
             results = self.rdsClient.describe_db_clusters(**p)
             
             arr = arr + results.get('DBClusters')
@@ -243,9 +242,21 @@ class Rds(Service):
                 objs[instance['Engine'] + '::' + dbInfo + '=' + instance[dbKey]] = obj.getInfo()
                 del obj
         
+        # Batch-fetch every distinct SG's detail in one (or a few, chunked)
+        # describe_security_groups call(s) instead of one call per SG.
+        sgDetailByGroupId = {}
+        uniqueSgIds = list(securityGroupArr.keys())
+        CHUNK = 200
+        for i in range(0, len(uniqueSgIds), CHUNK):
+            chunk = uniqueSgIds[i:i + CHUNK]
+            resp = self.ec2Client.describe_security_groups(GroupIds=chunk)
+            for sgDetail in resp.get('SecurityGroups', []):
+                sgDetailByGroupId[sgDetail['GroupId']] = sgDetail
+
         for sg, rdsList in securityGroupArr.items():
             _pi('RDS-SG', sg)
-            obj = RdsSecurityGroup(sg, self.ec2Client, rdsList)
+            sgSettings = [sgDetailByGroupId[sg]] if sg in sgDetailByGroupId else None
+            obj = RdsSecurityGroup(sg, self.ec2Client, rdsList, sgSettings)
             obj.run(self.__class__)
             objs['RDS_SG::' + sg] = obj.getInfo()
             del obj

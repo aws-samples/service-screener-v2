@@ -5,6 +5,7 @@ import time
 
 from utils.Config import Config
 from utils.Tools import _pr
+from utils.IamRoleLastUsedCache import IamRoleLastUsedCache
 from services.Service import Service
 from services.iam.drivers.IamRole import IamRole
 from services.iam.drivers.IamGroup import IamGroup
@@ -84,16 +85,23 @@ class Iam(Service):
     ## Groups has no TAG attribute
     ## Unable to implement "TAG" filter
     def getGroups(self):
+        # Use prefetched data if available - carries AttachedManagedPolicies/
+        # GroupPolicyList that a bare list_groups() call doesn't, so drivers
+        # can use it directly instead of falling back to per-group API calls.
+        if self._authDetails and self._authDetails.get('groups'):
+            return self._authDetails['groups']
+
+        # Fallback to API
         arr = []
         results = self.iamClient.list_groups()
         arr = results.get('Groups')
-        
+
         while results.get('Marker') is not None:
             results = self.iamClient.list_groups(
                 Marker = results.get('Marker')
             )
             arr = arr + results.get('Groups')
-            
+
         return arr
     
     def getRoles(self):
@@ -252,13 +260,39 @@ class Iam(Service):
             del obj
         
         roles = self.getRoles()
+        pendingRoleNames = {r['RoleName'] for r in self.registerItems(
+            'IamRole', roles, idFn=lambda r: r['RoleName']
+        )}
+
+        ## Persistent, cross-run cache for RoleLastUsed (separate from the per-run
+        ## checkpoint above) - RoleLastUsed doesn't change fast enough to need a
+        ## fresh get_role() call on every scan of the same account.
+        accountId = (Config.get('stsInfo', {}) or {}).get('Account', 'default')
+        roleLastUsedCache = IamRoleLastUsedCache.load(accountId)
+        cacheSizeBefore = len(roleLastUsedCache)
+
         for role in roles:
             _pi('IAM::Role', role['RoleName'])
-            obj = IamRole(role, self.iamClient, self._authDetails, self._policyDocumentMap)
+
+            if role['RoleName'] not in pendingRoleNames:
+                ## Already checkpointed. IamRole.__init__ unconditionally calls get_role()
+                ## via _enrichRoleDetail() whenever 'RoleLastUsed' isn't already present -
+                ## and get_account_authorization_details never includes it. Seed a
+                ## placeholder (on a copy, not the shared _authDetails entry) so that
+                ## early-return check is satisfied and the per-role get_role() call -
+                ## the exact call that crashed a 2,400-role account in the original bug
+                ## report - is skipped for cached roles.
+                role = dict(role)
+                role['RoleLastUsed'] = {}
+
+            obj = IamRole(role, self.iamClient, self._authDetails, self._policyDocumentMap, roleLastUsedCache)
             obj.run(self.__class__)
-            
+
             objs['Role::' + role['RoleName']] = obj.getInfo()
             del obj
+
+        if len(roleLastUsedCache) != cacheSizeBefore:
+            IamRoleLastUsedCache.save(accountId, roleLastUsedCache)
 
         groups = self.getGroups()
         for group in groups:

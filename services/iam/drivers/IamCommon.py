@@ -27,18 +27,22 @@ class IamCommon(Evaluator):
         policyWithWildcards = []
         
         if policies:
-            hasFullAccess = -1 # instead of false/true, easier handling on cache checking using !empty
             for policy in policies:
                 if policy['PolicyName'] == 'AdministratorAccess':
                     self.results['FullAdminAccess'] = [-1, 'AdministratorAccess']
                     continue
 
-                cache = Config.get(cachePrefix + policy['PolicyArn'], "")
-                if cache == 1:
-                    hasFullAccess = 1
-                    policyWithFullAccess.append(policy['PolicyName'])
+                # Per-policy cache: the analysis result for a given policy ARN is the
+                # same no matter which role/user/group it's attached to, so cache it
+                # by ARN instead of recomputing for every entity that has it attached.
+                cache = Config.get(cachePrefix + policy['PolicyArn'], None)
+                if cache is not None:
+                    if cache['fullAccess']:
+                        policyWithFullAccess.append(policy['PolicyName'])
+                    if cache['wildcards']:
+                        policyWithWildcards.append(f"{policy['PolicyName']} ({', '.join(cache['wildcards'])})")
                     continue
-                
+
                 # Try prefetched document first, then fall back to API
                 doc = None
                 if policyDocumentMap and policy['PolicyArn'] in policyDocumentMap:
@@ -57,16 +61,16 @@ class IamCommon(Evaluator):
                 pObj = Policy(doc)
                 pObj.inspectAccess()
 
-                if pObj.hasFullAccessToOneResource() == True:
-                    hasFullAccess = 1
+                policyFullAccess = pObj.hasFullAccessToOneResource() == True
+                if policyFullAccess:
                     policyWithFullAccess.append(policy['PolicyName'])
-                
+
                 # Check for wildcard actions (excluding full admin)
-                if pObj.hasWildcardActions() == True:
-                    wildcards = pObj.getWildcardActions()
-                    policyWithWildcards.append(f"{policy['PolicyName']} ({', '.join(wildcards)})")
-                    
-            Config.set(cachePrefix + policy['PolicyArn'], hasFullAccess)
+                policyWildcards = pObj.getWildcardActions() if pObj.hasWildcardActions() == True else []
+                if policyWildcards:
+                    policyWithWildcards.append(f"{policy['PolicyName']} ({', '.join(policyWildcards)})")
+
+                Config.set(cachePrefix + policy['PolicyArn'], {'fullAccess': policyFullAccess, 'wildcards': policyWildcards})
 
         if policyWithFullAccess:
             self.results['ManagedPolicyFullAccessOneServ'] = [-1, '<br>'.join(policyWithFullAccess)]

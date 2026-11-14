@@ -39,10 +39,25 @@ class Athena(Service):
     def getResources(self):
         workgroups = []
         try:
-            for summary in self._listWorkgroupSummaries():
+            summaries = self._listWorkgroupSummaries()
+            pendingNames = {s.get('Name') for s in self.registerItems(
+                'AthenaWorkgroup', summaries, idFn=lambda s: s.get('Name')
+            )}
+
+            for summary in summaries:
                 name = summary.get('Name')
                 if not name:
                     continue
+
+                if name not in pendingNames:
+                    ## Already checkpointed - skip get_work_group + list_tags_for_resource.
+                    ## Inject '_name' so it matches what the driver used as _resourceName
+                    ## when this workgroup was originally checkpointed.
+                    cached = dict(summary)
+                    cached['_name'] = name
+                    workgroups.append(cached)
+                    continue
+
                 detail = self._getWorkgroup(name, summary)
                 if detail is None:
                     continue

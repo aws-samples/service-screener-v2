@@ -54,10 +54,24 @@ class Emr(Service):
         try:
             paginator = self.emrClient.get_paginator('list_clusters')
             for page in paginator.paginate(ClusterStates=self.ACTIVE_STATES):
-                for summary in page.get('Clusters', []) or []:
+                summaries = page.get('Clusters', []) or []
+                pendingIds = {s.get('Id') for s in self.registerItems(
+                    ## idFn must match EmrCluster._resourceName exactly (Name, falling back to Id)
+                    'EmrCluster', summaries, idFn=lambda s: s.get('Name') or s.get('Id', 'unknown')
+                )}
+
+                for summary in summaries:
                     clusterId = summary.get('Id')
                     if not clusterId:
                         continue
+
+                    if clusterId not in pendingIds:
+                        ## Already checkpointed - Id/Name are shared between the
+                        ## list summary and describe_cluster's response, so the
+                        ## bare summary is enough for advise()/the driver.
+                        clusters.append(summary)
+                        continue
+
                     detail = self._describeCluster(clusterId)
                     if detail is None:
                         continue

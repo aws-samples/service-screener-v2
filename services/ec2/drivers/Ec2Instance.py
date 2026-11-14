@@ -121,14 +121,48 @@ class Ec2Instance(Evaluator):
         self.launchTimeDeltaInDays = launchDay
         
     def getImageInfo(self):
-        self.ec2ImageInfo = None
         imageId = self.ec2InstanceData['ImageId']
+        cacheKey = 'ec2::image::' + imageId
+        cached = Config.get(cacheKey, "__unset__")
+        if cached != "__unset__":
+            self.ec2ImageInfo = cached
+            return
+
         resp = self.ec2Client.describe_images(ImageIds=[imageId])
         images = resp.get('Images')
-        
+
         self.ec2ImageInfo = None
         for image in images:
             self.ec2ImageInfo = image
+
+        Config.set(cacheKey, self.ec2ImageInfo)
+
+    def _getInstanceTypeInfo(self, instanceTypeStr):
+        """Cached describe_instance_types lookup - shared across every instance
+        of the same type, and across this instance's own multiple checks that
+        query its own type. Returns the InstanceTypes[0] dict, None if the API
+        returned no match, or 'INVALID' if the type doesn't exist (mirrors the
+        InvalidInstanceType ClientError callers use as a signal, not an error).
+        Any other exception propagates uncaught - callers keep their own
+        try/except around calls to this method.
+        """
+        cacheKey = 'ec2::instancetype::' + instanceTypeStr
+        cached = Config.get(cacheKey, "__unset__")
+        if cached != "__unset__":
+            return cached
+
+        try:
+            resp = self.ec2Client.describe_instance_types(InstanceTypes=[instanceTypeStr])
+            types = resp.get('InstanceTypes', [])
+            result = types[0] if types else None
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] == 'InvalidInstanceType':
+                result = 'INVALID'
+            else:
+                raise
+
+        Config.set(cacheKey, result)
+        return result
     
     # checks
     def _checkSQLServerEdition(self):
@@ -184,17 +218,12 @@ class Ec2Instance(Evaluator):
         size = instanceArr['suffix']
         newFamily = instancePrefixArr['family'] + str(instancePrefixArr['version']) + instancePrefixArr['attributes']
        
-        try:
-            results = self.ec2Client.describe_instance_types(
-                InstanceTypes=[newFamily + '.' + size]
-            )
-        except Exception as e:
-            if type(e).__name__ == 'ClientError' and e.response['Error']['Code'] == 'InvalidInstanceType':
-                self.results['EC2NewGen'] = [1, self.ec2InstanceData['InstanceType']]
-                return
-            else:
-                raise
-    
+        result = self._getInstanceTypeInfo(newFamily + '.' + size)
+
+        if result == 'INVALID':
+            self.results['EC2NewGen'] = [1, self.ec2InstanceData['InstanceType']]
+            return
+
         self.results['EC2NewGen'] = [-1, self.ec2InstanceData['InstanceType']]
         return
         
@@ -409,15 +438,21 @@ class Ec2Instance(Evaluator):
     
     def _checkEC2SubnetAutoPublicIP(self):
         instance = self.ec2InstanceData
-        
-        results = self.ec2Client.describe_subnets(
-            SubnetIds = [instance.get('SubnetId')]
-        )
-        
-        for subnet in results.get('Subnets'):
+        subnetId = instance.get('SubnetId')
+
+        cacheKey = 'ec2::subnet::' + str(subnetId)
+        subnets = Config.get(cacheKey, "__unset__")
+        if subnets == "__unset__":
+            results = self.ec2Client.describe_subnets(
+                SubnetIds = [subnetId]
+            )
+            subnets = results.get('Subnets')
+            Config.set(cacheKey, subnets)
+
+        for subnet in subnets:
             if subnet.get('MapPublicIpOnLaunch'):
                 self.results['EC2SubnetAutoPublicIP'] = [-1, subnet.get('SubnetId')]
-        
+
         return
     
     def _checkEC2HasTag(self):
@@ -492,24 +527,32 @@ class Ec2Instance(Evaluator):
         return
 
     def checkInstanceTypeAvailable(self, instanceType):
-        resp = self.ec2Client.describe_instance_type_offerings(
-            LocationType='region',
-            Filters=[
-                {
-                    'Name': 'instance-type',
-                    'Values': [
-                        instanceType,
-                    ]
-                },
-                {
-                    'Name': 'location',
-                    'Values': [
-                        self.ec2Client.meta.region_name,
-                    ]
-                }
-            ]
-        )
-        if len(resp['InstanceTypeOfferings']) > 0:
+        region = self.ec2Client.meta.region_name
+        cacheKey = 'ec2::instancetypeoffering::' + region + '::' + instanceType
+        available = Config.get(cacheKey, None)
+
+        if available is None:
+            resp = self.ec2Client.describe_instance_type_offerings(
+                LocationType='region',
+                Filters=[
+                    {
+                        'Name': 'instance-type',
+                        'Values': [
+                            instanceType,
+                        ]
+                    },
+                    {
+                        'Name': 'location',
+                        'Values': [
+                            region,
+                        ]
+                    }
+                ]
+            )
+            available = len(resp['InstanceTypeOfferings']) > 0
+            Config.set(cacheKey, available)
+
+        if available:
             return True
     
     def _checkEC2AMD(self):
@@ -579,14 +622,11 @@ class Ec2Instance(Evaluator):
         
         # Check if instance type supports EBS optimization
         try:
-            resp = self.ec2Client.describe_instance_types(
-                InstanceTypes=[instanceType]
-            )
-            
-            if not resp['InstanceTypes']:
+            instanceTypeInfo = self._getInstanceTypeInfo(instanceType)
+
+            if not instanceTypeInfo or instanceTypeInfo == 'INVALID':
                 return
-            
-            instanceTypeInfo = resp['InstanceTypes'][0]
+
             ebsInfo = instanceTypeInfo.get('EbsInfo', {})
             
             # Check if EBS optimization is supported
@@ -686,15 +726,11 @@ class Ec2Instance(Evaluator):
         instanceType = instance.get('InstanceType', '')
 
         try:
-            resp = self.ec2Client.describe_instance_types(
-                InstanceTypes=[instanceType]
-            )
+            instanceTypeInfo = self._getInstanceTypeInfo(instanceType)
 
-            instanceTypes = resp.get('InstanceTypes', [])
-            if not instanceTypes:
+            if not instanceTypeInfo or instanceTypeInfo == 'INVALID':
                 return
 
-            instanceTypeInfo = instanceTypes[0]
             instanceStorageInfo = instanceTypeInfo.get('InstanceStorageInfo')
 
             if not instanceStorageInfo:

@@ -17,15 +17,22 @@ class Ec2ElbCommon(Evaluator):
         self._resourceName = elb['LoadBalancerArn']
 
         self.init()
-    
-    # checks    
+
+        self._listenersCache = None
+
+    def _getListeners(self):
+        """Memoized describe_listeners - _checkListenerPortEncrypt and
+        _checkALBSGPortMatch both need this for the same LB, no need to fetch twice."""
+        if self._listenersCache is None:
+            result = self.elbClient.describe_listeners(
+                LoadBalancerArn = self.elb['LoadBalancerArn']
+            )
+            self._listenersCache = result.get('Listeners', [])
+        return self._listenersCache
+
+    # checks
     def _checkListenerPortEncrypt(self):
-        arn = self.elb['LoadBalancerArn']
-        result = self.elbClient.describe_listeners(
-            LoadBalancerArn = arn
-        )
-        
-        listeners = result['Listeners']
+        listeners = self._getListeners()
         for listener in listeners:
             if listener['Port'] in Ec2SecGroup.NONENCRYPT_PORT:
                 self.results['ELBListenerInsecure'] = [-1, listener['Port']]
@@ -76,13 +83,10 @@ class Ec2ElbCommon(Evaluator):
         if self.elb['Type'] != 'application':
             return
         
-        arn = self.elb['LoadBalancerArn']
-        results = self.elbClient.describe_listeners(
-            LoadBalancerArn = arn
-        )
-        
+        listeners = self._getListeners()
+
         portList = []
-        for listener in results.get('Listeners'):
+        for listener in listeners:
             portList.append(listener.get('Port'))
             
         unmatchPortList = portList

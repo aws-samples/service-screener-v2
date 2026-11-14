@@ -49,9 +49,20 @@ class Codebuild(Service):
         if not names:
             return []
 
+        ## list_projects already returns the bare project name - matches
+        ## CodebuildProject._resourceName directly, no need for batch_get_projects
+        ## to compute the identity key.
+        pendingNames = set(self.registerItems('CodebuildProject', names))
+
         projects = []
-        for i in range(0, len(names), self.BATCH_SIZE):
-            batch = names[i:i + self.BATCH_SIZE]
+        toFetch = [n for n in names if n in pendingNames]
+        for n in names:
+            if n not in pendingNames:
+                ## Already checkpointed - skip batch_get_projects for this one.
+                projects.append({'name': n, '_tags': [], '_region': self.region})
+
+        for i in range(0, len(toFetch), self.BATCH_SIZE):
+            batch = toFetch[i:i + self.BATCH_SIZE]
             try:
                 resp = self.cbClient.batch_get_projects(names=batch)
             except botocore.exceptions.ClientError as e:
@@ -116,9 +127,25 @@ class Codebuild(Service):
         if not arns:
             return []
 
+        ## Report group name isn't known until batch_get_report_groups, but the
+        ## ARN is arn:...:report-group/{name} - the name is derivable up front,
+        ## matching CodebuildReportGroup._resourceName without the batch call.
+        pendingArns = set(self.registerItems(
+            'CodebuildReportGroup', arns, idFn=lambda a: a.rsplit('/', 1)[-1]
+        ))
+
         groups = []
-        for i in range(0, len(arns), self.BATCH_SIZE):
-            batch = arns[i:i + self.BATCH_SIZE]
+        for arn in arns:
+            if arn not in pendingArns:
+                ## Already checkpointed - skip batch_get_report_groups for this one.
+                groups.append({
+                    'name': arn.rsplit('/', 1)[-1],
+                    '_region': self.region,
+                })
+
+        toFetch = [a for a in arns if a in pendingArns]
+        for i in range(0, len(toFetch), self.BATCH_SIZE):
+            batch = toFetch[i:i + self.BATCH_SIZE]
             try:
                 resp = self.cbClient.batch_get_report_groups(
                     reportGroupArns=batch)

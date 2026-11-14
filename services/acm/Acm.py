@@ -50,9 +50,18 @@ class Acm(Service):
             )
 
             for page in page_iterator:
-                for summary in page.get('CertificateSummaryList', []):
-                    arn = summary.get('CertificateArn')
-                    if not arn:
+                summaries = [s for s in page.get('CertificateSummaryList', []) if s.get('CertificateArn')]
+                pendingArns = {s['CertificateArn'] for s in self.registerItems(
+                    'AcmCommon', summaries, idFn=lambda s: s['CertificateArn']
+                )}
+
+                for summary in summaries:
+                    arn = summary['CertificateArn']
+
+                    if arn not in pendingArns:
+                        ## Already checkpointed - keep the lightweight summary so advise()
+                        ## still builds the driver and Evaluator.run() serves the cached result.
+                        self.acmCertificates.append(summary)
                         continue
 
                     detail = self._describeCertificate(arn)

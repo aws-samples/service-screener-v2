@@ -429,14 +429,22 @@ class RdsCommon(Evaluator):
         cluster = self.db.get('DBClusterIdentifier', None)
         if not cluster:
             return
-        
-        resp = self.rdsClient.describe_db_clusters(
-            DBClusterIdentifier=cluster
-        )
-        
-        clusters = resp.get('DBClusters')
-        if len(clusters) < 2 or len(clusters) > 7:
-            self.results['Aurora__ClusterSize'] = [-1, len(clusters)]
+
+        # When self.db is the cluster's own dict (from Rds.getClusters()'s bulk
+        # describe_db_clusters() fetch), DBClusterMembers is already present -
+        # no need to re-describe it. When self.db is an instance dict (this
+        # driver also runs per-instance for cluster members), that field
+        # isn't there, so fall back to the original per-call lookup.
+        if 'DBClusterMembers' in self.db:
+            members = self.db['DBClusterMembers']
+        else:
+            resp = self.rdsClient.describe_db_clusters(
+                DBClusterIdentifier=cluster
+            )
+            members = resp.get('DBClusters')[0].get('DBClusterMembers', [])
+
+        if len(members) < 2 or len(members) > 7:
+            self.results['Aurora__ClusterSize'] = [-1, len(members)]
             
     def _checkHasTags(self):
         if len(self.db['TagList']) == 0:
@@ -798,33 +806,40 @@ class RdsCommon(Evaluator):
 
     def _checkRDSRecommendationsActive(self):
         # Check if the resource has active (non-dismissed) RDS recommendations
-        # API may not be available in all regions, so wrap in try/except
+        # API may not be available in all regions, so wrap in try/except.
+        # The recommendations list is account/region-wide, not per-resource -
+        # cache it once (same Config pattern as _checkEventSubscriptionNotConfigured
+        # below) instead of every instance/cluster re-fetching the whole list.
         try:
             resourceArn = self.db.get('DBInstanceArn') or self.db.get('DBClusterArn')
             if not resourceArn:
                 return
-            
-            resp = self.rdsClient.describe_db_recommendations(
-                Filters=[
-                    {
-                        'Name': 'status',
-                        'Values': ['active']
-                    }
-                ]
-            )
-            
-            recommendations = resp.get('DBRecommendations', [])
-            
+
+            cacheKey = 'rds::DBRecommendations'
+            recommendations = Config.get(cacheKey, None)
+
+            if recommendations is None:
+                resp = self.rdsClient.describe_db_recommendations(
+                    Filters=[
+                        {
+                            'Name': 'status',
+                            'Values': ['active']
+                        }
+                    ]
+                )
+                recommendations = resp.get('DBRecommendations', [])
+                Config.set(cacheKey, recommendations)
+
             # Filter recommendations for this specific resource
             resourceRecommendations = []
             for rec in recommendations:
                 recResourceArn = rec.get('ResourceArn', '')
                 if recResourceArn == resourceArn:
                     resourceRecommendations.append(rec)
-            
+
             if len(resourceRecommendations) > 0:
                 self.results['RDSRecommendationsActive'] = [-1, len(resourceRecommendations)]
-                
+
         except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']
             emsg = e.response['Error']['Message']

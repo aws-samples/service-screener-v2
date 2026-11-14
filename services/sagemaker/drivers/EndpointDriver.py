@@ -9,6 +9,7 @@ class EndpointDriver(Evaluator):
         self.endpoint = endpoint
         self.sagemakerClient = sagemakerClient
         self.autoscalingClient = autoscalingClient
+        self._resourceName = f"Endpoint::{endpoint['EndpointName']}"
         self.init()
     
     def _checkEndpointAutoScalingConfigured(self):

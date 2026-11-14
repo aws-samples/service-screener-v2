@@ -137,10 +137,30 @@ class Bedrock(Service):
         try:
             paginator = self.bedrockClient.get_paginator('list_guardrails')
             for page in paginator.paginate():
-                for summary in page.get('guardrails', []):
+                summaries = page.get('guardrails', [])
+                ## idFn mirrors BedrockGuardrail._resourceName exactly: name, falling
+                ## back to guardrailId (the detail-response field name; list summaries
+                ## use 'id' instead, but 'name' is present in both so this fallback
+                ## is effectively dead in practice, same as the driver itself).
+                pending = self.registerItems(
+                    'BedrockGuardrail', summaries,
+                    idFn=lambda s: s.get('name') or s.get('guardrailId', 'unknown')
+                )
+                pendingIds = {s.get('id') or s.get('arn') for s in pending}
+
+                for summary in summaries:
                     guardrailId = summary.get('id') or summary.get('arn')
                     if not guardrailId:
                         continue
+
+                    if guardrailId not in pendingIds:
+                        ## Already checkpointed - keep the lightweight summary so
+                        ## advise() still builds BedrockGuardrail and Evaluator.run()
+                        ## serves the cached result. Only ever counted (len()) by the
+                        ## aggregate drivers, never read per-field, so safe.
+                        resources['guardrails'].append(summary)
+                        continue
+
                     detail = self._describeGuardrail(guardrailId)
                     if detail is None:
                         continue
@@ -163,10 +183,29 @@ class Bedrock(Service):
         try:
             paginator = self.agentClient.get_paginator('list_knowledge_bases')
             for page in paginator.paginate():
-                for summary in page.get('knowledgeBaseSummaries', []):
+                summaries = page.get('knowledgeBaseSummaries', [])
+                ## idFn mirrors BedrockKnowledgeBase._resourceName exactly: name,
+                ## falling back to knowledgeBaseId. Both fields present in the
+                ## list summary and the get_knowledge_base detail response.
+                pending = self.registerItems(
+                    'BedrockKnowledgeBase', summaries,
+                    idFn=lambda s: s.get('name') or s.get('knowledgeBaseId', 'unknown')
+                )
+                pendingIds = {s.get('knowledgeBaseId') for s in pending}
+
+                for summary in summaries:
                     kbId = summary.get('knowledgeBaseId')
                     if not kbId:
                         continue
+
+                    if kbId not in pendingIds:
+                        ## Already checkpointed - keep the lightweight summary so
+                        ## advise() still builds BedrockKnowledgeBase and Evaluator.run()
+                        ## serves the cached result. Only ever counted (len()) by the
+                        ## aggregate drivers, never read per-field, so safe.
+                        resources['knowledgeBases'].append(summary)
+                        continue
+
                     detail = self._describeKnowledgeBase(kbId)
                     if detail is None:
                         continue

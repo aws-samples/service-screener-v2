@@ -37,10 +37,31 @@ class Sns(Service):
         try:
             paginator = self.snsClient.get_paginator('list_topics')
             for page in paginator.paginate():
-                for topic in page.get('Topics', []):
-                    arn = topic.get('TopicArn')
-                    if not arn:
+                summaries = [t for t in page.get('Topics', []) if t.get('TopicArn')]
+                pendingArns = {t['TopicArn'] for t in self.registerItems(
+                    'SnsCommon', summaries, idFn=lambda t: t['TopicArn'].split(':')[-1]
+                )}
+
+                for topic in summaries:
+                    arn = topic['TopicArn']
+
+                    if arn not in pendingArns:
+                        ## Already checkpointed - keep a minimal placeholder so advise()
+                        ## still builds the driver; Evaluator.run() serves the cached result.
+                        topics.append({
+                            '_arn': arn,
+                            '_name': arn.split(':')[-1],
+                            '_attributes': {},
+                            '_tags': [],
+                            '_subscriptions': [],
+                            '_dataProtectionPolicy': None,
+                            '_platformApps': [],
+                            '_currentAccount': self._currentAccount(),
+                            '_smsAttributes': {},
+                            '_isFifo': arn.endswith('.fifo'),
+                        })
                         continue
+
                     detail = self._describeTopic(arn)
                     if detail is None:
                         continue

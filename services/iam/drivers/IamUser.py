@@ -18,12 +18,16 @@ class IamUser(IamCommon):
         self._bedrockCredentialMap = bedrockCredentialMap or {}
         self._prefetchedUserDetail = None
         
-        # Look up prefetched user detail by username
+        # Look up prefetched user detail by username. Build the name->detail
+        # index once and cache it on the shared authDetails dict so the next
+        # IamUser construction gets an O(1) lookup instead of re-scanning the
+        # full user list (this constructor runs once per user).
         if authDetails and user['user'] != '<root_account>':
-            for u in authDetails.get('users', []):
-                if u.get('UserName') == user['user']:
-                    self._prefetchedUserDetail = u
-                    break
+            usersByName = authDetails.get('_usersByName')
+            if usersByName is None:
+                usersByName = {u.get('UserName'): u for u in authDetails.get('users', [])}
+                authDetails['_usersByName'] = usersByName
+            self._prefetchedUserDetail = usersByName.get(user['user'])
 
         self._resourceName = user['user']
         

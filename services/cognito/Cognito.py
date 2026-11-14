@@ -43,10 +43,27 @@ class Cognito(Service):
             paginator = self.cognitoClient.get_paginator('list_user_pools')
             # MaxResults must be 1..60 for list_user_pools
             for page in paginator.paginate(MaxResults=60):
-                for summary in page.get('UserPools', []):
+                summaries = page.get('UserPools', [])
+                pendingIds = {s.get('Id') for s in self.registerItems(
+                    ## idFn must match CognitoCommon._resourceName exactly (Name, falling back to Id)
+                    'CognitoCommon', summaries, idFn=lambda s: s.get('Name') or s.get('Id') or 'unknown'
+                )}
+
+                for summary in summaries:
                     poolId = summary.get('Id')
                     if not poolId:
                         continue
+
+                    if poolId not in pendingIds:
+                        ## Already checkpointed - keep the lightweight summary, skip
+                        ## describe_user_pool plus every per-pool enrichment call below
+                        ## (app clients, risk config, WAF association, log config,
+                        ## identity providers, groups). CognitoCommon.__init__ is lazy
+                        ## (.get()-only), and Evaluator.run() never executes checks for
+                        ## an already-checkpointed pool, so none of that data is read.
+                        pools.append(summary)
+                        continue
+
                     detail = self._describeUserPool(poolId)
                     if detail is None:
                         continue

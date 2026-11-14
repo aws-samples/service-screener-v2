@@ -35,7 +35,17 @@ class Firehose(Service):
             self._logClientError('list_delivery_streams', e)
             return streams
 
+        pendingNames = {item['_name'] for item in self.registerItems(
+            'FirehoseCommon', [{'_name': n} for n in names], idFn=lambda item: item['_name']
+        )}
+
         for name in names:
+            if name not in pendingNames:
+                ## Already checkpointed - keep the lightweight summary so advise()
+                ## still builds the driver and Evaluator.run() serves the cached result.
+                streams.append({'_name': name})
+                continue
+
             detail = self._describeStream(name)
             if detail is None:
                 continue

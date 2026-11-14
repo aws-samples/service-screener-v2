@@ -8,6 +8,7 @@ import json
 
 from utils.Config import Config
 from utils.Policy import Policy
+from utils import PolicyPrincipal
 from services.Evaluator import Evaluator
 
 class S3Bucket(Evaluator):
@@ -90,23 +91,9 @@ class S3Bucket(Evaluator):
         if not policy_document:
             return False
             
-        try:
-            policy = json.loads(policy_document)
-            
-            # Check for public read in policy
-            for statement in policy['Statement']:
-                principal = statement.get('Principal', {})
-                if (principal == '*' or principal.get('AWS') == '*') and \
-                   statement['Effect'] == 'Allow' and \
-                   any(action in ['s3:GetObject', 's3:GetObjectVersion', 's3:ListBucket'] 
-                       for action in (statement.get('Action', []) if isinstance(statement.get('Action', []), list) 
-                                    else [statement.get('Action', [])])):
-                    return True
-                    
-            return False
-            
-        except (json.JSONDecodeError, KeyError):
-            return False
+        # Handles every wildcard-principal form ("*", {"AWS": "*"}, {"AWS": ["*"]}),
+        # wildcard actions (s3:*, s3:Get*, *) and scoping Conditions.
+        return PolicyPrincipal.policyIsPublic(policy_document, ['s3:GetObject', 's3:GetObjectVersion', 's3:ListBucket'])
     
     def policyAllowsPublicWrite(self, policy_document):
         """
@@ -121,23 +108,9 @@ class S3Bucket(Evaluator):
         if not policy_document:
             return False
             
-        try:
-            policy = json.loads(policy_document)
-            
-            # Check for public write in policy
-            for statement in policy['Statement']:
-                principal = statement.get('Principal', {})
-                if (principal == '*' or principal.get('AWS') == '*') and \
-                   statement['Effect'] == 'Allow' and \
-                   any(action in ['s3:PutObject', 's3:DeleteObject'] 
-                       for action in (statement.get('Action', []) if isinstance(statement.get('Action', []), list) 
-                                    else [statement.get('Action', [])])):
-                    return True
-                    
-            return False
-            
-        except (json.JSONDecodeError, KeyError):
-            return False
+        # Handles every wildcard-principal form ("*", {"AWS": "*"}, {"AWS": ["*"]}),
+        # wildcard actions (s3:*, s3:Get*, *) and scoping Conditions.
+        return PolicyPrincipal.policyIsPublic(policy_document, ['s3:PutObject', 's3:DeleteObject'])
 
     def getBucketPolicy(self):
         # Fast path: already cached (including a cached None).

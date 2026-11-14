@@ -60,14 +60,28 @@ class Eventbridge(Service):
         try:
             paginator = self.ebClient.get_paginator('list_event_buses')
             for page in paginator.paginate():
-                for summary in page.get('EventBuses', []) or []:
+                summaries = page.get('EventBuses', []) or []
+                pendingNames = {s.get('Name') for s in self.registerItems(
+                    'EventbridgeBus', summaries, idFn=lambda s: s.get('Name')
+                )}
+
+                for summary in summaries:
                     name = summary.get('Name')
                     arn = summary.get('Arn')
                     if not name or not arn:
                         continue
-                    detail = self._describeBus(name, arn, summary)
-                    if detail is None:
-                        continue
+
+                    if name not in pendingNames:
+                        ## Already checkpointed - skip describe_event_bus/list_tags,
+                        ## but rules aren't checkpointed on their own, so still fetch
+                        ## them (cheap relative to the bus-level calls being saved).
+                        detail = {'_name': name, '_arn': arn}
+                    else:
+                        detail = self._describeBus(name, arn, summary)
+                        if detail is None:
+                            continue
+
+                    detail['_rules'] = self._listRules(name)
                     _pi('Eventbridge', f"Event bus: {name}")
                     buses.append(detail)
         except botocore.exceptions.ClientError as e:
@@ -90,6 +104,7 @@ class Eventbridge(Service):
                     continue
                 detail = self._describeBus(name, arn, summary)
                 if detail is not None:
+                    detail['_rules'] = self._listRules(name)
                     buses.append(detail)
         except botocore.exceptions.ClientError as e:
             self._logClientError('list_event_buses', e)
@@ -121,7 +136,6 @@ class Eventbridge(Service):
         detail['_isDefault'] = (name == 'default')
         detail['_currentAccount'] = self._currentAccount()
         detail['_region'] = self.region
-        detail['_rules'] = self._listRules(name)
         return detail
 
     def _listTags(self, arn, name):

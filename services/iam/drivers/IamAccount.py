@@ -620,35 +620,35 @@ class IamAccount(IamCommon):
                                 return True
                 return False
             
-            def get_entity_policies(entity_type, entity_name):
-                """Get all policy documents for a role or user, using prefetched data when available"""
+            def get_entity_policies(entity_type, entity):
+                """Get all policy documents for a role or user dict already in
+                hand, using its prefetched fields when present instead of
+                re-searching authDetails by name."""
                 import json as _json
                 docs = []
-                
-                # Try prefetched data first
-                if self._authDetails:
-                    source = self._authDetails.get('roles' if entity_type == 'role' else 'users', [])
-                    key_field = 'RoleName' if entity_type == 'role' else 'UserName'
-                    policy_list_field = 'RolePolicyList' if entity_type == 'role' else 'UserPolicyList'
-                    
-                    for entity in source:
-                        if entity.get(key_field) == entity_name:
-                            # Inline policies (already have documents)
-                            for p in entity.get(policy_list_field, []):
-                                doc = p.get('PolicyDocument', {})
-                                if isinstance(doc, str):
-                                    doc = _json.loads(doc)
-                                docs.append(doc)
-                            # Attached managed policies
-                            for p in entity.get('AttachedManagedPolicies', []):
-                                arn = p['PolicyArn']
-                                if arn in self._policyDocumentMap:
-                                    doc = self._policyDocumentMap[arn]
-                                    if isinstance(doc, str):
-                                        doc = _json.loads(doc)
-                                    docs.append(doc)
-                            return docs
-                
+
+                key_field = 'RoleName' if entity_type == 'role' else 'UserName'
+                policy_list_field = 'RolePolicyList' if entity_type == 'role' else 'UserPolicyList'
+                entity_name = entity.get(key_field, '')
+
+                # Use the entity's own prefetched fields directly - no need to
+                # re-scan authDetails, this dict came from there (or an
+                # equivalent bulk fetch) already.
+                if policy_list_field in entity or 'AttachedManagedPolicies' in entity:
+                    for p in entity.get(policy_list_field, []):
+                        doc = p.get('PolicyDocument', {})
+                        if isinstance(doc, str):
+                            doc = _json.loads(doc)
+                        docs.append(doc)
+                    for p in entity.get('AttachedManagedPolicies', []):
+                        arn = p['PolicyArn']
+                        if arn in self._policyDocumentMap:
+                            doc = self._policyDocumentMap[arn]
+                            if isinstance(doc, str):
+                                doc = _json.loads(doc)
+                            docs.append(doc)
+                    return docs
+
                 # Fallback to API calls
                 try:
                     if entity_type == 'role':
@@ -695,24 +695,31 @@ class IamAccount(IamCommon):
                     entities_without_boundaries.append(f"Role: {role_name}")
                     continue
                 
-                if has_iam_management_permissions(get_entity_policies('role', role_name)):
+                if has_iam_management_permissions(get_entity_policies('role', role)):
                     entities_without_boundaries.append(f"Role: {role_name}")
-            
-            # Check IAM users
+
+            # Check IAM users - use prefetched data when available instead of
+            # a fresh list_users() enumeration, same as the role loop above.
             try:
-                paginator = self.iamClient.get_paginator('list_users')
-                for page in paginator.paginate():
-                    for user in page.get('Users', []):
-                        user_name = user.get('UserName', '')
-                        if user.get('PermissionsBoundary'):
-                            continue
-                        
-                        if has_admin_name_pattern(user_name):
-                            entities_without_boundaries.append(f"User: {user_name}")
-                            continue
-                        
-                        if has_iam_management_permissions(get_entity_policies('user', user_name)):
-                            entities_without_boundaries.append(f"User: {user_name}")
+                if self._authDetails and self._authDetails.get('users'):
+                    users_source = self._authDetails['users']
+                else:
+                    users_source = []
+                    paginator = self.iamClient.get_paginator('list_users')
+                    for page in paginator.paginate():
+                        users_source.extend(page.get('Users', []))
+
+                for user in users_source:
+                    user_name = user.get('UserName', '')
+                    if user.get('PermissionsBoundary'):
+                        continue
+
+                    if has_admin_name_pattern(user_name):
+                        entities_without_boundaries.append(f"User: {user_name}")
+                        continue
+
+                    if has_iam_management_permissions(get_entity_policies('user', user)):
+                        entities_without_boundaries.append(f"User: {user_name}")
             except botocore.exceptions.ClientError as e:
                 print(f'Error listing users: {e.response["Error"]["Code"]}')
             

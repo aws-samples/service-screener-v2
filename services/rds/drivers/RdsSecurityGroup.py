@@ -11,16 +11,21 @@ from utils.Tools import checkIsPrivateIp
 from services.Evaluator import Evaluator
 
 class RdsSecurityGroup(Evaluator):
-    def __init__(self, sg, ec2Client, rdsLists):
+    def __init__(self, sg, ec2Client, rdsLists, sgSettings=None):
         self.ec2Client = ec2Client
         self.sg = sg
         self.rdsLists = rdsLists
-        
+
         self._resourceName = sg
-        
-        resp = self.ec2Client.describe_security_groups(GroupIds=[self.sg])
-        self.sgSettings = resp.get('SecurityGroups')
-        
+
+        if sgSettings is not None:
+            # Caller already batch-fetched this SG's detail (see Rds.py advise()) -
+            # avoid a separate describe_security_groups call per SG.
+            self.sgSettings = sgSettings
+        else:
+            resp = self.ec2Client.describe_security_groups(GroupIds=[self.sg])
+            self.sgSettings = resp.get('SecurityGroups')
+
         super(RdsSecurityGroup, self).__init__()
         
     def _checkSGIsDefaultVPC(self):

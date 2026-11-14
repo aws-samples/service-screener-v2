@@ -6,27 +6,46 @@ from .IamCommon import IamCommon
 class IamRole(IamCommon):
     MAXSESSIONDURATION = 3600
     MAXROLENOTUSEDDAYS = 14
-    def __init__(self, role, iamClient, authDetails=None, policyDocumentMap=None):
+    def __init__(self, role, iamClient, authDetails=None, policyDocumentMap=None, roleLastUsedCache=None):
         super().__init__()
         self.role = role
         self.iamClient = iamClient
         self._configPrefix = 'iam::role::'
         self._authDetails = authDetails
         self._policyDocumentMap = policyDocumentMap or {}
+        self._roleLastUsedCache = roleLastUsedCache
 
         self._resourceName = self.role['RoleName']
 
         self.init()
         self._enrichRoleDetail()
-        
+
     def _enrichRoleDetail(self):
-        """Ensure RoleLastUsed is populated, using prefetched data or API fallback"""
+        """Ensure RoleLastUsed is populated, using prefetched data, a persistent
+        cross-run cache, or the get_role() API as a last resort."""
         if 'RoleLastUsed' in self.role:
             return
-        
-        # Fallback to API if not in prefetched data
-        result = self.iamClient.get_role(RoleName=self.role['RoleName'])
-        self.role['RoleLastUsed'] = result.get('Role', {}).get('RoleLastUsed', {})
+
+        # A role younger than MAXROLENOTUSEDDAYS can't trigger the age-based
+        # unusedRole flag regardless of RoleLastUsed, so there's nothing this
+        # call could change for it - skip it and the cache entirely.
+        roleAgeDays = (datetime.datetime.today().date() - self.role['CreateDate'].date()).days
+        if roleAgeDays <= self.MAXROLENOTUSEDDAYS:
+            self.role['RoleLastUsed'] = {}
+            return
+
+        roleName = self.role['RoleName']
+        if self._roleLastUsedCache is not None and roleName in self._roleLastUsedCache:
+            self.role['RoleLastUsed'] = self._roleLastUsedCache[roleName]
+            return
+
+        # Cache miss / no cache - fall back to the API.
+        result = self.iamClient.get_role(RoleName=roleName)
+        roleLastUsed = result.get('Role', {}).get('RoleLastUsed', {})
+        self.role['RoleLastUsed'] = roleLastUsed
+
+        if self._roleLastUsedCache is not None:
+            self._roleLastUsedCache[roleName] = roleLastUsed
         
     def _checkRoleOldAge(self):
         now = datetime.datetime.today().date()

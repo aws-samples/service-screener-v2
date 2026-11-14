@@ -142,44 +142,50 @@ class Ec2(Service):
         
         return resources
     
+    def _getAllSecurityGroupsCached(self):
+        """One full-region describe_security_groups(), memoized per region and
+        reused by getEC2SecurityGroups/getELBSecurityGroup/getDefaultSG instead
+        of each doing its own describe_security_groups(GroupIds=...) call.
+        Real fleets share a small number of SGs across many instances/ELBs -
+        this call should scale with unique-SG count, not instance/ELB count."""
+        cacheKey = 'ec2::allsgs::' + self.region
+        cached = Config.get(cacheKey, None)
+        if cached is not None:
+            return cached
+
+        byId = {}
+        result = self.ec2Client.describe_security_groups()
+        for group in result.get('SecurityGroups'):
+            byId[group['GroupId']] = group
+
+        while result.get('NextToken') is not None:
+            result = self.ec2Client.describe_security_groups(
+                NextToken = result.get('NextToken')
+            )
+            for group in result.get('SecurityGroups'):
+                byId[group['GroupId']] = group
+
+        Config.set(cacheKey, byId)
+        return byId
+
     def getEC2SecurityGroups(self,instance):
         if 'SecurityGroups' not in instance:
             print(f"Security Group not found in {instance['InstanceId']}")
             return {}
-        
-        arr = []    
-        filters = []
-        groupIds = []
-        if self.tags:
-            filters = self.tags
-        
-        for group in instance['SecurityGroups']:
-            groupIds.append(group['GroupId'])
-        
-        results = self.ec2Client.describe_security_groups(
-            GroupIds=groupIds,
-            Filters=filters
-        )
-        arr = results.get('SecurityGroups')
-        
-        while results.get('NextToken') is not None:
-            results = self.ec2Client.describe_security_groups(
-                GroupIds = groupIds,
-                Filters=filters,
-                NextToken = results.get('NextToken')
-                )
-            arr = arr + results.get('SecurityGroups')
-        
+
+        allSGs = self._getAllSecurityGroupsCached()
+        arr = [allSGs[group['GroupId']] for group in instance['SecurityGroups'] if group['GroupId'] in allSGs]
+
         if not self.tags:
             return arr
-        
+
         finalArr = []
         for i, detail in enumerate(arr):
             if 'Tags' in detail and self.resourceHasTags(detail['Tags']):
                 finalArr.append(arr[i])
-        
-        return finalArr    
-    
+
+        return finalArr
+
     def getEBSResources(self):
         filters = []
         
@@ -196,7 +202,7 @@ class Ec2(Service):
                 Filters = filters,
                 NextToken = results.get('NextToken')
             )    
-            arr = arr + results.get('Reservations')
+            arr = arr + results.get('Volumes')
 
         return arr
         
@@ -214,19 +220,20 @@ class Ec2(Service):
         
         if not self.tags:
             return arr
-        
+
+        # describe_tags accepts up to 20 ResourceArns per call - batch instead
+        # of one call per load balancer.
+        lbByArn = {lb['LoadBalancerArn']: lb for lb in arr}
+        allArns = list(lbByArn.keys())
+
         filteredResults = []
-        for lb in arr:
-            tagResults = self.elbClient.describe_tags(
-                ResourceArns = [lb['LoadBalancerArn']]
-            )
-            tagDesc = tagResults.get('TagDescriptions')
-            if len(tagDesc) > 0:
-                for desc in tagDesc:
-                    if self.resourceHasTags(desc['Tags']):
-                        filteredResults.append(lb)
-                        break
-                    
+        for i in range(0, len(allArns), 20):
+            chunk = allArns[i:i+20]
+            tagResults = self.elbClient.describe_tags(ResourceArns = chunk)
+            for desc in tagResults.get('TagDescriptions', []):
+                if self.resourceHasTags(desc['Tags']):
+                    filteredResults.append(lbByArn[desc['ResourceArn']])
+
         return filteredResults
         
     def getELBClassic(self):
@@ -245,44 +252,24 @@ class Ec2(Service):
     def getELBSecurityGroup(self, elb):
         if 'SecurityGroups' not in elb:
             return []
-        
-        securityGroups = elb['SecurityGroups']
-        groupIds = []
-        arr = []
-        for groupId in securityGroups:
-            groupIds.append(groupId)
-            
+
+        groupIds = list(elb['SecurityGroups'])
         if len(groupIds) == 0:
-            return arr
-        
-        filters = []  
-        if self.tags is not None:
-            filters = self.tags
-            
-        results = self.ec2Client.describe_security_groups(
-            GroupIds = groupIds,
-            Filters = filters
-        )
-        
-        arr = results.get('SecurityGroups')
-        while results.get('NextToken') is not None:
-            results = self.ec2Client.describe_security_groups(
-                GroupIds = groupIds,
-                Filters = filters,
-                NextToken = results.get('NextToken')
-            )
-            arr = arr + results.get('SecurityGroups')
-        
+            return []
+
+        allSGs = self._getAllSecurityGroupsCached()
+        arr = [allSGs[gid] for gid in groupIds if gid in allSGs]
+
         if not self.tags:
             return arr
-        
+
         finalArr = []
         for i, detail in enumerate(arr):
             if self.resourceHasTags(detail['Tags']):
                 finalArr.append(arr[i])
-            
-        return arr
-        
+
+        return finalArr
+
     def getASGResources(self):
         filters = []
         if self.tags:
@@ -323,20 +310,9 @@ class Ec2(Service):
         return finalArr    
         
     def getDefaultSG(self):
-        defaultSGs = {}
-        result = self.ec2Client.describe_security_groups()
-        for group in result.get('SecurityGroups'):
-            if group.get('GroupName') == 'default':
-                defaultSGs[group.get('GroupId')] = group
-                
-        while result.get('NextToken') is not None:
-            result = self.ec2Client.describe_security_groups(
-                NextToken = result.get('NextToken')
-            )
-            for group in result.get('SecurityGroups'):
-                if group.get('GroupName') == 'default':
-                    defaultSGs[group.get('GroupId')] = group
-        
+        allSGs = self._getAllSecurityGroupsCached()
+        defaultSGs = {gid: group for gid, group in allSGs.items() if group.get('GroupName') == 'default'}
+
         if not self.tags:
             return defaultSGs
         
@@ -612,26 +588,29 @@ class Ec2(Service):
         
         # EC2 instance checks
         instances = self.getResources()
+        instancesById = {}
         for instanceArr in instances:
             for instanceData in instanceArr['Instances']:
+                instancesById[instanceData['InstanceId']] = instanceData
+
                 _pi('EC2', instanceData['InstanceId'])
                 obj = Ec2Instance(instanceData,self.ec2Client, self.cwClient)
                 obj.run(self.__class__)
-                
+
                 objs[f"EC2::{instanceData['InstanceId']}"] = obj.getInfo()
                 self.setChartData(obj.getChartData())
-                
+
                 ## Gather SecGroups in dict first to prevent check same sec groups multiple time
                 instanceSG = self.getEC2SecurityGroups(instanceData)
                 for group in instanceSG:
                     secGroups[group['GroupId']] = group
-        
-            
+
+
         #EBS checks
         volumes = self.getEBSResources()
         for volume in volumes:
             _pi('EBS', volume['VolumeId'])
-            obj = Ec2EbsVolume(volume,self.ec2Client, self.cwClient)
+            obj = Ec2EbsVolume(volume,self.ec2Client, self.cwClient, instancesById)
             obj.run(self.__class__)
             objs[f"EBS::{volume['VolumeId']}"] = obj.getInfo()
 

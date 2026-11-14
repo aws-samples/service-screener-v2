@@ -58,12 +58,39 @@ class Kinesis(Service):
         # Account-level shard limit (once)
         self._shardLimit = self._fetchShardLimit()
 
+        # Gate the heavier per-stream calls (tags, consumers, KMS rotation,
+        # CloudWatch alarms) - not describe_stream_summary itself, since its
+        # OpenShardCount feeds the account-wide _totalOpenShards aggregate
+        # every stream's utilisation check depends on.
+        pendingNames = {item['_name'] for item in self.registerItems(
+            'KinesisCommon', [{'_name': n} for n in names], idFn=lambda item: item['_name']
+        )}
+
         for name in names:
             summary = self._describeStreamSummary(name)
             if summary is None:
                 continue
 
             arn = summary.get('StreamARN', '')
+
+            if name not in pendingNames:
+                ## Already checkpointed - keep the summary (needed for the shard
+                ## aggregate below) but skip the other per-stream lookups; the tag
+                ## filter already passed when this stream was first checkpointed.
+                self._totalOpenShards += int(summary.get('OpenShardCount', 0) or 0)
+                streams.append({
+                    '_name': name,
+                    '_arn': arn,
+                    '_summary': summary,
+                    '_tags': [],
+                    '_consumers': [],
+                    '_kmsRotation': 'unknown',
+                    '_hasCloudWatchAlarms': None,
+                    '_shardLimit': self._shardLimit,
+                    '_totalOpenShards': 0,
+                })
+                continue
+
             tags = self._listTags(arn, name)
             if self.tags and not self.resourceHasTags(tags):
                 continue
