@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 from utils.Config import Config
 from services.Evaluator import Evaluator
+from utils import PolicyPrincipal
 
 class SqsQueueDriver(Evaluator):
     def __init__(self, queue, sqs_client, cloudwatch_client, cloudtrail_client=None):
@@ -226,13 +227,14 @@ class SqsQueueDriver(Evaluator):
         
         try:
             policy = json.loads(policy_str)
-            statements = policy.get('Statement', [])
+            statements = PolicyPrincipal.iterStatements(policy)
             
             issues = []
             for statement in statements:
-                # Check for overly permissive principals
-                principal = statement.get('Principal', {})
-                if principal == '*' or (isinstance(principal, dict) and principal.get('AWS') == '*'):
+                # Check for overly permissive principals: any wildcard form
+                # ("*", {"AWS": "*"}, {"AWS": ["*"]}) on an Allow statement
+                # that is not restricted by a scoping Condition.
+                if PolicyPrincipal.statementIsPublic(statement) and 'Wildcard principal' not in issues:
                     issues.append('Wildcard principal')
                 
                 # Check for overly permissive actions

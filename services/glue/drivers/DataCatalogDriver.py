@@ -2,6 +2,7 @@ import boto3
 import botocore
 
 from services.Evaluator import Evaluator
+from utils import PolicyPrincipal
 
 
 class DataCatalogDriver(Evaluator):
@@ -100,20 +101,16 @@ class DataCatalogDriver(Evaluator):
                 self.results['PublicAccessibility'] = [1, 'Not Publicly Accessible (No Policy)']
                 return
             
-            # Parse the policy to check for public access
-            import json
-            policy = json.loads(policyInJson)
-            
-            # Check each statement for public principal
-            for statement in policy.get('Statement', []):
-                principal = statement.get('Principal', {})
-                effect = statement.get('Effect', '')
-                
-                # Check if principal allows public access
-                if effect == 'Allow':
-                    if principal == '*' or (isinstance(principal, dict) and principal.get('AWS') == '*'):
-                        self.results['PublicAccessibility'] = [-1, 'Publicly Accessible']
-                        return
+            # A statement is public when it allows a wildcard principal in any
+            # form ("*", {"AWS": "*"}, {"AWS": ["*"]}, ...) or uses NotPrincipal,
+            # and is not restricted by a scoping Condition (e.g. aws:PrincipalOrgID).
+            if PolicyPrincipal.parsePolicy(policyInJson) is None:
+                self.results['PublicAccessibility'] = [0, 'Unable to evaluate (Unparseable Policy)']
+                return
+
+            if PolicyPrincipal.policyIsPublic(policyInJson):
+                self.results['PublicAccessibility'] = [-1, 'Publicly Accessible']
+                return
             
             # No public access found
             self.results['PublicAccessibility'] = [1, 'Not Publicly Accessible']
@@ -124,9 +121,10 @@ class DataCatalogDriver(Evaluator):
             if error_code == 'EntityNotFoundException':
                 # No resource policy means no public access
                 self.results['PublicAccessibility'] = [1, 'Not Publicly Accessible (No Policy)']
-            elif error_code == 'AccessDenied':
-                # Skip check silently if access denied
-                return
+            elif error_code in ('AccessDenied', 'AccessDeniedException'):
+                # Record explicitly so an unassessed catalog is distinguishable
+                # from a compliant one in the report.
+                self.results['PublicAccessibility'] = [0, 'Unable to evaluate (Access Denied)']
             else:
                 print(f"Error checking public accessibility: {error_code}")
                 self.results['PublicAccessibility'] = [0, f'Error: {error_code}']
