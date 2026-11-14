@@ -15,9 +15,105 @@ import {
   BarChart,
   PieChart,
   Pagination,
-  Button
+  Button,
+  ExpandableSection
 } from '@cloudscape-design/components';
 import EmptyState from './EmptyState';
+import RemediationSection from './RemediationSection';
+import { renderHtml } from '../utils/htmlDecoder';
+
+// Summary entries that feed the custom sections on this page rather than recommendation cards
+const CUSTOM_PAGE_CHECKS = ['Findings', 'UsageStat', 'FreeTrial', 'Settings', 'FailMeetingCompliances', 'AiProtectionStatus'];
+
+const AI_PROTECTION_CHECKS = {
+  AiProtectionDisabled: 'AI Protection enabled',
+  AiProtectionNoEventChannel: 'Bedrock data events streamed (AnomalousModelInvocation, CostHarvesting)',
+  AiProtectionPromptInjectionNotDetected: 'Prompt attack guardrail enforced (PromptInjection.Direct)'
+};
+
+const AI_STATUS_DISPLAY = {
+  1: { color: 'green', text: 'Pass' },
+  '-1': { color: 'red', text: 'Action required' },
+  0: { color: 'grey', text: 'Not evaluated' }
+};
+
+const CRITICALITY_DISPLAY = {
+  H: { color: 'red', text: 'High', order: 0 },
+  M: { color: 'blue', text: 'Medium', order: 1 },
+  L: { color: 'grey', text: 'Low', order: 2 },
+  I: { color: 'grey', text: 'Informational', order: 3 }
+};
+
+// __links and __affectedResources may arrive as JSON-encoded strings
+function parseMaybeJson(value, fallback) {
+  if (typeof value !== 'string') return value || fallback;
+  try {
+    return JSON.parse(value);
+  } catch (e) {
+    return fallback;
+  }
+}
+
+// Protection plan recommendations: every GuardDuty check except the custom-page carriers
+function getRecommendations(summary) {
+  return Object.entries(summary || {})
+    .filter(([checkName, finding]) => !CUSTOM_PAGE_CHECKS.includes(checkName) && finding.__categoryMain !== 'T')
+    .map(([checkName, finding]) => ({ checkName, ...finding }))
+    .sort((a, b) => (CRITICALITY_DISPLAY[a.criticality]?.order ?? 9) - (CRITICALITY_DISPLAY[b.criticality]?.order ?? 9));
+}
+
+function renderRecommendation(finding) {
+  const criticality = CRITICALITY_DISPLAY[finding.criticality] || CRITICALITY_DISPLAY.I;
+  const affected = parseMaybeJson(finding.__affectedResources, {});
+  const links = parseMaybeJson(finding.__links, []);
+  const tags = [
+    finding.downtime !== 0 && (finding.downtime === -1 ? 'Downtime (maybe)' : 'Downtime'),
+    finding.additionalCost === 1 && 'Additional cost',
+    finding.needFullTest === 1 && 'Testing required',
+    finding.slowness !== 0 && (finding.slowness === -1 ? 'Performance impact (maybe)' : 'Performance impact')
+  ].filter(Boolean);
+
+  return (
+    <ExpandableSection
+      key={finding.checkName}
+      variant="container"
+      headerText={finding.shortDesc || finding.checkName}
+      headerDescription={finding.checkName}
+      headerActions={
+        <SpaceBetween direction="horizontal" size="xs">
+          <Badge color={criticality.color}>{criticality.text}</Badge>
+          {tags.map(tag => <Badge key={tag}>{tag}</Badge>)}
+        </SpaceBetween>
+      }
+    >
+      <SpaceBetween size="m">
+        <div>
+          <Box variant="awsui-key-label">Description</Box>
+          <div dangerouslySetInnerHTML={renderHtml(finding['^description'] || finding.shortDesc)} />
+        </div>
+        {Object.keys(affected).length > 0 && (
+          <div>
+            <Box variant="awsui-key-label">Affected resources</Box>
+            {Object.entries(affected).map(([region, resources]) => (
+              <Box key={region} variant="small">
+                <strong>{region}:</strong> {Array.isArray(resources) ? resources.join(', ') : String(resources)}
+              </Box>
+            ))}
+          </div>
+        )}
+        <RemediationSection finding={finding} />
+        {links.length > 0 && (
+          <div>
+            <Box variant="awsui-key-label">Documentation</Box>
+            {links.map((link, index) => (
+              <div key={index} dangerouslySetInnerHTML={renderHtml(link)} />
+            ))}
+          </div>
+        )}
+      </SpaceBetween>
+    </ExpandableSection>
+  );
+}
 
 // Helper function to render grouped findings
 function renderGroupedFindings(groupedFindings, severityColor) {
@@ -91,6 +187,8 @@ export function GuardDutyDetail({ data }) {
     return <EmptyState title="Error processing GuardDuty data" description={error.message} />;
   }
   
+  const recommendations = getRecommendations(guardDutyData.summary);
+
   // Helper function to filter category data
   const getFilteredCategoryData = (categoryData, visibleSet) => {
     if (visibleSet.size === 0) {
@@ -312,6 +410,51 @@ export function GuardDutyDetail({ data }) {
             </Box>
           )}
 
+        {/* AI Protection status, including passing checks (the summary only carries failures) */}
+        {processedData.aiProtectionRows.length > 0 && (
+          <Table
+            columnDefinitions={[
+              { id: 'region', header: 'Region', cell: item => item.region },
+              { id: 'check', header: 'Check', cell: item => item.check },
+              {
+                id: 'status',
+                header: 'Status',
+                cell: item => {
+                  const display = AI_STATUS_DISPLAY[item.result] || AI_STATUS_DISPLAY[0];
+                  return <Badge color={display.color}>{display.text}</Badge>;
+                }
+              },
+              { id: 'detail', header: 'Detail', cell: item => item.detail }
+            ]}
+            items={processedData.aiProtectionRows}
+            variant="container"
+            wrapLines
+            header={
+              <Header
+                variant="h2"
+                counter={`(${processedData.aiProtectionRows.length})`}
+                description="Which AI Protection finding types GuardDuty can generate in each region"
+              >
+                AI Protection finding type coverage
+              </Header>
+            }
+          />
+        )}
+
+        {/* Protection plan recommendations, so GuardDuty checks are not lost on this custom page */}
+        {recommendations.length > 0 && (
+          <SpaceBetween size="s">
+            <Header
+              variant="h2"
+              counter={`(${recommendations.length})`}
+              description="GuardDuty configuration checks that need attention"
+            >
+              Protection plan recommendations
+            </Header>
+            {recommendations.map(renderRecommendation)}
+          </SpaceBetween>
+        )}
+
         {/* Findings Sections - Split by Severity */}
         <Box>
           <Header variant="h1">All Findings</Header>
@@ -379,6 +522,7 @@ function processAllRegionsGuardDutyData(allRegionsData) {
     settingsTableByRegion: [],
     findingsTable: [],
     groupedFindings: { High: [], Medium: [], Low: [] },
+    aiProtectionRows: [],
     hasUnresolvedFindings: false
   };
 
@@ -402,6 +546,14 @@ function processAllRegionsGuardDutyData(allRegionsData) {
 
     // Initialize region severity counts
     severityCountsByRegion[region] = { High: 0, Medium: 0, Low: 0 };
+
+    // AI Protection coverage for this region
+    const aiStatus = detector.AiProtectionStatus?.value || {};
+    Object.entries(AI_PROTECTION_CHECKS).forEach(([key, label]) => {
+      if (!Array.isArray(aiStatus[key])) return;
+      const [checkResult, detail] = aiStatus[key];
+      result.aiProtectionRows.push({ region, check: label, result: checkResult, detail: String(detail ?? '') });
+    });
 
     // Process Settings for this region
     if (detector.Settings?.value) {

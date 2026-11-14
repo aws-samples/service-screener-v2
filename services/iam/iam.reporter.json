@@ -753,5 +753,57 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html"
+	},
+	"bedrockLongTermApiKey": {
+		"category": "S",
+		"^description": "You have {$COUNT} IAM users holding active long-term Amazon Bedrock API keys (service-specific credentials for bedrock.amazonaws.com, usually on IAM users named <b>BedrockAPIKey-*</b>). Long-term Bedrock API keys are bearer tokens that grant model invocation without SigV4 signing. If leaked, attackers can use them to run LLM inference on your bill (LLMjacking). Use short-term API keys or IAM role credentials for applications, and delete ALL unused keys <b>and their IAM users</b>. Deleting a key does not delete its IAM user, so when the Bedrock console asks whether to delete the IAM user as well, choose yes.",
+		"shortDesc": "Replace long-term Bedrock API keys with short-term credentials",
+		"criticality": "H",
+		"downtime": -1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[How Amazon Bedrock API keys work]<https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-how.html>",
+			"[Manage Amazon Bedrock API keys]<https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-modify.html>",
+			"[Alternatives to long-term access keys]<https://docs.aws.amazon.com/IAM/latest/UserGuide/security-creds-programmatic-access.html#security-creds-alternatives-to-long-term-access-keys>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-modify.html"
+	},
+	"bedrockApiKeyNoExpiry": {
+		"category": "S",
+		"^description": "You have {$COUNT} IAM users with active long-term Amazon Bedrock API keys that never expire. A non-expiring key stays usable until someone deletes it, so a leaked key can be abused indefinitely. Set an expiration when generating keys, and rotate or delete existing keys that never expire.",
+		"shortDesc": "Set an expiration on long-term Bedrock API keys",
+		"criticality": "H",
+		"downtime": -1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Generate an Amazon Bedrock API key]<https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-generate.html>",
+			"[Manage Amazon Bedrock API keys]<https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-modify.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-modify.html"
+	},
+	"bedrockApiKeyUnusedUser": {
+		"category": "S",
+		"^description": "You have {$COUNT} IAM users left over from long-term Amazon Bedrock API keys. They have no active key (all keys are expired, inactive, or deleted), but deleting a key does not delete its IAM user or the attached Bedrock permissions such as <b>AmazonBedrockLimitedAccess</b>. Anyone with IAM permissions can generate a new key on the user. This happens when a key is only deactivated, expires, or is deleted without also deleting the IAM user (the Bedrock console prompts for this when you delete a key). Confirm the user has no other credentials in use, then delete ALL unused keys and their IAM users.",
+		"shortDesc": "Delete IAM users left over from unused Bedrock API keys",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Manage Amazon Bedrock API keys]<https://docs.aws.amazon.com/bedrock/latest/userguide/api-keys-modify.html>",
+			"[Remove unused users, roles, permissions, policies, and credentials]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#remove-credentials>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_remove.html"
 	}
 }
