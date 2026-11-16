@@ -8,6 +8,7 @@ from utils.Tools import _pr
 from utils.Tools import _warn
 # from utils.Tools import aws_parseInstanceFamily
 from utils.Policy import Policy
+from utils import PolicyPrincipal
 from services.Evaluator import Evaluator
 
 class KmsCommon(Evaluator):
@@ -168,10 +169,6 @@ class KmsCommon(Evaluator):
         pObj.parseDocumentToJson()
         parseInfo = pObj.extractPolicyInfo()
         
-        # Also parse the raw policy for condition checks
-        import json
-        rawPolicy = json.loads(pDoc)
-        
         admins = []
         users = []
         cross_account_principals = []
@@ -188,22 +185,19 @@ class KmsCommon(Evaluator):
         has_put_key_policy = False
         has_schedule_key_deletion = False
         
-        # Create a mapping of Sid to raw statement for condition checking
-        sid_to_statement = {}
-        for statement in rawPolicy.get('Statement', []):
-            sid = statement.get('Sid', 'noSid')
-            sid_to_statement[sid] = statement
-        
         if 'allow' in parseInfo:
             ## Build Admin List and perform security checks
             for sid, arr in parseInfo['allow'].items():
-                # Get the raw statement for condition checking
-                raw_statement = sid_to_statement.get(sid, {})
+                condition = arr.get('Condition') or {}
+                # A wildcard principal restricted to a known account / org /
+                # source (e.g. kms:CallerAccount, aws:PrincipalOrgID) is not open.
+                wildcard_scoped = PolicyPrincipal.conditionScopes(condition, extraKeys=['kms:CallerAccount'])
                 
                 # Tier 1: Check for wildcard principals (KeyPolicyWildcardPrincipal)
                 if 'Principal' in arr:
                     if arr['Principal'] == '*':
-                        wildcard_principals.append(f"Statement {sid}: Principal is *")
+                        if not wildcard_scoped:
+                            wildcard_principals.append(f"Statement {sid}: Principal is *")
                     elif isinstance(arr['Principal'], dict):
                         if 'AWS' in arr['Principal']:
                             aws_principals = arr['Principal']['AWS']
@@ -212,7 +206,8 @@ class KmsCommon(Evaluator):
                             
                             for principal in aws_principals:
                                 if principal == '*':
-                                    wildcard_principals.append(f"Statement {sid}: AWS Principal is *")
+                                    if not wildcard_scoped:
+                                        wildcard_principals.append(f"Statement {sid}: AWS Principal is *")
                                 # Check for root access
                                 elif f":iam::{key_account}:root" in principal:
                                     has_root_access = True
@@ -240,12 +235,12 @@ class KmsCommon(Evaluator):
                     for action in actions:
                         if action == '*' or action == 'kms:*':
                             # Check if there are conditions that might limit the wildcard
-                            if 'Condition' not in raw_statement or not raw_statement.get('Condition'):
+                            if not condition:
                                 wildcard_actions.append(f"Statement {sid}: Action {action} without conditions")
                     
                     # Tier 2: Check for statements without conditions (KeyPolicyNoConditions)
                     # Only flag for non-root principals and non-service principals
-                    if 'Condition' not in raw_statement or not raw_statement.get('Condition'):
+                    if not condition:
                         # Skip if it's a service principal or root with full access (common pattern)
                         is_service = 'Service' in arr.get('Principal', {})
                         is_root_full_access = False

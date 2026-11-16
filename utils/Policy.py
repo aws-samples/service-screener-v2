@@ -167,8 +167,10 @@ class Policy:
         
         policy = {'allow': {}, 'deny': {}}
         cnt = 1;
-        for statement in doc['Statement']:
-            effect = statement['Effect'].lower()
+        for statement in PolicyPrincipal.iterStatements(doc):
+            effect = str(statement.get('Effect', '')).lower()
+            if effect not in policy:
+                continue
             
             if 'Sid' in statement:
                 sid = statement['Sid']
@@ -176,7 +178,20 @@ class Policy:
                 sid = 'noSid:' + str(cnt)
                 cnt = cnt + 1
             
-            policy[effect][sid] = {'Principal': statement['Principal'], 'Action': statement['Action']}
+            # NotPrincipal / NotAction apply to everything except the listed
+            # values, so treat them as wildcards for analysis purposes.
+            principal = statement.get('Principal')
+            if principal is None:
+                principal = '*' if 'NotPrincipal' in statement else {}
+            action = statement.get('Action')
+            if action is None:
+                action = '*' if 'NotAction' in statement else []
+            
+            policy[effect][sid] = {
+                'Principal': principal,
+                'Action': action,
+                'Condition': statement.get('Condition') or {},
+            }
             
         return policy
 
