@@ -1,4 +1,5 @@
 import botocore
+import botocore.config
 
 from utils.Tools import _pi
 from utils.Config import Config
@@ -198,7 +199,134 @@ class Eventbridge(Service):
             '_endpoints': self._listEndpoints(),
             '_discoverers': discoverers,
             '_discovererLookupFailed': self._discovererLookupFailed,
+            '_routing': self._getRoutingDetail(),
         }
+
+    # ------------------------------------------------------------------ #
+    # Event routing (securityFindingsNotRouted / healthEventsNotRouted)
+    # ------------------------------------------------------------------ #
+    def _getRoutingDetail(self):
+        """
+        Default-bus rules that route security findings or AWS Health events,
+        plus the enrichment needed to suppress member-account false positives.
+        All calls are read-only. Lookup failures are recorded as error codes so
+        the checks can report 'Unable to evaluate' instead of a false PASS/FAIL.
+        """
+        sources = list(EventbridgeRegional.SECURITY_SOURCES) + [EventbridgeRegional.HEALTH_SOURCE]
+        routing = {'_region': self.region}
+        routing['regionRules'], routing['regionError'] = self._listRoutingRules(self.ebClient, sources)
+
+        ## Global AWS Health events (IAM, CloudFront, Route 53, ...) are only
+        ## delivered to the default bus in us-east-1.
+        if self.region != 'us-east-1':
+            try:
+                globalClient = self.ssBoto.client(
+                    'events', region_name='us-east-1', config=self.bConfig.merge(botocore.config.Config(region_name='us-east-1')))
+                routing['globalRules'], routing['globalError'] = self._listRoutingRules(
+                    globalClient, [EventbridgeRegional.HEALTH_SOURCE])
+            except Exception as e:
+                routing['globalRules'], routing['globalError'] = [], type(e).__name__
+        else:
+            routing['globalRules'], routing['globalError'] = routing['regionRules'], routing['regionError']
+
+        routing['guardDutyAdmin'] = self._guardDutyAdministrator()
+        routing['securityHubAdmin'] = self._securityHubAdministrator()
+        routing['securityHubAggregation'] = self._securityHubAggregationRegion()
+        return routing
+
+    def _listRoutingRules(self, client, sources):
+        """
+        Return ([{Name, State, sources, targetCount}], errorCode) for every
+        default-bus rule whose EventPattern matches at least one of `sources`.
+        Targets are only listed for matching rules, keeping the cost low.
+        """
+        out = []
+        try:
+            paginator = client.get_paginator('list_rules')
+            rules = []
+            for page in paginator.paginate(EventBusName='default'):
+                rules += page.get('Rules', []) or []
+        except botocore.exceptions.ClientError as e:
+            return [], e.response.get('Error', {}).get('Code', 'ClientError')
+        except botocore.exceptions.BotoCoreError as e:
+            return [], type(e).__name__
+
+        for rule in rules:
+            name = rule.get('Name')
+            pattern = rule.get('EventPattern')
+            if not name or not pattern:
+                continue
+            matched = [s for s in sources if EventbridgeRegional.patternMatchesSource(pattern, s)]
+            if not matched:
+                continue
+            targetCount = 0
+            try:
+                paginator = client.get_paginator('list_targets_by_rule')
+                for page in paginator.paginate(Rule=name, EventBusName='default'):
+                    targetCount += len(page.get('Targets', []) or [])
+            except botocore.exceptions.ClientError as e:
+                code = e.response.get('Error', {}).get('Code', 'ClientError')
+                if code != 'ResourceNotFoundException':
+                    return [], code
+                continue
+            out.append({'Name': name, 'State': rule.get('State'),
+                        'sources': matched, 'targetCount': targetCount})
+        return out, None
+
+    def _guardDutyAdministrator(self):
+        """Administrator account ID when this account is an active GuardDuty member, else None."""
+        try:
+            gd = self.ssBoto.client('guardduty', config=self.bConfig)
+            detectorIds = []
+            for page in gd.get_paginator('list_detectors').paginate():
+                detectorIds += page.get('DetectorIds', []) or []
+            for detectorId in detectorIds:
+                admin = gd.get_administrator_account(DetectorId=detectorId).get('Administrator') or {}
+                if admin.get('AccountId') and str(admin.get('RelationshipStatus', '')).lower() == 'enabled':
+                    return admin.get('AccountId')
+        except Exception:
+            ## Enrichment only - a failure leaves the routing verdict to the rules.
+            pass
+        return None
+
+    def _securityHubAdministrator(self):
+        """Administrator account ID when this account is an active Security Hub member, else None."""
+        try:
+            sh = self.ssBoto.client('securityhub', config=self.bConfig)
+            admin = sh.get_administrator_account().get('Administrator') or {}
+            if admin.get('AccountId') and str(admin.get('MemberStatus', '')).lower() in ('enabled', 'associated'):
+                return admin.get('AccountId')
+        except Exception:
+            pass
+        return None
+
+    def _securityHubAggregationRegion(self):
+        """
+        The Security Hub aggregation Region when this Region's findings are
+        aggregated into a different Region, else None.
+        """
+        try:
+            sh = self.ssBoto.client('securityhub', config=self.bConfig)
+            arns = []
+            for page in sh.get_paginator('list_finding_aggregators').paginate():
+                arns += [a.get('FindingAggregatorArn') for a in page.get('FindingAggregators', []) or []]
+            for arn in arns:
+                if not arn:
+                    continue
+                agg = sh.get_finding_aggregator(FindingAggregatorArn=arn)
+                aggRegion = agg.get('FindingAggregationRegion')
+                if not aggRegion or aggRegion == self.region:
+                    continue
+                mode = agg.get('RegionLinkingMode')
+                regions = agg.get('Regions') or []
+                linked = (mode == 'ALL_REGIONS'
+                          or (mode == 'ALL_REGIONS_EXCEPT_SPECIFIED' and self.region not in regions)
+                          or (mode == 'SPECIFIED_REGIONS' and self.region in regions))
+                if linked:
+                    return aggRegion
+        except Exception:
+            pass
+        return None
 
     def _listArchives(self):
         archives = []

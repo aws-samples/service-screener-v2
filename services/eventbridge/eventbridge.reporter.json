@@ -236,5 +236,41 @@
     "remediation": null,
     "remediation_risk": null,
     "remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-global-endpoints.html"
+  },
+  "securityFindingsNotRouted": {
+    "category": "S",
+    "^description": "{$COUNT} region(s) have no enabled EventBridge rule with a target that matches findings from Amazon GuardDuty, AWS Security Hub, Amazon Inspector or IAM Access Analyzer on the default event bus, and the account is not a GuardDuty/Security Hub member nor aggregating Security Hub findings into another Region. Findings are then only visible to someone who opens the console, so a compromised credential or exposed resource can go unnoticed for days. Route findings to a responder (ticketing, chat, on-call paging or automated remediation) so every finding is triaged.",
+    "shortDesc": "Route security findings to a responder with an EventBridge rule",
+    "criticality": "M",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": [
+      "[Creating a rule for GuardDuty findings with EventBridge]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_findings_eventbridge.html>",
+      "[Using EventBridge for automated response and remediation (Security Hub)]<https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cloudwatch-events.html>",
+      "[Amazon Inspector: creating custom responses with EventBridge]<https://docs.aws.amazon.com/inspector/latest/user/findings-managing-automating-responses.html>",
+      "[Monitoring IAM Access Analyzer with EventBridge]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-eventbridge.html>"
+    ],
+    "remediation": null,
+    "remediation_risk": null,
+    "remediation_doc": "https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_findings_eventbridge.html"
+  },
+  "healthEventsNotRouted": {
+    "category": "O",
+    "^description": "{$COUNT} region(s) have no enabled EventBridge rule with a target that matches source aws.health on the default event bus (in the Region or, for global events, in us-east-1). AWS Health service issues, scheduled maintenance and security notifications about the account's resources then reach no team automatically and are only seen when someone opens the AWS Health Dashboard. If AWS Health events are centralised with the organizational view in another account, confirm routing there.",
+    "shortDesc": "Route AWS Health events to an operations responder",
+    "criticality": "L",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": [
+      "[Monitoring AWS Health events with Amazon EventBridge]<https://docs.aws.amazon.com/health/latest/ug/cloudwatch-events-health.html>",
+      "[Creating an EventBridge rule for AWS Health]<https://docs.aws.amazon.com/health/latest/ug/creating-event-bridge-events-rule-for-aws-health.html>"
+    ],
+    "remediation": null,
+    "remediation_risk": null,
+    "remediation_doc": "https://docs.aws.amazon.com/health/latest/ug/cloudwatch-events-health.html"
   }
 }
