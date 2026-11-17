@@ -12,6 +12,7 @@ from services.cloudwatch.drivers.CloudwatchCommon import CloudwatchCommon
 from services.cloudwatch.drivers.CloudwatchTrails import CloudwatchTrails
 from services.cloudwatch.drivers.CloudwatchAlarms import CloudwatchAlarms
 from services.cloudwatch.drivers.CloudwatchDashboards import CloudwatchDashboards
+from services.cloudwatch.drivers.CloudwatchAccount import CloudwatchAccount
 
 from utils.Tools import _pi
 
@@ -108,7 +109,9 @@ class Cloudwatch(Service):
                 'logGroupName': lg['logGroupName'],
                 'storedBytes': lg['storedBytes'],
                 'retentionInDays': lg['retentionInDays'] if 'retentionInDays' in lg else -1,
-                'dataProtectionStatus': lg['dataProtectionStatus'] if 'dataProtectionStatus' in lg else ''
+                'dataProtectionStatus': lg['dataProtectionStatus'] if 'dataProtectionStatus' in lg else '',
+                'kmsKeyId': lg.get('kmsKeyId'),
+                'arn': lg.get('arn')
             })
         
         # Recursively fetch next page if more results exist
@@ -579,6 +582,15 @@ class Cloudwatch(Service):
         
         # Collect composite alarms for service-level check
         self.getAllCompositeAlarms()
+
+        # Account / region level security posture checks (WAFS2027)
+        _pi('CloudWatch Account', self.region)
+        obj = CloudwatchAccount(self.region, lambda svc, region=None: self.ssBoto.client(
+                                    svc, config=self.bConfig, region_name=region or self.region),
+                                self.ctLogs, self.logGroups, self.alarms)
+        obj.run(self.__class__)
+        objs[f"Account::{self.region}"] = obj.getInfo()
+        del obj
         
         # Check CloudWatch Dashboards
         self.getAllDashboards()

@@ -531,5 +531,139 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatchLogsDashboards.html"
+	},
+	"cwCrossAccountObservabilityNotLinked": {
+		"category": "S",
+		"^description": "{$COUNT} region(s) have no CloudWatch cross-account observability (Observability Access Manager) link to a monitoring account and no sink. In a multi-account organization, linking source accounts to a central monitoring account lets security and operations teams see metrics, logs and traces from every account in one place, so threats and failures are not missed in accounts nobody watches. Standalone accounts are not evaluated.",
+		"shortDesc": "Link account to a CloudWatch monitoring account",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[CloudWatch cross-account observability]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Unified-Cross-Account.html>",
+			"[Link monitoring accounts with source accounts]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Unified-Cross-Account-Setup.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Unified-Cross-Account.html"
+	},
+	"cwLogGroupNotKmsEncrypted": {
+		"category": "S",
+		"^description": "{$COUNT} region(s) have audit log groups (receiving CloudTrail, VPC Flow Logs or Route 53 Resolver query logs) that are not encrypted with a customer managed AWS KMS key. Log groups are always encrypted at rest, but a customer managed key adds an independent access control layer and an auditable key usage trail for security-sensitive logs, and lets you revoke access to the data by disabling the key.",
+		"shortDesc": "Encrypt audit log groups with a KMS customer managed key",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Encrypt log data in CloudWatch Logs using AWS KMS]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/encrypt-log-data-kms.html"
+	},
+	"cwLogsNoDataProtectionPolicy": {
+		"category": "S",
+		"^description": "{$COUNT} region(s) have no CloudWatch Logs data protection policy, neither at account level nor on any log group. Data protection policies detect and mask sensitive data such as credentials, personal data and financial data that applications write to logs, reducing who can read it and alerting you when it appears.",
+		"shortDesc": "Add a CloudWatch Logs data protection policy",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Help protect sensitive log data with masking]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/mask-sensitive-log-data.html>",
+			"[Account-wide data protection policy]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/mask-sensitive-log-data-accountlevel.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/mask-sensitive-log-data.html"
+	},
+	"detectionDisableNoAlarm": {
+		"category": "S",
+		"^description": "{$COUNT} region(s) have GuardDuty, Security Hub or IAM Access Analyzer enabled but nothing alerts when they are disabled: no enabled EventBridge rule with a target matches DeleteDetector, DisableSecurityHub or DeleteAnalyzer, and no CloudTrail metric filter on those events has an alarm with actions. Attackers commonly turn off detective controls first; an alert on these API calls lets you respond before visibility is lost. Also consider alerting on GuardDuty DisassociateFromAdministratorAccount.",
+		"shortDesc": "Alert when detective security services are disabled",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Creating EventBridge rules that react to AWS API calls via CloudTrail]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-log-api-call.html>",
+			"[Creating CloudWatch alarms for CloudTrail events]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudwatch-alarms-for-cloudtrail.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-log-api-call.html"
+	},
+	"logsResourcePolicyPublic": {
+		"category": "S",
+		"^description": "{$COUNT} region(s) have a CloudWatch Logs resource policy with an Allow statement for any AWS principal (\"*\") that is not restricted by aws:SourceAccount, aws:SourceArn, aws:PrincipalOrgID or a similar condition. Any AWS account could then write to or read from the log groups the policy covers. Scope resource policies to specific service principals and source accounts or ARNs.",
+		"shortDesc": "Restrict CloudWatch Logs resource policies",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[PutResourcePolicy]<https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutResourcePolicy.html>",
+			"[Cross-service confused deputy prevention]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/Subscriptions-confused-deputy.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutResourcePolicy.html"
+	},
+	"cwAlarmActionsDisabled": {
+		"category": "S",
+		"^description": "{$COUNT} CloudWatch alarm(s) have actions configured but ActionsEnabled set to false, or have been in INSUFFICIENT_DATA for more than 7 days. Such alarms never notify anyone, so a security or operational event they were built to detect goes unnoticed.",
+		"shortDesc": "Enable alarm actions and fix alarms without data",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Using Amazon CloudWatch alarms]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html>",
+			"[EnableAlarmActions]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_EnableAlarmActions.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html"
+	},
+	"cwLogsCentralizationRuleMissing": {
+		"category": "S",
+		"^description": "The organization has no CloudWatch Logs centralization rule. Centralization rules copy log data from member accounts and regions into a central account so it is retained and searchable even if a member account is compromised. Other centralization patterns (subscription filters, Amazon Data Firehose, an S3 log archive) are also valid; review whether one is in place. Evaluated only from the management or delegated administrator account.",
+		"shortDesc": "Centralize CloudWatch Logs across the organization",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Cross-account cross-Region log centralization]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatchLogs_Centralization.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatchLogs_Centralization.html"
+	},
+	"cwNoAnomalyDetection": {
+		"category": "S",
+		"^description": "{$COUNT} region(s) have security log groups (CloudTrail, VPC Flow Logs, Resolver query logs) or CloudTrail metric filters but no CloudWatch anomaly detection on them: no metric anomaly detector on a CloudTrail metric filter metric or on AWS/WAFV2, AWS/NetworkFirewall or AWS/DDoSProtection metrics, and no CloudWatch Logs anomaly detector on a security log group. Anomaly detection surfaces unusual activity that static thresholds miss.",
+		"shortDesc": "Use anomaly detection on security metrics and logs",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Using CloudWatch anomaly detection]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Anomaly_Detection.html>",
+			"[Log anomaly detection]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/LogsAnomalyDetection.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Anomaly_Detection.html"
 	}
 }

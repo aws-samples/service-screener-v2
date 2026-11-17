@@ -219,3 +219,28 @@ class CloudwatchAlarms(Evaluator):
 
 
 
+
+    def _checkAlarmActionsDisabled(self):
+        """
+        Flag alarms that cannot notify anyone: actions are configured but
+        ActionsEnabled is false, or the alarm has been stuck in
+        INSUFFICIENT_DATA for more than 7 days (it is not evaluating its metric).
+        """
+        import datetime
+        actions = (self.alarm.get('AlarmActions') or []) + (self.alarm.get('OKActions') or []) \
+            + (self.alarm.get('InsufficientDataActions') or [])
+        if self.alarm.get('ActionsEnabled') is False and actions:
+            self.results['cwAlarmActionsDisabled'] = [-1, f'Actions disabled ({len(actions)} configured action(s) will not run)']
+            return
+
+        if self.alarm.get('StateValue') == 'INSUFFICIENT_DATA':
+            since = self.alarm.get('StateTransitionedTimestamp') or self.alarm.get('StateUpdatedTimestamp')
+            if isinstance(since, datetime.datetime):
+                if since.tzinfo is None:
+                    since = since.replace(tzinfo=datetime.timezone.utc)
+                days = (datetime.datetime.now(datetime.timezone.utc) - since).days
+                if days > 7:
+                    self.results['cwAlarmActionsDisabled'] = [-1, f'In INSUFFICIENT_DATA for {days} days']
+                    return
+
+        self.results['cwAlarmActionsDisabled'] = [1, 'Alarm actions enabled and alarm is evaluating']
