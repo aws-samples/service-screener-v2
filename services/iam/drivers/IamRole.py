@@ -1,7 +1,9 @@
 import datetime
 from dateutil.tz import tzlocal
 
+from utils import PolicyPrincipal
 from .IamCommon import IamCommon
+from . import IamPolicyHelpers
 
 class IamRole(IamCommon):
     MAXSESSIONDURATION = 3600
@@ -91,3 +93,36 @@ class IamRole(IamCommon):
             resp = self.iamClient.list_role_policies(RoleName=role)
             inlinePolicies = resp.get('PolicyNames')
             self.evaluateInlinePolicy(inlinePolicies, role, 'role')
+
+    def _trustPolicy(self):
+        return self.role.get('AssumeRolePolicyDocument')
+
+    def _checkIamRoleTrustPublicPrincipal(self):
+        """Trust policy allows sts:AssumeRole to any AWS principal without a
+        scoping condition (aws:PrincipalOrgID / PrincipalAccount / PrincipalArn
+        / SourceAccount / SourceArn ...)."""
+        doc = self._trustPolicy()
+        if PolicyPrincipal.parsePolicy(doc) is None:
+            self.results['iamRoleTrustPublicPrincipal'] = [0, 'Unable to evaluate (trust policy not readable)']
+            return
+        public = IamPolicyHelpers.trustAllowsAnyPrincipal(doc)
+        if public:
+            self.results['iamRoleTrustPublicPrincipal'] = [-1, 'Any AWS principal can assume this role: ' + ', '.join(public)]
+        else:
+            self.results['iamRoleTrustPublicPrincipal'] = [1, 'Trust policy restricted to specific principals']
+
+    def _checkOidcRoleTrustNoSubjectCondition(self):
+        """Role trusting an IAM OIDC provider must pin the token's sub claim to
+        the caller's own org/repo/project/namespace."""
+        doc = self._trustPolicy()
+        if PolicyPrincipal.parsePolicy(doc) is None:
+            return
+        findings, notes = IamPolicyHelpers.evaluateOidcTrust(doc)
+        if findings is None:
+            return
+        if findings:
+            self.results['oidcRoleTrustNoSubjectCondition'] = [-1, '<br>'.join(findings + notes)]
+        elif notes:
+            self.results['oidcRoleTrustNoSubjectCondition'] = [0, '<br>'.join(notes)]
+        else:
+            self.results['oidcRoleTrustNoSubjectCondition'] = [1, 'sub condition pins the caller identity']

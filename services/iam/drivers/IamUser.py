@@ -1,12 +1,15 @@
 import boto3, botocore
 import datetime
 from dateutil.tz import tzlocal
+from dateutil.parser import parse
 
 from .IamCommon import IamCommon
  
 class IamUser(IamCommon):
     ENUM_NO_INFO = ['not_supported', 'no_information']
-    
+    ACCESS_KEY_UNUSED_DAYS = 90
+    ACCESS_KEY_NEVER_USED_GRACE_DAYS = 7
+
     BEDROCK_API_KEY_USER_PREFIX = 'bedrockapikey'
 
     def __init__(self, user, iamClient, authDetails=None, policyDocumentMap=None, bedrockCredentialMap=None):
@@ -161,6 +164,75 @@ class IamUser(IamCommon):
                     
             if daysAccesskey >= 90 and daySinceLastLogin >= 90:
                 self.results['userNoActivity90days'] = [-1, '']
+
+    def _isCredentialReportRow(self):
+        # Placeholder rows built for Bedrock API key users missing from the
+        # credential report carry no real credential data - never evaluate them.
+        return 'user_creation_time' in self.user and self.user['user'] != '<root_account>'
+
+    @staticmethod
+    def _reportDate(value):
+        if not value or value in ('N/A', 'not_supported', 'no_information'):
+            return None
+        try:
+            dt = parse(value)
+        except (ValueError, OverflowError, TypeError):
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return dt
+
+    def _checkIamActiveKeyUnused(self):
+        """Each active access key must have been used in the last
+        ACCESS_KEY_UNUSED_DAYS days; a key never used must not be older than
+        ACCESS_KEY_NEVER_USED_GRACE_DAYS. Evaluated per key, independently of
+        console activity (userNoActivity90days covers fully dormant users)."""
+        if not self._isCredentialReportRow():
+            return
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        activeKeys = 0
+        stale = []
+        unknown = []
+        for n in ('1', '2'):
+            if self.user.get('access_key_{}_active'.format(n)) != 'true':
+                continue
+            activeKeys += 1
+            lastUsedRaw = self.user.get('access_key_{}_last_used_date'.format(n), 'N/A')
+            lastUsed = self._reportDate(lastUsedRaw)
+            created = self._reportDate(self.user.get('access_key_{}_last_rotated'.format(n)))
+            if lastUsed is not None:
+                days = (now - lastUsed).days
+                if days > self.ACCESS_KEY_UNUSED_DAYS:
+                    stale.append('access key {}: last used {} days ago'.format(n, days))
+            elif lastUsedRaw == 'N/A' and created is not None:
+                days = (now - created).days
+                if days > self.ACCESS_KEY_NEVER_USED_GRACE_DAYS:
+                    stale.append('access key {}: never used, created {} days ago'.format(n, days))
+            else:
+                unknown.append('access key {}'.format(n))
+
+        if activeKeys == 0:
+            return
+        if stale:
+            self.results['iamActiveKeyUnused'] = [-1, '<br>'.join(stale)]
+        elif unknown:
+            self.results['iamActiveKeyUnused'] = [0, 'Unable to evaluate (no usable last-used/created date for {})'.format(', '.join(unknown))]
+        else:
+            self.results['iamActiveKeyUnused'] = [1, '{} active key(s), each used in the last {} days or created in the last {} days'.format(
+                activeKeys, self.ACCESS_KEY_UNUSED_DAYS, self.ACCESS_KEY_NEVER_USED_GRACE_DAYS)]
+
+    def _checkIamUserHumanAndMachineCreds(self):
+        """A user with both a console password and an active access key mixes
+        human and programmatic credentials on one identity."""
+        if not self._isCredentialReportRow():
+            return
+
+        activeKeys = [n for n in ('1', '2') if self.user.get('access_key_{}_active'.format(n)) == 'true']
+        if self.user.get('password_enabled') == 'true' and activeKeys:
+            self.results['iamUserHumanAndMachineCreds'] = [-1, 'Console password and active access key(s) {}'.format(', '.join(activeKeys))]
+        else:
+            self.results['iamUserHumanAndMachineCreds'] = [1, 'Single credential type']
 
     def _checkBedrockLongTermApiKey(self):
         user = self.user['user']

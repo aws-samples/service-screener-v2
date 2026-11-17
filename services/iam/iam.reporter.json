@@ -805,5 +805,147 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_remove.html"
+	},
+	"iamActiveKeyUnused": {
+		"category": "S",
+		"^description": "{$COUNT} IAM user(s) have an active access key that has not been used in the last 90 days, or that was never used and is older than 7 days. Unused active keys are standing credentials that can be leaked and abused without anyone noticing. This is evaluated per key, independent of console activity. Deactivate the key, confirm nothing breaks, then delete it; prefer temporary credentials (IAM roles, IAM Identity Center) over long-term access keys.",
+		"shortDesc": "Deactivate unused active access keys",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Find unused AWS credentials]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_finding-unused.html>",
+			"[Manage access keys for IAM users]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html>",
+			"[IAM Credential Reports]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_getting-report.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html#rotating_access_keys_console"
+	},
+	"iamRoleTrustPublicPrincipal": {
+		"category": "S",
+		"^description": "{$COUNT} IAM role(s) have a trust policy that allows <b>any AWS principal</b> (\"*\" or {\"AWS\": \"*\"}) to call sts:AssumeRole without a condition that restricts the caller to your organization or accounts (aws:PrincipalOrgID, aws:PrincipalAccount, aws:PrincipalArn, aws:SourceAccount ...). Any identity in any AWS account can then assume the role and use its permissions. An sts:ExternalId condition alone is not treated as a restriction because the external ID is not a secret. Replace the wildcard principal with specific account or role ARNs, or add an aws:PrincipalOrgID condition.",
+		"shortDesc": "Restrict role trust policies that allow any principal",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[IAM role trust policies]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_terms-and-concepts.html#iam-term-trust-policy>",
+			"[AWS JSON policy elements: Principal]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html>",
+			"[Access to AWS accounts owned by third parties]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_common-scenarios_third-party.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/roles-managingrole-editing-console.html#roles-managingrole_edit-trust-policy"
+	},
+	"iamServerCertificates": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) store expired TLS server certificates in IAM, or IAM server certificates that expire within 30 days. IAM server certificates are never renewed automatically; an expired certificate attached to a load balancer or CloudFront distribution breaks TLS for clients, and leaving expired certificates in IAM risks them being deployed by mistake. Delete expired certificates and move to AWS Certificate Manager (ACM), which renews certificates automatically. Accounts with only valid IAM server certificates are reported as informational.",
+		"shortDesc": "Remove expired IAM server certificates; prefer ACM",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Manage server certificates in IAM]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_server-certs.html>",
+			"[AWS Certificate Manager]<https://docs.aws.amazon.com/acm/latest/userguide/acm-overview.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_server-certs.html#delete-server-certificate"
+	},
+	"iamUserHumanAndMachineCreds": {
+		"category": "S",
+		"^description": "{$COUNT} IAM user(s) have both a console password and an active access key. Mixing human (console) and programmatic (access key) credentials on one identity makes it hard to apply the right controls to each, widens the impact of a leaked credential, and usually means a person is using long-term keys. Give people federated access through IAM Identity Center, and give workloads IAM roles; if an IAM user must remain, keep only one credential type.",
+		"shortDesc": "Separate human and programmatic credentials",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Security best practices in IAM]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html>",
+			"[Manage access keys for IAM users]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html>",
+			"[IAM Credential Reports]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_getting-report.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html"
+	},
+	"oidcRoleTrustNoSubjectCondition": {
+		"category": "S",
+		"^description": "{$COUNT} IAM role(s) trust a multi-tenant OIDC provider (GitHub Actions, GitLab.com, HCP Terraform, Buildkite) or an Amazon EKS cluster OIDC provider without a <b>sub</b> condition that pins the caller's own organization, repository, project or namespace (for example no token.actions.githubusercontent.com:sub condition, or a value such as \"repo:*\"). Any repository or pipeline on that platform - including ones owned by other customers - or any service account in the cluster can then assume the role. Add a StringEquals/StringLike condition on &lt;provider&gt;:sub that names your org/repo (e.g. repo:my-org/my-repo:ref:refs/heads/main). Roles trusting other (single-tenant) OIDC providers without a sub condition are reported as informational.",
+		"shortDesc": "Pin the sub claim in OIDC role trust policies",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Create a role for OIDC federation]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html>",
+			"[Configuring a role for GitHub OIDC identity provider]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html#idp_oidc_Create_GitHub>",
+			"[IAM roles for service accounts (EKS)]<https://docs.aws.amazon.com/eks/latest/userguide/associate-service-account-role.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html"
+	},
+	"broadSecretReadAccess": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have customer managed (attached) or inline identity policies that allow reading every secret or parameter - secretsmanager:GetSecretValue or ssm:GetParameter* on Resource \"*\" (or an ARN wildcard covering all secrets/parameters) without a resource-tag or secret-ID condition. Any principal with such a policy can read all application credentials in the account. Scope the Resource to the specific secret/parameter ARNs (or a path prefix) the workload needs, or use attribute-based access control with resource tags. Full administrator policies are reported by the administrator-access checks instead.",
+		"shortDesc": "Scope secret and parameter read permissions",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Authentication and access control for AWS Secrets Manager]<https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-access.html>",
+			"[Restricting access to Parameter Store parameters using IAM policies]<https://docs.aws.amazon.com/systems-manager/latest/userguide/sysman-paramstore-access.html>",
+			"[Apply least-privilege permissions]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-access_examples.html"
+	},
+	"controlTowerLandingZoneDrift": {
+		"category": "S",
+		"^description": "{$COUNT} AWS Control Tower landing zone(s) are drifted or failed, or have enabled controls in FAILED or DRIFTED state. Drift means the governance baseline (OUs, accounts, SCPs, Config rules) no longer matches what Control Tower deployed, so controls you rely on may not be enforced. Review the drift in the Control Tower console and repair the landing zone or re-enable the affected controls. This is only evaluated from the Organizations management account; accounts without a landing zone are reported as informational.",
+		"shortDesc": "Resolve Control Tower landing zone / control drift",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Detect and resolve drift in AWS Control Tower]<https://docs.aws.amazon.com/controltower/latest/userguide/drift.html>",
+			"[Repair your landing zone]<https://docs.aws.amazon.com/controltower/latest/userguide/resolve-drift.html>",
+			"[Control drift]<https://docs.aws.amazon.com/controltower/latest/controlreference/governance-drift.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/controltower/latest/userguide/resolve-drift.html"
+	},
+	"healthLifecycleEventsOpen": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have open or upcoming AWS Health scheduled-change events announcing end of life, end of standard support or deprecation of engines, runtimes or platform versions you use. After that date the versions stop receiving security patches (or are force-upgraded). Review the affected resources in AWS Health and plan the upgrade before the deadline. Requires a Business, Enterprise On-Ramp or Enterprise Support plan; otherwise reported as not evaluable.",
+		"shortDesc": "Act on AWS Health end-of-life / lifecycle events",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[AWS Health planned lifecycle events]<https://docs.aws.amazon.com/health/latest/ug/aws-health-planned-lifecycle-events.html>",
+			"[DescribeEvents]<https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEvents.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/health/latest/ug/aws-health-planned-lifecycle-events.html"
 	}
 }

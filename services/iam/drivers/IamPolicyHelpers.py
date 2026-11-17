@@ -1,0 +1,246 @@
+"""
+Pure helpers used by the IAM drivers to evaluate role trust policies and
+identity policies. Kept free of boto3 so they can be unit tested directly.
+"""
+import fnmatch
+import re
+
+from utils import PolicyPrincipal
+
+WEB_IDENTITY_ACTION = 'sts:AssumeRoleWithWebIdentity'
+
+# Positive-match string operators that can restrict an OIDC "sub" claim.
+# Negated operators (StringNotEquals / StringNotLike) never restrict who can
+# assume the role. ForAnyValue/ForAllValues prefixes and the IfExists suffix are
+# tolerated because "sub" is always present in an OIDC token.
+_SUB_OPERATORS = frozenset(('stringequals', 'stringequalsignorecase', 'stringlike'))
+
+# OIDC providers whose issuer is shared by many tenants (any customer can mint a
+# token from it) or, for EKS, by every service account in the cluster. For
+# these, the audience claim does not identify the caller, so the trust policy
+# must pin "sub" to the caller's own identity (org / repo / project /
+# namespace). Each entry: (issuer host match, regex the literal prefix of the
+# sub value - everything before the first wildcard - must match). The regexes
+# require a delimiter after the identity value so that a prefix wildcard such
+# as "repo:my-org*" (which also matches an attacker's "my-org-evil") is not
+# accepted as restricted.
+_MULTI_TENANT_OIDC = (
+    # GitHub Actions: repo:<owner>/<repo>:... or customised claims such as
+    # repository_owner:<owner>:... / repository_owner_id:<id>:...
+    (lambda host: host == 'token.actions.githubusercontent.com'
+        or host.startswith('token.actions.githubusercontent.com/'),
+     re.compile(r'(^|:)(repo|repository|job_workflow_ref):[^/:*?]+/'
+                r'|(^|:)(repository_owner|repository_owner_id|repository_id|enterprise|enterprise_id):[^:*?]+:')),
+    # GitLab.com (self-managed GitLab issuers are single tenant)
+    (lambda host: host == 'gitlab.com',
+     re.compile(r'(^|:)project_path:[^/:*?]+/|(^|:)(namespace_path|namespace_id|project_id):[^:*?]+:')),
+    # HCP Terraform / Terraform Cloud
+    (lambda host: host == 'app.terraform.io',
+     re.compile(r'(^|:)organization:[^:*?]+:')),
+    # Buildkite
+    (lambda host: host == 'agent.buildkite.com',
+     re.compile(r'(^|:)organization:[^:*?]+:')),
+    # Amazon EKS IRSA: system:serviceaccount:<namespace>:<name>
+    (lambda host: bool(re.match(r'^oidc\.eks\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/id/', host)),
+     re.compile(r'^system:serviceaccount:[^:*?]+:')),
+)
+
+
+def _asList(value):
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]
+
+
+def _multiTenantRule(host):
+    for match, rule in _MULTI_TENANT_OIDC:
+        if match(host):
+            return rule
+    return None
+
+
+def oidcProvidersInStatement(statement):
+    """Return the issuer hosts of IAM OIDC providers in an Allow statement's
+    Federated principal (e.g. 'token.actions.githubusercontent.com')."""
+    if not isinstance(statement, dict) or str(statement.get('Effect', '')).lower() != 'allow':
+        return []
+    principal = statement.get('Principal')
+    if not isinstance(principal, dict):
+        return []
+    hosts = []
+    for fed in _asList(principal.get('Federated')):
+        if isinstance(fed, str) and ':oidc-provider/' in fed:
+            hosts.append(fed.split(':oidc-provider/', 1)[1])
+    return hosts
+
+
+def subConditionValues(condition, host):
+    """Values of positive-match conditions on '<host>:sub' (case-insensitive)."""
+    values = []
+    if not isinstance(condition, dict):
+        return values
+    target = (host + ':sub').lower()
+    for operator, block in condition.items():
+        if not isinstance(operator, str) or not isinstance(block, dict):
+            continue
+        op = operator.lower()
+        for prefix in ('foranyvalue:', 'forallvalues:'):
+            if op.startswith(prefix):
+                op = op[len(prefix):]
+        if op.endswith('ifexists'):
+            op = op[:-len('ifexists')]
+        if op not in _SUB_OPERATORS:
+            continue
+        for key, value in block.items():
+            if str(key).lower() == target:
+                values.extend(v for v in _asList(value) if isinstance(v, str))
+    return values
+
+
+def subValueIsUnrestricted(value, rule):
+    """True if a sub value lets callers outside the intended identity match.
+    The literal part before the first wildcard must bind the caller's own
+    org / repo / project / namespace (rule). A value without wildcards is an
+    exact match and therefore restricted."""
+    if '*' not in value and '?' not in value:
+        return value == ''
+    literal = re.split(r'[*?]', value, maxsplit=1)[0]
+    return not rule.search(literal)
+
+
+def evaluateOidcTrust(trustDoc):
+    """
+    Evaluate a role trust policy for web-identity (OIDC) federation.
+
+    Returns (findings, notes):
+      findings: list of strings for statements trusting a multi-tenant / EKS
+                OIDC provider without a sub condition, or with a sub value
+                that does not pin the caller's identity.
+      notes:    list of strings for statements trusting other (single tenant)
+                OIDC providers without a sub condition - audience-bound only,
+                reported as informational.
+    Returns (None, None) when the policy has no OIDC web-identity trust.
+    """
+    findings, notes = [], []
+    found = False
+    for stmt in PolicyPrincipal.iterStatements(trustDoc):
+        hosts = oidcProvidersInStatement(stmt)
+        if not hosts or not PolicyPrincipal.statementAllowsAction(stmt, [WEB_IDENTITY_ACTION]):
+            continue
+        for host in hosts:
+            found = True
+            values = subConditionValues(stmt.get('Condition'), host)
+            rule = _multiTenantRule(host)
+            if rule is None:
+                if not values or all(set(v) <= {'*', '?'} for v in values):
+                    notes.append('{}: no {}:sub condition (audience-bound only)'.format(host, host))
+                continue
+            if not values:
+                findings.append('{}: no {}:sub condition'.format(host, host))
+                continue
+            loose = [v for v in values if subValueIsUnrestricted(v, rule)]
+            if loose:
+                findings.append('{}: sub allows any identity ({})'.format(host, ', '.join(loose)))
+    if not found:
+        return None, None
+    return findings, notes
+
+
+TRUST_ASSUME_ACTIONS = ['sts:AssumeRole']
+
+
+def trustAllowsAnyPrincipal(trustDoc):
+    """Statements (as short descriptions) of a role trust policy that allow
+    sts:AssumeRole to any AWS principal ("*", {"AWS": "*"}, list forms,
+    NotPrincipal) without a scoping condition (aws:PrincipalOrgID,
+    aws:PrincipalAccount, aws:PrincipalArn, aws:SourceAccount, ...).
+    sts:ExternalId alone is NOT treated as scoping: AWS documents the
+    external ID as not being a secret."""
+    out = []
+    for idx, stmt in enumerate(PolicyPrincipal.iterStatements(trustDoc)):
+        if not PolicyPrincipal.statementIsPublic(stmt):
+            continue
+        if not PolicyPrincipal.statementAllowsAction(stmt, TRUST_ASSUME_ACTIONS):
+            continue
+        sid = stmt.get('Sid') or '#{}'.format(idx + 1)
+        out.append('statement {}'.format(sid))
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# Broad secret read access in identity policies
+# --------------------------------------------------------------------------- #
+SECRET_READ_ACTIONS = {
+    'secretsmanager:GetSecretValue': ('secretsmanager', 'secret:ss-probe-AbCdEf'),
+    'secretsmanager:BatchGetSecretValue': ('secretsmanager', 'secret:ss-probe-AbCdEf'),
+    'ssm:GetParameter': ('ssm', 'parameter/ss-probe'),
+    'ssm:GetParameters': ('ssm', 'parameter/ss-probe'),
+    'ssm:GetParametersByPath': ('ssm', 'parameter/ss-probe'),
+    'ssm:GetParameterHistory': ('ssm', 'parameter/ss-probe'),
+}
+
+_SCOPING_OPERATORS = frozenset(('stringequals', 'stringequalsignorecase', 'stringlike', 'arnequals', 'arnlike'))
+
+
+def _resourcePatternMatchesAny(pattern, service, resourcePart):
+    """True if an IAM Resource pattern covers an arbitrary resource of this
+    service in any region/account (region/account segments are ignored, so a
+    pattern scoped to the own account still counts as 'all secrets')."""
+    if not isinstance(pattern, str):
+        return False
+    p = pattern.lower()
+    if p == '*':
+        return True
+    parts = p.split(':', 5)
+    if len(parts) < 6 or parts[0] != 'arn':
+        return fnmatch.fnmatchcase('arn:aws:{}:r:a:{}'.format(service, resourcePart), p)
+    return fnmatch.fnmatchcase(service, parts[2]) and fnmatch.fnmatchcase(resourcePart.lower(), parts[5])
+
+
+def _conditionScopesResource(condition):
+    """True if a Condition limits which secrets/parameters can be read
+    (resource tags or explicit secret IDs) with a concrete value."""
+    if not isinstance(condition, dict):
+        return False
+    for operator, block in condition.items():
+        if not isinstance(operator, str) or not isinstance(block, dict):
+            continue
+        op = operator.lower()
+        if op.startswith('forallvalues:') or op.endswith('ifexists'):
+            continue
+        if op.startswith('foranyvalue:'):
+            op = op[len('foranyvalue:'):]
+        if op not in _SCOPING_OPERATORS:
+            continue
+        for key, value in block.items():
+            k = str(key).lower()
+            if 'resourcetag/' in k or k in ('secretsmanager:secretid', 'secretsmanager:resourcetag'):
+                vals = _asList(value)
+                if vals and not any(isinstance(v, str) and set(v) <= {'*', '?'} for v in vals):
+                    return True
+    return False
+
+
+def broadSecretReadActions(policyDoc):
+    """Secret-read actions an identity policy allows on all secrets /
+    parameters. Statements granting Action "*" (full administrator) are
+    skipped - those are reported by the administrator-access checks."""
+    found = set()
+    for stmt in PolicyPrincipal.iterStatements(policyDoc):
+        if str(stmt.get('Effect', '')).lower() != 'allow':
+            continue
+        if 'Action' in stmt and any(a == '*' for a in _asList(stmt.get('Action'))):
+            continue
+        if _conditionScopesResource(stmt.get('Condition')):
+            continue
+        for action, (service, resourcePart) in SECRET_READ_ACTIONS.items():
+            if not PolicyPrincipal.statementAllowsAction(stmt, [action]):
+                continue
+            if 'NotResource' in stmt:
+                excluded = _asList(stmt.get('NotResource'))
+                broad = not any(_resourcePatternMatchesAny(p, service, resourcePart) for p in excluded)
+            else:
+                broad = any(_resourcePatternMatchesAny(p, service, resourcePart) for p in _asList(stmt.get('Resource')))
+            if broad:
+                found.add(action)
+    return sorted(found)

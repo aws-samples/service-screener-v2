@@ -2,12 +2,14 @@ import botocore
 from botocore.config import Config as bConfig
 
 import json
+import re
 from datetime import datetime, timedelta
 from dateutil.tz import tzlocal
 
 from utils.Config import Config
 from utils.Tools import _warn, _pr
 from .IamCommon import IamCommon
+from . import IamPolicyHelpers
  
 class IamAccount(IamCommon):
     PASSWORD_POLICY_MIN_SCORE = 4
@@ -28,6 +30,7 @@ class IamAccount(IamCommon):
         self.curClient = awsClients['curClient']
         self.ctClient = awsClients['ctClient']
         self.backupClient = awsClients['backupClient']
+        self.healthClient = awsClients.get('healthClient')
         
         self.noOfUsers = len(users)
         self.roles = roles
@@ -51,9 +54,11 @@ class IamAccount(IamCommon):
         self._policyDocumentsCache = dict(self._policyDocumentMap)
 
         # Check if AWS Organization is enabled
+        self.orgInfo = None
         try:
             resp = self.orgClient.describe_organization()
             self.organizationIsEnabled = True
+            self.orgInfo = resp.get('Organization', {})
         except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code'] 
 
@@ -823,3 +828,221 @@ class IamAccount(IamCommon):
         except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']
             print(f'Error checking SCP best practices: {ecode}')
+
+    SERVER_CERT_EXPIRY_WARN_DAYS = 30
+
+    def _checkIamServerCertificates(self):
+        """IAM server certificates are renewed manually: flag expired ones and
+        ones expiring within SERVER_CERT_EXPIRY_WARN_DAYS; any other IAM
+        server certificate is informational (prefer ACM)."""
+        certs = []
+        try:
+            paginator = self.iamClient.get_paginator('list_server_certificates')
+            for page in paginator.paginate():
+                certs.extend(page.get('ServerCertificateMetadataList', []))
+        except botocore.exceptions.ClientError as e:
+            self.results['iamServerCertificates'] = [0, 'Unable to evaluate ({})'.format(e.response['Error']['Code'])]
+            return
+
+        if not certs:
+            self.results['iamServerCertificates'] = [1, 'No IAM server certificates']
+            return
+
+        now = datetime.now(tzlocal())
+        expired, expiring, others = [], [], []
+        for cert in certs:
+            name = cert.get('ServerCertificateName', cert.get('Arn', '?'))
+            exp = cert.get('Expiration')
+            if exp is None:
+                others.append('{} (no expiration date)'.format(name))
+                continue
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=tzlocal())
+            days = (exp - now).days
+            if exp <= now:
+                expired.append('{} (expired {})'.format(name, exp.strftime('%Y-%m-%d')))
+            elif days < self.SERVER_CERT_EXPIRY_WARN_DAYS:
+                expiring.append('{} (expires in {} days)'.format(name, days))
+            else:
+                others.append('{} (expires {})'.format(name, exp.strftime('%Y-%m-%d')))
+
+        if expired or expiring:
+            self.results['iamServerCertificates'] = [-1, '<br>'.join(expired + expiring)]
+        else:
+            self.results['iamServerCertificates'] = [0, 'IAM server certificate(s) need manual renewal; consider ACM: ' + '<br>'.join(others)]
+
+    def _checkBroadSecretReadAccess(self):
+        """Customer managed (attached) or inline identity policies that allow
+        reading every secret / SSM parameter (Resource "*" or an ARN wildcard
+        covering all secrets/parameters, without a resource-tag or secret-ID
+        condition). Full-administrator statements (Action "*") are left to the
+        administrator-access checks."""
+        if not self._authDetails:
+            self.results['broadSecretReadAccess'] = [0, 'Unable to evaluate (authorization details not available)']
+            return
+
+        offenders = []
+
+        for policy in self._authDetails.get('policies', []):
+            arn = policy.get('Arn', '')
+            if ':iam::aws:policy/' in arn:
+                continue
+            if policy.get('AttachmentCount', 0) == 0:
+                continue
+            doc = self._policyDocumentMap.get(arn)
+            if doc is None:
+                for ver in policy.get('PolicyVersionList', []):
+                    if ver.get('IsDefaultVersion'):
+                        doc = ver.get('Document')
+            actions = IamPolicyHelpers.broadSecretReadActions(doc)
+            if actions:
+                offenders.append('managed policy {} ({})'.format(policy.get('PolicyName', arn), ', '.join(actions)))
+
+        inlineSources = (
+            ('users', 'UserName', 'UserPolicyList', 'user'),
+            ('groups', 'GroupName', 'GroupPolicyList', 'group'),
+            ('roles', 'RoleName', 'RolePolicyList', 'role'),
+        )
+        for key, nameField, listField, label in inlineSources:
+            for entity in self._authDetails.get(key, []):
+                if key == 'roles' and str(entity.get('Path', '')).startswith('/aws-service-role/'):
+                    continue
+                for p in entity.get(listField, []) or []:
+                    actions = IamPolicyHelpers.broadSecretReadActions(p.get('PolicyDocument'))
+                    if actions:
+                        offenders.append('{} {} inline policy {} ({})'.format(
+                            label, entity.get(nameField, '?'), p.get('PolicyName', '?'), ', '.join(actions)))
+
+        if offenders:
+            self.results['broadSecretReadAccess'] = [-1, '<br>'.join(offenders)]
+        else:
+            self.results['broadSecretReadAccess'] = [1, 'No identity policy grants secret reads on all resources']
+
+    def _isOrgManagementAccount(self):
+        if not self.organizationIsEnabled or not self.orgInfo:
+            return False
+        account = (Config.get('stsInfo', {}) or {}).get('Account')
+        return bool(account) and account == self.orgInfo.get('MasterAccountId')
+
+    def _controlTowerClient(self, region):
+        return self.ssBoto.client('controltower', config=bConfig(region_name=region))
+
+    def _checkControlTowerLandingZoneDrift(self):
+        """AWS Control Tower landing zone (and its enabled controls) must be in
+        sync. Only evaluable from the Organizations management account (where
+        Control Tower runs). No landing zone is a design choice - INFO only."""
+        if not self.organizationIsEnabled:
+            self.results['controlTowerLandingZoneDrift'] = [0, 'No AWS Organization - AWS Control Tower not in use']
+            return
+        if not self._isOrgManagementAccount():
+            self.results['controlTowerLandingZoneDrift'] = [0, 'Not evaluable from member account']
+            return
+
+        regions = [r for r in (Config.get('REGIONS_SELECTED') or []) if r != 'GLOBAL'] or ['us-east-1']
+        landingZoneArn = None
+        homeClient = None
+        errors = []
+        for region in regions:
+            client = self._controlTowerClient(region)
+            try:
+                arns = []
+                paginator = client.get_paginator('list_landing_zones')
+                for page in paginator.paginate():
+                    arns.extend(lz.get('arn') for lz in page.get('landingZones', []) if lz.get('arn'))
+            except botocore.exceptions.ClientError as e:
+                errors.append('{}: {}'.format(region, e.response['Error']['Code']))
+                continue
+            except botocore.exceptions.EndpointConnectionError:
+                continue
+            if arns:
+                landingZoneArn = arns[0]
+                parts = landingZoneArn.split(':')
+                lzRegion = parts[3] if len(parts) > 3 and parts[3] else region
+                homeClient = client if lzRegion == region else self._controlTowerClient(lzRegion)
+                break
+
+        if landingZoneArn is None:
+            if errors:
+                self.results['controlTowerLandingZoneDrift'] = [0, 'Unable to evaluate ({})'.format(', '.join(errors))]
+            else:
+                self.results['controlTowerLandingZoneDrift'] = [0, 'No AWS Control Tower landing zone found in scanned region(s): {}'.format(', '.join(regions))]
+            return
+
+        issues = []
+        try:
+            lz = homeClient.get_landing_zone(landingZoneIdentifier=landingZoneArn).get('landingZone', {})
+        except botocore.exceptions.ClientError as e:
+            self.results['controlTowerLandingZoneDrift'] = [0, 'Unable to evaluate ({})'.format(e.response['Error']['Code'])]
+            return
+        status = lz.get('status')
+        drift = (lz.get('driftStatus') or {}).get('status')
+        if status == 'FAILED':
+            issues.append('Landing zone status FAILED')
+        if drift == 'DRIFTED':
+            issues.append('Landing zone drifted')
+
+        controlNotes = []
+        for flt, label in (({'statuses': ['FAILED']}, 'failed'), ({'driftStatuses': ['DRIFTED']}, 'drifted')):
+            try:
+                bad = []
+                paginator = homeClient.get_paginator('list_enabled_controls')
+                for page in paginator.paginate(filter=flt):
+                    bad.extend(page.get('enabledControls', []))
+            except botocore.exceptions.ClientError as e:
+                controlNotes.append('{} controls: unable to evaluate ({})'.format(label, e.response['Error']['Code']))
+                continue
+            if bad:
+                names = sorted({str(c.get('controlIdentifier', '?')).split('/')[-1] for c in bad})
+                issues.append('{} enabled control(s) {}: {}'.format(
+                    len(bad), label, ', '.join(names[:10]) + (' ...' if len(names) > 10 else '')))
+
+        if issues:
+            self.results['controlTowerLandingZoneDrift'] = [-1, '<br>'.join(issues + controlNotes)]
+        elif controlNotes:
+            self.results['controlTowerLandingZoneDrift'] = [0, 'Landing zone {} / {}; {}'.format(status, drift, '; '.join(controlNotes))]
+        else:
+            self.results['controlTowerLandingZoneDrift'] = [1, 'Landing zone {} / {}'.format(status, drift or 'drift status n/a')]
+
+    # Scheduled-change event type codes that announce end of life / end of
+    # support / deprecation (no more security patches). Other scheduled
+    # changes (maintenance windows, instance retirement) are not security
+    # findings and are ignored here.
+    HEALTH_LIFECYCLE_EVENT_RE = re.compile(
+        r'LIFECYCLE|END_OF_(LIFE|SUPPORT|STANDARD_SUPPORT|EXTENDED_SUPPORT)|(^|_)EOL(_|$)|DEPRECAT', re.I)
+
+    def _healthClientForPartition(self):
+        if self.healthClient is not None:
+            return self.healthClient
+        arn = (Config.get('stsInfo', {}) or {}).get('Arn', '')
+        parts = arn.split(':')
+        partition = parts[1] if len(parts) > 1 and parts[1] else 'aws'
+        region = {'aws-cn': 'cn-northwest-1', 'aws-us-gov': 'us-gov-west-1'}.get(partition, 'us-east-1')
+        self.healthClient = self.ssBoto.client('health', config=bConfig(region_name=region))
+        return self.healthClient
+
+    def _checkHealthLifecycleEventsOpen(self):
+        """Open or upcoming AWS Health scheduled-change events announcing end of
+        life / end of support of engines, runtimes or platforms in use."""
+        client = self._healthClientForPartition()
+        events = []
+        try:
+            paginator = client.get_paginator('describe_events')
+            for page in paginator.paginate(filter={
+                'eventTypeCategories': ['scheduledChange'],
+                'eventStatusCodes': ['open', 'upcoming'],
+            }):
+                events.extend(page.get('events', []))
+        except botocore.exceptions.ClientError as e:
+            self.results['healthLifecycleEventsOpen'] = [0, 'Unable to evaluate ({})'.format(e.response['Error']['Code'])]
+            return
+
+        lifecycle = [ev for ev in events if self.HEALTH_LIFECYCLE_EVENT_RE.search(ev.get('eventTypeCode') or '')]
+        if not lifecycle:
+            self.results['healthLifecycleEventsOpen'] = [1, 'No open/upcoming lifecycle events ({} other scheduled change(s) ignored)'.format(len(events))]
+            return
+
+        summary = {}
+        for ev in lifecycle:
+            k = '{} ({})'.format(ev.get('eventTypeCode', '?'), ev.get('region', 'global'))
+            summary[k] = summary.get(k, 0) + 1
+        self.results['healthLifecycleEventsOpen'] = [-1, '<br>'.join('{} x{}'.format(k, v) for k, v in sorted(summary.items()))]
