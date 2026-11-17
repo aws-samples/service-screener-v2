@@ -79,6 +79,38 @@ def test_identity_pool_guest_role_service_wildcard_then_guest_disabled(emu, uid)
         _silent(iam.delete_role, RoleName=role)
 
 
+def test_identity_pool_guest_role_sync_all_identities_then_per_identity(emu, uid):
+    """cognito-sync:* on every identity of the pool is flagged; the per-identity
+    form recommended by the Cognito 'IAM roles' guide
+    (identitypool/${aud}/identity/${sub}/*) is not."""
+    ci, iam = emu.client('cognito-identity'), emu.client('iam')
+    role = f'ss-guest3-{uid}'
+    arn = iam.create_role(RoleName=role, AssumeRolePolicyDocument=TRUST)['Role']['Arn']
+    ipid = ci.create_identity_pool(IdentityPoolName=f'ss_ip3_{uid}',
+                                   AllowUnauthenticatedIdentities=True)['IdentityPoolId']
+    base = 'arn:aws:cognito-sync:us-east-1:000000000000:identitypool/${cognito-identity.amazonaws.com:aud}'
+
+    def _put(resource):
+        iam.put_role_policy(RoleName=role, PolicyName='sync', PolicyDocument=json.dumps({
+            'Version': '2012-10-17', 'Statement': [{
+                'Effect': 'Allow', 'Action': ['cognito-sync:*'], 'Resource': [resource]}]}))
+    try:
+        def misconfigure():
+            _put(base + '/*')
+            ci.set_identity_pool_roles(IdentityPoolId=ipid, Roles={'unauthenticated': arn})
+
+        def fix():
+            _put(base + '/identity/${cognito-identity.amazonaws.com:sub}/*')
+
+        before, after = assertFlagFixCycle(emu, 'cognito', 'cognitoIdentityPoolGuestRoleBroad', ipid,
+                                           misconfigure, fix)
+        assert list(after.values()) == [1]
+    finally:
+        _silent(ci.delete_identity_pool, IdentityPoolId=ipid)
+        _silent(iam.delete_role_policy, RoleName=role, PolicyName='sync')
+        _silent(iam.delete_role, RoleName=role)
+
+
 # --------------------------------------------------------------------------- #
 # cognitoIdentityPoolNoRoleMapping
 # --------------------------------------------------------------------------- #

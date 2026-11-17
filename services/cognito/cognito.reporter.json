@@ -595,7 +595,7 @@
 	},
 	"cognitoIdentityPoolGuestRoleBroad": {
 		"category": "S",
-		"^description": "{$COUNT} Cognito identity pool(s) allow unauthenticated (guest) identities and map them to an IAM role with broad permissions (Action '*' or 'service:*', NotAction, or an AWS managed AdministratorAccess / PowerUserAccess / *FullAccess policy). Anyone on the internet can obtain temporary AWS credentials for this role without signing in.",
+		"^description": "{$COUNT} Cognito identity pool(s) allow unauthenticated (guest) identities and map them to an IAM role with broad permissions (Action '*' or 'service:*' or NotAction on all resources or on resources shared by every guest, or an AWS managed AdministratorAccess / PowerUserAccess / *FullAccess policy). Wildcards confined to the caller's own identity with ${cognito-identity.amazonaws.com:sub} are not reported. Anyone on the internet can obtain temporary AWS credentials for this role without signing in.",
 		"shortDesc": "Scope the identity pool guest role to least privilege or disable guest access",
 		"criticality": "H",
 		"downtime": 0,

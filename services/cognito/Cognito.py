@@ -351,7 +351,10 @@ class Cognito(Service):
                 except Exception as e:
                     print(f"Error processing Cognito identity pool {ipool.get('IdentityPoolId')}: {e}")
 
-        if self._wants(self.ACCOUNT_METHODS):
+        ## Only emit the region-level silo result when there is something to say
+        ## (user pools exist, or their listing failed) - avoids INFO noise in
+        ## every empty region.
+        if self._wants(self.ACCOUNT_METHODS) and (pools or self._skippedPools or self._listPoolsError):
             try:
                 from utils.Checkpoint import Checkpoint
                 acct = (Config.get('stsInfo', {}) or {}).get('Account', 'default')
@@ -418,6 +421,13 @@ class Cognito(Service):
                     out.append(detail)
         except botocore.exceptions.ClientError as e:
             self._logClientError('list_identity_pools', e)
+            ## Do not let a failed listing look like "no identity pools": record a
+            ## region-level placeholder so both identity-pool checks report
+            ## 'Unable to evaluate (<code>)'.
+            out.append({'IdentityPoolId': f'ListIdentityPools::{self.region}',
+                        'IdentityPoolName': 'ListIdentityPools',
+                        '_resourceName': f'ListIdentityPools::{self.region}',
+                        '_describeError': self._errCode(e)})
         except botocore.exceptions.EndpointConnectionError as e:
             print(f"Cognito identity pools not available in region {self.region}: {e}")
         return out
@@ -500,7 +510,12 @@ class Cognito(Service):
         me = (Config.get('stsInfo', {}) or {}).get('Account')
         parts = roleArn.split(':')
         acct = parts[4] if len(parts) >= 5 else ''
-        if me and acct and acct != me:
+        if not me:
+            ## Cannot tell whether the role is local; get_role by bare name could
+            ## evaluate an unrelated same-named role in the scanning account.
+            res['error'] = 'CallerAccountUnknown'
+            return res
+        if acct and acct != me:
             res['crossAccount'] = True
             return res
         try:

@@ -157,6 +157,95 @@ def test_get_identity_pool_roles_denied_is_unable_to_evaluate(svc):
         assert _run(CognitoIdentityPool(dict(detail)), m) == [0, 'Unable to evaluate (NotAuthorizedException)']
 
 
+SYNC_PER_IDENTITY = ('{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["cognito-sync:*"],'
+                     '"Resource":["arn:aws:cognito-sync:us-east-1:111111111111:identitypool/'
+                     '${cognito-identity.amazonaws.com:aud}/identity/${cognito-identity.amazonaws.com:sub}/*"]}]}')
+SYNC_ALL_IDENTITIES = ('{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["cognito-sync:*"],'
+                       '"Resource":["arn:aws:cognito-sync:us-east-1:111111111111:identitypool/'
+                       '${cognito-identity.amazonaws.com:aud}/*"]}]}')
+
+
+def test_guest_role_documented_per_identity_sync_policy_not_flagged(svc):
+    """The Cognito 'IAM roles' guide grants cognito-sync:* on
+    identitypool/${aud}/identity/${sub}/* - least privilege, must not be -1.
+    The same wildcard on the whole pool (every identity's data) is -1."""
+    m = '_checkCognitoIdentityPoolGuestRoleBroad'
+    with Stubber(svc.iamClient) as st:
+        _stubRole(st, inline=('sync', SYNC_ALL_IDENTITIES))
+        bad = svc._fetchRoleEvaluation(ROLE_ARN)
+    with Stubber(svc.iamClient) as st:
+        _stubRole(st, inline=('sync', SYNC_PER_IDENTITY))
+        good = svc._fetchRoleEvaluation(ROLE_ARN)
+    r = _run(CognitoIdentityPool(_guestPool(_unauthRole=bad)), m)
+    assert r[0] == -1 and 'shared by all guests' in r[1]
+    assert _run(CognitoIdentityPool(_guestPool(_unauthRole=good)), m)[0] == 1
+
+
+def test_policy_scope_rules():
+    f = CognitoIdentityPool.policyBroadReasons
+    sub = '${cognito-identity.amazonaws.com:sub}'
+    # s3:* on a per-identity prefix: documented pattern -> not broad
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:*',
+                             'Resource': f'arn:aws:s3:::b/{sub}/*'}]}) == []
+    # dynamodb:* with LeadingKeys = sub on '*': per-identity -> not broad
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': 'dynamodb:*', 'Resource': '*',
+                             'Condition': {'ForAllValues:StringEquals': {'dynamodb:LeadingKeys': [sub]}}}]}) == []
+    # negated condition does not confine the caller
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': 'dynamodb:*', 'Resource': '*',
+                             'Condition': {'StringNotEquals': {'dynamodb:LeadingKeys': [sub]}}}]})
+    # arn:aws:s3:::* and NotResource are unscoped
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:*', 'Resource': 'arn:aws:s3:::*'}]}) == ["Action 's3:*'"]
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:*', 'NotResource': 'arn:aws:s3:::x'}]}) == ["Action 's3:*'"]
+    # partial wildcard is not broad
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:Get*', 'Resource': '*'}]}) == []
+
+
+def test_guest_role_allow_all_narrowed_by_deny_not_action(svc):
+    m = '_checkCognitoIdentityPoolGuestRoleBroad'
+    narrowed = ('{"Statement":[{"Effect":"Allow","Action":"*","Resource":"*"},'
+                '{"Effect":"Deny","NotAction":["mobileanalytics:PutEvents","s3:GetObject"],"Resource":"*"}]}')
+    stillWide = ('{"Statement":[{"Effect":"Allow","Action":"*","Resource":"*"},'
+                 '{"Effect":"Deny","NotAction":["s3:*"],"Resource":"*"}]}')
+    conditional = ('{"Statement":[{"Effect":"Allow","Action":"*","Resource":"*"},'
+                   '{"Effect":"Deny","NotAction":["s3:GetObject"],"Resource":"*",'
+                   '"Condition":{"Bool":{"aws:SecureTransport":"false"}}}]}')
+    results = []
+    for doc in (narrowed, stillWide, conditional):
+        with Stubber(svc.iamClient) as st:
+            _stubRole(st, inline=('p', doc))
+            results.append(_run(CognitoIdentityPool(_guestPool(_unauthRole=svc._fetchRoleEvaluation(ROLE_ARN))), m)[0])
+    assert results == [1, -1, -1]
+
+
+def test_legacy_console_default_guest_role_message(svc):
+    legacy = ('{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["mobileanalytics:PutEvents",'
+              '"cognito-sync:*"],"Resource":["*"]}]}')
+    arn = f'arn:aws:iam::{ACCOUNT}:role/Cognito_appUnauth_Role'
+    role = {'roleArn': arn, 'roleName': 'Cognito_appUnauth_Role', 'crossAccount': False, 'error': None,
+            'policyErrors': [], 'boundary': None,
+            'policies': [{'name': 'oneClick_Cognito_appUnauth_Role_1', 'arn': None, 'managedByAws': False,
+                          'document': __import__('json').loads(legacy)}]}
+    r = _run(CognitoIdentityPool(_guestPool(_unauthRole=role)), '_checkCognitoIdentityPoolGuestRoleBroad')
+    assert r[0] == -1 and 'legacy console-default guest role' in r[1]
+
+
+def test_unknown_caller_account_is_unable_to_evaluate(svc):
+    Config.set('stsInfo', {})
+    role = svc._fetchRoleEvaluation(ROLE_ARN)   # no IAM call may be made
+    assert _run(CognitoIdentityPool(_guestPool(_unauthRole=role)),
+                '_checkCognitoIdentityPoolGuestRoleBroad') == [0, 'Unable to evaluate (CallerAccountUnknown)']
+
+
+def test_list_identity_pools_denied_records_unable_to_evaluate(svc):
+    svc.registerItems = lambda *a, **kw: a[1]
+    with Stubber(svc.identityClient) as st:
+        st.add_client_error('list_identity_pools', 'AccessDeniedException', expected_params={'MaxResults': 60})
+        out = svc.getIdentityPools()
+    assert len(out) == 1
+    for m in ('_checkCognitoIdentityPoolGuestRoleBroad', '_checkCognitoIdentityPoolNoRoleMapping'):
+        assert _run(CognitoIdentityPool(dict(out[0])), m) == [0, 'Unable to evaluate (AccessDeniedException)']
+
+
 # --------------------------------------------------------------------------- #
 # cognitoIdentityPoolNoRoleMapping
 # --------------------------------------------------------------------------- #
