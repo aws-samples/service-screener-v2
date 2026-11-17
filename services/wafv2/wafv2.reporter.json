@@ -716,7 +716,7 @@
 	},
 	"fmsNoNetworkPolicies": {
 		"category": "S",
-		"^description": "This account is an AWS Firewall Manager administrator but has no Firewall Manager policies in {$COUNT} region(s). WAF, Shield Advanced, security group, Network Firewall and DNS Firewall baselines are therefore not centrally enforced on new accounts and resources in the organization. Only evaluated from the Firewall Manager administrator account; other mechanisms (CloudFormation StackSets, Landing Zone Accelerator) are valid alternatives.",
+		"^description": "This account is an AWS Firewall Manager administrator but has no Firewall Manager policies in {$COUNT} region(s). WAF, Shield Advanced, security group, Network Firewall and DNS Firewall baselines are therefore not centrally enforced on new accounts and resources in the organization. Only evaluated when the scanned account is confirmed as the Firewall Manager administrator (other accounts, and regions outside the administrator's region scope, are reported as informational); other mechanisms (CloudFormation StackSets, Landing Zone Accelerator) are valid alternatives.",
 		"shortDesc": "Define Firewall Manager policies to enforce network protections organization-wide",
 		"criticality": "L",
 		"downtime": 0,

@@ -6,7 +6,9 @@ shield.enable_proactive_engagement, associate_proactive_engagement_details and
 enable_application_layer_automatic_response, and cannot cancel a Shield
 subscription, so the FIX state of shieldAdvancedNoProactiveEngagement /
 shieldAutoL7MitigationDisabled and the not-subscribed / AccessDenied paths
-cannot be produced there. Real boto3 clients (real API shapes) are wrapped by
+cannot be produced there. For fmsNoNetworkPolicies, the "another account is
+the FMS administrator" state cannot be reverted in the single-account emulator
+(only the admin itself may disassociate), so it is tested here. Real boto3 clients (real API shapes) are wrapped by
 Stubber; no network call is made (Stubber intercepts before sending).
 """
 import os
@@ -183,39 +185,166 @@ def test_l7_flag_fix(session, arn):
 # --------------------------------------------------------------------------- #
 # fmsNoNetworkPolicies
 # --------------------------------------------------------------------------- #
-def _fms(session, admin=None, listResp=None, listErr=None):
+def _fms(session, admin=None, listResp=None, listErr=None, adminErr='ResourceNotFoundException',
+         scope=None, acct=ACCT, region='us-east-1'):
     fms, st = _client(session, 'fms')
     if admin:
         st.add_response('get_admin_account', admin)
     else:
-        st.add_client_error('get_admin_account', 'ResourceNotFoundException')
+        st.add_client_error('get_admin_account', adminErr)
     if listErr:
         st.add_client_error('list_policies', listErr)
     elif listResp is not None:
         st.add_response('list_policies', listResp)
+    if scope is not None:
+        st.add_response('get_admin_scope', {'AdminScope': {'RegionScope': scope}}, {'AdminAccount': acct})
     with st:
-        r = _run(Wafv2Fms(fms, 'us-east-1', ACCT), '_checkFmsNoNetworkPolicies')
+        r = _run(Wafv2Fms(fms, region, acct), '_checkFmsNoNetworkPolicies')
     return r['fmsNoNetworkPolicies']
+
+
+_FMS_POLICY = {'PolicyList': [{
+    'PolicyArn': f'arn:aws:fms:us-east-1:{ACCT}:policy/{FMS_PID}', 'PolicyId': FMS_PID, 'PolicyName': 'waf',
+    'ResourceType': 'AWS::ElasticLoadBalancingV2::LoadBalancer', 'SecurityServiceType': 'WAFV2'}]}
 
 
 def test_fms_flag_fix(session):
     admin = {'AdminAccount': ACCT, 'RoleStatus': 'READY'}
-    assert _fms(session, admin, {'PolicyList': []})[0] == -1
-    assert _fms(session, admin, {'PolicyList': [{
-        'PolicyArn': f'arn:aws:fms:us-east-1:{ACCT}:policy/{FMS_PID}', 'PolicyId': FMS_PID, 'PolicyName': 'waf',
-        'ResourceType': 'AWS::ElasticLoadBalancingV2::LoadBalancer', 'SecurityServiceType': 'WAFV2'}]})[0] == 1
+    allRegions = {'AllRegionsEnabled': True}
+    assert _fms(session, admin, {'PolicyList': []}, scope=allRegions)[0] == -1
+    assert _fms(session, admin, _FMS_POLICY)[0] == 1
 
 
-def test_fms_member_account_not_evaluable(session):
-    res = _fms(session, {'AdminAccount': '999999999999', 'RoleStatus': 'READY'},
-               listErr='AccessDeniedException')
+def test_fms_other_account_is_admin_not_evaluable(session):
+    """Review finding: another account is the FMS admin and list_policies
+    succeeds with an empty list (e.g. management account) -> INFO, not FAIL."""
+    other = {'AdminAccount': '999999999999', 'RoleStatus': 'READY'}
+    assert _fms(session, other, {'PolicyList': []}) == [0, 'Not evaluable from member account']
+    assert _fms(session, other, listErr='AccessDeniedException') == [0, 'Not evaluable from member account']
+
+
+def test_fms_no_admin_not_evaluable(session):
+    # ResourceNotFoundException from get_admin_account: no FMS admin at all.
+    assert _fms(session, None, {'PolicyList': []}) == [0, 'Not evaluable from member account']
+
+
+def test_fms_admin_unknown_never_fails(session):
+    # get_admin_account denied but list_policies returns nothing -> cannot confirm admin.
+    res = _fms(session, None, {'PolicyList': []}, adminErr='AccessDeniedException')
+    assert res[0] == 0 and 'Unable to evaluate' in res[1]
+    res = _fms(session, None, listErr='AccessDeniedException', adminErr='AccessDeniedException')
     assert res == [0, 'Not evaluable from member account']
-    res = _fms(session, None, listErr='AccessDeniedException')
-    assert res == [0, 'Not evaluable from member account']
+    # scanned account id unknown -> never FAIL
+    res = _fms(session, {'AdminAccount': ACCT, 'RoleStatus': 'READY'}, {'PolicyList': []}, acct='')
+    assert res[0] == 0
+
+
+def test_fms_region_outside_admin_scope_is_advisory(session):
+    admin = {'AdminAccount': ACCT, 'RoleStatus': 'READY'}
+    scoped = {'Regions': ['eu-west-1'], 'AllRegionsEnabled': False}
+    assert _fms(session, admin, {'PolicyList': []}, scope=scoped)[0] == 0
+    assert _fms(session, admin, {'PolicyList': []}, scope=scoped, region='eu-west-1')[0] == -1
 
 
 def test_fms_admin_being_removed_is_info(session):
     assert _fms(session, {'AdminAccount': ACCT, 'RoleStatus': 'PENDING_DELETION'})[0] == 0
+
+
+# --------------------------------------------------------------------------- #
+# Wafv2._adviseShieldAndFms: no duplicate get_subscription_state, and
+# non-ClientError botocore exceptions never escape advise().
+# --------------------------------------------------------------------------- #
+class _CountingShield:
+    def __init__(self, state='ACTIVE', raiseExc=None):
+        self.calls = {}
+        self.state = state
+        self.raiseExc = raiseExc
+
+    def _hit(self, name):
+        self.calls[name] = self.calls.get(name, 0) + 1
+        if self.raiseExc:
+            raise self.raiseExc
+
+    def get_subscription_state(self):
+        self._hit('get_subscription_state')
+        return {'SubscriptionState': self.state}
+
+    def get_paginator(self, name):
+        shield = self
+
+        class _P:
+            def paginate(self_inner):
+                shield._hit(name)
+                return [{'Protections': []}]
+        return _P()
+
+    def __getattr__(self, name):
+        def _f(*a, **k):
+            self._hit(name)
+            return {}
+        return _f
+
+
+class _NoAdminFms:
+    def get_admin_account(self):
+        import botocore.exceptions
+        raise botocore.exceptions.ClientError(
+            {'Error': {'Code': 'ResourceNotFoundException', 'Message': 'x'}}, 'GetAdminAccount')
+
+
+@pytest.fixture
+def isolatedCheckpoint(tmp_path, monkeypatch):
+    # Evaluator.run() persists results via utils.Checkpoint; keep it off the
+    # real __fork/checkpoint store so runs never reuse stale cached results.
+    from utils.Checkpoint import Checkpoint
+    monkeypatch.setattr(Checkpoint, 'CHECKPOINT_DIR', str(tmp_path / 'checkpoint'))
+    monkeypatch.setattr(Checkpoint, '_cache', {})
+    return tmp_path
+
+
+def _advise(shield, capsys):
+    from utils.Config import Config
+    from services.wafv2.Wafv2 import Wafv2
+    # Same class name (rule prefix 'Wafv2::rules'), but no Service.__del__ side effects.
+    cls = type('Wafv2', (Wafv2,), {'__del__': lambda self: None})
+    svc = cls.__new__(cls)
+    svc.RULESPREFIX = 'Wafv2::rules'
+    svc.region = 'us-east-1'
+    svc.shieldClient = shield
+    svc.fmsClient = _NoAdminFms()
+    svc.elbClient = svc.elbClassicClient = svc.ec2Client = svc.cfClient = svc.route53Client = None
+    svc.chartData = {}
+    saved = {k: Config.get(k, None) for k in ('Wafv2::rules', Wafv2.SHIELD_GLOBAL_CLAIM_KEY, 'scanned_wafv2')}
+    Config.set('scanned_wafv2', {'resources': 0, 'rules': 0, 'exceptions': 0})
+    Config.set('Wafv2::rules', ['shieldadvancednoproactiveengagement', 'shieldautol7mitigationdisabled',
+                                'fmsnonetworkpolicies'])
+    Config.set(Wafv2.SHIELD_GLOBAL_CLAIM_KEY, None)
+    try:
+        objs = svc._adviseShieldAndFms()
+        return objs, capsys.readouterr().out
+    finally:
+        for k, v in saved.items():
+            Config.set(k, v)
+
+
+def test_advise_reuses_cached_subscription_state(capsys, isolatedCheckpoint):
+    sh = _CountingShield()
+    objs, out = _advise(sh, capsys)
+    assert 'Error processing' not in out, out
+    assert 'Shield::Account' in objs and 'FirewallManager::Account' in objs
+    # The Shield driver really ran (and fetched the state) before advise reused it.
+    assert 'shieldAdvancedNoProactiveEngagement' in objs['Shield::Account']['results'], objs
+    assert sh.calls.get('get_subscription_state') == 1, sh.calls
+    assert sh.calls.get('list_protections', 0) <= 1, sh.calls
+
+
+def test_advise_survives_non_client_error(capsys, isolatedCheckpoint):
+    import botocore.exceptions
+    sh = _CountingShield(raiseExc=botocore.exceptions.NoCredentialsError())
+    objs, out = _advise(sh, capsys)  # must not raise
+    assert 'Error processing' not in out, out
+    assert 'ShieldProtection::Unavailable' in objs
+    assert 'FirewallManager::Account' in objs
 
 
 # --------------------------------------------------------------------------- #

@@ -17,14 +17,20 @@ def _errCode(e):
 class Wafv2Fms(Evaluator):
     """
     AWS Firewall Manager posture for the scanned region (read-only:
-    fms.get_admin_account, fms.list_policies).
+    fms.get_admin_account, fms.get_admin_scope, fms.list_policies).
 
     FMS policies are regional and only visible to a Firewall Manager
-    administrator account. From any other account list_policies is denied, so
-    the check reports 'Not evaluable from member account' instead of a FAIL.
-    Tier-3 heuristic: FMS is optional (StackSets / LZA are valid alternatives),
-    so a finding is raised only when this account IS an FMS administrator and
-    has zero policies in the region.
+    administrator account. Tier-3 heuristic: FMS is optional (StackSets / LZA
+    are valid alternatives), so a FAIL is raised only when get_admin_account
+    confirms that THIS account is the (READY) FMS administrator and it has zero
+    policies in the region. Every other situation is INFO:
+      - no FMS administrator (ResourceNotFoundException) or another account is
+        the administrator (e.g. scanning the Organizations management account)
+        -> 'Not evaluable from member account'
+      - administrator identity unreadable / scanned account id unknown ->
+        never FAIL on an empty policy list
+      - region outside the administrator's region scope (get_admin_scope)
+        -> advisory only
     """
 
     def __init__(self, fmsClient, region, accountId):
@@ -35,23 +41,48 @@ class Wafv2Fms(Evaluator):
         self._resourceName = 'FirewallManager'
         self.addII('region', region)
 
+    def _regionOutOfAdminScope(self):
+        """True only when get_admin_scope positively shows this region is not
+        administered by this account; any error/missing data -> False."""
+        try:
+            scope = (self.fms.get_admin_scope(AdminAccount=self.accountId).get('AdminScope') or {})
+        except Exception:
+            return False
+        rs = scope.get('RegionScope')
+        if not isinstance(rs, dict) or rs.get('AllRegionsEnabled', True):
+            return False
+        regions = rs.get('Regions') or []
+        return bool(regions) and self.region not in regions
+
     def _checkFmsNoNetworkPolicies(self):
         rk = 'fmsNoNetworkPolicies'
-        adminAccount, roleStatus = None, None
+        adminAccount, roleStatus, adminErr = None, None, None
         try:
             resp = self.fms.get_admin_account()
             adminAccount = resp.get('AdminAccount')
             roleStatus = resp.get('RoleStatus')
         except botocore.exceptions.ClientError as e:
-            if _errCode(e) not in NOT_ADMIN_CODES:
-                self.results[rk] = [0, f'Unable to evaluate ({_errCode(e)})']
+            code = _errCode(e)
+            if code == 'ResourceNotFoundException':
+                # No Firewall Manager administrator exists for the organization.
+                self.addII('fmsAdminAccount', 'none')
+                self.results[rk] = [0, 'Not evaluable from member account']
                 return
-        except botocore.exceptions.EndpointConnectionError as e:
+            if code not in NOT_ADMIN_CODES:
+                self.results[rk] = [0, f'Unable to evaluate ({code})']
+                return
+            adminErr = code
+        except Exception as e:
             self.results[rk] = [0, f'Unable to evaluate ({_errCode(e)})']
             return
 
-        self.addII('fmsAdminAccount', adminAccount or 'none')
-        if adminAccount and adminAccount == self.accountId and roleStatus in INACTIVE_ROLE_STATUS:
+        self.addII('fmsAdminAccount', adminAccount or 'unknown')
+        if adminAccount and self.accountId and adminAccount != self.accountId:
+            # Another account is the FMS administrator: policies (or their
+            # absence) are not visible/meaningful from here.
+            self.results[rk] = [0, 'Not evaluable from member account']
+            return
+        if adminAccount and roleStatus in INACTIVE_ROLE_STATUS:
             self.results[rk] = [0, f'Firewall Manager administrator role is {roleStatus}']
             return
 
@@ -66,19 +97,32 @@ class Wafv2Fms(Evaluator):
             else:
                 self.results[rk] = [0, f'Unable to evaluate ({code})']
             return
-        except botocore.exceptions.EndpointConnectionError as e:
+        except Exception as e:
             self.results[rk] = [0, f'Unable to evaluate ({_errCode(e)})']
             return
 
         self.addII('fmsPolicyCount', len(policies))
-        if not policies:
-            self.results[rk] = [
-                -1, f'This account is a Firewall Manager administrator but has no Firewall Manager '
-                    f'policies in {self.region} - WAF/Shield/security-group/network-firewall baselines '
-                    'are not centrally enforced across the organization'
-            ]
-        else:
+        if policies:
             types = sorted({(p.get('SecurityServiceType') or '?') for p in policies})
             self.results[rk] = [
                 1, f"{len(policies)} Firewall Manager policy(ies) in {self.region}: {', '.join(types)}"
             ]
+            return
+
+        confirmedAdmin = bool(adminAccount) and adminAccount == self.accountId
+        if not confirmedAdmin:
+            why = adminErr or ('scanned account id unknown' if not self.accountId else 'administrator unknown')
+            self.results[rk] = [
+                0, f'Unable to evaluate ({why}): cannot confirm this account is the Firewall Manager administrator'
+            ]
+            return
+        if self._regionOutOfAdminScope():
+            self.results[rk] = [
+                0, f'{self.region} is outside this Firewall Manager administrator\'s region scope (advisory only)'
+            ]
+            return
+        self.results[rk] = [
+            -1, f'This account is the Firewall Manager administrator but has no Firewall Manager '
+                f'policies in {self.region} - WAF/Shield/security-group/network-firewall baselines '
+                'are not centrally enforced across the organization'
+        ]

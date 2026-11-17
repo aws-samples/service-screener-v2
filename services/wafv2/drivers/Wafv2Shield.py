@@ -87,8 +87,7 @@ class Wafv2Shield(Evaluator):
                 try:
                     resp = self.shield.get_subscription_state()
                     self._state = (resp.get('SubscriptionState'), None)
-                except (botocore.exceptions.ClientError,
-                        botocore.exceptions.EndpointConnectionError) as e:
+                except Exception as e:  # ClientError, endpoint/credential/timeout errors
                     self._state = (None, _errCode(e))
             return self._state
 
@@ -97,8 +96,7 @@ class Wafv2Shield(Evaluator):
             if self._protections is None:
                 try:
                     self._protections = (listShieldProtections(self.shield), None)
-                except (botocore.exceptions.ClientError,
-                        botocore.exceptions.EndpointConnectionError) as e:
+                except Exception as e:  # ClientError, endpoint/credential/timeout errors
                     self._protections = (None, _errCode(e))
             return self._protections
 

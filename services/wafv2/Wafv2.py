@@ -784,27 +784,33 @@ class Wafv2(Service):
             'elb': self.elbClassicClient, 'ec2': self.ec2Client,
             'cloudfront': self.cfClient, 'route53': self.route53Client,
         }
+        shieldObj = None
         try:
-            obj = Wafv2Shield(clients, self.region, acct, self._partition(), isGlobal)
-            obj.run(self.__class__)
-            objs['Shield::Account'] = obj.getInfo()
-            del obj
+            shieldObj = Wafv2Shield(clients, self.region, acct, self._partition(), isGlobal)
+            shieldObj.run(self.__class__)
+            objs['Shield::Account'] = shieldObj.getInfo()
         except Exception as e:
             print(f"Error processing Shield Advanced posture: {e}")
 
         # Per-protection L7 auto-mitigation: ALB protections of this region,
-        # CloudFront protections in the global-claim region only.
+        # CloudFront protections in the global-claim region only. Reuse the
+        # subscription state / protection list already cached by the Shield
+        # driver (no duplicate API calls). Any failure - including non-
+        # ClientError botocore exceptions - is recorded, never propagated.
         protections = []
         shieldErr = None
         try:
-            state = self.shieldClient.get_subscription_state().get('SubscriptionState')
-            if state == 'ACTIVE':
-                protections = listShieldProtections(self.shieldClient)
-        except botocore.exceptions.ClientError as e:
-            self._logClientError('shield.list_protections', e)
-            shieldErr = e.response.get('Error', {}).get('Code', 'Unknown')
-        except botocore.exceptions.EndpointConnectionError:
-            shieldErr = 'EndpointConnectionError'
+            if shieldObj is None:
+                shieldObj = Wafv2Shield(clients, self.region, acct, self._partition(), isGlobal)
+            state, shieldErr = shieldObj._subscriptionState()
+            if not shieldErr and state == 'ACTIVE':
+                protections, shieldErr = shieldObj._getProtections()
+                protections = protections or []
+        except Exception as e:
+            shieldErr = type(e).__name__
+            protections = []
+        finally:
+            shieldObj = None
         if shieldErr and isGlobal:
             # No protection to attach the per-resource result to: report the
             # gap once per scan instead of dropping it silently.

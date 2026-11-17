@@ -8,6 +8,11 @@ Emulator notes:
 - enable_proactive_engagement / enable_application_layer_automatic_response are
   NotImplemented; the FIX half of those checks is covered by
   tests/test_stub_wafv2_shield.py. Here we only assert the FLAG end to end.
+- The emulator is single-account and only the FMS admin may call
+  disassociate_admin_account, so associating ANOTHER account as FMS admin
+  cannot be undone and would break later runs on a shared emulator. The
+  "another account is the FMS admin" case of fmsNoNetworkPolicies is covered by
+  test_fms_other_account_is_admin_not_evaluable in tests/test_stub_wafv2_shield.py.
 """
 import json
 
