@@ -105,12 +105,12 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Configuring authorization for API Gateway V2 WebSocket APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-websocket-api-authorization.html>",
-			"[Configuring authorization for API Gateway V2 HTTP APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-auth-providers.html>"
+			"[Configuring authorization for API Gateway V2 WebSocket APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-websocket-api-control-access.html>",
+			"[Configuring authorization for API Gateway V2 HTTP APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-access-control.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-auth-providers.html"
+		"remediation_doc": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-access-control.html"
 	},
 	"AccessLogging": {
 		"category": "S",
@@ -138,11 +138,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Configuring a minimum TLS version for API Gateway REST API domains]<https://docs.aws.amazon.com/apigateway/latest/developerguide/security-policy.html>"
+			"[Configuring a minimum TLS version for API Gateway REST API domains]<https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-custom-domain-tls-version.html>"
 		],
 		"remediation": "aws apigateway update-domain-name --domain-name {ResourceName} --patch-operations op=replace,path=/securityPolicy,value=TLS_1_2",
 		"remediation_risk": "medium",
-		"remediation_doc": "https://docs.aws.amazon.com/apigateway/latest/developerguide/security-policy.html"
+		"remediation_doc": "https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-custom-domain-tls-version.html"
 	},
 	"IdleAPIGateway": {
 		"category": "O",

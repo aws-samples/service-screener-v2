@@ -77,7 +77,7 @@
         "additionalCost": 0,
         "needFullTest": 1,
         "ref": [
-            "[Build artifact encryption]<https://docs.aws.amazon.com/codebuild/latest/userguide/create-project-cli.html>",
+            "[Build artifact encryption]<https://docs.aws.amazon.com/codebuild/latest/userguide/create-project.html>",
             "[Data protection in CodeBuild]<https://docs.aws.amazon.com/codebuild/latest/userguide/data-protection.html>"
         ],
         "remediation": null,
@@ -94,12 +94,12 @@
         "additionalCost": 0,
         "needFullTest": 1,
         "ref": [
-            "[Source provider settings]<https://docs.aws.amazon.com/codebuild/latest/userguide/create-project-cli.html>",
+            "[Source provider settings]<https://docs.aws.amazon.com/codebuild/latest/userguide/create-project.html>",
             "[Data protection in transit]<https://docs.aws.amazon.com/codebuild/latest/userguide/data-protection.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/codebuild/latest/userguide/create-project-cli.html"
+        "remediation_doc": "https://docs.aws.amazon.com/codebuild/latest/userguide/create-project.html"
     },
     "cbEncryptionDefaultKey": {
         "category": "S",
@@ -282,13 +282,13 @@
         "additionalCost": 0,
         "needFullTest": 1,
         "ref": [
-            "[Filter GitHub webhook events]<https://docs.aws.amazon.com/codebuild/latest/userguide/github-webhook-events.html>",
+            "[Filter GitHub webhook events]<https://docs.aws.amazon.com/codebuild/latest/userguide/github-webhook.html>",
             "[Pull request comment approval]<https://docs.aws.amazon.com/codebuild/latest/userguide/pull-request-build-policy.html>",
             "[Best practices for webhooks]<https://docs.aws.amazon.com/codebuild/latest/userguide/webhooks.html#webhook-best-practices>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/codebuild/latest/userguide/github-webhook-events.html"
+        "remediation_doc": "https://docs.aws.amazon.com/codebuild/latest/userguide/github-webhook.html"
     },
     "cbProjectNoTestReports": {
         "category": "S",

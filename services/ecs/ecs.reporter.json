@@ -10,11 +10,11 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Security Hub ECS.12]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecs-controls.html#ecs-12>",
-			"[Container Insights on Amazon ECS]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/deploy_servicelens_CloudWatch_agent_deploy_ECS.html>"
+			"[Container Insights on Amazon ECS]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/deploy-container-insights-ECS-cluster.html>"
 		],
 		"remediation": "aws ecs update-cluster-settings --cluster {ResourceName} --settings name=containerInsights,value=enabled",
 		"remediation_risk": "low",
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/deploy_servicelens_CloudWatch_agent_deploy_ECS.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/deploy-container-insights-ECS-cluster.html"
 	},
 	"ecsClusterExecuteCommandLogging": {
 		"category": "S",
@@ -58,12 +58,12 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Fargate ephemeral storage encryption]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-storage.html>",
-			"[ECS managed storage encryption]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/managed-storage-encryption.html>"
+			"[Fargate ephemeral storage encryption]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-storage-encryption.html>",
+			"[ECS managed storage encryption]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-storage-encryption.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/managed-storage-encryption.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-storage-encryption.html"
 	},
 	"ecsClusterDefaultCapacityProviderStrategy": {
 		"category": "R",
@@ -91,11 +91,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Troubleshoot service scheduling]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_scheduler_errors.html>"
+			"[Troubleshoot service scheduling]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-event-messages.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_scheduler_errors.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-event-messages.html"
 	},
 	"ecsClusterTagging": {
 		"category": "O",
@@ -626,11 +626,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[ECS updating a service]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/update-service.html>"
+			"[ECS updating a service]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/update-service-console-v2.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/update-service.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/update-service-console-v2.html"
 	},
 	"ecsTaskDefinitionSensitiveHostPaths": {
 		"category": "S",
@@ -674,11 +674,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Fargate ephemeral storage]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-storage.html>"
+			"[Fargate ephemeral storage]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-storage-encryption.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-storage.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-storage-encryption.html"
 	},
 	"ecsTaskRoleOverprivileged": {
 		"category": "S",

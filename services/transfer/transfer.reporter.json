@@ -11,7 +11,7 @@
 		"ref": [
 			"[Security policies for AWS Transfer Family servers]<https://docs.aws.amazon.com/transfer/latest/userguide/security-policies.html>",
 			"[Edit the file transfer protocols]<https://docs.aws.amazon.com/transfer/latest/userguide/edit-server-config.html>",
-			"[Data protection in AWS Transfer Family]<https://docs.aws.amazon.com/transfer/latest/userguide/data-protection.html>"
+			"[Data protection in AWS Transfer Family]<https://docs.aws.amazon.com/transfer/latest/userguide/security-policies.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,

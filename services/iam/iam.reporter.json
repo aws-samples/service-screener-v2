@@ -907,7 +907,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Authentication and access control for AWS Secrets Manager]<https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-access.html>",
-			"[Restricting access to Parameter Store parameters using IAM policies]<https://docs.aws.amazon.com/systems-manager/latest/userguide/sysman-paramstore-access.html>",
+			"[Restricting access to Parameter Store parameters using IAM policies]<https://docs.aws.amazon.com/systems-manager/latest/userguide/ps-restrict-parameter-access.html>",
 			"[Apply least-privilege permissions]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
 		],
 		"remediation": null,
@@ -926,7 +926,7 @@
 		"ref": [
 			"[Detect and resolve drift in AWS Control Tower]<https://docs.aws.amazon.com/controltower/latest/userguide/drift.html>",
 			"[Repair your landing zone]<https://docs.aws.amazon.com/controltower/latest/userguide/resolve-drift.html>",
-			"[Control drift]<https://docs.aws.amazon.com/controltower/latest/controlreference/governance-drift.html>"
+			"[Control drift]<https://docs.aws.amazon.com/controltower/latest/userguide/governance-drift.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -964,7 +964,7 @@
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/health/latest/ug/enable-organizational-view-in-health-console.html"
+		"remediation_doc": "https://docs.aws.amazon.com/health/latest/ug/enable-organizational-view.html"
 	},
 	"iamUserTwoActiveKeys": {
 		"category": "S",
@@ -1256,13 +1256,13 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Security Incident Response - Membership]<https://docs.aws.amazon.com/security-ir/latest/userguide/membership.html>",
+			"[AWS Security Incident Response - Membership]<https://docs.aws.amazon.com/security-ir/latest/userguide/managing-my-incident-response-team.html>",
 			"[SEC10-BP01 Identify key personnel and external resources]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_identify_personnel.html>",
 			"[GetMembership]<https://docs.aws.amazon.com/security-ir/latest/APIReference/API_GetMembership.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/security-ir/latest/userguide/membership.html"
+		"remediation_doc": "https://docs.aws.amazon.com/security-ir/latest/userguide/managing-my-incident-response-team.html"
 	},
 	"orgMgmtAccountHostsWorkloads": {
 		"category": "S",

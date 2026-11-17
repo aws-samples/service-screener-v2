@@ -43,12 +43,12 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[SNS access policy]<https://docs.aws.amazon.com/sns/latest/dg/sns-access-policy-language-overview.html>",
+			"[SNS access policy]<https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html#ensure-topics-not-publicly-accessible>",
 			"[SNS security best practices]<https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/sns/latest/dg/sns-access-policy-language-overview.html"
+		"remediation_doc": "https://docs.aws.amazon.com/sns/latest/dg/sns-security-best-practices.html#ensure-topics-not-publicly-accessible"
 	},
 	"snsNoHttpsEnforcement": {
 		"category": "S",
@@ -332,11 +332,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[SNS SMS attributes]<https://docs.aws.amazon.com/sns/latest/dg/sms_publish-to-phone.html>"
+			"[SNS SMS attributes]<https://docs.aws.amazon.com/sns/latest/dg/sms_preferences.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/sns/latest/dg/sms_publish-to-phone.html"
+		"remediation_doc": "https://docs.aws.amazon.com/sns/latest/dg/sms_preferences.html"
 	},
 	"snsPolicyVersionOutdated": {
 		"category": "S",
@@ -364,10 +364,10 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[SNS message archive & replay]<https://docs.aws.amazon.com/sns/latest/dg/message-archiving-and-replay.html>"
+			"[SNS message archive & replay]<https://docs.aws.amazon.com/sns/latest/dg/fifo-message-archiving-replay.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/sns/latest/dg/message-archiving-and-replay.html"
+		"remediation_doc": "https://docs.aws.amazon.com/sns/latest/dg/fifo-message-archiving-replay.html"
 	}
 }

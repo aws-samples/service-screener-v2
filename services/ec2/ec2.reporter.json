@@ -25,7 +25,7 @@
 		"needFullTest": 0,
 		"shortDesc": "EC2 Detailed Monitoring",
 		"ref": [
-			"[Enable Detailed Monitoring]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/using-cloudwatch-new.html>"
+			"[Enable Detailed Monitoring]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/manage-detailed-monitoring.html>"
 		],
 		"remediation": "aws ec2 monitor-instances --instance-ids {ResourceId}",
 		"remediation_risk": "low",
@@ -57,7 +57,7 @@
 		"needFullTest": 0,
 		"shortDesc": "Elastic IP In Use",
 		"ref": [
-			"[Elastic IP Charges]<https://aws.amazon.com/premiumsupport/knowledge-center/elastic-ip-charges/>"
+			"[Elastic IP Charges]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/elastic-ip-addresses-eip.html#eip-pricing>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -140,7 +140,7 @@
 		"needFullTest": 0,
 		"shortDesc": "Register with SSM",
 		"ref": [
-			"[Setting up Systems Manager]<https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-setting-up.html>",
+			"[Setting up Systems Manager]<https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-setting-up-ec2.html>",
 			"[SSM Agent]<https://docs.aws.amazon.com/systems-manager/latest/userguide/ssm-agent.html>"
 		],
 		"remediation": null,
@@ -351,7 +351,7 @@
 		"shortDesc": "EC2 with AMD chips",
 		"ref": [
 			"[EC2 Linux Migrate to Graviton]<https://repost.aws/knowledge-center/ec2-linux-migrate-to-graviton>",
-			"[What is AWS Graviton]<https://docs.aws.amazon.com/whitepapers/latest/aws-graviton-performance-testing/what-is-aws-graviton.html>"
+			"[What is AWS Graviton]<https://aws.amazon.com/ec2/graviton/>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -783,7 +783,7 @@
 		"needFullTest": 0,
 		"shortDesc": "ELB Cross Zone Load Balancing",
 		"ref": [
-			"[To Enable ALB Az]<https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-disable-az.html>"
+			"[To Enable ALB Az]<https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-disable-crosszone-lb.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -975,7 +975,7 @@
 		"needFullTest": 1,
 		"shortDesc": "Use supported SQL Server version",
 		"ref": [
-			"[Windows Modernization]<https://aws.amazon.com/windows/modernization/>",
+			"[Windows Modernization]<https://aws.amazon.com/microsoft/sql-server/>",
 			"[RDS SQL Server]<https://aws.amazon.com/rds/sqlserver/>",
 			"[endoflife]<https://endoflife.date/mssqlserver>"
 		],
@@ -1075,7 +1075,7 @@
 		"needFullTest": 0,
 		"shortDesc": "Enable EBS Encryption by Default",
 		"ref": [
-			"[EBS Encryption by Default]<https://docs.aws.amazon.com/ebs/latest/userguide/work-with-ebs-encr.html#encryption-by-default>"
+			"[EBS Encryption by Default]<https://docs.aws.amazon.com/ebs/latest/userguide/encryption-by-default.html>"
 		],
 		"remediation": "aws ec2 enable-ebs-encryption-by-default",
 		"remediation_risk": "low",
@@ -1091,7 +1091,7 @@
 		"needFullTest": 0,
 		"shortDesc": "Tag Volumes with Data Classification",
 		"ref": [
-			"[Tagging EBS Resources]<https://docs.aws.amazon.com/ebs/latest/userguide/Using_Tags.html>"
+			"[Tagging EBS Resources]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/Using_Tags.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -1299,7 +1299,7 @@
 		"needFullTest": 0,
 		"shortDesc": "Separate OS and Data Volumes",
 		"ref": [
-			"[EBS Best Practices]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-usage-best-practices.html>"
+			"[EBS Best Practices]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html#storage>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -1417,7 +1417,7 @@
 		],
 		"remediation": "aws ec2 enable-snapshot-block-public-access --state block-all-sharing",
 		"remediation_risk": "medium",
-		"remediation_doc": "https://docs.aws.amazon.com/ebs/latest/userguide/block-public-access-snapshots-work.html"
+		"remediation_doc": "https://docs.aws.amazon.com/ebs/latest/userguide/block-public-access-snapshots.html"
 	},
 	"elbAccessLogsDisabled": {
 		"category": "S",
@@ -1484,11 +1484,11 @@
 		"shortDesc": "Create locked Recycle Bin rules for snapshots/AMIs",
 		"ref": [
 			"[Recycle Bin]<https://docs.aws.amazon.com/ebs/latest/userguide/recycle-bin.html>",
-			"[Lock Recycle Bin retention rules]<https://docs.aws.amazon.com/ebs/latest/userguide/recycle-bin-working-with-rules.html#recycle-bin-lock-rule>"
+			"[Lock Recycle Bin retention rules]<https://docs.aws.amazon.com/ebs/latest/userguide/recycle-bin-lock.html>"
 		],
 		"remediation": "aws rbin create-rule --resource-type EBS_SNAPSHOT --retention-period RetentionPeriodValue=7,RetentionPeriodUnit=DAYS --lock-configuration 'UnlockDelay={UnlockDelayValue=7,UnlockDelayUnit=DAYS}'",
 		"remediation_risk": "low",
-		"remediation_doc": "https://docs.aws.amazon.com/ebs/latest/userguide/recycle-bin-working-with-rules.html"
+		"remediation_doc": "https://docs.aws.amazon.com/ebs/latest/userguide/recycle-bin-lock.html"
 	},
 	"ebsSnapshotSharedExternally": {
 		"category": "S",
@@ -1808,7 +1808,7 @@
 		"shortDesc": "Self-managed database/cache on EC2",
 		"ref": [
 			"[SEC01-BP04 Stay up to date with security threats and recommendations]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_securely_operate_updated_threats.html>",
-			"[Shared Responsibility Model - AWS Risk and Compliance]<https://docs.aws.amazon.com/whitepapers/latest/aws-risk-and-compliance/shared-responsibility-model.html>",
+			"[Shared Responsibility Model - AWS Risk and Compliance]<https://aws.amazon.com/compliance/shared-responsibility-model/>",
 			"[AWS Systems Manager Inventory]<https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-inventory.html>"
 		],
 		"remediation": null,

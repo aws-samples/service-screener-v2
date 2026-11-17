@@ -413,11 +413,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[CloudWatch Application Signals]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Application-Signals.html>"
+			"[CloudWatch Application Signals]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Application-Signals-Enable.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Application-Signals.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Application-Signals-Enable.html"
 	},
 	"missingXRayIntegration": {
 		"category": "O",
@@ -526,11 +526,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Vended log dashboards]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatchLogsDashboards.html>"
+			"[Vended log dashboards]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/GettingStarted.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatchLogsDashboards.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/GettingStarted.html"
 	},
 	"cwCrossAccountObservabilityNotLinked": {
 		"category": "S",
@@ -678,7 +678,7 @@
 		"ref": [
 			"[Monitoring Amazon RDS read replication]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ReadRepl.Monitoring.html>",
 			"[Monitoring Amazon Aurora global databases]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-monitoring.html>",
-			"[DynamoDB global tables monitoring]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_monitoring.html>",
+			"[DynamoDB global tables monitoring]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables_monitoring.html>",
 			"[S3 Replication metrics]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/repl-metrics.html>",
 			"[Using Amazon CloudWatch alarms]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Alarms.html>"
 		],

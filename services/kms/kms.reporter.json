@@ -283,7 +283,7 @@
 		"shortDesc": "Re-import expiring key material",
 		"ref": [
 			"[Importing key material for AWS KMS keys]<https://docs.aws.amazon.com/kms/latest/developerguide/importing-keys.html>",
-			"[Setting an expiration time for imported key material]<https://docs.aws.amazon.com/kms/latest/developerguide/importing-keys-set-expiration.html>"
+			"[Setting an expiration time for imported key material]<https://docs.aws.amazon.com/kms/latest/developerguide/importing-keys-import-key-material.html#importing-keys-expiration>"
 		],
 		"remediation": null,
 		"remediation_risk": null,

@@ -77,12 +77,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Lambda code scanning]<https://docs.aws.amazon.com/inspector/latest/user/scanning-lambda-code.html>",
+            "[Lambda code scanning]<https://docs.aws.amazon.com/inspector/latest/user/scanning_resources_lambda_code.html>",
             "[Lambda scanning]<https://docs.aws.amazon.com/inspector/latest/user/scanning-lambda.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/scanning-lambda-code.html"
+        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/scanning_resources_lambda_code.html"
     },
     "inspectorCodeRepositoryScanningDisabled": {
         "category": "S",
@@ -94,12 +94,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Code security scanning]<https://docs.aws.amazon.com/inspector/latest/user/code-security-scanning.html>",
+            "[Code security scanning]<https://docs.aws.amazon.com/inspector/latest/user/code-security-assessments.html>",
             "[Getting started]<https://docs.aws.amazon.com/inspector/latest/user/getting_started_tutorial.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/code-security-scanning.html"
+        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/code-security-assessments.html"
     },
     "inspectorCoverageGap": {
         "category": "S",
@@ -111,12 +111,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Understanding coverage]<https://docs.aws.amazon.com/inspector/latest/user/managing-coverage.html>",
-            "[Coverage troubleshooting]<https://docs.aws.amazon.com/inspector/latest/user/troubleshooting.html>"
+            "[Understanding coverage]<https://docs.aws.amazon.com/inspector/latest/user/assessing-coverage.html>",
+            "[Coverage troubleshooting]<https://docs.aws.amazon.com/inspector/latest/user/assessing-coverage.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/managing-coverage.html"
+        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/assessing-coverage.html"
     },
     "inspectorCriticalFindings": {
         "category": "S",
@@ -162,12 +162,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Remediating findings]<https://docs.aws.amazon.com/inspector/latest/user/remediating-findings.html>",
+            "[Remediating findings]<https://docs.aws.amazon.com/inspector/latest/user/findings-understanding-details.html>",
             "[Managing findings]<https://docs.aws.amazon.com/inspector/latest/user/findings-managing.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/remediating-findings.html"
+        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/findings-understanding-details.html"
     },
     "inspectorFindingsAged": {
         "category": "S",

@@ -379,7 +379,7 @@
 		"shortDesc": "Restrict the domain access policy to specific IAM principals or source IPs, or move the domain into a VPC.",
 		"ref": [
 			"[Identity and Access Management in Amazon OpenSearch Service]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ac.html>",
-			"[Security best practices for Amazon OpenSearch Service]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/security-best-practices.html>",
+			"[Security best practices for Amazon OpenSearch Service]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ac.html#ac-types-resource>",
 			"[Launching your Amazon OpenSearch Service domains within a VPC]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"
 		],
 		"remediation": null,

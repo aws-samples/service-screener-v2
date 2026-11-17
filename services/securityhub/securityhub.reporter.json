@@ -27,7 +27,7 @@
         "needFullTest": 0,
         "ref": [
             "[Security standards]<https://docs.aws.amazon.com/securityhub/latest/userguide/standards-reference.html>",
-            "[Enabling standards]<https://docs.aws.amazon.com/securityhub/latest/userguide/set-standards.html>"
+            "[Enabling standards]<https://docs.aws.amazon.com/securityhub/latest/userguide/enable-standards.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -44,7 +44,7 @@
         "needFullTest": 0,
         "ref": [
             "[CIS AWS Foundations Benchmark]<https://docs.aws.amazon.com/securityhub/latest/userguide/cis-aws-foundations-benchmark.html>",
-            "[Enabling standards]<https://docs.aws.amazon.com/securityhub/latest/userguide/set-standards.html>"
+            "[Enabling standards]<https://docs.aws.amazon.com/securityhub/latest/userguide/enable-standards.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -61,7 +61,7 @@
         "needFullTest": 0,
         "ref": [
             "[Auto-enabling controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/controls-auto-enable.html>",
-            "[Managing controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/controls-manage.html>"
+            "[Managing controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/controls-auto-enable.html>"
         ],
         "remediation": null,
         "remediation_risk": null,

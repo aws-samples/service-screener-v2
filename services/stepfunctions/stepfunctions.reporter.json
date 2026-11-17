@@ -26,12 +26,12 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Step Functions IAM best practices]<https://docs.aws.amazon.com/step-functions/latest/dg/security-iam.html>",
+			"[Step Functions IAM best practices]<https://docs.aws.amazon.com/step-functions/latest/dg/manage-state-machine-permissions.html>",
 			"[IAM least-privilege best practices]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/security-iam.html"
+		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/manage-state-machine-permissions.html"
 	},
 	"sfnLoggingDisabled": {
 		"category": "O",
@@ -60,11 +60,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Step Functions log levels]<https://docs.aws.amazon.com/step-functions/latest/dg/cloudwatch-log-level.html>"
+			"[Step Functions log levels]<https://docs.aws.amazon.com/step-functions/latest/dg/cw-logs.html#cloudwatch-log-level>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/cloudwatch-log-level.html"
+		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/cw-logs.html#cloudwatch-log-level"
 	},
 	"sfnTracingDisabled": {
 		"category": "O",
@@ -125,11 +125,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Step Functions TimeoutSeconds]<https://docs.aws.amazon.com/step-functions/latest/dg/concepts-avoid-exec-failures.html>"
+			"[Step Functions TimeoutSeconds]<https://docs.aws.amazon.com/step-functions/latest/dg/statemachine-structure.html#statemachinetimeoutseconds>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/concepts-avoid-exec-failures.html"
+		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/statemachine-structure.html#statemachinetimeoutseconds"
 	},
 	"sfnExpressWorkflowNoLogging": {
 		"category": "O",
@@ -224,11 +224,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Payload size limits and Amazon S3 offload]<https://docs.aws.amazon.com/step-functions/latest/dg/avoid-exec-failures.html>"
+			"[Payload size limits and Amazon S3 offload]<https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html#avoid-exec-failures>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/avoid-exec-failures.html"
+		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html#avoid-exec-failures"
 	},
 	"sfnMapNoConcurrencyLimit": {
 		"category": "P",
@@ -448,10 +448,10 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Step Functions HTTP tasks]<https://docs.aws.amazon.com/step-functions/latest/dg/connect-http-task.html>"
+			"[Step Functions HTTP tasks]<https://docs.aws.amazon.com/step-functions/latest/dg/call-https-apis.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/connect-http-task.html"
+		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/call-https-apis.html"
 	}
 }

@@ -58,11 +58,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Deletion protection]<https://docs.aws.amazon.com/cognito/latest/developerguide/managing-users-with-user-pools.html>"
+			"[Deletion protection]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-deletion-protection.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/managing-users-with-user-pools.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-deletion-protection.html"
 	},
 	"cognitoNoEmailPhoneVerification": {
 		"category": "O",
@@ -250,11 +250,11 @@
 		"additionalCost": 1,
 		"needFullTest": 1,
 		"ref": [
-			"[WAF on Cognito user pools]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-waf.html>"
+			"[WAF on Cognito user pools]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-waf.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-waf.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-waf.html"
 	},
 	"cognitoClientImplicitGrantEnabled": {
 		"category": "S",
@@ -363,11 +363,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Cognito account takeover protection]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-account-takeover.html>"
+			"[Cognito account takeover protection]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-threat-protection.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-account-takeover.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-threat-protection.html"
 	},
 	"cognitoNoLoggingConfiguration": {
 		"category": "O",
@@ -555,11 +555,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Cognito account takeover protection]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-account-takeover.html>"
+			"[Cognito account takeover protection]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-threat-protection.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-account-takeover.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-threat-protection.html"
 	},
 	"cognitoGroupOverlyPermissiveRole": {
 		"category": "S",

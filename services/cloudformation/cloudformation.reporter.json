@@ -112,11 +112,11 @@
         "needFullTest": 0,
         "ref": [
             "[Stack notifications]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-create-stack.html#configure-stack-options>",
-            "[Monitoring stacks]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks-monitoring.html>"
+            "[Monitoring stacks]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-create-stack.html#configure-stack-options-notification>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks-monitoring.html"
+        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-create-stack.html#configure-stack-options-notification"
     },
     "cfnOldStackUnupdated": {
         "category": "O",

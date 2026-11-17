@@ -26,12 +26,12 @@
         "additionalCost": 0,
         "needFullTest": 1,
         "ref": [
-            "[Introspection configuration]<https://docs.aws.amazon.com/appsync/latest/devguide/configuring-introspection.html>",
+            "[Introspection configuration]<https://docs.aws.amazon.com/appsync/latest/devguide/configuration-limits.html#configuration-limits-introspection>",
             "[Securing your API]<https://docs.aws.amazon.com/appsync/latest/devguide/security.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/appsync/latest/devguide/configuring-introspection.html"
+        "remediation_doc": "https://docs.aws.amazon.com/appsync/latest/devguide/configuration-limits.html#configuration-limits-introspection"
     },
     "appsyncWafNotAssociated": {
         "category": "S",
@@ -94,12 +94,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Query depth and resolver limits]<https://docs.aws.amazon.com/appsync/latest/devguide/quotas.html>",
-            "[Configuring quotas]<https://docs.aws.amazon.com/appsync/latest/devguide/quotas.html>"
+            "[Query depth and resolver limits]<https://docs.aws.amazon.com/appsync/latest/devguide/configuration-limits.html>",
+            "[Configuring quotas]<https://docs.aws.amazon.com/appsync/latest/devguide/configuration-limits.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/appsync/latest/devguide/quotas.html"
+        "remediation_doc": "https://docs.aws.amazon.com/appsync/latest/devguide/configuration-limits.html"
     },
     "appsyncNoResolverCountLimit": {
         "category": "P",
@@ -111,12 +111,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Query depth and resolver limits]<https://docs.aws.amazon.com/appsync/latest/devguide/quotas.html>",
-            "[Configuring quotas]<https://docs.aws.amazon.com/appsync/latest/devguide/quotas.html>"
+            "[Query depth and resolver limits]<https://docs.aws.amazon.com/appsync/latest/devguide/configuration-limits.html>",
+            "[Configuring quotas]<https://docs.aws.amazon.com/appsync/latest/devguide/configuration-limits.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/appsync/latest/devguide/quotas.html"
+        "remediation_doc": "https://docs.aws.amazon.com/appsync/latest/devguide/configuration-limits.html"
     },
     "appsyncFieldLevelLogging": {
         "category": "O",
@@ -179,11 +179,11 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Tagging resources]<https://docs.aws.amazon.com/appsync/latest/devguide/tagging-resources.html>",
+            "[Tagging resources]<https://docs.aws.amazon.com/appsync/latest/APIReference/API_TagResource.html>",
             "[Tagging AWS resources]<https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/appsync/latest/devguide/tagging-resources.html"
+        "remediation_doc": "https://docs.aws.amazon.com/appsync/latest/APIReference/API_TagResource.html"
     }
 }

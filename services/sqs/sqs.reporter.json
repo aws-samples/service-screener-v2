@@ -106,11 +106,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[FIFO queues]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues.html>"
+			"[FIFO queues]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-fifo-queues.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/FIFO-queues.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-fifo-queues.html"
 	},
 	"AccessPolicy": {
 		"category": "S",
@@ -154,11 +154,11 @@
 		"additionalCost": -1,
 		"needFullTest": 1,
 		"ref": [
-			"[Cost optimization]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-cost-optimization.html>"
+			"[Cost optimization]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/best-practices-setting-up-long-polling.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-cost-optimization.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/best-practices-setting-up-long-polling.html"
 	},
 	"TaggingStrategy": {
 		"category": "O",
@@ -187,7 +187,7 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Long polling]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html>",
-			"[Cost optimization]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-cost-optimization.html>"
+			"[Cost optimization]<https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/best-practices-setting-up-long-polling.html>"
 		],
 		"remediation": "aws sqs set-queue-attributes --queue-url {ResourceId} --attributes ReceiveMessageWaitTimeSeconds=20",
 		"remediation_risk": "medium",

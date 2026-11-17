@@ -387,7 +387,7 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Storage Lens Overview]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage_lens.html>",
-			"[Getting Started]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage_lens_console_getting_started.html>",
+			"[Getting Started]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage_lens_creating_dashboard.html>",
 			"[Cost Optimization]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/storage-lens-optimize-storage.html>"
 		],
 		"remediation": null,
@@ -457,11 +457,11 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Managing Macie accounts with AWS Organizations]<https://docs.aws.amazon.com/macie/latest/user/accounts-mgmt-ao.html>",
-			"[Configuring Macie for new organization accounts]<https://docs.aws.amazon.com/macie/latest/user/accounts-mgmt-ao-auto-enable.html>"
+			"[Configuring Macie for new organization accounts]<https://docs.aws.amazon.com/macie/latest/user/accounts-mgmt-ao-integrate.html#accounts-mgmt-ao-members-autoenable>"
 		],
 		"remediation": "aws macie2 update-organization-configuration --auto-enable",
 		"remediation_risk": "low",
-		"remediation_doc": "https://docs.aws.amazon.com/macie/latest/user/accounts-mgmt-ao-auto-enable.html"
+		"remediation_doc": "https://docs.aws.amazon.com/macie/latest/user/accounts-mgmt-ao-integrate.html#accounts-mgmt-ao-members-autoenable"
 	},
 	"macieSensitiveDataFindingsOpen": {
 		"category": "S",
@@ -526,12 +526,12 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Automated sensitive data discovery scope]<https://docs.aws.amazon.com/macie/latest/user/discovery-asdd-account-manage-s3.html>",
+			"[Automated sensitive data discovery scope]<https://docs.aws.amazon.com/macie/latest/user/discovery-asdd-account-manage.html>",
 			"[Running sensitive data discovery jobs]<https://docs.aws.amazon.com/macie/latest/user/discovery-jobs.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/macie/latest/user/discovery-asdd-account-manage-s3.html"
+		"remediation_doc": "https://docs.aws.amazon.com/macie/latest/user/discovery-asdd-account-manage.html"
 	},
 	"s3ReplicationNoMetrics": {
 		"category": "RS",

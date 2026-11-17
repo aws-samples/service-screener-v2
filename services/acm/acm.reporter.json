@@ -77,11 +77,11 @@
 		"criticality": "H",
 		"shortDesc": "Certificate has been revoked",
 		"ref": [
-			"[ACM Certificate Revocation]<https://docs.aws.amazon.com/acm/latest/userguide/revocation-reasons.html>"
+			"[ACM Certificate Revocation]<https://docs.aws.amazon.com/acm/latest/userguide/revoke-certificate.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/acm/latest/userguide/revocation-reasons.html"
+		"remediation_doc": "https://docs.aws.amazon.com/acm/latest/userguide/revoke-certificate.html"
 	},
 	"acmCertExpiry90Days": {
 		"category": "O",
@@ -125,11 +125,11 @@
 		"criticality": "M",
 		"shortDesc": "Certificate validation stuck or failed",
 		"ref": [
-			"[Troubleshoot validation]<https://docs.aws.amazon.com/acm/latest/userguide/troubleshooting-validation.html>"
+			"[Troubleshoot validation]<https://docs.aws.amazon.com/acm/latest/userguide/certificate-validation.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/acm/latest/userguide/troubleshooting-validation.html"
+		"remediation_doc": "https://docs.aws.amazon.com/acm/latest/userguide/certificate-validation.html"
 	},
 	"acmCertRenewalIneligible": {
 		"category": "O",

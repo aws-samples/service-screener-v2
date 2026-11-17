@@ -91,12 +91,12 @@
         "criticality": "H",
         "shortDesc": "Enable GuardDuty EKS Audit Log Monitoring",
         "ref": [
-            "[GuardDuty EKS Protection]<https://docs.aws.amazon.com/guardduty/latest/ug/eks-protection.html>",
+            "[GuardDuty EKS Protection]<https://docs.aws.amazon.com/guardduty/latest/ug/kubernetes-protection.html>",
             "[Security Hub control GuardDuty.5]<https://docs.aws.amazon.com/securityhub/latest/userguide/guardduty-controls.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/guardduty/latest/ug/eks-protection.html"
+        "remediation_doc": "https://docs.aws.amazon.com/guardduty/latest/ug/kubernetes-protection.html"
     },
     "MalwareProtectionDisabled": {
         "category": "S",
@@ -337,11 +337,11 @@
         "shortDesc": "Consider enabling Amazon Detective for investigations",
         "ref": [
             "[What is Amazon Detective?]<https://docs.aws.amazon.com/detective/latest/userguide/what-is-detective.html>",
-            "[Enabling Amazon Detective]<https://docs.aws.amazon.com/detective/latest/adminguide/detective-setup.html>"
+            "[Enabling Amazon Detective]<https://docs.aws.amazon.com/detective/latest/userguide/detective-setup.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/detective/latest/adminguide/detective-setup.html",
+        "remediation_doc": "https://docs.aws.amazon.com/detective/latest/userguide/detective-setup.html",
         "needFullTest": 0
     },
     "guarddutyS3MalwareProtectionOff": {

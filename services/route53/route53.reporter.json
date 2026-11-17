@@ -10,7 +10,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Configuring DNSSEC signing in Route 53]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec.html>",
-			"[Route 53 security best practices]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/security-best-practices.html>"
+			"[Route 53 security best practices]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec-enable-signing.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -238,7 +238,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Choosing between alias and non-alias records]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resource-record-sets-choosing-alias-non-alias.html>",
-			"[RFC 1034 § 3.6.2]<https://www.rfc-editor.org/rfc/rfc1034#section-3.6.2>"
+			"[RFC 1034 § 3.6.2]<https://www.rfc-editor.org/rfc/rfc1034.html#section-3.6.2>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -255,7 +255,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Configuring SPF]<https://docs.aws.amazon.com/ses/latest/dg/send-email-authentication-spf.html>",
-			"[Configuring DMARC]<https://docs.aws.amazon.com/ses/latest/dg/send-email-dmarc.html>"
+			"[Configuring DMARC]<https://docs.aws.amazon.com/ses/latest/dg/send-email-authentication-dmarc.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -303,12 +303,12 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Preventing subdomain takeover]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/DNSDangling.html>",
+			"[Preventing subdomain takeover]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resource-record-sets-deleting.html>",
 			"[MITRE ATT&CK T1584.001]<https://attack.mitre.org/techniques/T1584/001/>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/DNSDangling.html"
+		"remediation_doc": "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resource-record-sets-deleting.html"
 	},
 	"route53LowTtlOnStableRecords": {
 		"category": "P",
@@ -336,11 +336,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Public and private hosted zones]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/hosted-zones-comparison.html>"
+			"[Public and private hosted zones]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/hosted-zones-private.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/hosted-zones-comparison.html"
+		"remediation_doc": "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/hosted-zones-private.html"
 	},
 	"route53HealthCheckSniDisabled": {
 		"category": "S",

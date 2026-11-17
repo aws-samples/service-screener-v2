@@ -274,11 +274,11 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[Choosing the price class for a CloudFront distribution]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/PriceClass.html>",
-			"[Cost optimization]<https://docs.aws.amazon.com/whitepapers/latest/amazon-cloudfront-media/cost-optimization.html>"
+			"[Choosing the price class for a CloudFront distribution]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesGeneral.html#DownloadDistValuesPriceClass>",
+			"[Cost optimization]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesGeneral.html#DownloadDistValuesPriceClass>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/PriceClass.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesGeneral.html#DownloadDistValuesPriceClass"
 	}
 }

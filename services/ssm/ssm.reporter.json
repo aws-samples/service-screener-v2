@@ -10,11 +10,11 @@
     "needFullTest": 1,
     "ref": [
       "[Creating Parameter Store parameters]<https://docs.aws.amazon.com/systems-manager/latest/userguide/parameter-create-console.html>",
-      "[SecureString parameters]<https://docs.aws.amazon.com/systems-manager/latest/userguide/parameter-store-about-examples.html>"
+      "[SecureString parameters]<https://docs.aws.amazon.com/systems-manager/latest/userguide/secure-string-parameter-kms-encryption.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
-    "remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/parameter-store-about-examples.html"
+    "remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/secure-string-parameter-kms-encryption.html"
   },
   "ssmParameterNoEncryptionCMK": {
     "category": "S",
@@ -27,7 +27,7 @@
     "needFullTest": 1,
     "ref": [
       "[How AWS Systems Manager uses AWS KMS]<https://docs.aws.amazon.com/systems-manager/latest/userguide/secure-string-parameter-kms-encryption.html>",
-      "[SecureString parameters]<https://docs.aws.amazon.com/systems-manager/latest/userguide/parameter-store-about-examples.html>"
+      "[SecureString parameters]<https://docs.aws.amazon.com/systems-manager/latest/userguide/secure-string-parameter-kms-encryption.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
@@ -77,12 +77,12 @@
     "additionalCost": 0,
     "needFullTest": 0,
     "ref": [
-      "[Tagging Systems Manager parameters]<https://docs.aws.amazon.com/systems-manager/latest/userguide/sysman-paramstore-tagging.html>",
-      "[Controlling access to parameters using tags]<https://docs.aws.amazon.com/systems-manager/latest/userguide/sysman-paramstore-access.html>"
+      "[Tagging Systems Manager parameters]<https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_AddTagsToResource.html>",
+      "[Controlling access to parameters using tags]<https://docs.aws.amazon.com/systems-manager/latest/userguide/ps-restrict-parameter-access.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
-    "remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/sysman-paramstore-tagging.html"
+    "remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_AddTagsToResource.html"
   },
   "ssmSessionManagerNoEncryption": {
     "category": "S",
@@ -163,7 +163,7 @@
     "needFullTest": 1,
     "ref": [
       "[AWS Systems Manager Patch Manager]<https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager.html>",
-      "[About patch compliance]<https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-compliance.html>"
+      "[About patch compliance]<https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager-compliance-reports.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
@@ -231,7 +231,7 @@
     "needFullTest": 0,
     "ref": [
       "[AWS Systems Manager Inventory]<https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-inventory.html>",
-      "[Configuring inventory collection]<https://docs.aws.amazon.com/systems-manager/latest/userguide/sysman-inventory-configuring.html>"
+      "[Configuring inventory collection]<https://docs.aws.amazon.com/systems-manager/latest/userguide/inventory-collection.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
@@ -284,7 +284,7 @@
     "ref": [
       "[Patch policy configurations in Quick Setup]<https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager-policies.html>",
       "[SSM Command document for patching: AWS-RunPatchBaseline]<https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager-aws-runpatchbaseline.html>",
-      "[Patching schedules using maintenance windows]<https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager-scheduling.html>"
+      "[Patching schedules using maintenance windows]<https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager-policies.html>"
     ],
     "remediation": null,
     "remediation_risk": null,

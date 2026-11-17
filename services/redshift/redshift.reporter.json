@@ -137,11 +137,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Create new cluster]<https://docs.aws.amazon.com/redshift/latest/gsg/rs-gsg-prereq.html>"
+			"[Create new cluster]<https://docs.aws.amazon.com/redshift/latest/mgmt/create-cluster.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/redshift/latest/gsg/rs-gsg-prereq.html"
+		"remediation_doc": "https://docs.aws.amazon.com/redshift/latest/mgmt/create-cluster.html"
 	},
 	"DefaultDatabaseName": {
 		"category": "S",
@@ -330,10 +330,10 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Amazon Redshift Cluster Security Groups]<https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-security-groups.html>"
+			"[Amazon Redshift Cluster Security Groups]<https://docs.aws.amazon.com/redshift/latest/mgmt/managing-vpc-security-groups.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/redshift/latest/mgmt/working-with-security-groups.html"
+		"remediation_doc": "https://docs.aws.amazon.com/redshift/latest/mgmt/managing-vpc-security-groups.html"
 	}
 }

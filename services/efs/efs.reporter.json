@@ -219,11 +219,11 @@
 		"needFullTest": 0,
 		"shortDesc": "Review storage distribution for cost optimization",
 		"ref": [
-			"[EFS Storage Classes]<https://docs.aws.amazon.com/efs/latest/ug/storage-classes.html>"
+			"[EFS Storage Classes]<https://docs.aws.amazon.com/efs/latest/ug/features.html#storage-classes>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/efs/latest/ug/storage-classes.html"
+		"remediation_doc": "https://docs.aws.amazon.com/efs/latest/ug/features.html#storage-classes"
 	},
 	"NoSensitiveDataInTags": {
 		"category": "S",

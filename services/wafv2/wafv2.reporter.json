@@ -10,7 +10,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Managing rules in a web ACL]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-editing.html>",
-			"[AWS WAF security best practices]<https://docs.aws.amazon.com/waf/latest/developerguide/security-best-practices.html>"
+			"[AWS WAF security best practices]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-processing.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -60,7 +60,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Testing rules with Count]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-testing.html>",
-			"[Overriding a managed rule group action]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-group-override-options.html>"
+			"[Overriding a managed rule group action]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-action.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -124,11 +124,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Web ACL and rule visibility configuration]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-basic-configuration.html>"
+			"[Web ACL and rule visibility configuration]<https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-basic-configuration.html"
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html"
 	},
 	"wafv2SampledRequestsDisabled": {
 		"category": "O",
@@ -156,11 +156,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Web ACL and rule visibility configuration]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-basic-configuration.html>"
+			"[Web ACL and rule visibility configuration]<https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-basic-configuration.html"
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html"
 	},
 	"wafv2NotAssociated": {
 		"category": "C",
@@ -190,7 +190,7 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Tagging AWS resources]<https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html>",
-			"[Tagging AWS WAF resources]<https://docs.aws.amazon.com/waf/latest/developerguide/tagging.html>"
+			"[Tagging AWS WAF resources]<https://docs.aws.amazon.com/waf/latest/APIReference/API_TagResource.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -223,7 +223,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[AWSManagedRulesSQLiRuleSet]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-list.html#aws-managed-rule-groups-use-case-sql-db>",
-			"[OWASP A03: Injection]<https://owasp.org/Top10/A03_2021-Injection/>"
+			"[OWASP A03: Injection]<https://top10.owasp.org/A03_2021-Injection/>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -304,11 +304,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[WAF rule priorities]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-rule-order.html>"
+			"[WAF rule priorities]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-processing-order.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-rule-order.html"
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-processing-order.html"
 	},
 	"wafv2ManagedRuleGroupVersionPinned": {
 		"category": "O",
@@ -320,11 +320,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Managed rule group versions]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-group-versioning.html>"
+			"[Managed rule group versions]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-groups-versioning.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-group-versioning.html"
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-groups-versioning.html"
 	},
 	"wafv2NoBotControl": {
 		"category": "S",
@@ -497,11 +497,11 @@
 		"additionalCost": -1,
 		"needFullTest": 1,
 		"ref": [
-			"[WAF rule priority]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-rule-order.html>"
+			"[WAF rule priority]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-processing-order.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-rule-order.html"
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-processing-order.html"
 	},
 	"wafv2IpSetEmpty": {
 		"category": "O",
@@ -577,11 +577,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Managed rule group versioning]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-group-versioning.html>"
+			"[Managed rule group versioning]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-groups-versioning.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-group-versioning.html"
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-groups-versioning.html"
 	},
 	"wafv2AlbWithoutWebAcl": {
 		"category": "S",
@@ -657,11 +657,11 @@
 		"additionalCost": 1,
 		"needFullTest": 1,
 		"ref": [
-			"[WAF with Cognito user pools]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-waf.html>"
+			"[WAF with Cognito user pools]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-waf.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-waf.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-waf.html"
 	},
 	"shieldAdvancedNoProactiveEngagement": {
 		"category": "S",

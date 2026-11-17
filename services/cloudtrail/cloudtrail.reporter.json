@@ -303,7 +303,7 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[GuardDuty Best Practices]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_best-practices.html>",
+			"[GuardDuty Best Practices]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_settingup.html>",
 			"[Getting Started with GuardDuty]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_settingup.html>"
 		],
 		"remediation": "aws guardduty create-detector --enable",

@@ -9,12 +9,12 @@
     "additionalCost": 1,
     "needFullTest": 0,
     "ref": [
-      "[Data protection in Amazon EventBridge]<https://docs.aws.amazon.com/eventbridge/latest/userguide/encryption-at-rest.html>",
-      "[Customer managed keys for event buses]<https://docs.aws.amazon.com/eventbridge/latest/userguide/encryption-at-rest-cmkes.html>"
+      "[Data protection in Amazon EventBridge]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-encryption-event-bus-cmkey.html>",
+      "[Customer managed keys for event buses]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-encryption-event-bus-cmkey-configure.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
-    "remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/encryption-at-rest-cmkes.html"
+    "remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-encryption-event-bus-cmkey-configure.html"
   },
   "ebBusPublicPolicy": {
     "category": "S",
@@ -95,7 +95,7 @@
     "needFullTest": 1,
     "ref": [
       "[Amazon EventBridge targets]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-targets.html>",
-      "[Adding targets to a rule]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-rule.html>"
+      "[Adding targets to a rule]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-rule-visual.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
@@ -146,7 +146,7 @@
     "needFullTest": 0,
     "ref": [
       "[Amazon EventBridge rules]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rules.html>",
-      "[Creating a rule that reacts to events]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-rule.html>"
+      "[Creating a rule that reacts to events]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-rule-visual.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
@@ -163,7 +163,7 @@
     "needFullTest": 0,
     "ref": [
       "[Archiving and replaying events]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-archive.html>",
-      "[Replaying archived events]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-archive-replay.html>"
+      "[Replaying archived events]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-archive.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
@@ -180,11 +180,11 @@
     "needFullTest": 0,
     "ref": [
       "[EventBridge schemas]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-schema.html>",
-      "[Schema discovery]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-schema-discovery.html>"
+      "[Schema discovery]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-schemas-infer.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
-    "remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-schema-discovery.html"
+    "remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-schemas-infer.html"
   },
   "ebConnectionNoAuth": {
     "category": "S",
@@ -197,11 +197,11 @@
     "needFullTest": 1,
     "ref": [
       "[Connections for API destinations]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-api-destinations.html>",
-      "[Authorization for API destinations]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-api-destination-auth.html>"
+      "[Authorization for API destinations]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-target-connection-auth.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
-    "remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-api-destination-auth.html"
+    "remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-target-connection-auth.html"
   },
   "ebApiDestinationHttpEndpoint": {
     "category": "S",

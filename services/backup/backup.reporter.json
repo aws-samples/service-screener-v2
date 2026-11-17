@@ -155,11 +155,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Backup region settings]<https://docs.aws.amazon.com/aws-backup/latest/devguide/opt-in.html>"
+			"[Backup region settings]<https://docs.aws.amazon.com/aws-backup/latest/devguide/assigning-resources.html#backup-service-optin>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/opt-in.html"
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/assigning-resources.html#backup-service-optin"
 	},
 	"backupRecoveryPointNotEncrypted": {
 		"category": "S",

@@ -1082,7 +1082,7 @@
 		"criticality": "M",
 		"shortDesc": "Consider using I/O-Optimized",
 		"ref": [
-			"[Choosing Aurora StorageType]<https://youtu.be/OlFeaVd6Ll4?si=r_2V66HqA83tJOkg&t=351>",
+			"[Choosing Aurora StorageType]<https://www.youtube.com/watch?v=OlFeaVd6Ll4&t=351s>",
 			"[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications>"
 		],
 		"remediation": null,
@@ -1099,7 +1099,7 @@
 		"criticality": "M",
 		"shortDesc": "Consider using Aurora Standard",
 		"ref": [
-			"[Choosing Aurora StorageType]<https://youtu.be/OlFeaVd6Ll4?si=r_2V66HqA83tJOkg&t=351>",
+			"[Choosing Aurora StorageType]<https://www.youtube.com/watch?v=OlFeaVd6Ll4&t=351s>",
 			"[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications>"
 		],
 		"remediation": null,
@@ -1116,7 +1116,7 @@
 		"criticality": "I",
 		"shortDesc": "(Informational) Cluster IO/Storage Ratio",
 		"ref": [
-			"[Choosing Aurora StorageType]<https://youtu.be/OlFeaVd6Ll4?si=r_2V66HqA83tJOkg&t=351>",
+			"[Choosing Aurora StorageType]<https://www.youtube.com/watch?v=OlFeaVd6Ll4&t=351s>",
 			"[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications>"
 		],
 		"remediation": null,
@@ -1434,12 +1434,12 @@
 		"criticality": "M",
 		"shortDesc": "Review snapshots shared with other accounts",
 		"ref": [
-			"[Sharing a DB snapshot]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/share-snapshot.html>",
+			"[Sharing a DB snapshot]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ShareSnapshot.html>",
 			"[Sharing a DB cluster snapshot]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-share-snapshot.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/share-snapshot.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ShareSnapshot.html"
 	},
 	"rdsSnapshotUnencrypted": {
 		"category": "S",

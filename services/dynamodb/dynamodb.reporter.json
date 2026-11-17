@@ -153,7 +153,7 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[DDB Backup/Restore]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/BackupRestore.html>"
+			"[DDB Backup/Restore]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Backup-and-Restore.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -410,7 +410,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Global Tables Version Comparison]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V2.html>",
+			"[Global Tables Version Comparison]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_versions.html>",
 			"[Upgrading Global Tables]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_versions.html>"
 		],
 		"remediation": null,
