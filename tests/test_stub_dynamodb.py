@@ -223,3 +223,81 @@ def test_legacy_global_table_error_is_not_pass():
 def test_tag_access_denied_is_not_pass():
     res = _runReplica(_table(), tagError='AccessDeniedException')
     assert res == [0, 'Unable to evaluate (AccessDeniedException)']
+
+
+# --------------------------------------------------------------------------- #
+# Review fix round 1
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize('status', [
+    'CREATING', 'CREATION_FAILED', 'DELETING', 'REGION_DISABLED', 'ARCHIVING', 'ARCHIVED',
+    'INACCESSIBLE_ENCRYPTION_CREDENTIALS', 'REPLICATION_NOT_AUTHORIZED',
+])
+def test_unhealthy_replica_does_not_count_flag_then_fix(status):
+    critical = [{'Key': 'criticality', 'Value': 'high'}]
+    bad = _runReplica(_table(GlobalTableVersion='2019.11.21',
+                             Replicas=[{'RegionName': 'us-west-2', 'ReplicaStatus': status}]), tags=critical)
+    assert bad[0] == -1 and status in bad[1]
+    for healthy in ('ACTIVE', 'UPDATING'):
+        good = _runReplica(_table(GlobalTableVersion='2019.11.21',
+                                  Replicas=[{'RegionName': 'us-west-2', 'ReplicaStatus': healthy}]))
+        assert good[0] == 1
+
+
+def test_legacy_global_table_unhealthy_replica_flag_then_fix():
+    critical = [{'Key': 'tier', 'Value': '1'}]
+    bad = _runReplica(_table(GlobalTableVersion='2017.11.29'), tags=critical, globalTable={
+        'GlobalTableName': TABLE,
+        'ReplicationGroup': [{'RegionName': 'us-east-1', 'ReplicaStatus': 'ACTIVE'},
+                             {'RegionName': 'eu-west-1', 'ReplicaStatus': 'CREATION_FAILED'}]})
+    assert bad[0] == -1
+    good = _runReplica(_table(GlobalTableVersion='2017.11.29'), globalTable={
+        'GlobalTableName': TABLE,
+        'ReplicationGroup': [{'RegionName': 'us-east-1', 'ReplicaStatus': 'ACTIVE'},
+                             {'RegionName': 'eu-west-1', 'ReplicaStatus': 'ACTIVE'}]})
+    assert good[0] == 1 and 'eu-west-1' in good[1]
+
+
+@pytest.mark.parametrize('condition', [
+    {'StringLike': {'aws:PrincipalOrgID': 'o-*'}},
+    {'StringLike': {'aws:PrincipalOrgID': 'o-abc123def?'}},
+    {'ForAnyValue:StringLike': {'aws:PrincipalOrgPaths': 'o-*/*'}},
+    {'ForAnyValue:StringLike': {'aws:PrincipalOrgPaths': '*/r-ab12/*'}},
+])
+def test_wildcard_org_id_does_not_scope_cross_account(condition):
+    principal = {'AWS': f'arn:aws:iam::{OTHER}:root'}
+    bad = _runPolicy([(TABLE_ARN, _doc(_stmt(principal, condition)))])
+    assert bad[0] == -1 and OTHER in bad[1]
+    good = _runPolicy([(TABLE_ARN, _doc(_stmt(principal, {'StringEquals': {'aws:PrincipalOrgID': 'o-abc123def4'}})))])
+    assert good[0] == 1
+
+
+@pytest.mark.parametrize('condition', [
+    {'StringLike': {'aws:PrincipalOrgID': 'o-*'}},
+    {'ArnLike': {'aws:PrincipalArn': 'arn:aws:iam::*:role/x'}},
+    {'ArnLike': {'aws:PrincipalArn': 'arn:aws:iam::1111*:role/x'}},
+    {'StringLike': {'aws:PrincipalAccount': '1111*'}},
+])
+def test_wildcard_principal_with_wildcard_scoping_values_flags(condition):
+    bad = _runPolicy([(TABLE_ARN, _doc(_stmt('*', condition)))])
+    assert bad[0] == -1 and 'any principal' in bad[1]
+    good = _runPolicy([(TABLE_ARN, _doc(_stmt('*', {'ArnEquals': {'aws:PrincipalArn': f'arn:aws:iam::{SELF}:role/x'}})))])
+    assert good[0] == 1
+
+
+@pytest.mark.parametrize('condition', [
+    {'StringEquals': {'aws:PrincipalAccount': OTHER}},
+    {'StringEquals': {'aws:PrincipalAccount': [SELF, OTHER]}},
+    {'StringEquals': {'aws:SourceAccount': OTHER}},
+    {'ArnEquals': {'aws:PrincipalArn': f'arn:aws:iam::{OTHER}:role/reader'}},
+])
+def test_wildcard_principal_pinned_to_other_account_needs_org(condition):
+    bad = _runPolicy([(TABLE_ARN, _doc(_stmt('*', condition)))])
+    assert bad[0] == -1 and OTHER in bad[1]
+    fixed = dict(condition)
+    fixed['StringEquals'] = dict(fixed.get('StringEquals', {}), **{'aws:PrincipalOrgID': 'o-abc123def4'})
+    good = _runPolicy([(TABLE_ARN, _doc(_stmt('*', fixed)))])
+    assert good[0] == 1
+
+
+def test_wildcard_principal_own_account_arn_passes():
+    assert _runPolicy([(TABLE_ARN, _doc(_stmt('*', {'ArnLike': {'aws:PrincipalArn': f'arn:aws:iam::{SELF}:role/app-*'}})))])[0] == 1

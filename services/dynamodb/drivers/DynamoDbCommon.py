@@ -14,11 +14,20 @@ from utils import PolicyPrincipal
 
 # Condition keys accepted as organisation scoping for cross-account grants.
 _ORG_CONDITION_KEYS = frozenset(('aws:principalorgid', 'aws:principalorgpaths'))
-# Positive-match string operators (negated / IfExists / ForAllValues forms do not restrict callers).
-_ORG_OPERATORS = frozenset(('stringequals', 'stringequalsignorecase', 'stringlike'))
+# Positive-match operators (negated / IfExists / ForAllValues forms do not restrict callers).
+_POSITIVE_OPERATORS = frozenset(('stringequals', 'stringequalsignorecase', 'stringlike', 'arnequals', 'arnlike'))
+_ALL_ORG_KEYS = _ORG_CONDITION_KEYS | frozenset(('aws:sourceorgid', 'aws:sourceorgpaths'))
+_ACCOUNT_KEYS = frozenset(('aws:principalaccount', 'aws:sourceaccount', 'aws:sourceowner'))
+_ARN_KEYS = frozenset(('aws:principalarn', 'aws:sourcearn'))
+_NETWORK_PATH_KEYS = frozenset(('aws:sourcevpc', 'aws:sourcevpce'))
+_ORG_ID = re.compile(r'^o-[a-z0-9]{10,32}$')
+_ACCOUNT_ID = re.compile(r'^\d{12}$')
 # Principal values that carry an account ID: "123456789012", arn:aws:iam::123456789012:..., arn:aws:sts::123456789012:...
 _ACCOUNT_IN_PRINCIPAL = re.compile(r'^(?:arn:aws[a-z-]*:(?:iam|sts)::)?(\d{12})(?::|$)')
 _OPEN_CIDRS = frozenset(('0.0.0.0/0', '::/0'))
+# Replica statuses that can serve traffic. CREATING, CREATION_FAILED, DELETING, REGION_DISABLED,
+# INACCESSIBLE_ENCRYPTION_CREDENTIALS, ARCHIVING, ARCHIVED and REPLICATION_NOT_AUTHORIZED do not.
+_HEALTHY_REPLICA_STATUSES = frozenset(('ACTIVE', 'UPDATING'))
 
 # Tag keys/values (case-insensitive, '-', '_' and spaces ignored) that mark a table as business critical.
 _CRITICALITY_TAG_KEYS = frozenset((
@@ -41,25 +50,108 @@ def _asList(value):
     return value if isinstance(value, list) else [value]
 
 
-def _conditionScopesToOrg(condition):
-    """True if the Condition pins aws:PrincipalOrgID / aws:PrincipalOrgPaths to concrete values."""
-    if not isinstance(condition, dict):
+def _hasWildcard(value):
+    return '*' in value or '?' in value
+
+
+def _orgValueIsConcrete(key, value):
+    """aws:PrincipalOrgID / SourceOrgID must be a full o-... ID (no wildcards: 'o-*' matches every
+    organisation). aws:PrincipalOrgPaths / SourceOrgPaths must start with a concrete o-... segment."""
+    if not isinstance(value, str):
         return False
+    if key.endswith('orgid'):
+        return bool(_ORG_ID.match(value))
+    first = value.split('/', 1)[0]
+    return bool(_ORG_ID.match(first)) and '/' in value
+
+
+def _positiveBlocks(condition):
+    """Yield (key_lower, values) for positive-match operators that actually restrict callers.
+    Negated, IfExists and ForAllValues forms are skipped (they can match callers without the key)."""
+    if not isinstance(condition, dict):
+        return
     for operator, block in condition.items():
         if not isinstance(operator, str) or not isinstance(block, dict):
             continue
         op = operator.lower()
+        if op.startswith('forallvalues:'):
+            continue
         if op.startswith('foranyvalue:'):
             op = op[len('foranyvalue:'):]
-        if op not in _ORG_OPERATORS:
+        if op not in _POSITIVE_OPERATORS:
             continue
         for key, value in block.items():
-            if str(key).lower() not in _ORG_CONDITION_KEYS:
-                continue
             values = _asList(value)
-            if values and all(isinstance(v, str) and v and not set(v) <= {'*', '?'} for v in values):
-                return True
+            if values:
+                yield str(key).lower(), values
+
+
+def _conditionScopesToOrg(condition, keys=_ORG_CONDITION_KEYS):
+    """True if the Condition pins an organisation key to a concrete organisation."""
+    for key, values in _positiveBlocks(condition):
+        if key in keys and all(_orgValueIsConcrete(key, v) for v in values):
+            return True
     return False
+
+
+def _wildcardScope(condition, ownAccount):
+    """
+    Classify how a Condition restricts an Allow statement whose principal is "*" / NotPrincipal.
+    Returns (scoped, externalAccounts):
+      scoped=True  -> limited to a concrete organisation, to this account, to a specific source
+                      resource / VPC / VPC endpoint, or to fixed non-open source CIDRs;
+      externalAccounts -> other 12-digit accounts the caller is pinned to (cross-account grant,
+                      still needs organisation scoping);
+      scoped=False and no accounts -> effectively public.
+    Wildcards in an account position (e.g. aws:PrincipalArn arn:aws:iam::*:role/x) do not scope.
+    """
+    if _conditionScopesToOrg(condition, _ALL_ORG_KEYS) or _conditionScopesToNetwork(condition):
+        return True, set()
+    scoped = False
+    external = set()
+    for key, values in _positiveBlocks(condition):
+        if not all(isinstance(v, str) and v for v in values):
+            continue
+        if key in _ACCOUNT_KEYS:
+            if all(_ACCOUNT_ID.match(v) for v in values):
+                others = {v for v in values if v != ownAccount}
+                if others:
+                    external |= others
+                else:
+                    scoped = True
+        elif key in _ARN_KEYS:
+            accounts = set()
+            ok = True
+            for v in values:
+                parts = v.split(':')
+                if len(parts) < 6 or not parts[0] == 'arn':
+                    ok = False
+                    break
+                acct = parts[4]
+                if acct == '':
+                    # Resources without an account segment (e.g. S3 buckets) scope only when fully concrete.
+                    if key == 'aws:principalarn' or _hasWildcard(v):
+                        ok = False
+                        break
+                elif _ACCOUNT_ID.match(acct):
+                    accounts.add(acct)
+                else:
+                    ok = False
+                    break
+            if not ok:
+                continue
+            others = accounts - {ownAccount}
+            if others:
+                external |= others
+            else:
+                scoped = True
+        elif key in _NETWORK_PATH_KEYS:
+            if not any(_hasWildcard(v) for v in values):
+                scoped = True
+    if scoped:
+        # Any concrete own-account / resource / VPC restriction is ANDed with the others.
+        return True, set()
+    return False, external
 
 
 def _conditionScopesToNetwork(condition):
@@ -101,8 +193,15 @@ def resourcePolicyIssues(policyDoc, ownAccount):
         sid = stmt.get('Sid')
         label = 'statement ' + (str(sid) if sid else '(no Sid)')
         condition = stmt.get('Condition')
-        if PolicyPrincipal.statementIsPublic(stmt) and not _conditionScopesToNetwork(condition):
-            issues.append(label + ' allows any principal without a restricting condition')
+        if PolicyPrincipal.principalIsWildcard(stmt.get('Principal')) or 'NotPrincipal' in stmt:
+            scoped, externalAccts = _wildcardScope(condition, ownAccount)
+            if scoped:
+                continue
+            if externalAccts:
+                issues.append(label + ' allows any principal in account(s) ' + ', '.join(sorted(externalAccts))
+                              + ' without aws:PrincipalOrgID')
+            else:
+                issues.append(label + ' allows any principal without a restricting condition')
             continue
         principal = stmt.get('Principal')
         awsValues = _asList(principal.get('AWS')) if isinstance(principal, dict) else []
@@ -714,19 +813,31 @@ class DynamoDbCommon(Evaluator):
         ownRegion = arnParts[3] if len(arnParts) > 3 else None
 
         replicaRegions = set()
-        for r in table.get('Replicas') or []:
+        unhealthy = []
+
+        def consider(r):
             region = r.get('RegionName')
-            if region and region != ownRegion and r.get('ReplicaStatus') not in ('DELETING', 'REGION_DISABLED'):
+            if not region or region == ownRegion:
+                return
+            status = r.get('ReplicaStatus')
+            # Allowlist: only replicas that can serve traffic count for DR. A missing (optional)
+            # status field is not evidence of an unhealthy replica.
+            if status is None or status in _HEALTHY_REPLICA_STATUSES:
                 replicaRegions.add(region)
+            else:
+                unhealthy.append(region + ' (' + str(status) + ')')
+
+        for r in table.get('Replicas') or []:
+            if isinstance(r, dict):
+                consider(r)
 
         # Legacy (2017.11.29) global tables report their replicas only via DescribeGlobalTable.
         if not replicaRegions and table.get('GlobalTableVersion') == '2017.11.29':
             try:
                 gt = self.dynamoDbClient.describe_global_table(GlobalTableName=self.tablename)
                 for r in gt.get('GlobalTableDescription', {}).get('ReplicationGroup', []) or []:
-                    region = r.get('RegionName')
-                    if region and region != ownRegion:
-                        replicaRegions.add(region)
+                    if isinstance(r, dict):
+                        consider(r)
             except botocore.exceptions.ClientError as e:
                 code = e.response.get('Error', {}).get('Code', 'Unknown')
                 self.results[key] = [0, 'Unable to evaluate (' + code + ')']
@@ -756,7 +867,10 @@ class DynamoDbCommon(Evaluator):
                 criticalTag = str(t.get('Key')) + '=' + str(t.get('Value'))
                 break
 
+        note = ''
+        if unhealthy:
+            note = ' (replicas not serving traffic: ' + ', '.join(sorted(unhealthy)) + ')'
         if criticalTag:
-            self.results[key] = [-1, 'Table tagged ' + criticalTag + ' has no replica in another Region']
+            self.results[key] = [-1, 'Table tagged ' + criticalTag + ' has no active replica in another Region' + note]
         else:
-            self.results[key] = [0, 'No replica in another Region; table is not tagged as critical - review its DR requirements']
+            self.results[key] = [0, 'No active replica in another Region; table is not tagged as critical - review its DR requirements' + note]
