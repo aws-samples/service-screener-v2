@@ -29,7 +29,9 @@ class Vpclattice(Service):
         'UnrecognizedClientException',
     )
 
-    SKIP_STATUSES = ('DELETE_IN_PROGRESS',)
+    # CREATE_FAILED resources never became usable. DELETE_FAILED resources are
+    # still evaluated: they continue to exist and may still route traffic.
+    SKIP_STATUSES = ('DELETE_IN_PROGRESS', 'CREATE_FAILED')
 
     def __init__(self, region):
         super().__init__(region)

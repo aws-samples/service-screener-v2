@@ -78,12 +78,20 @@ class VpclatticeService(VpclatticeBase):
                 'log service traffic'
             ]
             return
-        if unlogged or not nets:
-            where = (f'; associated service network(s) without service access logs: '
-                     f'{", ".join(unlogged[:5])}') if unlogged else ' and it is not associated with any service network'
+        if not nets:
+            # An unassociated service cannot receive VPC Lattice traffic, so
+            # there is nothing to log yet.
+            self.results[key] = [
+                0,
+                'The service has no access log subscription but is not associated with any service '
+                'network, so it receives no traffic; enable access logs before associating it'
+            ]
+            return
+        if unlogged:
             self.results[key] = [
                 -1,
-                f'The service has no access log subscription{where} - requests to it are not recorded'
+                'The service has no access log subscription; associated service network(s) without '
+                f'service access logs: {", ".join(unlogged[:5])} - requests to it are not recorded'
             ]
             return
         self.results[key] = [

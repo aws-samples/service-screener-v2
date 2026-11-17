@@ -119,6 +119,69 @@ def test_auth_iam_with_anonymous_policy_flag_then_fix(cls, res, arn):
     assert fixed[KEY_AUTH][0] == 1
 
 
+def _auth(cls, res, arn, stmts):
+    return _run(cls, res('AWS_IAM'), [
+        ('get_auth_policy', {'policy': _policy(*stmts), 'state': 'Active'}, {'resourceIdentifier': arn})],
+        AUTH)[KEY_AUTH][0]
+
+
+VPC_STMT = dict(OPEN_STMT, Sid='Vpc', Condition={'StringEquals': {'vpc-lattice-svcs:SourceVpc': 'vpc-123'}})
+
+
+@pytest.mark.parametrize('cls,res,arn', [
+    (VpclatticeService, _svc, SVC_ARN), (VpclatticeServiceNetwork, _sn, SN_ARN)])
+def test_auth_iam_source_vpc_only_condition_flag_then_fix(cls, res, arn):
+    # SourceVpc is satisfiable by unsigned callers in that VPC -> still anonymous.
+    assert _auth(cls, res, arn, [VPC_STMT]) == -1
+    # Fix: also require an authenticated principal from the org.
+    fixed = dict(VPC_STMT, Condition={
+        'StringEquals': {'vpc-lattice-svcs:SourceVpc': 'vpc-123', 'aws:PrincipalOrgID': 'o-abc123'}})
+    assert _auth(cls, res, arn, [fixed]) == 1
+
+
+@pytest.mark.parametrize('condition', [
+    {'StringEquals': {'vpc-lattice-svcs:ServiceNetworkArn': SN_ARN}},
+    {'StringEquals': {'vpc-lattice-svcs:SourceVpcOwnerAccount': ACCT}},
+    {'IpAddress': {'aws:SourceIp': '10.0.0.0/8'}},
+    # negated operators on keys anonymous callers lack evaluate true
+    {'StringNotEquals': {'aws:PrincipalOrgID': 'o-abc123'}},
+    {'ArnNotLike': {'aws:PrincipalArn': 'arn:aws:iam::999999999999:*'}},
+    # IfExists / ForAllValues evaluate true when the key is missing
+    {'StringEqualsIfExists': {'aws:PrincipalAccount': ACCT}},
+    {'ForAllValues:StringLike': {'aws:PrincipalOrgPaths': 'o-abc/*'}},
+    {'StringNotEquals': {'aws:PrincipalType': 'anonymous'}},  # case-sensitive: does not match
+    {'StringEquals': {'aws:PrincipalType': ['AssumedRole', 'Anonymous']}},
+])
+def test_auth_conditions_that_still_admit_anonymous(condition):
+    assert _auth(VpclatticeService, _svc, SVC_ARN, [dict(OPEN_STMT, Condition=condition)]) == -1
+
+
+@pytest.mark.parametrize('condition', [
+    {'StringEquals': {'aws:PrincipalAccount': ACCT}},
+    {'ArnLike': {'aws:PrincipalArn': f'arn:aws:iam::{ACCT}:role/*'}},
+    {'ForAnyValue:StringLike': {'aws:PrincipalOrgPaths': 'o-abc/*'}},
+    {'StringEquals': {'aws:PrincipalTag/team': 'orders'}},
+    {'Null': {'aws:PrincipalArn': 'false'}},
+    {'StringNotEquals': {'aws:PrincipalType': 'Anonymous'}},
+    {'StringEquals': {'aws:PrincipalType': 'AssumedRole'}},
+])
+def test_auth_conditions_that_exclude_anonymous(condition):
+    assert _auth(VpclatticeService, _svc, SVC_ARN, [dict(OPEN_STMT, Condition=condition)]) == 1
+
+
+@pytest.mark.parametrize('deny_condition,expected', [
+    ({'StringEquals': {'aws:PrincipalType': 'Anonymous'}}, 1),
+    ({'StringNotEquals': {'aws:PrincipalOrgID': 'o-abc123'}}, 1),
+    ({'Null': {'aws:PrincipalArn': 'true'}}, 1),
+    # Deny scoped by a key anonymous callers may not match does not block them all
+    ({'StringNotEquals': {'vpc-lattice-svcs:SourceVpc': 'vpc-123'}}, -1),
+])
+def test_auth_explicit_deny_of_anonymous(deny_condition, expected):
+    deny = {'Sid': 'DenyAnon', 'Effect': 'Deny', 'Principal': '*', 'Action': 'vpc-lattice-svcs:Invoke',
+            'Resource': '*', 'Condition': deny_condition}
+    assert _auth(VpclatticeService, _svc, SVC_ARN, [VPC_STMT, deny]) == expected
+
+
 def test_auth_iam_without_policy_is_deny_all_not_flagged():
     r = _run(VpclatticeService, _svc('AWS_IAM'), [
         ('get_auth_policy', ('ResourceNotFoundException', 404), {'resourceIdentifier': SVC_ARN})], AUTH)
@@ -187,11 +250,12 @@ def test_service_access_logs_flag_then_fix():
     assert fixed[KEY_LOGS][0] == 1
 
 
-def test_service_unassociated_without_logs_flagged():
+def test_service_unassociated_without_logs_is_info():
+    # An unassociated service receives no Lattice traffic -> INFO, not a finding.
     r = _run(VpclatticeService, _svc(), [
         ('list_access_log_subscriptions', {'items': []}, {'resourceIdentifier': SVC_ARN}),
         ('list_service_network_service_associations', {'items': []}, {'serviceIdentifier': SVC_ARN})], LOGS)
-    assert r[KEY_LOGS][0] == -1
+    assert r[KEY_LOGS][0] == 0
 
 
 def test_service_logs_unreadable_is_not_evaluable():
