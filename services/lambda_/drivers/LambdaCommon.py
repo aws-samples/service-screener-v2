@@ -1,7 +1,8 @@
 import json
 import os
+import re
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone, date
 
 import botocore
 import boto3
@@ -25,6 +26,72 @@ class LambdaCommon(Evaluator):
     CUSTOM_RUNTIME_PREFIX = [
         'provided'
     ]
+
+    # lambdaDeprecatedRuntime: runtime identifier -> deprecation date (YYYY-MM-DD),
+    # from https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
+    # ("Deprecated runtimes" / "Upcoming runtime deprecations"). Maintain this table
+    # when AWS publishes new dates. A runtime is flagged only once its deprecation
+    # date is in the past. Runtimes still in support upstream whose AWS date is not
+    # yet confirmed (e.g. java8.al2, java11, java17, provided.al2, python3.11) are
+    # intentionally NOT listed to avoid false FAILs; lambdaRuntimeUpdate still
+    # reports that a newer version exists.
+    DEPRECATED_RUNTIMES = {
+        'nodejs': '2016-10-31',
+        'nodejs4.3': '2020-03-05',
+        'nodejs4.3-edge': '2019-04-30',
+        'nodejs6.10': '2019-08-12',
+        'nodejs8.10': '2020-03-06',
+        'nodejs10.x': '2021-07-30',
+        'nodejs12.x': '2023-03-31',
+        'nodejs14.x': '2023-12-04',
+        'nodejs16.x': '2024-06-12',
+        'nodejs18.x': '2025-09-01',
+        'nodejs20.x': '2026-04-30',
+        'python2.7': '2021-07-15',
+        'python3.6': '2022-07-18',
+        'python3.7': '2023-12-04',
+        'python3.8': '2024-10-14',
+        'python3.9': '2025-12-15',
+        'python3.10': '2026-06-30',
+        'ruby2.5': '2021-07-30',
+        'ruby2.7': '2023-12-07',
+        'ruby3.2': '2026-03-31',
+        'java8': '2024-01-08',
+        'go1.x': '2024-01-08',
+        'provided': '2024-01-08',
+        'dotnetcore1.0': '2019-07-30',
+        'dotnetcore2.0': '2019-05-30',
+        'dotnetcore2.1': '2022-01-05',
+        'dotnetcore3.1': '2023-04-03',
+        'dotnet6': '2024-12-20',
+        'dotnet7': '2024-05-14',
+        'dotnet8': '2026-11-10',
+    }
+
+    # lambdaEnvVarSecrets: same name patterns as ecs.ecsTaskDefinitionNoSecretsInEnvVars
+    SECRET_NAME_PATTERNS = [
+        re.compile(r'AWS_SECRET_ACCESS_KEY', re.IGNORECASE),
+        re.compile(r'AWS_SESSION_TOKEN', re.IGNORECASE),
+        re.compile(r'PASSWORD', re.IGNORECASE),
+        re.compile(r'PASSWD', re.IGNORECASE),
+        re.compile(r'(^|_)SECRET($|_)', re.IGNORECASE),
+        re.compile(r'API[_-]?KEY', re.IGNORECASE),
+        re.compile(r'PRIVATE[_-]?KEY', re.IGNORECASE),
+        re.compile(r'(^|_)TOKEN($|_)', re.IGNORECASE),
+        re.compile(r'CREDENTIALS?', re.IGNORECASE),
+        re.compile(r'CONNECTION[_-]?STRING', re.IGNORECASE),
+        re.compile(r'AUTH[_-]?KEY', re.IGNORECASE),
+    ]
+    # Names that point at a secret rather than hold it (e.g. DB_PASSWORD_SECRET_ARN)
+    SECRET_REFERENCE_NAME_RE = re.compile(
+        r'_(ARN|NAME|ID|PATH|PARAM|PARAMETER|PARAMETER_NAME|SSM|REF|URL|URI|ENDPOINT|TTL|TIMEOUT|EXPIRY|EXPIRATION|ENABLED|HEADER)$',
+        re.IGNORECASE)
+    # Values that reference Secrets Manager / SSM Parameter Store instead of embedding a secret
+    SECRET_REFERENCE_VALUE_RE = re.compile(r'^arn:aws[a-z-]*:(secretsmanager|ssm|kms):', re.IGNORECASE)
+    BENIGN_VALUE_RE = re.compile(r'^(true|false|yes|no|on|off|none|null|enabled|disabled|\d{1,5})$', re.IGNORECASE)
+    AWS_ACCESS_KEY_ID_RE = re.compile(r'\b(AKIA|ASIA)[0-9A-Z]{16}\b')
+    PEM_PRIVATE_KEY_RE = re.compile(r'-----BEGIN [A-Z ]*PRIVATE KEY-----')
+    URL_WITH_PASSWORD_RE = re.compile(r'[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s@]+@', re.IGNORECASE)
 
     RUNTIME_PATH = _C.BOTOCORE_DIR + '/data/lambda/2015-03-31/service-2.json'
     CW_HISTORY_DAYS = [30, 7]
@@ -833,3 +900,104 @@ class LambdaCommon(Evaluator):
             print(f"Error checking reserved concurrency for throttling: {str(e)}")
         
         return
+
+    # ------------------------------------------------------------------ #
+    # WAFS2027 security checks
+    # ------------------------------------------------------------------ #
+    def _checkLambdaDeprecatedRuntime(self):
+        """FAIL when the function runtime has passed its AWS deprecation date."""
+        key = 'lambdaDeprecatedRuntime'
+        runtime = self.lambda_.get('Runtime')
+        if not runtime:
+            if self.lambda_.get('PackageType') == 'Image':
+                self.results[key] = [0, 'Container image function; runtime is managed in the image']
+            else:
+                self.results[key] = [0, 'Unable to evaluate (Runtime not returned)']
+            return
+
+        deprecated = self.DEPRECATED_RUNTIMES.get(runtime)
+        today = datetime.now(timezone.utc).date()
+        if deprecated and date.fromisoformat(deprecated) <= today:
+            self.results[key] = [-1, f"{runtime} deprecated since {deprecated}"]
+        else:
+            self.results[key] = [1, f"{runtime} is not deprecated"]
+
+    def _checkLambdaEnvVarSecrets(self):
+        """FAIL when environment variables look like they hold credentials.
+        Only variable NAMES are reported - values are never echoed."""
+        key = 'lambdaEnvVarSecrets'
+        env = self.lambda_.get('Environment') or {}
+        variables = env.get('Variables')
+        if variables is None and env.get('Error'):
+            code = (env.get('Error') or {}).get('ErrorCode') or 'EnvironmentError'
+            self.results[key] = [0, f'Unable to evaluate ({code})']
+            return
+        if not variables:
+            self.results[key] = [1, 'No environment variables']
+            return
+
+        findings = []
+        for name, value in variables.items():
+            val = '' if value is None else str(value).strip()
+            if not val:
+                continue
+            # Value-side: unmistakable credential material regardless of name
+            if self.AWS_ACCESS_KEY_ID_RE.search(val):
+                findings.append(f"{name} (AWS access key ID)")
+                continue
+            if self.PEM_PRIVATE_KEY_RE.search(val):
+                findings.append(f"{name} (PEM private key)")
+                continue
+            if self.URL_WITH_PASSWORD_RE.search(val):
+                findings.append(f"{name} (URL with embedded password)")
+                continue
+            # Name-side: secret-like name holding a literal (not a reference)
+            if name.upper().startswith('AWS_LAMBDA_') or self.SECRET_REFERENCE_NAME_RE.search(name):
+                continue
+            if self.SECRET_REFERENCE_VALUE_RE.match(val) or self.BENIGN_VALUE_RE.match(val):
+                continue
+            if any(p.search(name) for p in self.SECRET_NAME_PATTERNS):
+                findings.append(name)
+
+        if findings:
+            msg = 'Credential-like environment variable(s): ' + ', '.join(findings[:5])
+            if len(findings) > 5:
+                msg += f" (+{len(findings) - 5} more)"
+            self.results[key] = [-1, msg]
+        else:
+            self.results[key] = [1, 'No credential-like environment variables detected']
+
+    def _getCodeSigningPolicy(self, cscArn):
+        """UntrustedArtifactOnDeployment for a code signing config (cached per ARN)."""
+        cache = Config.get('lambdaCscPolicyCache', None)
+        if cache is None:
+            cache = {}
+            Config.set('lambdaCscPolicyCache', cache)
+        if cscArn not in cache:
+            resp = self.lambda_client.get_code_signing_config(CodeSigningConfigArn=cscArn)
+            policies = (resp.get('CodeSigningConfig') or {}).get('CodeSigningPolicies') or {}
+            # API default when not specified is Warn
+            cache[cscArn] = policies.get('UntrustedArtifactOnDeployment', 'Warn')
+        return cache[cscArn]
+
+    def _checkLambdaCodeSigningWarnOnly(self):
+        """FAIL when the attached code signing config only warns on untrusted artifacts."""
+        key = 'lambdaCodeSigningWarnOnly'
+        if self.lambda_.get('PackageType', 'Zip') != 'Zip':
+            self.results[key] = [0, 'Code signing not applicable to container image functions']
+            return
+        try:
+            resp = self.lambda_client.get_function_code_signing_config(FunctionName=self.function_name)
+            cscArn = resp.get('CodeSigningConfigArn')
+            if not cscArn:
+                self.results[key] = [0, 'No code signing config attached (see lambdaCodeSigningDisabled)']
+                return
+            policy = self._getCodeSigningPolicy(cscArn)
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({e.response['Error']['Code']})"]
+            return
+
+        if policy == 'Warn':
+            self.results[key] = [-1, f"UntrustedArtifactOnDeployment=Warn ({cscArn.split(':')[-1]})"]
+        else:
+            self.results[key] = [1, f"UntrustedArtifactOnDeployment={policy}"]

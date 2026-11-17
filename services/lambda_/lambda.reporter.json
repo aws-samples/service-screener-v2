@@ -446,5 +446,73 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html"
+	},
+	"lambdaDeprecatedRuntime": {
+		"category": "S",
+		"^description": "Deprecated Runtime: {$COUNT} of your Lambda functions use a runtime that has passed its AWS deprecation date. Deprecated runtimes no longer receive security patches or technical support. Migrate to a supported runtime version.",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "H",
+		"needFullTest": 1,
+		"shortDesc": "Deprecated Runtime",
+		"ref": [
+			"[Lambda runtimes - Runtime deprecation policy]<https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html#runtime-support-policy>",
+			"[Retrieve data about Lambda functions that use a deprecated runtime]<https://docs.aws.amazon.com/lambda/latest/dg/runtimes-list-deprecated.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html"
+	},
+	"lambdaEnvVarSecrets": {
+		"category": "S",
+		"^description": "Secrets in Environment Variables: {$COUNT} of your Lambda functions have environment variables whose name or value looks like a credential (password, token, API key, AWS access key, private key or a URL with an embedded password). Anyone with lambda:GetFunctionConfiguration can read them. Store secrets in AWS Secrets Manager or SSM Parameter Store (SecureString) and retrieve them at runtime.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "H",
+		"needFullTest": 1,
+		"shortDesc": "Credential-like Environment Variables",
+		"ref": [
+			"[Securing Lambda environment variables]<https://docs.aws.amazon.com/lambda/latest/dg/configuration-envvars-encryption.html>",
+			"[Use Secrets Manager secrets in Lambda functions]<https://docs.aws.amazon.com/lambda/latest/dg/with-secrets-manager.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/retrieving-secrets_lambda.html"
+	},
+	"lambdaCodeSigningWarnOnly": {
+		"category": "S",
+		"^description": "Code Signing Warn Only: {$COUNT} of your Lambda functions use a code signing configuration whose UntrustedArtifactOnDeployment policy is Warn, so unsigned or invalidly signed code is still deployed. Set the policy to Enforce to block untrusted artifacts.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "M",
+		"needFullTest": 1,
+		"shortDesc": "Code Signing Policy Set to Warn",
+		"ref": [
+			"[Configuring code signing for AWS Lambda]<https://docs.aws.amazon.com/lambda/latest/dg/configuration-codesigning.html>",
+			"[CodeSigningPolicies]<https://docs.aws.amazon.com/lambda/latest/api/API_CodeSigningPolicies.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-codesigning.html"
+	},
+	"signerProfileInvalid": {
+		"category": "S",
+		"^description": "Invalid Trusted Signing Profile: {$COUNT} of your Lambda code signing configurations trust a signing profile version that is revoked, canceled, superseded or no longer exists. Remove stale publishers from AllowedPublishers so only active, intended signing profiles are trusted.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Code Signing Config Trusts Invalid Signing Profile",
+		"ref": [
+			"[Configuring code signing for AWS Lambda]<https://docs.aws.amazon.com/lambda/latest/dg/configuration-codesigning.html>",
+			"[Revoking signing profiles and signatures]<https://docs.aws.amazon.com/signer/latest/developerguide/revocation.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-codesigning.html"
 	}
 }
