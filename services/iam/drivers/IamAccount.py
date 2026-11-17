@@ -1934,3 +1934,129 @@ class IamAccount(IamCommon):
             self.results[key] = [0, 'Unable to evaluate ({})'.format(', '.join(errors[:10]))]
         else:
             self.results[key] = [1, '{} role(s) in use by compute components, none shared across components'.format(len(usage))]
+
+    # ------------------------------------------------------------------ #
+    # WAFS2027 identity checks (chunk 4) - AWS Security Incident Response
+    # ------------------------------------------------------------------ #
+    SIR_SERVICE_PRINCIPAL = 'security-ir.amazonaws.com'
+
+    def _sirMemberships(self):
+        """List AWS Security Incident Response memberships visible to this
+        account in the scanned Regions (deduplicated by membershipId).
+        Returns (memberships, errors, unsupportedRegions); each membership dict
+        carries '_queryRegion' (the Region whose endpoint returned it)."""
+        if getattr(self, '_sirCache', None) is not None:
+            return self._sirCache
+        found, errors, unsupported = {}, [], []
+        for region in self._scanRegions():
+            try:
+                client = self._regionalClient('security-ir', region)
+                for page in client.get_paginator('list_memberships').paginate():
+                    for m in page.get('items', []) or []:
+                        mid = m.get('membershipId') or m.get('membershipArn')
+                        if mid and mid not in found:
+                            found[mid] = dict(m, _queryRegion=region)
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                if code == 'SecurityIncidentResponseNotActiveException':
+                    # Service not activated for this account: no membership.
+                    continue
+                errors.append('{}: {}'.format(region, code))
+            except (botocore.exceptions.EndpointConnectionError, botocore.exceptions.UnknownEndpointError):
+                unsupported.append(region)
+        self._sirCache = (list(found.values()), errors, unsupported)
+        return self._sirCache
+
+    def _sirDelegatedAdmins(self):
+        """Account IDs registered as Security Incident Response delegated
+        administrator, or None when Organizations cannot be queried."""
+        try:
+            ids = []
+            for page in self.orgClient.get_paginator('list_delegated_administrators').paginate(
+                    ServicePrincipal=self.SIR_SERVICE_PRINCIPAL):
+                ids.extend(a.get('Id') for a in page.get('DelegatedAdministrators', []) if a.get('Id'))
+            return ids
+        except botocore.exceptions.ClientError:
+            return None
+
+    def _checkSirMembershipMissing(self):
+        """No active AWS Security Incident Response membership. The membership
+        is created in the Organizations management account or the SIR delegated
+        administrator (or a standalone account); a plain member account cannot
+        tell, so it is not evaluable there. SIR is an optional paid service."""
+        key = 'sirMembershipMissing'
+        memberships, errors, unsupported = self._sirMemberships()
+        active = [m for m in memberships if m.get('membershipStatus') == 'Active']
+        if active:
+            self.results[key] = [1, 'Active membership(s): {}'.format(', '.join(sorted(
+                '{} ({})'.format(m.get('membershipId', '?'), m.get('region') or m.get('_queryRegion')) for m in active)))]
+            return
+        if errors:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(', '.join(errors[:10]))]
+            return
+        queried = [r for r in self._scanRegions() if r not in unsupported]
+        if not queried:
+            self.results[key] = [0, 'AWS Security Incident Response not available in scanned region(s): {}'.format(', '.join(unsupported))]
+            return
+
+        account = (Config.get('stsInfo', {}) or {}).get('Account')
+        if self.organizationIsEnabled:
+            admins = self._sirDelegatedAdmins()
+            isMgmt = self._isOrgManagementAccount()
+            isAdmin = bool(admins) and account in admins
+            if not isMgmt and not isAdmin:
+                self.results[key] = [0, 'Not evaluable from member account']
+                return
+            others = [a for a in (admins or []) if a != account]
+            if isMgmt and others:
+                self.results[key] = [0, 'Security Incident Response delegated administrator is account {} - evaluate the membership from that account'.format(', '.join(others))]
+                return
+
+        inactive = ['{} {}'.format(m.get('membershipId', '?'), m.get('membershipStatus', '?')) for m in memberships]
+        self.results[key] = [-1, 'No active AWS Security Incident Response membership in scanned region(s): {}{}'.format(
+            ', '.join(queried), ' (inactive: {})'.format(', '.join(inactive)) if inactive else '')]
+
+    SIR_MIN_TEAM = 2
+
+    def _checkSirTeamTooSmall(self):
+        """An active Security Incident Response membership whose incident
+        response team has fewer than 2 distinct contacts (by email), so a
+        single absent person stalls engagement with the AWS CIRT."""
+        key = 'sirTeamTooSmall'
+        memberships, errors, _ = self._sirMemberships()
+        active = [m for m in memberships if m.get('membershipStatus') == 'Active']
+        if not active:
+            if errors:
+                self.results[key] = [0, 'Unable to evaluate ({})'.format(', '.join(errors[:10]))]
+            else:
+                self.results[key] = [0, 'No active AWS Security Incident Response membership']
+            return
+
+        offenders, notes, ok = [], [], []
+        for m in active:
+            mid = m.get('membershipId')
+            region = m.get('region') or m.get('_queryRegion')
+            try:
+                detail = self._regionalClient('security-ir', region).get_membership(membershipId=mid)
+            except botocore.exceptions.ClientError as e:
+                notes.append('{}: unable to read ({})'.format(mid, e.response['Error']['Code']))
+                continue
+            except (botocore.exceptions.EndpointConnectionError, botocore.exceptions.UnknownEndpointError):
+                notes.append('{}: endpoint not reachable in {}'.format(mid, region))
+                continue
+            contacts = set()
+            for member in detail.get('incidentResponseTeam') or []:
+                ident = (member.get('email') or member.get('name') or '').strip().lower()
+                if ident:
+                    contacts.add(ident)
+            if len(contacts) < self.SIR_MIN_TEAM:
+                offenders.append('{} ({}): {} distinct incident response team contact(s)'.format(mid, region, len(contacts)))
+            else:
+                ok.append('{}: {} contacts'.format(mid, len(contacts)))
+
+        if offenders:
+            self.results[key] = [-1, '<br>'.join(offenders + notes)]
+        elif notes:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format('; '.join(notes))]
+        else:
+            self.results[key] = [1, '; '.join(ok)]

@@ -1226,5 +1226,41 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege"
+	},
+	"sirMembershipMissing": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have no active AWS Security Incident Response membership in the scanned Regions. AWS Security Incident Response triages GuardDuty and Security Hub findings, provides a case-management workflow and gives 24/7 access to the AWS Customer Incident Response Team (CIRT), shortening the time to contain and recover from a security event. Consider subscribing from the AWS Organizations management account or a Security Incident Response delegated administrator account (it is an optional, paid service). Plain member accounts of an organization are reported as not evaluable.",
+		"shortDesc": "Consider an AWS Security Incident Response membership",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[What is AWS Security Incident Response?]<https://docs.aws.amazon.com/security-ir/latest/userguide/what-is.html>",
+			"[SEC10-BP02 Develop incident management plans]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_develop_management_plans.html>",
+			"[ListMemberships]<https://docs.aws.amazon.com/security-ir/latest/APIReference/API_ListMemberships.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/security-ir/latest/userguide/what-is.html"
+	},
+	"sirTeamTooSmall": {
+		"category": "S",
+		"^description": "{$COUNT} AWS Security Incident Response membership(s) have fewer than 2 distinct incident response team contacts (counted by email address). The incident response team receives case notifications and is engaged by the AWS Customer Incident Response Team; relying on a single person (or several entries sharing one mailbox) stalls the response when that person is unavailable. Add at least two distinct, monitored contacts to the membership's incident response team.",
+		"shortDesc": "Add at least 2 distinct SIR incident response team contacts",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Security Incident Response - Membership]<https://docs.aws.amazon.com/security-ir/latest/userguide/membership.html>",
+			"[SEC10-BP01 Identify key personnel and external resources]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_identify_personnel.html>",
+			"[GetMembership]<https://docs.aws.amazon.com/security-ir/latest/APIReference/API_GetMembership.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/security-ir/latest/userguide/membership.html"
 	}
 }
