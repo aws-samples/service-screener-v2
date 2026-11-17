@@ -145,3 +145,53 @@ def test_plaintext_secret_name_heuristics():
     drv = CloudformationStack(dict(stack, StackName='s'), None)
     res = _run(drv, '_checkCfnPlaintextSecretParams')['cfnPlaintextSecretParams']
     assert res[0] == -1 and 'p@ss' not in res[1] and 'ghp_x' not in res[1]
+
+
+def test_plaintext_secret_metadata_names_not_flagged():
+    """Review round 1: names that only DESCRIBE a secret (AWS Config
+    conformance-pack parameters among them) must not be flagged, and short
+    forms of credential names must be."""
+    benign = {
+        'MaxPasswordAge': '90', 'PasswordReusePrevention': '24',
+        'IamPasswordPolicyParamMaxPasswordAge': '90',
+        'IamPasswordPolicyParamPasswordReusePrevention': '24',
+        'IamPasswordPolicyParamRequireSymbols': 'true',
+        'ApiKeySource': 'HEADER', 'TokenValidityUnits': 'hours',
+        'SecretRotationSchedule': 'rate(30 days)',
+        'TokenSigningAlgorithm': 'RS256', 'PasswordHashAlgorithm': 'bcrypt',
+        'SecretsManagerSecretPrefix': 'app/', 'KmsKeyForSecrets': 'alias/x',
+        'DatabaseSecret': 'prod/db', 'PasswordValid': 'yes-really',
+        'DbPasswordSecretArn': 'arn:aws:secretsmanager:x', 'SecretName': 'prod/db',
+        'AccessKeyId': 'AKIAEXAMPLEEXAMPLE', 'Bypass': 'something-long',
+    }
+    stack = {'Parameters': [{'ParameterKey': k, 'ParameterValue': v}
+                            for k, v in benign.items()]}
+    assert plaintextSecretParams(stack) == []
+    res = _run(CloudformationStack(dict(stack, StackName='s'), None),
+               '_checkCfnPlaintextSecretParams')['cfnPlaintextSecretParams']
+    assert res[0] == 1
+
+    secrets = {'Pwd': 'hunter2!', 'DbPass': 'hunter2!', 'AdminPass': 'hunter2!',
+               'db_password': 'hunter2!', 'dbpassword': 'hunter2!',
+               'Password1': 'hunter2!', 'SecretAccessKey': 'wJalrXUtnFEMI/K7MDENG',
+               'ClientSecret': 'Zx9-abc_def', 'SlackApiKey': 'xoxb-123-abc',
+               'DatabaseSecret': 'S3cr3tValue!', 'DBPasswordValue': 'hunter2!'}
+    stack = {'Parameters': [{'ParameterKey': k, 'ParameterValue': v}
+                            for k, v in secrets.items()]}
+    assert sorted(plaintextSecretParams(stack)) == sorted(secrets)
+
+
+def test_stackset_failed_detection_is_unable_to_evaluate():
+    ts = datetime(2026, 11, 1, tzinfo=timezone.utc)
+    res = _stackSet({'DriftStatus': 'NOT_CHECKED', 'DriftDetectionStatus': 'FAILED',
+                     'LastDriftCheckTimestamp': ts})
+    assert res[0] == 0 and 'Unable to evaluate' in res[1]
+
+
+def test_hooks_cloud_control_only_is_not_enabled_and_warn_is_noted():
+    cc = '{"CloudFormationConfiguration":{"HookConfiguration":{"HookInvocationStatus":"ENABLED","TargetOperations":["CLOUD_CONTROL"]}}}'
+    assert not CloudformationCommon.hookConfigEnabled(cc)
+    assert _run(CloudformationCommon(_hookPosture(cc)), '_checkCfnNoProactiveHooks')['cfnNoProactiveHooks'][0] == -1
+    warn = '{"CloudFormationConfiguration":{"HookConfiguration":{"HookInvocationStatus":"ENABLED","FailureMode":"WARN","TargetOperations":["RESOURCE"]}}}'
+    res = _run(CloudformationCommon(_hookPosture(warn)), '_checkCfnNoProactiveHooks')['cfnNoProactiveHooks']
+    assert res[0] == 1 and 'WARN' in res[1]

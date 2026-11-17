@@ -58,7 +58,28 @@ class CloudformationCommon(Evaluator):
         if (str(hookCfg.get('TargetStacks', '')).upper() == 'NONE'
                 and not hookCfg.get('TargetOperations')):
             return False
+        ## A hook that only targets Cloud Control API operations never sees a
+        ## CloudFormation stack deployment. STACK, RESOURCE and CHANGE_SET all
+        ## run during stack operations; an absent list means the default.
+        ops = hookCfg.get('TargetOperations')
+        if isinstance(ops, list) and ops:
+            if not {str(o).upper() for o in ops} & {'STACK', 'RESOURCE',
+                                                     'CHANGE_SET'}:
+                return False
         return True
+
+    @staticmethod
+    def hookConfigWarnOnly(configuration):
+        """True when the configuration sets FailureMode WARN (the hook reports
+        but blocks nothing). FailureMode defaults to FAIL."""
+        try:
+            cfg = json.loads(configuration) if isinstance(configuration, str) \
+                else (configuration or {})
+        except (TypeError, ValueError):
+            return False
+        hookCfg = ((cfg.get('CloudFormationConfiguration') or {})
+                   .get('HookConfiguration') or {})
+        return str(hookCfg.get('FailureMode', 'FAIL')).upper() == 'WARN'
 
     def _checkCfnNoProactiveHooks(self):
         key = 'cfnNoProactiveHooks'
@@ -68,12 +89,15 @@ class CloudformationCommon(Evaluator):
             ]
             return
 
-        enabled, configUnknown = [], []
+        enabled, warnOnly, configUnknown = [], [], []
         for h in self.hooks:
             name = h.get('TypeName') or h.get('TypeArn') or '?'
-            if any(self.hookConfigEnabled(c)
-                   for c in h.get('Configurations') or []):
+            on = [c for c in h.get('Configurations') or []
+                  if self.hookConfigEnabled(c)]
+            if on:
                 enabled.append(name)
+                if all(self.hookConfigWarnOnly(c) for c in on):
+                    warnOnly.append(name)
             elif h.get('ConfigError'):
                 configUnknown.append((name, h.get('ConfigError')))
 
@@ -82,6 +106,9 @@ class CloudformationCommon(Evaluator):
                 1,
                 f"{len(enabled)} CloudFormation hook(s) enabled in "
                 f"{self.region}: " + self._joinNames(enabled)
+                + (f" ({len(warnOnly)} in FailureMode WARN only, which reports "
+                   "but does not block non-compliant operations: "
+                   + self._joinNames(warnOnly) + ")" if warnOnly else "")
             ]
         elif configUnknown:
             codes = sorted({c for _, c in configUnknown})

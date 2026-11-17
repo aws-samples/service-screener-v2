@@ -98,16 +98,21 @@ class CloudformationStackSet(Evaluator):
             ]
             return
         if lastCheck:
-            msg = (f"StackSet '{self.name}' last drift check "
-                   f"({self._fmt(lastCheck)}, {detection or 'status unknown'}) "
-                   f"produced no usable result (status {status or 'NOT_CHECKED'})")
-        else:
-            msg = (f"StackSet '{self.name}' has never been checked for drift "
-                   f"(status {status or 'NOT_CHECKED'})")
+            ## Drift detection was attempted (FAILED / STOPPED / PARTIAL_SUCCESS
+            ## without a status): the drift state is unknown, not a finding.
+            self.results[key] = [
+                0,
+                f"Unable to evaluate (last drift detection "
+                f"{detection or 'status unknown'}) — StackSet '{self.name}' "
+                f"last drift check ({self._fmt(lastCheck)}) produced no usable "
+                f"result (status {status or 'NOT_CHECKED'})"
+            ]
+            return
         self.results[key] = [
             -1,
-            msg + " — whether its stack instances still match the template is "
-            "unknown"
+            f"StackSet '{self.name}' has never been checked for drift "
+            f"(status {status or 'NOT_CHECKED'}) — whether its stack instances "
+            "still match the template is unknown"
         ]
 
     @staticmethod
