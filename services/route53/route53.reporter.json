@@ -389,5 +389,23 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/routing-policy.html"
+	},
+	"dnsFirewallNoBlockRules": {
+		"category": "S",
+		"^description": "{$COUNT} VPC(s) have Route 53 Resolver DNS Firewall rule groups associated, but none of the associated rule groups contains a BLOCK rule. ALERT/ALLOW-only rule groups log matching queries but still resolve malware, botnet C2 and exfiltration domains, so the firewall provides visibility without protection. ALERT-only can be a legitimate rollout phase; move to BLOCK (ideally with AWS-managed threat domain lists or DNS Firewall Advanced) once tuned.",
+		"shortDesc": "Add BLOCK rules (e.g. AWS-managed threat lists) to associated DNS Firewall rule groups",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 1,
+		"ref": [
+			"[Route 53 Resolver DNS Firewall rule actions]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-dns-firewall-rule-actions.html>",
+			"[AWS-managed domain lists]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-dns-firewall-managed-domain-lists.html>",
+			"[DNS Firewall Advanced]<https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/firewall-advanced.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolver-dns-firewall-rule-actions.html"
 	}
 }

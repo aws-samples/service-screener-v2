@@ -9,6 +9,7 @@ from services.route53.drivers.Route53HostedZone import Route53HostedZone
 from services.route53.drivers.Route53HealthCheck import Route53HealthCheck
 from services.route53.drivers.Route53Domain import Route53Domain
 from services.route53.drivers.Route53Resolver import Route53Resolver
+from services.route53.drivers.Route53DnsFirewallVpc import Route53DnsFirewallVpc
 
 
 class Route53(Service):
@@ -336,6 +337,65 @@ class Route53(Service):
 
         return detail
 
+    def getDnsFirewallVpcs(self, resolver):
+        """Group active DNS Firewall associations by VPC and read the rules of
+        each associated rule group (read-only: list_firewall_rules,
+        list_firewall_domain_lists). Returns a list of per-VPC dicts."""
+        assocs = [a for a in (resolver or {}).get('_firewallAssociations') or []
+                  if (a.get('Status') or '').upper() not in ('DELETING', 'DELETE_FAILED')]
+        if not assocs:
+            return []
+
+        domainLists, domainListsError = {}, None
+        try:
+            paginator = self.resolverClient.get_paginator('list_firewall_domain_lists')
+            for page in paginator.paginate():
+                for d in page.get('FirewallDomainLists', []) or []:
+                    if d.get('Id'):
+                        domainLists[d['Id']] = d
+        except botocore.exceptions.ClientError as e:
+            domainListsError = e.response.get('Error', {}).get('Code', 'Unknown')
+            self._logClientError('list_firewall_domain_lists', e)
+
+        rulesCache = {}
+
+        def _rules(rgid):
+            if rgid in rulesCache:
+                return rulesCache[rgid]
+            rules, err = [], None
+            try:
+                paginator = self.resolverClient.get_paginator('list_firewall_rules')
+                for page in paginator.paginate(FirewallRuleGroupId=rgid):
+                    rules.extend(page.get('FirewallRules', []) or [])
+            except botocore.exceptions.ClientError as e:
+                err = e.response.get('Error', {}).get('Code', 'Unknown')
+                rules = None
+                self._logClientError(f'list_firewall_rules({rgid})', e)
+            rulesCache[rgid] = (rules, err)
+            return rulesCache[rgid]
+
+        byVpc = {}
+        for a in assocs:
+            vpcId = a.get('VpcId')
+            rgid = a.get('FirewallRuleGroupId')
+            if not vpcId or not rgid:
+                continue
+            rules, err = _rules(rgid)
+            byVpc.setdefault(vpcId, []).append({
+                'ruleGroupId': rgid,
+                'associationName': a.get('Name'),
+                'rules': rules,
+                'error': err,
+            })
+
+        return [{
+            '_region': self.region,
+            '_vpcId': vpcId,
+            '_ruleGroups': groups,
+            '_domainLists': domainLists,
+            '_domainListsError': domainListsError,
+        } for vpcId, groups in byVpc.items()]
+
     # ------------------------------------------------------------------ #
     # Cross-service helpers for dangling-DNS check (#19)
     # ------------------------------------------------------------------ #
@@ -519,6 +579,18 @@ class Route53(Service):
                 del obj
             except Exception as e:
                 print(f"Error processing resolver ({self.region}): {e}")
+
+            # DNS Firewall rule content — one resource per associated VPC
+            for vpc in self.getDnsFirewallVpcs(resolver):
+                try:
+                    vid = f"{self.region}/{vpc.get('_vpcId')}"
+                    _pi('Route53', f"DnsFirewall::{vid}")
+                    obj = Route53DnsFirewallVpc(vpc, self.resolverClient)
+                    obj.run(self.__class__)
+                    objs[f"Route53::DnsFirewall={vid}"] = obj.getInfo()
+                    del obj
+                except Exception as e:
+                    print(f"Error processing DNS Firewall VPC {vpc.get('_vpcId')}: {e}")
 
         return objs
 
