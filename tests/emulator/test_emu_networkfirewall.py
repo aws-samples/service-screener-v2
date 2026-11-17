@@ -219,6 +219,41 @@ def test_networkfirewall_route_bypass_via_nat(emu, uid):
         env.cleanup()
 
 
+def test_networkfirewall_route_firewall_before_nat(emu, uid):
+    """Firewall-before-NAT design: workload subnet -> firewall endpoint ->
+    NAT -> IGW. The NAT subnet's 0.0.0.0/0 -> IGW route is only acceptable
+    when it returns the workload CIDR through the firewall endpoint. The
+    emulator, like EC2, reports that route as GatewayId='vpce-...'."""
+    env = Env(emu, uid, '10.78')
+    ec2 = env.ec2
+    try:
+        natSubnet = ec2.create_subnet(VpcId=env.vpc, CidrBlock='10.78.3.0/24',
+                                      AvailabilityZone='us-east-1a')['Subnet']['SubnetId']
+        env.extra.append(lambda: ec2.delete_subnet(SubnetId=natSubnet))
+        eip = ec2.allocate_address(Domain='vpc')['AllocationId']
+        nat = ec2.create_nat_gateway(SubnetId=natSubnet, AllocationId=eip)['NatGateway']['NatGatewayId']
+        env.extra.insert(0, lambda: ec2.release_address(AllocationId=eip))
+        env.extra.insert(0, lambda: ec2.delete_nat_gateway(NatGatewayId=nat))
+
+        fwRt = env.routeTable(env.fwSubnet)
+        env.setDefault(fwRt, NatGatewayId=nat)
+        wlRt = env.routeTable(env.wlSubnet)
+        env.setDefault(wlRt, VpcEndpointId=env.endpoint)
+        natRt = env.routeTable(natSubnet)
+        env.setDefault(natRt, GatewayId=env.igw)
+
+        def misconfigure():
+            _safe(ec2.delete_route, RouteTableId=natRt, DestinationCidrBlock='10.78.2.0/24')
+
+        def fix():
+            ec2.create_route(RouteTableId=natRt, DestinationCidrBlock='10.78.2.0/24',
+                             VpcEndpointId=env.endpoint)
+
+        assertFlagFixCycle(emu, 'networkfirewall', 'networkFirewallRouteBypass', env.fwName, misconfigure, fix)
+    finally:
+        env.cleanup()
+
+
 def test_networkfirewall_not_deployed(emu, uid):
     env = Env(emu, uid, '10.77', withFirewall=False)
     ec2 = env.ec2

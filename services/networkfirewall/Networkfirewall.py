@@ -39,6 +39,10 @@ class Networkfirewall(Service):
         self.ec2Client = ssBoto.client('ec2', config=self.bConfig)
         self._policyCache = {}
         self._listError = None
+        ## VPC placement of every described firewall, recorded before the
+        ## --tags filter so VPC-level logic sees all firewalls.
+        self._allFirewalls = []
+        self._describeError = None
 
     # ------------------------------------------------------------------ #
     # Discovery
@@ -74,8 +78,11 @@ class Networkfirewall(Service):
             except botocore.exceptions.ClientError as e:
                 self._logClientError(f'describe_firewall({name})', e)
                 detail['_error'] = self._code(e)
+                self._describeError = self._describeError or detail['_error']
                 firewalls.append(detail)
                 continue
+
+            self._allFirewalls.append(detail)
 
             if self.tags and not self.resourceHasTags(detail['Firewall'].get('Tags') or []):
                 continue
@@ -136,7 +143,7 @@ class Networkfirewall(Service):
         def bucket(vpcId):
             return byVpc.setdefault(vpcId, {
                 'subnets': [], 'routeTables': [], 'natGateways': [],
-                'gwlbEndpoints': [], 'igws': [],
+                'gwlbEndpoints': [], 'gwlbSubnets': [], 'igws': [],
             })
 
         for v in vpcs:
@@ -152,7 +159,9 @@ class Networkfirewall(Service):
         for ep in endpoints:
             if ep.get('VpcEndpointType') == 'GatewayLoadBalancer' and \
                     ep.get('State') not in ('deleted', 'deleting', 'failed', 'rejected', 'expired'):
-                bucket(ep.get('VpcId'))['gwlbEndpoints'].append(ep.get('VpcEndpointId'))
+                b = bucket(ep.get('VpcId'))
+                b['gwlbEndpoints'].append(ep.get('VpcEndpointId'))
+                b['gwlbSubnets'] += ep.get('SubnetIds') or []
         for igw in igws:
             for att in igw.get('Attachments', []) or []:
                 if att.get('VpcId') and att.get('State') in ('available', 'attached', None):
@@ -177,30 +186,36 @@ class Networkfirewall(Service):
         firewalls = self.getResources()
         byVpc, vpcs, netError = self.getNetwork()
 
+        ## VPC membership, endpoints and subnets of every described firewall
+        ## (including ones excluded by --tags); several firewalls may share
+        ## a VPC.
         firewallVpcs = set()
-        for fw in firewalls or []:
-            vpcId = (fw.get('Firewall') or {}).get('VpcId')
-            if vpcId:
-                firewallVpcs.add(vpcId)
-
-        ## Firewall endpoints of every firewall in each VPC (several firewalls
-        ## may share a VPC).
         fwEndpointsByVpc = {}
-        for fw in firewalls or []:
-            vpcId = (fw.get('Firewall') or {}).get('VpcId')
+        fwSubnetsByVpc = {}
+        for fw in self._allFirewalls:
+            f = fw.get('Firewall') or {}
+            vpcId = f.get('VpcId')
             if not vpcId:
                 continue
-            for state in ((fw.get('FirewallStatus') or {}).get('SyncStates') or {}).values():
-                epId = (state.get('Attachment') or {}).get('EndpointId')
-                if epId:
-                    fwEndpointsByVpc.setdefault(vpcId, set()).add(epId)
+            firewallVpcs.add(vpcId)
+            subnets = fwSubnetsByVpc.setdefault(vpcId, set())
+            for m in f.get('SubnetMappings') or []:
+                if m.get('SubnetId'):
+                    subnets.add(m['SubnetId'])
+            for sid, state in ((fw.get('FirewallStatus') or {}).get('SyncStates') or {}).items():
+                att = state.get('Attachment') or {}
+                if att.get('EndpointId'):
+                    fwEndpointsByVpc.setdefault(vpcId, set()).add(att['EndpointId'])
+                if att.get('SubnetId'):
+                    subnets.add(att['SubnetId'])
 
         for fw in firewalls or []:
             try:
                 vpcId = (fw.get('Firewall') or {}).get('VpcId')
                 obj = NetworkfirewallFirewall(
                     fw, byVpc.get(vpcId) if vpcId else None, netError,
-                    fwEndpointsByVpc.get(vpcId, set()))
+                    fwEndpointsByVpc.get(vpcId, set()),
+                    fwSubnetsByVpc.get(vpcId, set()))
                 obj.run(self.__class__)
                 objs[f"Firewall::{fw.get('FirewallName')}"] = obj.getInfo()
                 del obj
@@ -222,8 +237,11 @@ class Networkfirewall(Service):
                         and NetworkfirewallVpc.internetRoutes(net):
                     hasEni = self._hasNetworkInterfaces(vpcId)
                 try:
+                    ## A firewall whose describe_firewall failed has an unknown
+                    ## VPC: do not FAIL VPCs that could be hosting it.
                     obj = NetworkfirewallVpc(vpc, net, vpcId in firewallVpcs,
-                                             self._listError, hasEni)
+                                             self._listError or self._describeError,
+                                             hasEni)
                     obj.run(self.__class__)
                     objs[f"VPC::{vpcId}"] = obj.getInfo()
                     del obj

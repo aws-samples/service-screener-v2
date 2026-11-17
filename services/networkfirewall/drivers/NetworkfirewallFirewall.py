@@ -46,6 +46,9 @@ class NetworkfirewallFirewall(Evaluator):
                       routeTables, natGateways, gwlbEndpoints) or None
       netError     -- error code if the EC2 inventory could not be read
       fwEndpoints  -- firewall endpoint ids of all firewalls in the VPC
+      inspectionSubnets -- subnet ids hosting any inspection endpoint in the
+                      VPC (all firewalls' subnets, GWLB endpoint subnets);
+                      these route to the IGW by design and are not judged
 
     Status contract (services/Evaluator.py): -1 = FAIL, 1 = PASS, 0 = INFO.
     """
@@ -55,7 +58,7 @@ class NetworkfirewallFirewall(Evaluator):
                               'aws:drop_established_app_layer')
     MAX_LISTED = 10
 
-    def __init__(self, fw, net, netError, fwEndpoints):
+    def __init__(self, fw, net, netError, fwEndpoints, inspectionSubnets=None):
         super().__init__()
         self.fw = fw
         self.firewall = fw.get('Firewall') or {}
@@ -63,6 +66,7 @@ class NetworkfirewallFirewall(Evaluator):
         self.net = net
         self.netError = netError
         self.fwEndpoints = set(fwEndpoints or [])
+        self.inspectionSubnets = set(inspectionSubnets or [])
         self._resourceName = fw.get('FirewallName') or fw.get('FirewallArn')
 
         self.addII('firewallArn', fw.get('FirewallArn'))
@@ -172,20 +176,26 @@ class NetworkfirewallFirewall(Evaluator):
             return
 
         fwSubnets = {m.get('SubnetId') for m in self.firewall.get('SubnetMappings') or []}
+        fwSubnets |= self.inspectionSubnets
+        fwSubnets |= set(self.net.get('gwlbSubnets') or [])
         rtBySubnet = subnetRouteTables(self.net)
         natSubnet = {n.get('NatGatewayId'): n.get('SubnetId')
                      for n in self.net.get('natGateways') or []}
         natSubnets = set(natSubnet.values())
 
+        ## EC2 DescribeRouteTables reports a route to a GWLB / firewall
+        ## endpoint as GatewayId='vpce-...' (the Route shape has no
+        ## VpcEndpointId member); VpcEndpointId is kept only as a fallback.
         def isInspected(route):
-            return route.get('VpcEndpointId') in inspection
+            return (route.get('GatewayId') or '') in inspection or \
+                (route.get('VpcEndpointId') or '') in inspection
 
         def toInternet(route):
             gw = route.get('GatewayId') or ''
             return gw.startswith('igw-') or bool(route.get('EgressOnlyInternetGatewayId'))
 
         def hasInspectionReturnRoute(rt):
-            return any(r.get('VpcEndpointId') in inspection
+            return any(isInspected(r)
                        for r in (rt or {}).get('Routes', []) or []
                        if r.get('State') != 'blackhole')
 

@@ -127,7 +127,7 @@ def net(routeTables, nats=(), subnets=('subnet-fw', 'subnet-a', 'subnet-nat')):
 def test_route_bypass_main_route_table_flagged_then_fixed():
     fwRt = rt('rtb-fw', 'subnet-fw', routes=[route(GatewayId='igw-1')])
     bad = net([fwRt, rt('rtb-main', main=True, routes=[route(GatewayId='igw-1')])], subnets=('subnet-fw', 'subnet-a'))
-    good = net([fwRt, rt('rtb-main', main=True, routes=[route(VpcEndpointId=EP)])], subnets=('subnet-fw', 'subnet-a'))
+    good = net([fwRt, rt('rtb-main', main=True, routes=[route(GatewayId=EP)])], subnets=('subnet-fw', 'subnet-a'))
     assert firewallStatus(*R, fwDetail(), bad) == -1
     assert firewallStatus(*R, fwDetail(), good) == 1
 
@@ -135,8 +135,8 @@ def test_route_bypass_main_route_table_flagged_then_fixed():
 def test_route_bypass_ipv6_egress_only_flagged():
     fwRt = rt('rtb-fw', 'subnet-fw', routes=[route(GatewayId='igw-1')])
     v6 = {'DestinationIpv6CidrBlock': '::/0', 'EgressOnlyInternetGatewayId': 'eigw-1', 'State': 'active'}
-    bad = net([fwRt, rt('rtb-a', 'subnet-a', routes=[route(VpcEndpointId=EP), v6])], subnets=('subnet-fw', 'subnet-a'))
-    good = net([fwRt, rt('rtb-a', 'subnet-a', routes=[route(VpcEndpointId=EP)])], subnets=('subnet-fw', 'subnet-a'))
+    bad = net([fwRt, rt('rtb-a', 'subnet-a', routes=[route(GatewayId=EP), v6])], subnets=('subnet-fw', 'subnet-a'))
+    good = net([fwRt, rt('rtb-a', 'subnet-a', routes=[route(GatewayId=EP)])], subnets=('subnet-fw', 'subnet-a'))
     assert firewallStatus(*R, fwDetail(), bad) == -1
     assert firewallStatus(*R, fwDetail(), good) == 1
 
@@ -147,8 +147,8 @@ def test_route_firewall_before_nat_design_not_flagged():
     nat = {'NatGatewayId': 'nat-1', 'SubnetId': 'subnet-nat', 'VpcId': VPC}
     tables = [
         rt('rtb-fw', 'subnet-fw', routes=[route(NatGatewayId='nat-1')]),
-        rt('rtb-a', 'subnet-a', routes=[route(VpcEndpointId=EP)]),
-        rt('rtb-nat', 'subnet-nat', routes=[route(GatewayId='igw-1'), route('10.0.2.0/24', VpcEndpointId=EP)]),
+        rt('rtb-a', 'subnet-a', routes=[route(GatewayId=EP)]),
+        rt('rtb-nat', 'subnet-nat', routes=[route(GatewayId='igw-1'), route('10.0.2.0/24', GatewayId=EP)]),
     ]
     assert firewallStatus(*R, fwDetail(), net(tables, [nat])) == 1
     ## Without the return route the NAT subnet is an uninspected internet path.
@@ -194,3 +194,24 @@ def test_not_deployed_edge_cases():
     tgwOnly = {'routeTables': [rt('rtb-main', main=True, routes=[route(TransitGatewayId='tgw-1')])],
                'igws': [], 'gwlbEndpoints': []}
     assert vpcStatus(tgwOnly) == 1                                  # centralised egress
+
+
+def test_route_other_inspection_subnets_not_flagged():
+    """A second firewall (or a third-party GWLB appliance) in the same VPC has
+    its own endpoint subnet that routes 0.0.0.0/0 to the IGW by design."""
+    tables = [rt('rtb-fw', 'subnet-fw', routes=[route(GatewayId='igw-1')]),
+              rt('rtb-fw2', 'subnet-fw2', routes=[route(GatewayId='igw-1')]),
+              rt('rtb-a', 'subnet-a', routes=[route(GatewayId=EP)])]
+    n = net(tables, subnets=('subnet-fw', 'subnet-fw2', 'subnet-a'))
+    ## Unknown subnet sending 0.0.0.0/0 to the IGW is a bypass.
+    assert firewallStatus(*R, fwDetail(), n) == -1
+    ## Subnet of another firewall in the VPC.
+    assert run(NetworkfirewallFirewall(fwDetail(), n, None, {EP}, {'subnet-fw', 'subnet-fw2'}), *R) == 1
+    ## Subnet of a GWLB appliance endpoint (describe_vpc_endpoints SubnetIds).
+    assert firewallStatus(*R, fwDetail(), dict(n, gwlbSubnets=['subnet-fw2'])) == 1
+
+
+def test_route_vpc_endpoint_id_fallback_still_accepted():
+    tables = [rt('rtb-fw', 'subnet-fw', routes=[route(GatewayId='igw-1')]),
+              rt('rtb-a', 'subnet-a', routes=[route(VpcEndpointId=EP)])]
+    assert firewallStatus(*R, fwDetail(), net(tables, subnets=('subnet-fw', 'subnet-a'))) == 1
