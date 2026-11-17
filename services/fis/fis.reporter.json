@@ -1,0 +1,20 @@
+{
+    "fisNoRecentExperiment": {
+        "category": "R",
+        "^description": "{$COUNT} region(s) have had no AWS Fault Injection Service (FIS) experiment run in the last 90 days. Resilience mechanisms such as failover, retries, Auto Scaling and alarms that are never exercised drift out of working order unnoticed. Regularly injecting controlled faults validates that the workload, its monitoring and its runbooks behave as designed. This is a proxy signal: teams may use other chaos-engineering tooling, and FIS may intentionally be used only in a subset of regions.",
+        "shortDesc": "Run FIS experiments regularly",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[What is AWS Fault Injection Service]<https://docs.aws.amazon.com/fis/latest/userguide/what-is.html>",
+            "[REL12-BP04 Test resiliency using chaos engineering]<https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_testing_resiliency_failure_injection_resiliency.html>",
+            "[REL13-BP03 Test disaster recovery implementation to validate the implementation]<https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_planning_for_recovery_dr_tested.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/fis/latest/userguide/experiments.html"
+    }
+}
