@@ -1,0 +1,71 @@
+{
+    "networkFirewallLoggingDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} Network Firewall firewall(s) do not send both ALERT and FLOW logs to a destination. Without ALERT logs there is no record of the traffic that matched a stateful alert or drop rule, and without FLOW logs there is no record of the connections the firewall inspected, so an intrusion or exfiltration attempt cannot be investigated after the fact.",
+        "shortDesc": "Enable Network Firewall ALERT and FLOW logging",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Logging network traffic from AWS Network Firewall]<https://docs.aws.amazon.com/network-firewall/latest/developerguide/firewall-logging.html>",
+            "[Security Hub control NetworkFirewall.2]<https://docs.aws.amazon.com/securityhub/latest/userguide/networkfirewall-controls.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/network-firewall/latest/developerguide/firewall-update-logging-configuration.html"
+    },
+    "networkFirewallPolicyWeak": {
+        "category": "S",
+        "^description": "{$COUNT} Network Firewall firewall(s) use a policy that lets traffic through uninspected: the stateless default action for full or fragmented packets is aws:pass (unmatched packets skip the stateful engine), or the policy references no stateful rule group so forwarded traffic is passed without any rule being evaluated. Use aws:forward_to_sfe or aws:drop as the stateless defaults and attach stateful rule groups; AWS managed threat signature and domain list rule groups are a good baseline.",
+        "shortDesc": "Forward unmatched traffic to stateful rule groups",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Stateless default actions in your firewall policy]<https://docs.aws.amazon.com/network-firewall/latest/developerguide/stateless-default-actions.html>",
+            "[AWS managed rule groups for Network Firewall]<https://docs.aws.amazon.com/network-firewall/latest/developerguide/nwfw-managed-rule-groups.html>",
+            "[Security Hub controls NetworkFirewall.3, .4, .5]<https://docs.aws.amazon.com/securityhub/latest/userguide/networkfirewall-controls.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/network-firewall/latest/developerguide/firewall-policies.html"
+    },
+    "networkFirewallRouteBypass": {
+        "category": "S",
+        "^description": "{$COUNT} Network Firewall firewall(s) sit in a VPC where at least one other subnet sends its default route (0.0.0.0/0 or ::/0) straight to the internet gateway or egress-only internet gateway, or to a NAT gateway whose subnet does so, instead of to a firewall endpoint. Traffic from those subnets reaches the internet without inspection, so the firewall gives a false sense of coverage. Route each protected subnet (or the NAT gateway subnet) to the firewall endpoint in its Availability Zone and add an internet gateway ingress route table that returns traffic through the firewall. This is a route-table heuristic: transit gateway and other centralised designs are not judged.",
+        "shortDesc": "Route subnets through the firewall endpoint",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Network Firewall architectures with routing]<https://docs.aws.amazon.com/network-firewall/latest/developerguide/architectures.html>",
+            "[Route table configurations for Network Firewall]<https://docs.aws.amazon.com/network-firewall/latest/developerguide/route-tables.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/network-firewall/latest/developerguide/route-tables.html"
+    },
+    "networkFirewallNotDeployed": {
+        "category": "S",
+        "^description": "{$COUNT} VPC(s) with workloads route directly to an internet gateway but have no AWS Network Firewall and no Gateway Load Balancer endpoint, so traffic to and from the internet is filtered only by security groups and network ACLs, with no stateful or intrusion-prevention inspection. Whether to deploy network inspection is a cost and design decision; VPCs whose internet traffic is inspected centrally through a transit gateway are not flagged.",
+        "shortDesc": "Inspect internet traffic of internet-connected VPCs",
+        "criticality": "L",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[What is AWS Network Firewall]<https://docs.aws.amazon.com/network-firewall/latest/developerguide/what-is-aws-network-firewall.html>",
+            "[Deployment models for AWS Network Firewall]<https://docs.aws.amazon.com/network-firewall/latest/developerguide/architectures.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/network-firewall/latest/developerguide/getting-started.html"
+    }
+}
