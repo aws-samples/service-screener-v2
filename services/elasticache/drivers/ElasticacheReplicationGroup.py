@@ -26,11 +26,12 @@ class ElasticacheReplicationGroup(Evaluator):
         return
     
     def _checkSlowLog(self):
-        if len(self.group.get('LogDeliveryConfigurations')) == 0:
+        logConfigs = self.group.get('LogDeliveryConfigurations') or []
+        if len(logConfigs) == 0:
             self.results['EnableSlowLog'] = [-1, '']
             return
         
-        for config in self.group.get('LogDeliveryConfigurations'):
+        for config in logConfigs:
             if config.get('LogType') == 'slow-log' and config.get('Status') in ['disabling', 'error']:
                 self.results['EnableSlowLog'] = [-1, config.get('Status').capitalize()]
                 

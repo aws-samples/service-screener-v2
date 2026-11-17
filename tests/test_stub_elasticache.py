@@ -14,23 +14,28 @@ import boto3
 from botocore.stub import Stubber
 
 from services.elasticache.drivers.ElasticacheRedis import ElasticacheRedis
+from services.elasticache.drivers.ElasticacheMemcached import ElasticacheMemcached
 
 
-def _cluster(client, transit, atRest):
-    stub = Stubber(client)
-    stub.add_response('describe_cache_clusters', {'CacheClusters': [{
+def _cluster(client, transit, atRest, engine='redis'):
+    c = {
         'CacheClusterId': 'ss-test-enc',
         'ARN': 'arn:aws:elasticache:us-east-1:123456789012:cluster:ss-test-enc',
-        'Engine': 'redis', 'EngineVersion': '7.1', 'CacheNodeType': 'cache.r7g.large',
-        'CacheClusterStatus': 'available',
-        'TransitEncryptionEnabled': transit, 'AtRestEncryptionEnabled': atRest,
-    }]})
+        'Engine': engine, 'EngineVersion': '7.1' if engine == 'redis' else '1.6.22',
+        'CacheNodeType': 'cache.r7g.large', 'CacheClusterStatus': 'available',
+    }
+    if transit is not None:
+        c['TransitEncryptionEnabled'] = transit
+    if atRest is not None:
+        c['AtRestEncryptionEnabled'] = atRest
+    stub = Stubber(client)
+    stub.add_response('describe_cache_clusters', {'CacheClusters': [c]})
     with stub:
         return client.describe_cache_clusters(ShowCacheNodeInfo=True)['CacheClusters'][0]
 
 
-def _evaluate(client, cluster):
-    obj = ElasticacheRedis(cluster, client, {})
+def _evaluate(client, cluster, cls=ElasticacheRedis):
+    obj = cls(cluster, client, {})
     obj._checkEncryption()
     return obj.results.get('EncInTransitAndRest')
 
@@ -42,7 +47,7 @@ def test_enc_at_rest_only_missing_flag_fix_cycle():
     assert res is not None and res[0] == -1 and 'at rest' in res[1] and 'in transit' not in res[1]
 
     res = _evaluate(client, _cluster(client, True, True))
-    assert res is None or res[0] != -1
+    assert res is not None and res[0] == 1
 
 
 def test_enc_in_transit_missing_flag_fix_cycle():
@@ -52,4 +57,20 @@ def test_enc_in_transit_missing_flag_fix_cycle():
     assert res is not None and res[0] == -1 and 'in transit' in res[1]
 
     res = _evaluate(client, _cluster(client, True, True))
-    assert res is None or res[0] != -1
+    assert res is not None and res[0] == 1
+
+
+def test_enc_memcached_engine_aware_message():
+    """Node-based Memcached has no at-rest encryption (field absent in the API response):
+    it is flagged, and the message points to Serverless / Valkey / Redis OSS."""
+    client = boto3.client('elasticache', region_name='us-east-1',
+                          aws_access_key_id='x', aws_secret_access_key='x')
+    res = _evaluate(client, _cluster(client, True, None, engine='memcached'), ElasticacheMemcached)
+    assert res is not None and res[0] == -1 and 'at rest' in res[1] and 'Serverless' in res[1]
+    assert 'in transit' not in res[1]
+
+
+def test_service_imports_memcached_driver():
+    """Regression: Elasticache.advise() instantiates ElasticacheMemcached; it must be imported."""
+    import services.elasticache.Elasticache as mod
+    assert getattr(mod, 'ElasticacheMemcached', None) is ElasticacheMemcached
