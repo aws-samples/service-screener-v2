@@ -1,0 +1,54 @@
+{
+    "codeartifactRepoPolicyBroad": {
+        "category": "S",
+        "^description": "{$COUNT} CodeArtifact domain(s) or repository(ies) have a resource policy with an Allow statement for any principal (\"*\") that is not scoped by an aws:PrincipalOrgID, aws:PrincipalAccount or similar condition. Depending on the actions granted, any AWS account can read packages from, or publish packages to, your private registry, which exposes internal code and opens a supply-chain injection path into every build that consumes it.",
+        "shortDesc": "Scope CodeArtifact resource policies to your organization",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Repository policies]<https://docs.aws.amazon.com/codeartifact/latest/ug/repo-policies.html>",
+            "[Domain policies]<https://docs.aws.amazon.com/codeartifact/latest/ug/domain-policies.html>",
+            "[aws:PrincipalOrgID condition key]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html#condition-keys-principalorgid>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/codeartifact/latest/ug/repo-policies.html"
+    },
+    "codeartifactNotUsed": {
+        "category": "S",
+        "^description": "{$COUNT} region(s) have no AWS CodeArtifact domain or repository. A private package registry gives builds a single curated, access-controlled source for third-party and internal dependencies, with package origin controls against dependency substitution. Without one, builds commonly fetch packages directly from public registries. This is a weak signal: another private registry or a different Region may already provide this control, so review before acting.",
+        "shortDesc": "Use a private package registry such as CodeArtifact",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[What is AWS CodeArtifact]<https://docs.aws.amazon.com/codeartifact/latest/ug/welcome.html>",
+            "[Connect a repository to a public repository]<https://docs.aws.amazon.com/codeartifact/latest/ug/external-connection.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/codeartifact/latest/ug/welcome.html"
+    },
+    "codeartifactPackageOriginUnrestricted": {
+        "category": "S",
+        "^description": "{$COUNT} CodeArtifact repository(ies) contain packages whose origin controls allow BOTH direct publishing and ingestion from upstream sources, while the repository can reach a public registry through an external connection. For an internal package this permits dependency substitution: a same-named version published to the public registry can be pulled in and mixed with your internal versions. Internal packages should set upstream to BLOCK; packages consumed from public registries should set publish to BLOCK.",
+        "shortDesc": "Restrict package origin controls on internal packages",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Editing package origin controls]<https://docs.aws.amazon.com/codeartifact/latest/ug/package-origin-controls.html>",
+            "[Package group origin controls]<https://docs.aws.amazon.com/codeartifact/latest/ug/package-group-origin-controls.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/codeartifact/latest/ug/package-origin-controls.html"
+    }
+}
