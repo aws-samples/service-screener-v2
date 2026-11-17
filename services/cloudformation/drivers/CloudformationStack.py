@@ -1,11 +1,117 @@
+import re
 from datetime import datetime, timezone
 
 from services.Evaluator import Evaluator
 
 
+## ParameterKey heuristic. The key is split into words (camelCase, snake_case,
+## kebab-case) and only the FINAL word decides: "DbPassword", "AdminPass",
+## "GitHubToken", "ApiKey" name a credential, while "MaxPasswordAge",
+## "PasswordReusePrevention", "ApiKeySource", "TokenValidityUnits",
+## "SecretRotationSchedule", "PasswordHashAlgorithm", "KmsKeyForSecrets",
+## "DbPasswordSecretArn" only DESCRIBE one. Anchoring on the last word avoids
+## the open-ended list of metadata suffixes a substring match needs.
+_NAME_TOKEN_RE = re.compile(r'[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+')
+
+## Final words that are a credential on their own. A single all-lowercase word
+## ("dbpassword") is matched by suffix for the long forms.
+SECRET_WORDS = ('password', 'passwd', 'passphrase', 'secret', 'token',
+                'credential', 'credentials', 'apikey', 'privatekey',
+                'secretkey', 'secretaccesskey', 'clientsecret')
+SECRET_SHORT_WORDS = ('pwd', 'pass', 'pw')
+## "...Key" is a credential only after one of these words.
+SECRET_KEY_QUALIFIERS = ('api', 'private', 'secret', 'signing')
+## Trailing words that do not change meaning: "PasswordValue", "Password1".
+NEUTRAL_TRAILING_WORDS = ('value', 'plain', 'plaintext', 'text', 'string',
+                          'str', 'raw', 'input')
+
+## Values that are clearly not a secret.
+NON_SECRET_VALUES = ('', 'true', 'false', 'yes', 'no', 'none', 'null',
+                     'enabled', 'disabled')
+## A Secrets Manager / Parameter Store NAME ("prod/db", "/app/db/password")
+## rather than a value; only applied to names ending in "secret", the one word
+## customers routinely use for the secret's name.
+_SECRET_PATH_RE = re.compile(r'^/?[A-Za-z0-9_.+=@-]+(/[A-Za-z0-9_.+=@-]+)+/?$')
+## Enum-like constants ("HEADER", "AUTO", "NONE").
+_ENUM_RE = re.compile(r'^[A-Z]+(_[A-Z]+)*$')
+
+
+def secretNameWord(key):
+    """
+    Return the credential word ('password', 'secret', 'apikey', ...) the final
+    word of ParameterKey `key` names, or None when the key does not name a
+    credential.
+    """
+    words = [w.lower() for w in _NAME_TOKEN_RE.findall(key or '')]
+    while words and (words[-1].isdigit()
+                     or words[-1] in NEUTRAL_TRAILING_WORDS):
+        words.pop()
+    if not words:
+        return None
+    last = words[-1]
+    if last == 'key' and len(words) > 1:
+        if words[-2] in SECRET_KEY_QUALIFIERS:
+            return words[-2] + 'key'
+        ## "SecretAccessKey"; a bare "AccessKey" is usually the key ID.
+        if words[-2] == 'access' and len(words) > 2 and words[-3] == 'secret':
+            return 'secretaccesskey'
+    if last in SECRET_SHORT_WORDS:
+        return 'password'
+    for w in SECRET_WORDS:
+        if last == w or (len(words) == 1 and last.endswith(w)):
+            return w
+    return None
+
+
+def _looksLikeNonSecretValue(word, value):
+    v = value.strip()
+    if v.lower() in NON_SECRET_VALUES:
+        return True
+    if set(v) == {'*'}:                      # NoEcho mask
+        return True
+    if v.startswith('{{resolve:') or v.startswith('arn:') \
+            or v.startswith('alias/'):
+        return True
+    if len(v) < 4 or v.isdigit():            # flags, counts, ages
+        return True
+    if _ENUM_RE.match(v):
+        return True
+    if word == 'secret' and _SECRET_PATH_RE.match(v):
+        return True
+    return False
+
+
+def plaintextSecretParams(stack):
+    """
+    Return the ParameterKeys of `stack` (a describe_stacks entry) whose name
+    looks like a credential AND whose value describe_stacks returns in clear
+    text. A NoEcho parameter is returned masked as '****' and is skipped; an
+    SSM parameter-type parameter (ResolvedValue present) holds a parameter
+    NAME, not the value, and is skipped; a dynamic reference, ARN, KMS alias,
+    secret path, number, very short or enum-like value is skipped.
+    """
+    found = []
+    for p in stack.get('Parameters') or []:
+        key = p.get('ParameterKey') or ''
+        word = secretNameWord(key)
+        if not word:
+            continue
+        if p.get('UsePreviousValue') and 'ParameterValue' not in p:
+            continue
+        if 'ResolvedValue' in p:
+            continue
+        value = p.get('ParameterValue')
+        if not isinstance(value, str):
+            continue
+        if _looksLikeNonSecretValue(word, value):
+            continue
+        found.append(key)
+    return found
+
+
 class CloudformationStack(Evaluator):
     """
-    Per-stack AWS CloudFormation checks (9).
+    Per-stack AWS CloudFormation checks (11).
 
     Input:
       stack -- a describe_stacks entry plus '_region', '_tags' and
@@ -282,6 +388,37 @@ class CloudformationStack(Evaluator):
                 f"Stack '{self.name}' has no tags — CloudFormation propagates "
                 "stack tags to every resource it creates, so tagging the stack is "
                 "the cheapest way to tag a whole deployment at once"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 11. Secret-like parameters visible in clear text
+    # ------------------------------------------------------------------ #
+    def _checkCfnPlaintextSecretParams(self):
+        """
+        Reads the Parameters describe_stacks already returned. The parameter
+        VALUE is never copied into the message, only its key.
+        """
+        params = self.stack.get('Parameters') or []
+        exposed = plaintextSecretParams(self.stack)
+        if exposed:
+            self.results['cfnPlaintextSecretParams'] = [
+                -1,
+                f"Stack '{self.name}' returns secret-like parameter(s) "
+                + self._joinNames(exposed)
+                + " in clear text — anyone allowed cloudformation:DescribeStacks "
+                "can read the value. Declare them NoEcho, or better, resolve the "
+                "secret from Secrets Manager or SSM SecureString with a dynamic "
+                "reference"
+            ]
+        elif params:
+            self.results['cfnPlaintextSecretParams'] = [
+                1,
+                f"Stack '{self.name}' has no secret-like parameter returned in "
+                "clear text"
+            ]
+        else:
+            self.results['cfnPlaintextSecretParams'] = [
+                1, f"Stack '{self.name}' has no parameters"
             ]
 
     # ------------------------------------------------------------------ #
