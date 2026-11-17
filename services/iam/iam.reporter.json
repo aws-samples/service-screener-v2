@@ -1078,5 +1078,126 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege"
+	},
+	"accountNotVended": {
+		"category": "S",
+		"^description": "One or more active member accounts joined your AWS Organization by invitation (JoinedMethod INVITED) instead of being created through an account-vending process such as Control Tower Account Factory, Account Factory for Terraform (AFT) or a CreateAccount pipeline. Invited accounts do not automatically receive your account baseline (guardrails, logging, security tooling, network setup). Invited accounts that are enrolled in AWS Control Tower are not reported. Accounts created with a raw CreateAccount call cannot be distinguished from Account Factory ones and are not reported. Run from the management or a delegated administrator account.",
+		"shortDesc": "Vend accounts through Account Factory (or enroll invited accounts)",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Provision accounts with AWS Control Tower Account Factory]<https://docs.aws.amazon.com/controltower/latest/userguide/account-factory.html>",
+			"[Enroll an existing AWS account in Control Tower]<https://docs.aws.amazon.com/controltower/latest/userguide/enroll-account.html>",
+			"[Organizing Your AWS Environment Using Multiple Accounts]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/organizing-your-aws-environment.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/controltower/latest/userguide/enroll-account.html"
+	},
+	"orgAccountsMissingOwnershipTags": {
+		"category": "S",
+		"^description": "{$COUNT} or more active accounts in your AWS Organization have no ownership-like tag on the account itself (tag key containing owner, team, contact, cost center, business unit, department, steward or custodian). Account tags identify who is accountable for the account, who to contact during an incident and how costs are allocated. Tag key conventions are organization-specific, so this name-based check is informational. Run from the management or a delegated administrator account.",
+		"shortDesc": "Tag member accounts with owner information",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Tagging AWS Organizations resources]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_tagging.html>",
+			"[Best Practices for Tagging AWS Resources]<https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/tagging-best-practices.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_tagging.html"
+	},
+	"orgBackupPolicyMissing": {
+		"category": "S",
+		"^description": "No AWS Organizations backup policy is attached to the root, an OU or an account (or the backup policy type is not enabled). Backup policies centrally deploy and enforce AWS Backup plans across member accounts so new accounts and resources are protected without per-account setup. Per-account backup plans and coverage are evaluated separately by the AWS Backup checks; this check only reports the absence of organization-level enforcement. Run from the management or a delegated administrator account.",
+		"shortDesc": "Enforce backups with an Organizations backup policy",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Backup policies]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_backup.html>",
+			"[Managing AWS Backup resources across multiple AWS accounts]<https://docs.aws.amazon.com/aws-backup/latest/devguide/manage-cross-account.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_backup.html"
+	},
+	"orgNoDeclarativePolicy": {
+		"category": "S",
+		"^description": "No AWS Organizations declarative policy for EC2 is attached to the root, an OU or an account (or the declarative policy type is not enabled). Declarative policies enforce baseline service configurations, such as blocking public access to EBS snapshots and AMIs, enforcing IMDSv2 defaults, VPC Block Public Access and allowed images, and stay in effect when new features or APIs are added. The effective per-account settings are also evaluated directly by the EC2 account-level checks. Run from the management or a delegated administrator account.",
+		"shortDesc": "Enforce EC2 baselines with a declarative policy",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Declarative policies]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_declarative.html>",
+			"[Declarative policy syntax and examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_declarative_syntax.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_declarative.html"
+	},
+	"orgNoForensicsOu": {
+		"category": "S",
+		"^description": "No organizational unit or active account in your AWS Organization is named like a forensics or incident-investigation environment (name containing forensic, investigation or incident response). A dedicated forensics account (commonly in a Security or Forensics OU) lets responders copy snapshots and evidence into an isolated, access-controlled environment. This is a name-based heuristic: if your forensics environment uses a different name, suppress this finding. Run from the management or a delegated administrator account.",
+		"shortDesc": "Prepare a dedicated forensics account/OU",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Security Incident Response Guide - Forensics]<https://docs.aws.amazon.com/security-ir/latest/userguide/develop-forensics-capabilities.html>",
+			"[Recommended OUs and accounts - Security OU]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/security-ou-and-accounts.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/security-ou-and-accounts.html"
+	},
+	"orgNoSandboxOrStagingOu": {
+		"category": "S",
+		"^description": "No organizational unit in your AWS Organization is named like a Sandbox OU (sandbox, playground, experiment) or a Policy Staging OU (policy staging / SCP test). A Sandbox OU gives builders a place to experiment away from production guardrails and data, and a Policy Staging OU lets you test SCP and other policy changes before applying them broadly. This is a name-based heuristic; the PASS detail shows which of the two OUs were found. Run from the management or a delegated administrator account.",
+		"shortDesc": "Create Sandbox / Policy Staging OUs",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Recommended OUs and accounts]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/recommended-ous-and-accounts.html>",
+			"[Sandbox OU]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/sandbox-ou.html>",
+			"[Policy Staging OU]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/policy-staging-ou.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/recommended-ous-and-accounts.html"
+	},
+	"principalInventorySummary": {
+		"category": "S",
+		"^description": "Informational inventory of principal sources in this account: IAM users and roles (service-linked, Identity Center and other), IAM SAML and OIDC identity providers, IAM Identity Center instances, Amazon Cognito user pools and IAM Roles Anywhere trust anchors in the scanned Regions. This check never reports a finding; use it to confirm every identity source is known and centrally managed.",
+		"shortDesc": "Review the inventory of principal sources",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Identity providers and federation]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers.html>",
+			"[SEC02-BP04 Rely on a centralized identity provider]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_identities_identity_provider.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers.html"
 	}
 }

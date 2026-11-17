@@ -128,3 +128,102 @@ def test_third_party_role_unclassifiable_in_emulator(emu, uid):
         except Exception:
             pass
         iam.delete_role(RoleName=name)
+
+
+# --------------------------------------------------------------------------- #
+# Organization hygiene heuristics (WAFS2027 tier 3)
+# --------------------------------------------------------------------------- #
+def _cleanupOus(org, created):
+    for ouId in reversed(created):
+        try:
+            org.delete_organizational_unit(OrganizationalUnitId=ouId)
+        except Exception:
+            pass
+
+
+def test_no_sandbox_or_staging_ou(emu, uid):
+    org = emu.client('organizations')
+    root = org.list_roots()['Roots'][0]['Id']
+    created = []
+
+    def misconfigure():
+        ou = org.create_organizational_unit(ParentId=root, Name=f'ss-test-{uid}-workloads')
+        created.append(ou['OrganizationalUnit']['Id'])
+
+    def fix():
+        # Nested under the workloads OU: the whole OU tree is searched.
+        ou = org.create_organizational_unit(ParentId=created[0], Name=f'Sandbox-{uid}')
+        created.append(ou['OrganizationalUnit']['Id'])
+
+    try:
+        _, after = assertFlagFixCycle(emu, 'iam', 'orgNoSandboxOrStagingOu', RES, misconfigure, fix)
+        assert after == {RES: 1}
+        res = runCheck(emu, 'iam', 'orgNoSandboxOrStagingOu', RES)
+        assert f'Sandbox-{uid}' in res.results[RES]['orgNoSandboxOrStagingOu'][1]
+    finally:
+        _cleanupOus(org, created)
+
+
+def test_no_forensics_ou(emu, uid):
+    """Without a forensics-like OU the check falls back to account names;
+    list_accounts is NotImplemented in the emulator, so it must report 0 (not
+    PASS, not an unproven FAIL). Adding a Forensics OU makes it PASS. The
+    -1 path (no OU and no account match) is in tests/test_stub_iam_org_hygiene.py."""
+    org = emu.client('organizations')
+    root = org.list_roots()['Roots'][0]['Id']
+    created = []
+    try:
+        ou = org.create_organizational_unit(ParentId=root, Name=f'ss-test-{uid}-security')
+        created.append(ou['OrganizationalUnit']['Id'])
+        res = runCheck(emu, 'iam', 'orgNoForensicsOu', RES)
+        assert res.statuses() == {RES: 0}, res.results
+
+        ou = org.create_organizational_unit(ParentId=created[0], Name=f'Forensics-{uid}')
+        created.append(ou['OrganizationalUnit']['Id'])
+        res = runCheck(emu, 'iam', 'orgNoForensicsOu', RES)
+        assert res.statuses() == {RES: 1}, res.results
+    finally:
+        _cleanupOus(org, created)
+
+
+def test_hygiene_checks_unimplemented_reads_not_silent_pass(emu):
+    """list_accounts / list_policies are NotImplemented in the emulator:
+    these checks must report 0. Flag/fix cycles are Stubber-based."""
+    for check in ('accountNotVended', 'orgAccountsMissingOwnershipTags'):
+        res = runCheck(emu, 'iam', check, RES)
+        assert res.statuses() == {RES: 0}, (check, res.results)
+
+
+def test_org_policy_types_not_enabled_flag(emu):
+    """The emulator root only enables SERVICE_CONTROL_POLICY, so backup and
+    declarative policies are genuinely missing (FLAG). enable_policy_type /
+    list_policies are NotImplemented, so the FIX half is Stubber-based."""
+    org = emu.client('organizations')
+    types = {t['Type'] for t in org.list_roots()['Roots'][0].get('PolicyTypes', []) if t.get('Status') == 'ENABLED'}
+    for check, ptype in (('orgBackupPolicyMissing', 'BACKUP_POLICY'), ('orgNoDeclarativePolicy', 'DECLARATIVE_POLICY_EC2')):
+        assert ptype not in types
+        res = runCheck(emu, 'iam', check, RES)
+        assert res.statuses() == {RES: -1}, (check, res.results)
+        assert 'type is not enabled' in res.results[RES][check][1]
+
+
+def test_principal_inventory_summary(emu, uid):
+    """Informational: never -1. Adding an OIDC provider is reflected on re-run."""
+    iam = emu.client('iam')
+    url = f'https://ss-test-{uid}.example.com'
+    arn = None
+    try:
+        res = runCheck(emu, 'iam', 'principalInventorySummary', RES)
+        assert res.statuses() == {RES: 0}, res.results
+        before = res.results[RES]['principalInventorySummary'][1]
+        assert before.startswith('INFO: ') and 'IAM users:' in before and 'Cognito user pools:' in before, before
+        n = int(before.split('IAM OIDC providers: ')[1].split('<br>')[0])
+
+        arn = iam.create_open_id_connect_provider(Url=url, ClientIDList=['sts.amazonaws.com'],
+                                                  ThumbprintList=['a' * 40])['OpenIDConnectProviderArn']
+        res = runCheck(emu, 'iam', 'principalInventorySummary', RES)
+        assert res.statuses() == {RES: 0}, res.results
+        assert f'IAM OIDC providers: {n + 1}' in res.results[RES]['principalInventorySummary'][1]
+    finally:
+        if arn:
+            iam.delete_open_id_connect_provider(OpenIDConnectProviderArn=arn)

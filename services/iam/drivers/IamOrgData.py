@@ -27,6 +27,8 @@ FULL_AWS_ACCESS_ID = 'p-FullAWSAccess'
 SCP = 'SERVICE_CONTROL_POLICY'
 RCP = 'RESOURCE_CONTROL_POLICY'
 TAG = 'TAG_POLICY'
+BACKUP = 'BACKUP_POLICY'
+DECLARATIVE_EC2 = 'DECLARATIVE_POLICY_EC2'
 
 
 def _code(e):
@@ -149,6 +151,32 @@ class OrgData:
 
     def accounts(self):
         return self._cached('accounts', lambda: self._paginate('list_accounts', 'Accounts'))
+
+    def ous(self):
+        """Every OU in the organization, walked with the OU APIs only (no
+        account listing). {ouId: {'Name', 'Parent', 'Path'}} where Path is
+        'Root/Parent/Child'."""
+        roots, err = self.roots()
+        if err:
+            return None, err
+
+        def fetch():
+            out = {}
+            if not roots:
+                return out
+            stack = [(roots[0]['Id'], roots[0].get('Name', 'Root'))]
+            while stack:
+                parent, path = stack.pop()
+                for ou in self._paginate('list_organizational_units_for_parent', 'OrganizationalUnits', ParentId=parent):
+                    ouPath = '{}/{}'.format(path, ou.get('Name', ou['Id']))
+                    out[ou['Id']] = {'Name': ou.get('Name', ou['Id']), 'Parent': parent, 'Path': ouPath}
+                    stack.append((ou['Id'], ouPath))
+            return out
+        return self._cached('ous', fetch)
+
+    def accountTags(self, accountId):
+        return self._cached('tags::' + str(accountId), lambda: self._paginate(
+            'list_tags_for_resource', 'Tags', ResourceId=accountId))
 
 
 # ---------------------------------------------------------------------- #

@@ -8,7 +8,7 @@ from dateutil.tz import tzlocal
 from utils.Config import Config
 from utils.Tools import _warn, _pr
 from .IamCommon import IamCommon
-from .IamOrgData import OrgData, SCP, RCP, TAG, FULL_AWS_ACCESS_ID, statements, denyCoversAction, conditionKeys, scpGuardrails, SCP_GUARDRAILS, \
+from .IamOrgData import OrgData, SCP, RCP, TAG, BACKUP, DECLARATIVE_EC2, FULL_AWS_ACCESS_ID, statements, denyCoversAction, conditionKeys, scpGuardrails, SCP_GUARDRAILS, \
     denyIsUnconditionalGuardrail, guardrailCoverage
 from .IamSsoData import SsoData, parseIsoDuration
  
@@ -886,6 +886,7 @@ class IamAccount(IamCommon):
         mgmtId = org.get('MasterAccountId')
         nodes = tree['nodes']
         evaluated, missing, unknown = 0, [], []
+        lackCount = {g: 0 for g in SCP_GUARDRAILS}
         for nid, node in nodes.items():
             if node['Type'] == 'ROOT':
                 continue
@@ -903,14 +904,19 @@ class IamAccount(IamCommon):
                     have |= scpGuardrails(p['Content'])
                 cur = nodes.get(cur, {}).get('Parent')
             lacking = [SCP_GUARDRAILS[g] for g in SCP_GUARDRAILS if g not in have]
+            if lacking and not unparsed:
+                for g in SCP_GUARDRAILS:
+                    if g not in have:
+                        lackCount[g] += 1
             if lacking:
                 label = '{} {} ({}): missing {}'.format(
                     'OU' if node['Type'] == 'ORGANIZATIONAL_UNIT' else 'Account', node['Name'], nid, ', '.join(lacking))
                 (unknown if unparsed else missing).append(label)
 
         if missing:
-            self.results[key] = [-1, '{} of {} OUs/member accounts lack effective SCP guardrails:<br>{}'.format(
-                len(missing), evaluated, self._detail(missing))]
+            perControl = '; '.join('{}: missing on {}'.format(SCP_GUARDRAILS[g], n) for g, n in lackCount.items() if n)
+            self.results[key] = [-1, '{} of {} OUs/member accounts lack effective SCP guardrails ({}):<br>{}'.format(
+                len(missing), evaluated, perControl, self._detail(missing))]
         elif unknown:
             self.results[key] = [0, 'Unable to evaluate (unparseable SCP content):<br>{}'.format(self._detail(unknown))]
         elif evaluated == 0:
@@ -1366,3 +1372,265 @@ class IamAccount(IamCommon):
             self.results[key] = [0, 'INFO: {}. Ensure these are limited to a small, group-based audience.'.format(adminNote)]
         else:
             self.results[key] = [1, '{} permission set(s): none grant full admin or a session longer than 8 hours'.format(count)]
+
+    # ------------------------------------------------------------------ #
+    # Organization hygiene heuristics (WAFS2027 tier 3, low criticality).
+    # Name/tag based: they only FAIL when nothing in the org matches, and
+    # record [0, ...] whenever the data needed to decide cannot be read.
+    # ------------------------------------------------------------------ #
+    OWNERSHIP_TAG_KEYWORDS = ('owner', 'contact', 'team', 'costcenter', 'businessunit', 'department',
+                              'steward', 'custodian')
+    FORENSICS_NAME_KEYWORDS = ('forensic', 'investigation', 'incidentresponse')
+    SANDBOX_NAME_KEYWORDS = ('sandbox', 'playground', 'experiment')
+    POLICY_STAGING_NAME_KEYWORDS = ('policystaging', 'policytest', 'scpstaging', 'scptest', 'stagingpolicy')
+
+    @staticmethod
+    def _normName(v):
+        return ''.join(ch for ch in str(v or '').lower() if ch.isalnum())
+
+    def _nameMatches(self, name, keywords):
+        n = self._normName(name)
+        return any(k in n for k in keywords)
+
+    def _activeAccounts(self, accounts):
+        return [a for a in accounts if (a.get('State') or a.get('Status') or 'ACTIVE') == 'ACTIVE']
+
+    def _orgPolicyPresence(self, key, policyType, label):
+        """Shared logic for 'no <type> policy attached' checks."""
+        if not self._orgPrecondition(key, True, 'Not applicable: {} require All Features (see orgNotAllFeatures)'.format(label)):
+            return
+        pols = self._policyGate(key, policyType, [-1, '{} type is not enabled on the organization root'.format(label[0].upper() + label[1:])])
+        if pols is None:
+            return
+        attached = self._customerAttached(pols)
+        if not attached:
+            self.results[key] = [-1, 'No {} is attached to the root, any OU or any account'.format(label)]
+            return
+        self.results[key] = [1, '{} {} attached: {}'.format(len(attached), label, '; '.join(
+            '{} -> {}'.format(p['Name'], ', '.join(self._targetLabel(t) for t in p['Targets'][:5])) for p in attached[:20]))]
+
+    def _checkOrgBackupPolicyMissing(self):
+        """Org-level enforcement of backup plans. Per-account backup coverage
+        is evaluated separately by the backup service checks."""
+        self._orgPolicyPresence('orgBackupPolicyMissing', BACKUP, 'backup policy')
+
+    def _checkOrgNoDeclarativePolicy(self):
+        self._orgPolicyPresence('orgNoDeclarativePolicy', DECLARATIVE_EC2, 'declarative policy (EC2)')
+
+    def _checkOrgNoSandboxOrStagingOu(self):
+        key = 'orgNoSandboxOrStagingOu'
+        if not self._orgPrecondition(key):
+            return
+        ous, err = self.orgData.ous()
+        if err:
+            self.results[key] = self.orgData.notEvaluable(err)
+            return
+        sandbox = [o['Path'] for o in ous.values() if self._nameMatches(o['Name'], self.SANDBOX_NAME_KEYWORDS)]
+        staging = [o['Path'] for o in ous.values() if self._nameMatches(o['Name'], self.POLICY_STAGING_NAME_KEYWORDS)]
+        if not sandbox and not staging:
+            self.results[key] = [-1, 'None of the {} OU(s) is named like a Sandbox or Policy Staging OU (name-based heuristic)'.format(len(ous))]
+            return
+        parts = []
+        parts.append('Sandbox OU: {}'.format(', '.join(sandbox[:10])) if sandbox else 'No Sandbox-like OU')
+        parts.append('Policy Staging OU: {}'.format(', '.join(staging[:10])) if staging else 'No Policy-Staging-like OU')
+        self.results[key] = [1, '; '.join(parts)]
+
+    def _checkOrgNoForensicsOu(self):
+        key = 'orgNoForensicsOu'
+        if not self._orgPrecondition(key):
+            return
+        ous, err = self.orgData.ous()
+        if err:
+            self.results[key] = self.orgData.notEvaluable(err)
+            return
+        found = [o['Path'] for o in ous.values() if self._nameMatches(o['Name'], self.FORENSICS_NAME_KEYWORDS)]
+        if found:
+            self.results[key] = [1, 'Forensics-like OU(s): {}'.format(', '.join(found[:10]))]
+            return
+        # A dedicated forensics account often lives in the Security OU.
+        accounts, err = self.orgData.accounts()
+        if err:
+            self.results[key] = [0, 'Unable to evaluate (no forensics-like OU; account names unreadable: {})'.format(err)]
+            return
+        accs = [a for a in self._activeAccounts(accounts) if self._nameMatches(a.get('Name'), self.FORENSICS_NAME_KEYWORDS)]
+        if accs:
+            self.results[key] = [1, 'Forensics-like account(s): {}'.format(', '.join(
+                '{} ({})'.format(a.get('Name', ''), a.get('Id')) for a in accs[:10]))]
+        else:
+            self.results[key] = [-1, 'No OU or active account is named like a forensics / incident-investigation environment (name-based heuristic; {} OU(s), {} account(s))'.format(
+                len(ous), len(accounts))]
+
+    def _checkOrgAccountsMissingOwnershipTags(self):
+        key = 'orgAccountsMissingOwnershipTags'
+        if not self._orgPrecondition(key):
+            return
+        accounts, err = self.orgData.accounts()
+        if err:
+            self.results[key] = self.orgData.notEvaluable(err)
+            return
+        active = self._activeAccounts(accounts)
+        if not active:
+            self.results[key] = [0, 'No active accounts returned by the organization']
+            return
+        missing, errors, readOk = [], [], 0
+        for a in active:
+            tags, err = self.orgData.accountTags(a['Id'])
+            if err:
+                errors.append('{}: {}'.format(a['Id'], err))
+                if readOk == 0:
+                    # First read failed: every further call would fail the same way.
+                    break
+                continue
+            readOk += 1
+            if not any(self._nameMatches(t.get('Key'), self.OWNERSHIP_TAG_KEYWORDS) for t in tags or []):
+                missing.append('{} ({}): tags [{}]'.format(a.get('Name', ''), a['Id'],
+                                                           ', '.join(t.get('Key', '') for t in (tags or [])[:10]) or 'none'))
+        if missing:
+            msg = '{} of {} active account(s) have no ownership-like tag (owner/team/contact/cost center...):<br>{}'.format(
+                len(missing), readOk, self._detail(missing))
+            if errors:
+                msg += '<br>Unable to read tags of {} account(s)'.format(len(errors))
+            self.results[key] = [-1, msg]
+        elif errors:
+            self.results[key] = self.orgData.notEvaluable(errors[0].split(': ')[-1])
+        else:
+            self.results[key] = [1, 'All {} active account(s) carry an ownership-like tag'.format(readOk)]
+
+    def _controlTowerEnrolledAccounts(self):
+        """(set(accountIds) enrolled via a Control Tower baseline, landingZoneFound, notes)."""
+        enrolled, lzFound, notes = set(), False, []
+        regions = [r for r in (Config.get('REGIONS_SELECTED', []) or []) if r != 'GLOBAL']
+        for region in regions:
+            try:
+                ct = self.ssBoto.client('controltower', config=bConfig(region_name=region))
+                lzs = []
+                for page in ct.get_paginator('list_landing_zones').paginate():
+                    lzs.extend(page.get('landingZones', []))
+                if not lzs:
+                    continue
+                lzFound = True
+                for page in ct.get_paginator('list_enabled_baselines').paginate(includeChildren=True):
+                    for b in page.get('enabledBaselines', []):
+                        tid = str(b.get('targetIdentifier', ''))
+                        if ':account/' in tid:
+                            enrolled.add(tid.rsplit('/', 1)[-1])
+            except botocore.exceptions.ClientError as e:
+                notes.append('{}: {}'.format(region, e.response['Error']['Code']))
+            except botocore.exceptions.BotoCoreError as e:
+                notes.append('{}: {}'.format(region, type(e).__name__))
+        return enrolled, lzFound, notes
+
+    def _checkAccountNotVended(self):
+        """Member accounts that joined the organization by invitation were not
+        provisioned by an account-vending process (Account Factory, AFT or a
+        custom CreateAccount pipeline). Invited accounts later enrolled in
+        Control Tower (baseline applied) are not reported. Accounts created
+        with a raw CreateAccount call cannot be told apart from Account
+        Factory ones and are not reported."""
+        key = 'accountNotVended'
+        if not self._orgPrecondition(key):
+            return
+        accounts, err = self.orgData.accounts()
+        if err:
+            self.results[key] = self.orgData.notEvaluable(err)
+            return
+        org, _ = self.orgData.organization()
+        mgmt = org.get('MasterAccountId')
+        members = [a for a in self._activeAccounts(accounts) if a.get('Id') != mgmt]
+        if not members:
+            self.results[key] = [1, 'No active member accounts in the organization']
+            return
+        unknown = [a for a in members if a.get('JoinedMethod') not in ('INVITED', 'CREATED')]
+        invited = [a for a in members if a.get('JoinedMethod') == 'INVITED']
+        enrolledNote = ''
+        if invited:
+            enrolled, lzFound, notes = self._controlTowerEnrolledAccounts()
+            if enrolled:
+                skipped = [a for a in invited if a['Id'] in enrolled]
+                invited = [a for a in invited if a['Id'] not in enrolled]
+                if skipped:
+                    enrolledNote = '<br>{} invited account(s) enrolled in Control Tower not reported'.format(len(skipped))
+            elif lzFound and notes:
+                enrolledNote = '<br>(Control Tower enrollment unreadable: {})'.format(notes[0])
+        if invited:
+            self.results[key] = [-1, '{} of {} active member account(s) joined by invitation, not through an account-vending process:<br>{}{}'.format(
+                len(invited), len(members), self._detail(['{} ({}) joined {}'.format(
+                    a.get('Name', ''), a['Id'], str(a.get('JoinedTimestamp', ''))[:10]) for a in invited]), enrolledNote)]
+        elif unknown and len(unknown) == len(members):
+            self.results[key] = [0, 'Unable to evaluate (JoinedMethod not returned for member accounts)']
+        else:
+            self.results[key] = [1, 'All {} active member account(s) were created from within the organization{}'.format(
+                len(members) - len(unknown), enrolledNote)]
+
+    # ------------------------------------------------------------------ #
+    # Principal inventory (informational, never a finding)
+    # ------------------------------------------------------------------ #
+    def _checkPrincipalInventorySummary(self):
+        key = 'principalInventorySummary'
+        lines, errors = [], []
+
+        def iamCount(op, resultKey):
+            try:
+                out = []
+                if self.iamClient.can_paginate(op):
+                    for page in self.iamClient.get_paginator(op).paginate():
+                        out.extend(page.get(resultKey, []))
+                else:
+                    out = getattr(self.iamClient, op)().get(resultKey, [])
+                return out
+            except botocore.exceptions.ClientError as e:
+                errors.append('iam.{}: {}'.format(op, e.response['Error']['Code']))
+                return None
+
+        if self._authDetails and (self._authDetails.get('users') or self._authDetails.get('roles')):
+            users, roles = self._authDetails.get('users', []), self._authDetails.get('roles', [])
+        else:
+            users, roles = iamCount('list_users', 'Users'), iamCount('list_roles', 'Roles')
+        if users is not None:
+            lines.append('IAM users: {}'.format(len(users)))
+        if roles is not None:
+            slr = len([r for r in roles if str(r.get('Path', '')).startswith('/aws-service-role/')])
+            sso = len([r for r in roles if str(r.get('RoleName', '')).startswith('AWSReservedSSO_')])
+            lines.append('IAM roles: {} (service-linked: {}, Identity Center: {}, other: {})'.format(
+                len(roles), slr, sso, len(roles) - slr - sso))
+        saml = iamCount('list_saml_providers', 'SAMLProviderList')
+        if saml is not None:
+            lines.append('IAM SAML providers: {}'.format(len(saml)))
+        oidc = iamCount('list_open_id_connect_providers', 'OpenIDConnectProviderList')
+        if oidc is not None:
+            lines.append('IAM OIDC providers: {}'.format(len(oidc)))
+
+        insts, ssoErr = self.ssoData.instances()
+        errors.extend('sso-admin {}'.format(e) for e in ssoErr)
+        if insts or not ssoErr:
+            lines.append('IAM Identity Center instances: {}'.format(', '.join(
+                '{} ({}, {})'.format(i['Instance'].get('InstanceArn', '').rsplit('/', 1)[-1], i['Kind'].lower(), i['Region'])
+                for i in insts) or 'none'))
+
+        regions = [r for r in (Config.get('REGIONS_SELECTED', []) or []) if r != 'GLOBAL']
+        regional = [('Cognito user pools', 'cognito-idp', 'list_user_pools', 'UserPools', {'MaxResults': 60}),
+                    ('IAM Roles Anywhere trust anchors', 'rolesanywhere', 'list_trust_anchors', 'trustAnchors', {})]
+        for label, svc, op, rkey, kw in regional:
+            perRegion, ok = [], False
+            for region in regions:
+                try:
+                    client = self.ssBoto.client(svc, config=bConfig(region_name=region))
+                    n = 0
+                    for page in client.get_paginator(op).paginate(**kw):
+                        n += len(page.get(rkey, []))
+                    ok = True
+                    if n:
+                        perRegion.append('{}: {}'.format(region, n))
+                except botocore.exceptions.ClientError as e:
+                    errors.append('{} {}: {}'.format(svc, region, e.response['Error']['Code']))
+                except botocore.exceptions.BotoCoreError as e:
+                    errors.append('{} {}: {}'.format(svc, region, type(e).__name__))
+            if ok:
+                lines.append('{}: {}'.format(label, ', '.join(perRegion) or 'none'))
+
+        if not lines:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(errors[0].split(': ')[-1] if errors else 'no data')]
+            return
+        if errors:
+            lines.append('Unreadable: {}'.format(', '.join(errors[:10])))
+        self.results[key] = [0, 'INFO: ' + self._detail(lines)]
