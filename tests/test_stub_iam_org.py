@@ -114,6 +114,26 @@ class Harness:
         return self.drv.results[key]
 
 
+def stubTree(h, children):
+    """Stub the depth-first walk of OrgData.tree().
+    children: {parentId: ([(ouId, name)], [(accountId, name, state)])}."""
+    stack = [ROOT_ID]
+    while stack:
+        parent = stack.pop()
+        ous, accs = children.get(parent, ([], []))
+        h.org.add_response('list_organizational_units_for_parent', {'OrganizationalUnits': [
+            {'Id': oid, 'Arn': f'arn:aws:organizations::{MGMT}:ou/{ORG_ID}/{oid}', 'Name': name} for oid, name in ous]},
+            {'ParentId': parent})
+        h.org.add_response('list_accounts_for_parent', {'Accounts': [
+            {'Id': aid, 'Name': name, 'State': state} for aid, name, state in accs]}, {'ParentId': parent})
+        stack.extend(oid for oid, _ in ous)
+
+
+# Root -> management account + OU Workloads -> member account "app".
+DEFAULT_TREE = {ROOT_ID: ([(OU_ID, 'Workloads')], [(MGMT, 'mgmt', 'ACTIVE')]),
+                OU_ID: ([], [(MEMBER, 'app', 'ACTIVE')])}
+
+
 FULL = ('p-FullAWSAccess', 'FullAWSAccess', True, None, [(ROOT_ID, 'Root', 'ROOT')])
 RCP_FULL = ('p-RCPFullAWSAccess', 'RCPFullAWSAccess', True, None, [(ROOT_ID, 'Root', 'ROOT')])
 OU_T = (OU_ID, 'Workloads', 'ORGANIZATIONAL_UNIT')
@@ -395,12 +415,15 @@ class TestBackupTamperScp:
         h = Harness()
         h.org.add_response('list_roots', _roots())
         h.policies('SERVICE_CONTROL_POLICY', [FULL, ('p-partial01', 'Partial', False, _doc(self.PARTIAL), [ROOT_T])])
+        stubTree(h, DEFAULT_TREE)
         r = h.run('ScpNoBackupTamperProtection', 'scpNoBackupTamperProtection')
-        assert r[0] == -1 and 'PutBackupVaultAccessPolicy' in r[1] and 'DeleteRecoveryPoint' not in r[1]
+        assert r[0] == -1 and 'Not denied: backup:PutBackupVaultAccessPolicy' in r[1]
+        assert 'Not denied: backup:DeleteRecoveryPoint' not in r[1] and 'Account app (222222222222)' in r[1]
 
         h = Harness()
         h.org.add_response('list_roots', _roots())
         h.policies('SERVICE_CONTROL_POLICY', [FULL, ('p-backup001', 'BackupGuard', False, _doc(self.FULLDENY), [OU_T])])
+        stubTree(h, DEFAULT_TREE)
         assert h.run('ScpNoBackupTamperProtection', 'scpNoBackupTamperProtection')[0] == 1
 
     def test_unattached_policy_does_not_count(self):

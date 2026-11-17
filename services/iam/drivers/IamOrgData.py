@@ -244,6 +244,12 @@ def scpGuardrails(doc):
     for s in statements(doc):
         if s.get('Effect') != 'Deny':
             continue
+        # A Deny "*" without a narrowing condition (quarantine / suspended
+        # SCP) blocks every action - including root user, out-of-region and
+        # privilege-escalation actions - so it provides every guardrail.
+        if any(str(p) == '*' for p in _asList(s.get('Action'))) and denyIsUnconditionalGuardrail(s):
+            found.update(SCP_GUARDRAILS)
+            continue
         conds = conditionKeys(s)
         for (op, key), vals in conds.items():
             baseOp = op[:-len('ifexists')] if op.endswith('ifexists') else op

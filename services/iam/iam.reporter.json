@@ -494,11 +494,11 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Notify on Root Activity]<https://aws.amazon.com/blogs/mt/monitor-and-notify-on-aws-account-root-user-activity/>",
-			"[Root ID responsible]<https://docs.aws.amazon.com/accounts/latest/reference/root-user-tasks.html>"
+			"[Root ID responsible]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html#root-user-tasks>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/accounts/latest/reference/root-user-tasks.html"
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html#root-user-tasks"
 	},
 	"rootConsoleLoginFail3x": {
 		"category": "S",
@@ -739,7 +739,7 @@
 	},
 	"scpBestPractices": {
 		"category": "S",
-		"^description": "One or more organizational units or member accounts in your AWS Organization are missing recommended guardrails in their EFFECTIVE set of service control policies (SCPs attached directly plus those inherited from every parent OU and the root). Best-practice SCP guardrails are: (1) denying root user actions in member accounts, (2) restricting access to approved AWS Regions (aws:RequestedRegion), and (3) preventing privilege escalation by denying sensitive IAM actions such as iam:CreatePolicyVersion, iam:SetDefaultPolicyVersion or iam:PassRole. A guardrail provided by any SCP in the inheritance path counts, so splitting guardrails across several SCPs is fine. The management account is not evaluated because SCPs never apply to it. Review the listed OUs/accounts and attach SCPs with the missing Deny statements at the root or a parent OU.",
+		"^description": "One or more organizational units or member accounts in your AWS Organization are missing recommended guardrails in their EFFECTIVE set of service control policies (SCPs attached directly plus those inherited from every parent OU and the root). Best-practice SCP guardrails are: (1) denying root user actions in member accounts, (2) restricting access to approved AWS Regions (aws:RequestedRegion), and (3) preventing privilege escalation by denying sensitive IAM actions such as iam:CreatePolicyVersion, iam:SetDefaultPolicyVersion or iam:PassRole. A guardrail provided by any SCP in the inheritance path counts, so splitting guardrails across several SCPs is fine. The management account is not evaluated because SCPs never apply to it. OUs without active member accounts are skipped, and an unconditional Deny \"*\" (for example a Suspended or Quarantine OU SCP) meets every guardrail. Review the listed OUs/accounts and attach SCPs with the missing Deny statements at the root or a parent OU.",
 		"shortDesc": "Improve SCP security guardrails",
 		"criticality": "M",
 		"downtime": 0,
@@ -818,7 +818,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Best practices for the management account]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_best-practices_mgmt-acct.html>",
-			"[Organizing your AWS environment using multiple accounts]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/management-account.html>"
+			"[Design principles - avoid workloads in the management account]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/design-principles-for-your-multi-account-strategy.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -868,7 +868,8 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Resource control policies (RCPs)]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_rcps.html>",
-			"[Data perimeter policy examples]<https://github.com/aws-samples/data-perimeter-policy-examples>"
+			"[RCP examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_rcps_examples.html>",
+			"[Building a data perimeter on AWS]<https://docs.aws.amazon.com/whitepapers/latest/building-a-data-perimeter-on-aws/building-a-data-perimeter-on-aws.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -885,7 +886,7 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Tag policies]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_tag-policies.html>",
-			"[Data classification and tagging]<https://docs.aws.amazon.com/whitepapers/latest/data-classification/data-classification-models.html>"
+			"[Tagging best practices - tags for data security and access control]<https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/tags-for-data-security-risk-management-and-access-control.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -926,7 +927,7 @@
 	},
 	"scpNoBackupTamperProtection": {
 		"category": "S",
-		"^description": "No attached service control policy denies the AWS Backup actions used to tamper with backups (backup:DeleteBackupVault, DeleteBackupVaultAccessPolicy, DeleteBackupVaultLockConfiguration, DeleteRecoveryPoint, PutBackupVaultAccessPolicy, UpdateRecoveryPointLifecycle). Ransomware actors with administrator access in a member account commonly delete recovery points or shorten retention before encrypting data. Attach an SCP that denies these actions except for a designated backup administration role, and consider AWS Backup Vault Lock in compliance mode for immutable backups.",
+		"^description": "The effective service control policies of one or more member accounts do not deny the AWS Backup actions used to tamper with backups (backup:DeleteBackupVault, DeleteBackupVaultAccessPolicy, DeleteBackupVaultLockConfiguration, DeleteRecoveryPoint, PutBackupVaultAccessPolicy, UpdateRecoveryPointLifecycle). The check evaluates the EFFECTIVE SCP set of every active member account (SCPs attached to the account, its parent OUs and the root) and lists the accounts that are not covered, so a Deny attached only to one OU, one account or the management account (where SCPs never apply) does not make the whole organization compliant. Ransomware actors with administrator access in a member account commonly delete recovery points or shorten retention before encrypting data. Attach an SCP that denies these actions except for a designated backup administration role, and consider AWS Backup Vault Lock in compliance mode for immutable backups.",
 		"shortDesc": "Protect backups from tampering with an SCP",
 		"criticality": "L",
 		"downtime": 0,
@@ -934,7 +935,8 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Backup and SCPs]<https://docs.aws.amazon.com/aws-backup/latest/devguide/backup-scp.html>",
+			"[SCP examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html>",
+			"[AWS Backup vault access policies]<https://docs.aws.amazon.com/aws-backup/latest/devguide/create-a-vault-access-policy.html>",
 			"[AWS Backup Vault Lock]<https://docs.aws.amazon.com/aws-backup/latest/devguide/vault-lock.html>"
 		],
 		"remediation": null,
@@ -943,7 +945,7 @@
 	},
 	"scpNoDataProtectionGuardrail": {
 		"category": "S",
-		"^description": "No attached service control policy (SCP) denies the actions that weaken account-wide data-protection settings: changing S3 Block Public Access (s3:PutAccountPublicAccessBlock / s3:PutBucketPublicAccessBlock), disabling EBS encryption by default (ec2:DisableEbsEncryptionByDefault) and scheduling KMS key deletion (kms:ScheduleKeyDeletion). Without these preventive guardrails any administrator in a member account can expose data publicly, create unencrypted volumes or destroy keys protecting encrypted data. Attach an SCP that denies these actions (with an exception for a designated platform role if needed). A Deny that only applies to the root user or outside approved Regions does not count. Region restriction is reported by scpBestPractices.",
+		"^description": "The effective service control policies (SCPs) of one or more member accounts do not deny the actions that weaken account-wide data-protection settings: changing S3 Block Public Access (s3:PutAccountPublicAccessBlock / s3:PutBucketPublicAccessBlock), disabling EBS encryption by default (ec2:DisableEbsEncryptionByDefault) and scheduling KMS key deletion (kms:ScheduleKeyDeletion). The check evaluates the EFFECTIVE SCP set of every active member account (SCPs attached to the account, its parent OUs and the root) and lists the accounts that are not covered, so a Deny attached only to one OU, one account or the management account (where SCPs never apply) does not make the whole organization compliant. Without these preventive guardrails any administrator in a member account can expose data publicly, create unencrypted volumes or destroy keys protecting encrypted data. Attach an SCP that denies these actions (with an exception for a designated platform role if needed). A Deny that only applies to the root user or outside approved Regions does not count. Region restriction is reported by scpBestPractices.",
 		"shortDesc": "Protect data-protection settings with an SCP",
 		"criticality": "L",
 		"downtime": 0,
@@ -962,7 +964,7 @@
 	},
 	"scpNoIamUserCreationDeny": {
 		"category": "S",
-		"^description": "No attached service control policy (SCP) denies iam:CreateUser or iam:CreateAccessKey. IAM users with long-term access keys are a common source of credential leaks; organizations that federate human access through IAM Identity Center should prevent new IAM users and access keys in workload accounts with an SCP (optionally with an exception for an approved automation role or only on selected OUs).",
+		"^description": "The effective service control policies (SCPs) of one or more member accounts do not deny iam:CreateUser or iam:CreateAccessKey. The check evaluates the EFFECTIVE SCP set of every active member account (SCPs attached to the account, its parent OUs and the root) and lists the accounts that are not covered, so a Deny attached only to one OU, one account or the management account (where SCPs never apply) does not make the whole organization compliant. IAM users with long-term access keys are a common source of credential leaks; organizations that federate human access through IAM Identity Center should prevent new IAM users and access keys in workload accounts with an SCP (optionally with an exception for an approved automation role). Accounts that intentionally keep IAM users (for example outside the workload OUs) are listed in the detail and can be suppressed.",
 		"shortDesc": "Restrict IAM user and access key creation with an SCP",
 		"criticality": "L",
 		"downtime": 0,
@@ -979,7 +981,7 @@
 	},
 	"scpNoSecurityServiceProtection": {
 		"category": "S",
-		"^description": "No attached service control policy (SCP) fully prevents security services from being disabled. The detail lists which of these are not denied: CloudTrail (cloudtrail:StopLogging, cloudtrail:DeleteTrail), GuardDuty (guardduty:DeleteDetector, guardduty:DisassociateFromMasterAccount / DisassociateFromAdministratorAccount), AWS Config (config:StopConfigurationRecorder, config:DeleteConfigurationRecorder) and leaving the organization (organizations:LeaveOrganization). An attacker or careless administrator in a member account can otherwise switch off logging and detection. A Deny that only applies to the root user or outside approved Regions does not count.",
+		"^description": "The effective service control policies (SCPs) of one or more member accounts do not fully prevent security services from being disabled. The check evaluates the EFFECTIVE SCP set of every active member account (SCPs attached to the account, its parent OUs and the root) and lists the accounts that are not covered, so a Deny attached only to one OU, one account or the management account (where SCPs never apply) does not make the whole organization compliant. The detail lists which of these are not denied: CloudTrail (cloudtrail:StopLogging, cloudtrail:DeleteTrail), GuardDuty (guardduty:DeleteDetector, guardduty:DisassociateFromMasterAccount / DisassociateFromAdministratorAccount), AWS Config (config:StopConfigurationRecorder, config:DeleteConfigurationRecorder) and leaving the organization (organizations:LeaveOrganization). An attacker or careless administrator in a member account can otherwise switch off logging and detection. A Deny that only applies to the root user or outside approved Regions does not count.",
 		"shortDesc": "Prevent disabling security services with an SCP",
 		"criticality": "L",
 		"downtime": 0,
@@ -988,7 +990,7 @@
 		"needFullTest": 0,
 		"ref": [
 			"[SCP examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html>",
-			"[SCP examples for CloudTrail, GuardDuty and Config]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples_general.html>"
+			"[CloudTrail security best practices]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/best-practices-security.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -1030,7 +1032,7 @@
 	},
 	"ssoPermissionSetOverprivileged": {
 		"category": "S",
-		"^description": "IAM Identity Center permission sets allow sessions longer than 8 hours. Long sessions keep credentials valid long after work is done and increase the impact of a stolen session. The detail also lists admin-level permission sets (AdministratorAccess or an inline Allow *:*) so their audience can be reviewed.",
+		"^description": "IAM Identity Center permission sets allow sessions longer than 8 hours. Long sessions keep credentials valid long after work is done and increase the impact of a stolen session. The detail also lists admin-level permission sets (AdministratorAccess, or an inline policy allowing *:*, NotAction or iam:* on all resources; customer-managed policy references are not inspected) so their audience can be reviewed.",
 		"shortDesc": "Shorten Identity Center session durations",
 		"criticality": "L",
 		"downtime": 0,
@@ -1141,12 +1143,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Declarative policies]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_declarative.html>",
-			"[Declarative policy syntax and examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_declarative_syntax.html>"
+			"[Declarative policies]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_declarative_policies.html>",
+			"[Declarative policy syntax and examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_ec2_syntax.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_declarative.html"
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_declarative_policies.html"
 	},
 	"orgNoForensicsOu": {
 		"category": "S",
@@ -1158,12 +1160,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AWS Security Incident Response Guide - Forensics]<https://docs.aws.amazon.com/security-ir/latest/userguide/develop-forensics-capabilities.html>",
-			"[Recommended OUs and accounts - Security OU]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/security-ou-and-accounts.html>"
+			"[SEC10-BP03 Prepare forensic capabilities]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_prepare_forensic.html>",
+			"[Foundational OUs - Security OU]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/foundational-ous.html#security-ou>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/security-ou-and-accounts.html"
+		"remediation_doc": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_prepare_forensic.html"
 	},
 	"orgNoSandboxOrStagingOu": {
 		"category": "S",
@@ -1176,8 +1178,8 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Recommended OUs and accounts]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/recommended-ous-and-accounts.html>",
-			"[Sandbox OU]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/sandbox-ou.html>",
-			"[Policy Staging OU]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/policy-staging-ou.html>"
+			"[Experimental OUs - Sandbox OU]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/experimental-ous.html#sandbox-ou>",
+			"[Procedural OUs - Policy Staging OU]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/procedural-ous.html#policy-staging-ou>"
 		],
 		"remediation": null,
 		"remediation_risk": null,

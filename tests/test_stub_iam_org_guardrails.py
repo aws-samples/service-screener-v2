@@ -30,7 +30,7 @@ sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.dirname(__file__))
 
 from test_stub_iam_org import (Harness, _roots, _doc, _session, _org, FULL, ROOT_T, OU_T, DENY_ROOT,  # noqa: E402
-                               DENY_REGION, MGMT, MEMBER, ORG_ID)
+                               DENY_REGION, MGMT, MEMBER, ORG_ID, stubTree, DEFAULT_TREE)
 from services.iam.drivers.IamRole import IamRole  # noqa: E402
 from services.iam.drivers.IamOrgData import OrgData, denyIsUnconditionalGuardrail  # noqa: E402
 from services.iam.drivers.IamTrust import buildTrustContext, externalIdWeakness  # noqa: E402
@@ -39,9 +39,13 @@ from services.iam.drivers.IamSsoData import parseIsoDuration  # noqa: E402
 THIRD = '999988887777'
 
 
-def _scp(h, *items):
+def _scp(h, *items, tree=DEFAULT_TREE):
+    """Stub the SCP list and, when any customer SCP is attached, the org
+    tree walked for the per-account effective SCP set."""
     h.org.add_response('list_roots', _roots())
     h.policies('SERVICE_CONTROL_POLICY', [FULL] + list(items))
+    if any(not managed and targets for _, _, managed, _, targets in items):
+        stubTree(h, tree)
 
 
 # --------------------------------------------------------------------------- #

@@ -783,6 +783,57 @@ class IamAccount(IamCommon):
     def _targetLabel(t):
         return '{} {} ({})'.format(t.get('Type', ''), t.get('Name', ''), t.get('TargetId', '')).strip()
 
+    def _scpEffectiveTargets(self, key, pols, includeOus=False):
+        """Effective SCP set of every ACTIVE member account (and, with
+        includeOus, of every OU that contains at least one of them).
+
+        Returns [(nodeId, node, [customer SCPs attached to the node or any
+        parent up to the root])], or None after recording a result for `key`.
+        Deny statements in any SCP of the path apply, so the union of the path
+        is the effective deny set. The management account is excluded (SCPs
+        never apply to it), and SCPs attached only to the management account
+        therefore protect nothing."""
+        tree, err = self.orgData.tree()
+        if err:
+            self.results[key] = self.orgData.notEvaluable(err)
+            return None
+        byTarget = {}
+        for p in self._customerAttached(pols):
+            for t in p['Targets']:
+                byTarget.setdefault(t.get('TargetId'), []).append(p)
+        org, _ = self.orgData.organization()
+        mgmtId = (org or {}).get('MasterAccountId')
+        nodes = tree['nodes']
+
+        def path(nid):
+            out, cur, seen = [], nid, set()
+            while cur and cur not in seen:
+                seen.add(cur)
+                out.append(cur)
+                cur = nodes.get(cur, {}).get('Parent')
+            return out
+
+        accounts = [nid for nid, n in nodes.items() if n['Type'] == 'ACCOUNT' and nid != mgmtId
+                    and (n.get('State') or 'ACTIVE') == 'ACTIVE']
+        populated = set()
+        for a in accounts:
+            populated.update(x for x in path(a)[1:] if nodes.get(x, {}).get('Type') == 'ORGANIZATIONAL_UNIT')
+        ids = ([nid for nid in nodes if nid in populated] if includeOus else []) + accounts
+        out = []
+        for nid in ids:
+            pathPols, seenPol = [], set()
+            for x in path(nid):
+                for p in byTarget.get(x, []):
+                    if p['Id'] not in seenPol:
+                        seenPol.add(p['Id'])
+                        pathPols.append(p)
+            out.append((nid, nodes[nid], pathPols))
+        return out
+
+    @staticmethod
+    def _nodeLabel(nid, node):
+        return '{} {} ({})'.format('OU' if node['Type'] == 'ORGANIZATIONAL_UNIT' else 'Account', node.get('Name', ''), nid)
+
     def _policyGate(self, key, policyType, disabledResult):
         """Common gate for policy-type checks. Returns the policy list or None
         (after recording a result)."""
@@ -819,7 +870,7 @@ class IamAccount(IamCommon):
             return
 
         counts = {'EC2 instances': 0, 'Lambda functions': 0, 'RDS DB instances': 0, 'EKS clusters': 0}
-        errors = []
+        errors, skipped = [], set()
         regions = [r for r in (Config.get('REGIONS_SELECTED', []) or []) if r != 'GLOBAL']
         if not regions:
             self.results[key] = [0, 'Unable to evaluate (no regions selected)']
@@ -848,9 +899,19 @@ class IamAccount(IamCommon):
                         else:
                             counts[label] += len(items)
                 except botocore.exceptions.ClientError as e:
-                    errors.append('{} {}: {}'.format(region, label, e.response['Error']['Code']))
+                    code = e.response['Error']['Code']
+                    if code == 'OptInRequired':
+                        # Region not enabled for this account: nothing can run there.
+                        skipped.add(region)
+                        break
+                    errors.append('{} {}: {}'.format(region, label, code))
+                except botocore.exceptions.BotoCoreError as e:
+                    errors.append('{} {}: {}'.format(region, label, type(e).__name__))
 
         found = ['{}: {}'.format(k, v) for k, v in counts.items() if v > 0]
+        errors = [e for e in errors if e.split(' ', 1)[0] not in skipped]
+        if skipped:
+            regions = [r for r in regions if r not in skipped] + ['skipped (not enabled): ' + ', '.join(sorted(skipped))]
         if found:
             self.results[key] = [-1, 'Management account hosts workload resources in scanned regions ({}):<br>{}'.format(
                 ', '.join(regions), '<br>'.join(found))]
@@ -879,7 +940,9 @@ class IamAccount(IamCommon):
         guardrails: root user denial, region restriction and privilege
         escalation prevention. A guardrail provided by any SCP in the path
         counts, so guardrails split across several SCPs are not flagged.
-        The management account is skipped (SCPs never apply to it)."""
+        The management account is skipped (SCPs never apply to it) and so are
+        OUs without any active member account (e.g. an empty Suspended OU).
+        An unconditional Deny "*" (quarantine SCP) meets every guardrail."""
         key = 'scpBestPractices'
         if not self._orgPrecondition(key, True, 'Not applicable: SCPs require All Features (see orgNotAllFeatures)'):
             return
@@ -889,37 +952,19 @@ class IamAccount(IamCommon):
         if not self._customerAttached(pols):
             self.results[key] = [0, 'Not applicable: no customer SCP is attached (see SCPEnabled)']
             return
-        tree, err = self.orgData.tree()
-        if err:
-            self.results[key] = self.orgData.notEvaluable(err)
+        targets = self._scpEffectiveTargets(key, pols, includeOus=True)
+        if targets is None:
             return
 
-        byTarget = {}
-        for p in pols:
-            for t in p['Targets']:
-                byTarget.setdefault(t.get('TargetId'), []).append(p)
-
-        org, _ = self.orgData.organization()
-        mgmtId = org.get('MasterAccountId')
-        nodes = tree['nodes']
         evaluated, missing, unknown = 0, [], []
         lackCount = {g: 0 for g in SCP_GUARDRAILS}
-        for nid, node in nodes.items():
-            if node['Type'] == 'ROOT':
-                continue
-            if node['Type'] == 'ACCOUNT' and (nid == mgmtId or (node.get('State') or 'ACTIVE') != 'ACTIVE'):
-                continue
+        for nid, node, pathPols in targets:
             evaluated += 1
-            have, unparsed, cur, seen = set(), False, nid, set()
-            while cur and cur not in seen:
-                seen.add(cur)
-                for p in byTarget.get(cur, []):
-                    if p['AwsManaged'] or p['Id'] == FULL_AWS_ACCESS_ID:
-                        continue
-                    if p['Content'] is None:
-                        unparsed = True
-                    have |= scpGuardrails(p['Content'])
-                cur = nodes.get(cur, {}).get('Parent')
+            have, unparsed = set(), False
+            for p in pathPols:
+                if p['Content'] is None:
+                    unparsed = True
+                have |= scpGuardrails(p['Content'])
             lacking = [SCP_GUARDRAILS[g] for g in SCP_GUARDRAILS if g not in have]
             if lacking and not unparsed:
                 for g in SCP_GUARDRAILS:
@@ -937,7 +982,7 @@ class IamAccount(IamCommon):
         elif unknown:
             self.results[key] = [0, 'Unable to evaluate (unparseable SCP content):<br>{}'.format(self._detail(unknown))]
         elif evaluated == 0:
-            self.results[key] = [0, 'No OUs or member accounts to evaluate (SCPs do not apply to the management account)']
+            self.results[key] = [0, 'No active member accounts to evaluate (SCPs do not apply to the management account)']
         else:
             self.results[key] = [1, 'All {} OUs/member accounts have effective root-denial, region and privilege-escalation guardrails'.format(evaluated)]
 
@@ -975,8 +1020,10 @@ class IamAccount(IamCommon):
             self.results[key] = [1, '{} top-level OU(s); no member accounts attached directly to the root'.format(len(ous))]
 
     def _checkOrgMemberAlternateContactsMissing(self):
-        """Alternate contacts of every other ACTIVE account in the org. The
-        scanned account itself is covered by hasAlternateContact."""
+        """Alternate contacts of every ACTIVE member account in the org. The
+        scanned account itself is covered by hasAlternateContact, and the
+        management account is not a member account (GetAlternateContact with
+        its AccountId is rejected when called from a delegated admin)."""
         key = 'orgMemberAlternateContactsMissing'
         if not self._orgPrecondition(key):
             return
@@ -985,8 +1032,10 @@ class IamAccount(IamCommon):
             self.results[key] = self.orgData.notEvaluable(err)
             return
         caller = self.orgData.callerAccountId
+        org, _ = self.orgData.organization()
+        skip = {caller, (org or {}).get('MasterAccountId')}
         members = [a for a in accounts
-                   if a.get('Id') != caller and (a.get('State') or a.get('Status')) == 'ACTIVE']
+                   if a.get('Id') not in skip and (a.get('State') or a.get('Status')) == 'ACTIVE']
         if not members:
             self.results[key] = [1, 'No other active member accounts in the organization']
             return
@@ -1087,8 +1136,8 @@ class IamAccount(IamCommon):
             code = e.response['Error']['Code']
             if code == 'ServiceAccessNotEnabledException' and self.orgData.isManagementAccount():
                 self.results[key] = [-1, 'Trusted access for IAM is not enabled in AWS Organizations; centralized root access is off']
-            elif code in ('AccountNotManagementOrDelegatedAdministratorException', 'AccessDenied', 'AccessDeniedException') \
-                    and not self.orgData.isManagementAccount():
+            elif code in ('AccountNotManagementOrDelegatedAdministratorException', 'AccessDenied', 'AccessDeniedException',
+                          'ServiceAccessNotEnabledException') and not self.orgData.isManagementAccount():
                 self.results[key] = [0, 'Not evaluable from member account']
             elif code == 'OrganizationNotInAllFeaturesModeException':
                 self.results[key] = [0, 'Not applicable: organization does not use All Features (see orgNotAllFeatures)']
@@ -1102,37 +1151,21 @@ class IamAccount(IamCommon):
             self.results[key] = [1, 'RootCredentialsManagement and RootSessions are enabled']
 
     def _checkScpNoBackupTamperProtection(self):
-        key = 'scpNoBackupTamperProtection'
-        if not self._orgPrecondition(key, True, 'Not applicable: SCPs require All Features (see orgNotAllFeatures)'):
-            return
-        pols = self._policyGate(key, SCP, [0, 'Not applicable: SCPs are not enabled (see SCPEnabled)'])
-        if pols is None:
-            return
-        covered, protecting, unparsed = set(), set(), []
-        for p in self._customerAttached(pols):
-            if p['Content'] is None:
-                unparsed.append(p['Name'])
-                continue
-            for s in statements(p['Content']):
-                for a in self.BACKUP_TAMPER_ACTIONS:
-                    # A Deny scoped to e.g. the root user or non-approved regions
-                    # leaves backups deletable by everyone else: not coverage.
-                    if denyCoversAction(s, a) and denyIsUnconditionalGuardrail(s):
-                        covered.add(a)
-                        protecting.add(p['Name'])
-        uncovered = [a for a in self.BACKUP_TAMPER_ACTIONS if a not in covered]
-        if not uncovered:
-            self.results[key] = [1, 'Attached SCP(s) deny backup tampering actions: {}'.format(', '.join(sorted(protecting)))]
-        elif unparsed:
-            self.results[key] = [0, 'Unable to evaluate (unparseable SCP content: {})'.format(', '.join(unparsed))]
-        else:
-            self.results[key] = [-1, 'No attached SCP denies: {}'.format(', '.join(uncovered))]
+        # Each tamper action must be denied on its own; a Deny scoped to e.g.
+        # the root user or non-approved regions leaves backups deletable by
+        # everyone else and does not count (see _scpActionGuard).
+        self._scpActionGuard('scpNoBackupTamperProtection', [(a, [[a]]) for a in self.BACKUP_TAMPER_ACTIONS],
+                             'AWS Backup tampering actions')
 
     # ------------------------------------------------------------------ #
-    # SCP action guardrails. Coverage is the union of every customer SCP
-    # attached anywhere in the organization; a Deny only counts when it is
-    # unconditional or carries exception-style conditions (see
-    # IamOrgData.denyIsUnconditionalGuardrail).
+    # SCP action guardrails. Evaluated on the EFFECTIVE SCP set of every
+    # active member account (SCPs attached to the account, its parent OUs and
+    # the root), so a Deny attached only to one OU, one sandbox account or the
+    # management account (where SCPs never apply) does not make the whole
+    # organization pass. A Deny only counts when it is unconditional or
+    # carries exception-style conditions (see
+    # IamOrgData.denyIsUnconditionalGuardrail); an unconditional Deny "*"
+    # (quarantine OU) therefore covers the accounts below it.
     # ------------------------------------------------------------------ #
     DATA_PROTECTION_GUARDRAILS = [
         ('S3 Block Public Access (s3:PutAccountPublicAccessBlock / s3:PutBucketPublicAccessBlock)',
@@ -1162,30 +1195,61 @@ class IamAccount(IamCommon):
         if pols is None:
             return
         attached = self._customerAttached(pols)
-        cov = guardrailCoverage(attached, requirements)
-        targets = {p['Name']: p['Targets'] for p in attached}
-
-        def where(names):
-            return '; '.join('{} -> {}'.format(n, ', '.join(self._targetLabel(t) for t in targets.get(n, [])[:5]))
-                             for n in sorted(names))
-
-        if not cov['missing']:
-            self.results[key] = [1, 'Attached SCP(s) deny {}:<br>{}'.format(what, self._detail(
-                ['{}: {}'.format(label, where(names)) for label, names in cov['met'].items()]))]
+        if not attached:
+            self.results[key] = [-1, 'No customer SCP is attached, so nothing denies {}'.format(what)]
             return
-        if cov['unparsed']:
-            self.results[key] = [0, 'Unable to evaluate (unparseable SCP content: {})'.format(', '.join(cov['unparsed']))]
+        targets = self._scpEffectiveTargets(key, pols)
+        if targets is None:
             return
-        lines = []
-        for label in cov['missing']:
-            note = ''
-            if label in cov['conditional']:
-                note = ' (only denied under a narrowing condition, e.g. root user or region, by: {})'.format(
-                    ', '.join(sorted(cov['conditional'][label])))
-            lines.append('Not denied: {}{}'.format(label, note))
-        for label, names in cov['met'].items():
-            lines.append('Denied: {} by {}'.format(label, ', '.join(sorted(names))))
-        self.results[key] = [-1, self._detail(lines)]
+        if not targets:
+            self.results[key] = [0, 'No active member accounts to evaluate (SCPs do not apply to the management account)']
+            return
+
+        labels = [label for label, _ in requirements]
+        cache, missing, unknown = {}, [], []
+        lackCount = {label: 0 for label in labels}
+        conditional, metBy = {}, {}
+        for nid, node, pathPols in targets:
+            sig = tuple(sorted(p['Id'] for p in pathPols))
+            if sig not in cache:
+                cache[sig] = guardrailCoverage(pathPols, requirements)
+            cov = cache[sig]
+            for label, names in cov['met'].items():
+                metBy.setdefault(label, set()).update(names)
+            if not cov['missing']:
+                continue
+            nodeLabel = self._nodeLabel(nid, node)
+            if cov['unparsed']:
+                unknown.append('{}: unparseable SCP {}'.format(nodeLabel, ', '.join(cov['unparsed'])))
+                continue
+            for label in cov['missing']:
+                lackCount[label] += 1
+                if label in cov['conditional']:
+                    conditional.setdefault(label, set()).update(cov['conditional'][label])
+            missing.append('{}: not denied: {}'.format(nodeLabel, ', '.join(cov['missing'])))
+
+        total = len(targets)
+        if missing:
+            lines = []
+            for label in labels:
+                if lackCount[label]:
+                    note = ''
+                    if label in conditional:
+                        note = ' (only denied under a narrowing condition, e.g. root user or region, by: {})'.format(
+                            ', '.join(sorted(conditional[label])))
+                    lines.append('Not denied: {} on {} of {} member account(s){}'.format(label, lackCount[label], total, note))
+                else:
+                    lines.append('Denied: {} by {}'.format(label, ', '.join(sorted(metBy.get(label, [])))))
+            if unknown:
+                lines.append('Unable to evaluate {} account(s) (unparseable SCP content)'.format(len(unknown)))
+            self.results[key] = [-1, '{} of {} active member account(s) have no effective SCP denying {}:<br>{}'.format(
+                len(missing), total, what, self._detail(lines + missing))]
+        elif unknown:
+            self.results[key] = [0, 'Unable to evaluate (unparseable SCP content):<br>{}'.format(self._detail(unknown))]
+        else:
+            self.results[key] = [1, 'Effective SCPs of all {} active member account(s) deny {}:<br>{}'.format(
+                total, what, self._detail(['{}: {}'.format(label, ', '.join(sorted(metBy.get(label, []))))
+                                           for label in labels]))]
 
     def _checkScpNoDataProtectionGuardrail(self):
         self._scpActionGuard('scpNoDataProtectionGuardrail', self.DATA_PROTECTION_GUARDRAILS,
@@ -1329,6 +1393,9 @@ class IamAccount(IamCommon):
 
     @staticmethod
     def _inlineIsAdmin(doc):
+        """Reason string when an inline policy grants admin-equivalent access
+        on Resource "*" (Allow *, Allow NotAction ..., or Allow iam:*), else
+        None. Informational only (see _checkSsoPermissionSetOverprivileged)."""
         for s in statements(doc):
             if s.get('Effect') != 'Allow':
                 continue
@@ -1336,16 +1403,22 @@ class IamAccount(IamCommon):
             res = res if isinstance(res, list) else [res]
             if '*' not in [str(r) for r in res]:
                 continue
+            if 'NotAction' in s:
+                return 'inline Allow NotAction'
             acts = s.get('Action', [])
-            acts = acts if isinstance(acts, list) else [acts]
-            if any(str(a) in ('*', '*:*') for a in acts):
-                return True
-        return False
+            acts = [str(a).lower() for a in (acts if isinstance(acts, list) else [acts])]
+            if any(a in ('*', '*:*') for a in acts):
+                return 'inline Allow *:*'
+            if 'iam:*' in acts:
+                return 'inline Allow iam:*'
+        return None
 
     def _checkSsoPermissionSetOverprivileged(self):
         """FAIL on SessionDuration > PT8H. Admin-level permission sets
-        (AdministratorAccess or inline Allow *:* on *) are reported as INFO:
-        nearly every organization legitimately has one."""
+        (AdministratorAccess, or an inline Allow *:* / NotAction / iam:* on *)
+        are reported as INFO only: nearly every organization legitimately has
+        one. Customer-managed policy references live in each member account
+        and are not inspected."""
         key = 'ssoPermissionSetOverprivileged'
         insts = self._ssoOrgInstances(key)
         if insts is None:
@@ -1378,8 +1451,9 @@ class IamAccount(IamCommon):
                         doc = json.loads(raw) if isinstance(raw, str) else raw
                     except ValueError:
                         doc = None
-                    if self._inlineIsAdmin(doc):
-                        admins.append('{} (inline Allow *:*)'.format(name))
+                    reason = self._inlineIsAdmin(doc)
+                    if reason:
+                        admins.append('{} ({})'.format(name, reason))
         adminNote = 'Admin-level permission set(s) ({}): {}'.format(len(admins), ', '.join(admins)) if admins else ''
         if longSessions:
             lines = ['Session longer than 8 hours: ' + l for l in longSessions] + ([adminNote] if adminNote else [])
@@ -1389,7 +1463,9 @@ class IamAccount(IamCommon):
         elif admins:
             self.results[key] = [0, 'INFO: {}. Ensure these are limited to a small, group-based audience.'.format(adminNote)]
         else:
-            self.results[key] = [1, '{} permission set(s): none grant full admin or a session longer than 8 hours'.format(count)]
+            self.results[key] = [1, '{} permission set(s): none allow a session longer than 8 hours or attach '
+                                    'AdministratorAccess / an admin-equivalent inline policy (customer-managed policy '
+                                    'references are not inspected)'.format(count)]
 
     def _checkSsoUsersNotScimProvisioned(self):
         """FAIL only when an identity store mixes externally provisioned users
