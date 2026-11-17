@@ -5,6 +5,7 @@ from utils.Tools import _pr
 from services.Service import Service
 ##import drivers here
 from services.kms.drivers.KmsCommon import KmsCommon
+from services.kms.drivers.KmsAccount import KmsAccount
 
 from utils.Tools import _pi
 
@@ -48,11 +49,15 @@ class Kms(Service):
                 try:
                     rr = self.kmsClient.get_key_rotation_status(KeyId = key['KeyId'])
                     metadata['KeyRotationEnabled'] = rr.get('KeyRotationEnabled')
-                except botocore.exceptions.ClientError:
+                    metadata['_rotationPeriodInDays'] = rr.get('RotationPeriodInDays')
+                except botocore.exceptions.ClientError as e:
                     metadata['KeyRotationEnabled'] = None
+                    metadata['_rotationError'] = e.response.get('Error', {}).get('Code', 'ClientError')
                 
                 if self.tags:
                     tags = self.kmsClient.list_resource_tags(KeyId = key['KeyId'])
+                    ## Only the first page is needed for filtering; the driver
+                    ## re-reads all pages when it evaluates tags.
                     nTags = self.convertTagKeyTagValueIntoKeyValue(tags.get('Tags'))
                     if self.resourceHasTags(nTags) == False:
                         continue
@@ -73,6 +78,15 @@ class Kms(Service):
             
             objs[key['KeyId']] = obj.getInfo()
             del obj
+
+        ## Region-scoped checks (custom key stores, cross-service key reuse).
+        ## Always evaluated, even when the region has no customer managed keys.
+        ssBoto = self.ssBoto
+        bConfig = self.bConfig
+        obj = KmsAccount(self.kmsClient, lambda name: ssBoto.client(name, config=bConfig))
+        obj.run(self.__class__)
+        objs['KMS::Account'] = obj.getInfo()
+        del obj
            
         return objs
     
