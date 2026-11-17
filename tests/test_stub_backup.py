@@ -15,9 +15,12 @@ Why Stubber and not the emulator:
 - Plan-level branches the emulator cannot create (vaults in other accounts,
   DELETE_AFTER_COPY lifecycles) are driven with API-shaped plan dicts.
 
-Every client is a real boto3 client wrapped in botocore.stub.Stubber, so
-request parameters and response shapes are validated against the real API
-model; nothing is sent over the network.
+Every client is a real boto3 client wrapped in an active
+botocore.stub.Stubber, so request parameters and response shapes are
+validated against the real API model, and an unexpected API call raises
+locally instead of being sent anywhere. Clients point at an unroutable
+loopback endpoint (https://127.0.0.1:1) as a second safety net: no request
+can ever reach a real AWS endpoint.
 """
 import os
 import sys
@@ -40,15 +43,39 @@ REGION = 'us-east-1'
 NOW = datetime.now(timezone.utc)
 
 
-def _client(svc):
+# Never a real AWS endpoint: loopback port 1 (nothing listens there).
+SAFE_ENDPOINT = 'https://127.0.0.1:1'
+_ACTIVE_STUBS = []
+
+
+def _rawClient(svc):
+    """Real boto3 client on the loopback safety endpoint. The caller must
+    wrap it in an active Stubber before use."""
     return boto3.client(svc, region_name=REGION, aws_access_key_id='testing',
                         aws_secret_access_key='testing', aws_session_token='testing',
-                        endpoint_url=f'https://{svc}.{REGION}.amazonaws.com')
+                        endpoint_url=SAFE_ENDPOINT)
+
+
+def _client(svc):
+    """Client for drivers whose checks under test must not call the API:
+    an active Stubber with no queued responses makes any call fail locally."""
+    c = _rawClient(svc)
+    st = Stubber(c)
+    st.activate()
+    _ACTIVE_STUBS.append(st)
+    return c
+
+
+@pytest.fixture(autouse=True)
+def _deactivateStubs():
+    yield
+    while _ACTIVE_STUBS:
+        _ACTIVE_STUBS.pop().deactivate()
 
 
 @pytest.fixture
 def clients():
-    c = {s: _client(s) for s in ('backup', 'events', 'cloudwatch')}
+    c = {s: _rawClient(s) for s in ('backup', 'events', 'cloudwatch')}
     stubs = {s: Stubber(cl) for s, cl in c.items()}
     for st in stubs.values():
         st.activate()
@@ -67,10 +94,27 @@ def _account(plans=None, vaults=None):
             '_plans': plans if plans is not None else [{'_id': 'p1', '_name': 'plan1', '_rules': []}]}
 
 
-def _drv(clients, account=None):
+def _drv(clients, account=None, vaultLookup=None):
     c, _ = clients
     return BackupAccount(account or _account(), c['backup'],
-                         eventsClient=c['events'], cloudwatchClient=c['cloudwatch'])
+                         eventsClient=c['events'], cloudwatchClient=c['cloudwatch'],
+                         vaultLookup=vaultLookup)
+
+
+def _lookupFrom(vaults):
+    """vaultLookup stand-in for Backup._lookupVault: {arn: summary | 'ERR:code'}."""
+    calls = []
+
+    def lookup(arn):
+        calls.append(arn)
+        v = vaults.get(arn)
+        if v is None:
+            return None, 'vault not found'
+        if isinstance(v, str):
+            return None, v[4:]
+        return v, None
+    lookup.calls = calls
+    return lookup
 
 
 def _run(drv, method, key):
@@ -164,6 +208,14 @@ def test_restore_validation_failed_flags(clients):
     assert r[0] == -1 and 'validation' in r[1], r
 
 
+def test_restore_validation_timed_out_is_noted_not_failed(clients):
+    _, stubs = clients
+    stubs['backup'].add_response('list_restore_jobs', {'RestoreJobs': [
+        _restore('r5', 'COMPLETED', 'TIMED_OUT')]}, {'ByCreatedAfter': ANY})
+    r = _run(_drv(clients), '_checkBackupRestoreJobsFailing', 'backupRestoreJobsFailing')
+    assert r[0] == 1 and 'TIMED_OUT' in r[1], r
+
+
 def test_restore_jobs_unreadable(clients):
     _, stubs = clients
     _err(stubs['backup'], 'list_restore_jobs', 'AccessDeniedException')
@@ -179,15 +231,17 @@ def _plan(rules, name='plan1', pid='p1'):
 
 
 def test_cross_account_copy_flag_fix(clients):
+    dr = _vaultArn('dr', region='us-west-2')
+    lookup = _lookupFrom({dr: {'BackupVaultName': 'dr', 'VaultType': 'BACKUP_VAULT', 'Locked': False}})
     sameAcct = [{'RuleName': 'r', 'TargetBackupVaultName': 'v1',
-                 'CopyActions': [{'DestinationBackupVaultArn': _vaultArn('dr', region='us-west-2')}]}]
-    r = _run(_drv(clients, _account(plans=[_plan(sameAcct)])),
+                 'CopyActions': [{'DestinationBackupVaultArn': dr}]}]
+    r = _run(_drv(clients, _account(plans=[_plan(sameAcct)]), lookup),
              '_checkBackupPlanNoCrossAccountCopy', 'backupPlanNoCrossAccountCopy')
     assert r[0] == -1, r
 
     crossAcct = [{'RuleName': 'r', 'TargetBackupVaultName': 'v1',
                   'CopyActions': [{'DestinationBackupVaultArn': _vaultArn('central', acct=OTHER)}]}]
-    r = _run(_drv(clients, _account(plans=[_plan(sameAcct), _plan(crossAcct, 'plan2', 'p2')])),
+    r = _run(_drv(clients, _account(plans=[_plan(sameAcct), _plan(crossAcct, 'plan2', 'p2')]), lookup),
              '_checkBackupPlanNoCrossAccountCopy', 'backupPlanNoCrossAccountCopy')
     assert r[0] == 1 and OTHER in r[1], r
 
@@ -217,11 +271,70 @@ def test_cross_account_copy_lag_counts_as_isolation(clients):
     r = _run(_drv(clients, _account(plans=[_plan(rules)], vaults=vaults)),
              '_checkBackupPlanNoCrossAccountCopy', 'backupPlanNoCrossAccountCopy')
     assert r[0] == 1 and 'air-gapped' in r[1], r
-    # Same name in another Region is not the local LAG vault.
-    rules[0]['CopyActions'][0]['DestinationBackupVaultArn'] = _vaultArn('lag', region='eu-west-1')
-    r = _run(_drv(clients, _account(plans=[_plan(rules)], vaults=vaults)),
+
+
+def test_cross_account_copy_other_region_lag_counts_as_isolation(clients):
+    """A copy to a same-account logically air-gapped vault in another Region
+    is isolation (resolved with the cached describe_backup_vault lookup); a
+    same-named standard vault there is not; an unreadable one is not
+    evaluable, never a FAIL."""
+    vaults = [{'_name': 'v1', '_vaultType': 'BACKUP_VAULT'},
+              {'_name': 'lag', '_vaultType': 'LOGICALLY_AIR_GAPPED_BACKUP_VAULT'}]
+    remote = _vaultArn('lag', region='eu-west-1')
+    rules = [{'RuleName': 'r', 'TargetBackupVaultName': 'v1',
+              'CopyActions': [{'DestinationBackupVaultArn': remote}]}]
+    key, m = 'backupPlanNoCrossAccountCopy', '_checkBackupPlanNoCrossAccountCopy'
+    acct = _account(plans=[_plan(rules)], vaults=vaults)
+
+    lookup = _lookupFrom({remote: {'BackupVaultName': 'lag', 'VaultType': 'BACKUP_VAULT'}})
+    r = _run(_drv(clients, acct, lookup), m, key)
+    assert r[0] == -1 and lookup.calls == [remote], r
+
+    lookup = _lookupFrom({remote: {'BackupVaultName': 'lag',
+                                   'VaultType': 'LOGICALLY_AIR_GAPPED_BACKUP_VAULT'}})
+    r = _run(_drv(clients, acct, lookup), m, key)
+    assert r[0] == 1 and 'air-gapped' in r[1], r
+
+    lookup = _lookupFrom({remote: 'ERR:AccessDeniedException'})
+    r = _run(_drv(clients, acct, lookup), m, key)
+    assert r[0] == 0 and 'AccessDeniedException' in r[1], r
+    # No lookup available at all -> not evaluable either.
+    r = _run(_drv(clients, acct), m, key)
+    assert r[0] == 0, r
+
+
+def test_unreadable_plan_is_kept_for_account_checks(clients):
+    """Backup._discoverPlans keeps a stub for a plan whose get_backup_plan
+    fails, so backupPlanNoCrossAccountCopy reports 'Unable to evaluate'
+    rather than FAILing on the readable plans alone."""
+    from services.backup.Backup import Backup
+    client = _rawClient('backup')
+    stub = Stubber(client)
+    stub.add_response('list_backup_plans', {'BackupPlansList': [
+        {'BackupPlanId': 'p1', 'BackupPlanName': 'readable'},
+        {'BackupPlanId': 'p2', 'BackupPlanName': 'secret'}]}, {})
+    stub.add_response('get_backup_plan', {'BackupPlanId': 'p1', 'BackupPlan': {
+        'BackupPlanName': 'readable', 'Rules': [{'RuleName': 'r', 'TargetBackupVaultName': 'v1'}]}},
+        {'BackupPlanId': 'p1'})
+    stub.add_response('list_backup_selections', {'BackupSelectionsList': []}, {'BackupPlanId': 'p1'})
+    _err(stub, 'get_backup_plan', 'AccessDeniedException', {'BackupPlanId': 'p2'})
+    svc = type('_BackupDiscovery', (), {
+        '_discoverPlans': Backup._discoverPlans, '_describePlan': Backup._describePlan,
+        '_listSelections': Backup._listSelections, '_logClientError': Backup._logClientError,
+        'registerItems': lambda self, objType, items, idFn=None: list(items),
+        'backupClient': client,
+    })()
+    with stub:
+        plans = svc._discoverPlans()
+    stub.assert_no_pending_responses()
+    assert [p['_name'] for p in plans] == ['readable', 'secret']
+    assert plans[1].get('_unreadable') and '_rules' not in plans[1]
+
+    _, stubs = clients
+    _err(stubs['backup'], 'get_backup_plan', 'AccessDeniedException', {'BackupPlanId': 'p2'})
+    r = _run(_drv(clients, _account(plans=plans)),
              '_checkBackupPlanNoCrossAccountCopy', 'backupPlanNoCrossAccountCopy')
-    assert r[0] == -1, r
+    assert r[0] == 0 and 'secret' in r[1], r
 
 
 # --------------------------------------------------------------------------- #
@@ -241,19 +354,19 @@ def test_no_failure_alerting_flag_fix_vault_notifications(clients):
     r = _run(drv, '_checkBackupNoFailureAlerting', 'backupNoFailureAlerting')
     assert r[0] == -1, r
 
+    stubs['events'].add_response('list_rules', {'Rules': []}, {})
+    stubs['cloudwatch'].add_response('describe_alarms', {'MetricAlarms': []}, {'AlarmTypes': ['MetricAlarm']})
     stubs['backup'].add_response('get_backup_vault_notifications', {
         'BackupVaultName': 'v1', 'SNSTopicArn': f'arn:aws:sns:{REGION}:{ACCT}:backup-alerts',
         'BackupVaultEvents': ['BACKUP_JOB_FAILED', 'COPY_JOB_FAILED']}, {'BackupVaultName': 'v1'})
     r = _run(drv, '_checkBackupNoFailureAlerting', 'backupNoFailureAlerting')
-    assert r[0] == 1 and 'vault v1' in r[1], r
+    assert r[0] == 1 and 'vault notifications' in r[1], r
     for s in stubs.values():
         s.assert_no_pending_responses()
 
 
 def test_no_failure_alerting_fix_eventbridge(clients):
     _, stubs = clients
-    _err(stubs['backup'], 'get_backup_vault_notifications', 'ResourceNotFoundException',
-         {'BackupVaultName': 'v1'})
     stubs['events'].add_response('list_rules', {'Rules': [
         {'Name': 'disabled', 'State': 'DISABLED', 'EventPattern': '{"source":["aws.backup"]}',
          'EventBusName': 'default'},
@@ -266,12 +379,80 @@ def test_no_failure_alerting_fix_eventbridge(clients):
         {'Rule': 'backup-fail', 'EventBusName': 'default'})
     r = _run(_drv(clients), '_checkBackupNoFailureAlerting', 'backupNoFailureAlerting')
     assert r[0] == 1 and 'backup-fail' in r[1], r
+    for s in stubs.values():
+        s.assert_no_pending_responses()
+
+
+def test_no_failure_alerting_eventbridge_rule_must_match_failures(clients):
+    """Enabled aws.backup rules that cannot match a failed job event
+    (COMPLETED-only state filter, plan/vault change detail-types) are not
+    failure alerting."""
+    _, stubs = clients
+    stubs['events'].add_response('list_rules', {'Rules': [
+        {'Name': 'completed-only', 'State': 'ENABLED', 'EventBusName': 'default',
+         'EventPattern': '{"source":["aws.backup"],"detail-type":["Backup Job State Change"],'
+                         '"detail":{"state":["COMPLETED"]}}'},
+        {'Name': 'plan-changes', 'State': 'ENABLED', 'EventBusName': 'default',
+         'EventPattern': '{"source":["aws.backup"],"detail-type":["Backup Plan State Change"]}'},
+        {'Name': 'not-failed', 'State': 'ENABLED', 'EventBusName': 'default',
+         'EventPattern': '{"source":["aws.backup"],"detail":{"state":[{"anything-but":'
+                         '["FAILED","ABORTED","EXPIRED"]}]}}'}]}, {})
+    stubs['cloudwatch'].add_response('describe_alarms', {'MetricAlarms': []}, {'AlarmTypes': ['MetricAlarm']})
+    _err(stubs['backup'], 'get_backup_vault_notifications', 'ResourceNotFoundException',
+         {'BackupVaultName': 'v1'})
+    r = _run(_drv(clients), '_checkBackupNoFailureAlerting', 'backupNoFailureAlerting')
+    assert r[0] == -1, r
+
+    # Fix: a rule whose state filter admits FAILED (anything-but COMPLETED).
+    stubs['events'].add_response('list_rules', {'Rules': [
+        {'Name': 'not-completed', 'State': 'ENABLED', 'EventBusName': 'default',
+         'EventPattern': '{"source":["aws.backup"],"detail-type":["Copy Job State Change"],'
+                         '"detail":{"state":[{"anything-but":"COMPLETED"}]}}'}]}, {})
+    stubs['events'].add_response('list_targets_by_rule', {'Targets': [
+        {'Id': '1', 'Arn': f'arn:aws:sns:{REGION}:{ACCT}:t'}]},
+        {'Rule': 'not-completed', 'EventBusName': 'default'})
+    r = _run(_drv(clients), '_checkBackupNoFailureAlerting', 'backupNoFailureAlerting')
+    assert r[0] == 1 and 'not-completed' in r[1], r
+    for s in stubs.values():
+        s.assert_no_pending_responses()
+
+
+def test_no_failure_alerting_vault_notifications_must_cover_every_target_vault(clients):
+    """One notifying vault does not cover jobs written to another vault;
+    vaults no backup rule writes to are not required to notify."""
+    _, stubs = clients
+    vaults = [{'_name': n, '_vaultType': 'BACKUP_VAULT'} for n in ('v1', 'v2', 'unused')]
+    plans = [_plan([{'RuleName': 'a', 'TargetBackupVaultName': 'v1'},
+                    {'RuleName': 'b', 'TargetBackupVaultName': 'v2'}])]
+    notif = {'BackupVaultName': 'v1', 'SNSTopicArn': f'arn:aws:sns:{REGION}:{ACCT}:t',
+             'BackupVaultEvents': ['BACKUP_JOB_FAILED']}
+
+    def accountWide():
+        stubs['events'].add_response('list_rules', {'Rules': []}, {})
+        stubs['cloudwatch'].add_response('describe_alarms', {'MetricAlarms': []},
+                                         {'AlarmTypes': ['MetricAlarm']})
+
+    accountWide()
+    stubs['backup'].add_response('get_backup_vault_notifications', notif, {'BackupVaultName': 'v1'})
+    _err(stubs['backup'], 'get_backup_vault_notifications', 'ResourceNotFoundException',
+         {'BackupVaultName': 'v2'})
+    r = _run(_drv(clients, _account(plans=plans, vaults=vaults)),
+             '_checkBackupNoFailureAlerting', 'backupNoFailureAlerting')
+    assert r[0] == -1 and 'v2' in r[1], r
+
+    accountWide()
+    stubs['backup'].add_response('get_backup_vault_notifications', notif, {'BackupVaultName': 'v1'})
+    stubs['backup'].add_response('get_backup_vault_notifications', dict(notif, BackupVaultName='v2'),
+                                 {'BackupVaultName': 'v2'})
+    r = _run(_drv(clients, _account(plans=plans, vaults=vaults)),
+             '_checkBackupNoFailureAlerting', 'backupNoFailureAlerting')
+    assert r[0] == 1, r
+    for s in stubs.values():
+        s.assert_no_pending_responses()
 
 
 def test_no_failure_alerting_fix_cloudwatch_alarm(clients):
     _, stubs = clients
-    _err(stubs['backup'], 'get_backup_vault_notifications', 'ResourceNotFoundException',
-         {'BackupVaultName': 'v1'})
     stubs['events'].add_response('list_rules', {'Rules': []}, {})
     stubs['cloudwatch'].add_response('describe_alarms', {'MetricAlarms': [
         {'AlarmName': 'no-actions', 'Namespace': 'AWS/Backup', 'MetricName': 'NumberOfBackupJobsFailed',
@@ -432,7 +613,7 @@ def test_lookup_vault_cross_region_uses_describe():
     from botocore.config import Config as BConfig
     from services.backup.Backup import Backup
 
-    remote = _client('backup')
+    remote = _rawClient('backup')
     stub = Stubber(remote)
     stub.add_response('describe_backup_vault', {
         'BackupVaultName': 'dr', 'BackupVaultArn': _vaultArn('dr', region='us-west-2'),
@@ -477,7 +658,7 @@ def test_lookup_vault_cross_region_uses_describe():
 # --------------------------------------------------------------------------- #
 def _describeVaultWithPolicy(policyOrCode, mpaTeam=None, vaultType='BACKUP_VAULT'):
     from services.backup.Backup import Backup
-    client = _client('backup')
+    client = _rawClient('backup')
     stub = Stubber(client)
     desc = {'BackupVaultName': 'v1', 'BackupVaultArn': _vaultArn('v1'), 'VaultType': vaultType,
             'NumberOfRecoveryPoints': 0, 'Locked': False}
@@ -510,7 +691,7 @@ def _describeVaultWithPolicy(policyOrCode, mpaTeam=None, vaultType='BACKUP_VAULT
 def _vaultResult(detail, method, key):
     d = BackupVault(detail, _client('backup'))
     getattr(d, method)()
-    return d.results[key]
+    return d.results.get(key)
 
 
 def _pol(stmt):
@@ -563,7 +744,8 @@ def test_air_gapped_vault_no_mpa_stub():
     team = f'arn:aws:mpa:{REGION}:{ACCT}:approval-team/t1'
     assert _vaultResult(_describeVaultWithPolicy('ERR:ResourceNotFoundException', mpaTeam=team,
                                                  vaultType=lag), m, key)[0] == 1
-    assert _vaultResult(_describeVaultWithPolicy('ERR:ResourceNotFoundException'), m, key)[0] == 0
+    # Standard vault: MPA not applicable -> no result row at all.
+    assert _vaultResult(_describeVaultWithPolicy('ERR:ResourceNotFoundException'), m, key) is None
 
 
 # --------------------------------------------------------------------------- #

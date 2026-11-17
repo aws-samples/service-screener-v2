@@ -163,7 +163,8 @@ class BackupVault(Evaluator):
     def _checkAirGappedVaultNoMpa(self):
         key = 'airGappedVaultNoMpa'
         if (self.vault.get('_vaultType') or '').upper() != self.LOGICALLY_AIR_GAPPED:
-            self.results[key] = [0, "Not a logically air-gapped vault - MPA not applicable"]
+            # MPA only applies to logically air-gapped vaults: emit no row for
+            # standard vaults rather than a 0 "not applicable" per vault.
             return
         teamArn = self.vault.get('_mpaApprovalTeamArn')
         if teamArn:

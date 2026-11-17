@@ -234,6 +234,15 @@ class Backup(Service):
 
                     detail = self._describePlan(plan_id, summary)
                     if detail is None:
+                        ## get_backup_plan failed: keep a stub so account-level
+                        ## checks know the plan exists (and re-fetch / report it
+                        ## as unreadable) instead of judging only the readable
+                        ## plans. '_unreadable' keeps it out of BackupPlan.
+                        plans.append({
+                            '_id': plan_id,
+                            '_name': summary.get('BackupPlanName') or plan_id,
+                            '_unreadable': True,
+                        })
                         continue
                     _pi('Backup', f"Plan: {detail.get('_name', plan_id)}")
                     plans.append(detail)
@@ -499,6 +508,8 @@ class Backup(Service):
 
         # --- Per-plan ---------------------------------------------------
         for plan in resources.get('plans', []):
+            if plan.get('_unreadable'):
+                continue
             try:
                 name = plan.get('_name') or plan.get('_id') or 'unknown'
                 _pi('Backup', f"Analyzing plan: {name}")
@@ -518,7 +529,8 @@ class Backup(Service):
             _pi('Backup', f"Analyzing account/region: {self.region}")
             obj = BackupAccount(account, self.backupClient,
                                 eventsClient=self.eventsClient,
-                                cloudwatchClient=self.cloudwatchClient)
+                                cloudwatchClient=self.cloudwatchClient,
+                                vaultLookup=self._lookupVault)
             obj.run(self.__class__)
             objs[f"Backup::Account::{self.region}"] = obj.getInfo()
             del obj

@@ -30,6 +30,9 @@ class BackupAccount(Evaluator):
                       so they only cost API calls when they run.
       eventsClient, cloudwatchClient -- optional boto3 clients used as
                       alerting evidence by backupNoFailureAlerting.
+      vaultLookup  -- optional callable(vaultArn) -> (summary|None, reason|None)
+                      (Backup._lookupVault) used to resolve copy destinations
+                      in other Regions of this account.
     """
 
     LOGICALLY_AIR_GAPPED = 'LOGICALLY_AIR_GAPPED_BACKUP_VAULT'
@@ -53,12 +56,14 @@ class BackupAccount(Evaluator):
         'NumberOfBackupJobsExpired', 'NumberOfCopyJobsFailed',
     })
 
-    def __init__(self, account, backupClient, eventsClient=None, cloudwatchClient=None):
+    def __init__(self, account, backupClient, eventsClient=None, cloudwatchClient=None,
+                 vaultLookup=None):
         super().__init__()
         self.account = account
         self.backupClient = backupClient
         self.eventsClient = eventsClient
         self.cloudwatchClient = cloudwatchClient
+        self.vaultLookup = vaultLookup
 
         self._resourceName = f"Account::{account.get('_region', 'unknown')}"
 
@@ -311,7 +316,7 @@ class BackupAccount(Evaluator):
     def _checkBackupRestoreJobsFailing(self):
         key = 'backupRestoreJobsFailing'
         since = datetime.now(timezone.utc) - timedelta(days=self.RESTORE_LOOKBACK_DAYS)
-        failedRestore, failedValidation = [], []
+        failedRestore, failedValidation, timedOut = [], [], 0
         try:
             # One listing covers both conditions: ValidationStatus has no
             # server-side filter, so list every restore job in the window.
@@ -321,13 +326,20 @@ class BackupAccount(Evaluator):
                     failedRestore.append(entry)
                 elif (job.get('ValidationStatus') or '').upper() == 'FAILED':
                     failedValidation.append(entry)
+                elif (job.get('ValidationStatus') or '').upper() == 'TIMED_OUT':
+                    # Not a proven failure (the validation never reported);
+                    # surfaced in the message only.
+                    timedOut += 1
         except botocore.exceptions.ClientError as e:
             self.results[key] = [0, f"Unable to evaluate ({self._code(e)})"]
             return
 
         if not failedRestore and not failedValidation:
+            note = (f"; {timedOut} restore validation(s) TIMED_OUT - review the validation"
+                    if timedOut else "")
             self.results[key] = [
-                1, f"No failed restore jobs or failed restore validations in the last {self.RESTORE_LOOKBACK_DAYS} days"
+                1, f"No failed restore jobs or failed restore validations in the last "
+                   f"{self.RESTORE_LOOKBACK_DAYS} days{note}"
             ]
             return
 
@@ -360,7 +372,7 @@ class BackupAccount(Evaluator):
             self.results[key] = [0, "Unable to evaluate (caller account ID unknown)"]
             return
 
-        crossAccount, airGapped, unreadable = [], [], []
+        crossAccount, airGapped, unreadable, unresolved = [], [], [], []
         for plan in plans:
             planName = plan.get('_name') or plan.get('_id')
             rules = plan.get('_rules')
@@ -380,8 +392,12 @@ class BackupAccount(Evaluator):
                     parts = dest.split(':')
                     if len(parts) >= 5 and parts[4] and parts[4] != own:
                         crossAccount.append(f"{planName}->{parts[4]}")
-                    elif self._isLocalLagVaultArn(dest):
+                        continue
+                    isLag, reason = self._isLagVaultArn(dest)
+                    if isLag:
                         airGapped.append(planName)
+                    elif reason:
+                        unresolved.append(f"{self._shortArn(dest)}({reason})")
 
         if crossAccount:
             self.results[key] = [
@@ -398,6 +414,11 @@ class BackupAccount(Evaluator):
             self.results[key] = [
                 0, f"Unable to evaluate (get_backup_plan failed for {', '.join(unreadable[:5])})"
             ]
+        elif unresolved:
+            self.results[key] = [
+                0, "Unable to evaluate (copy destination vault(s) could not be read: "
+                   f"{', '.join(sorted(set(unresolved))[:5])})"
+            ]
         else:
             self.results[key] = [
                 -1,
@@ -409,6 +430,13 @@ class BackupAccount(Evaluator):
     # 10. No alerting on backup / copy job failures
     # ------------------------------------------------------------------ #
     def _checkBackupNoFailureAlerting(self):
+        """PASS when an account-wide alert covers backup/copy job failures
+        (an enabled EventBridge rule whose pattern can match a failed
+        Backup/Copy Job State Change event and has a target, or a CloudWatch
+        alarm with actions on an AWS/Backup failure metric), or when every
+        vault that backup rules write to has SNS notifications for failure
+        events. Vault notifications are per vault, so one notifying vault
+        does not cover jobs written to the others."""
         key = 'backupNoFailureAlerting'
         vaults = self.account.get('_vaults') or []
         plans = self.account.get('_plans') or []
@@ -418,30 +446,13 @@ class BackupAccount(Evaluator):
 
         evidence, unknown = [], []
 
-        # a) Vault notifications (SNS) for failure events
-        for v in vaults:
-            name = v.get('_name')
-            if not name:
-                continue
-            try:
-                resp = self.backupClient.get_backup_vault_notifications(BackupVaultName=name)
-                hit = set(resp.get('BackupVaultEvents') or []) & self.FAILURE_NOTIFICATION_EVENTS
-                if hit and resp.get('SNSTopicArn'):
-                    evidence.append(f"vault {name} notifies {','.join(sorted(hit))}")
-                    break
-            except botocore.exceptions.ClientError as e:
-                code = self._code(e)
-                # ResourceNotFoundException == no notifications configured.
-                if code != 'ResourceNotFoundException':
-                    unknown.append(f"get_backup_vault_notifications:{code}")
-
-        # b) Enabled EventBridge rule on source aws.backup with a target
-        if not evidence and self.eventsClient is not None:
+        # a) Enabled EventBridge rule matching failed aws.backup job events
+        if self.eventsClient is not None:
             try:
                 for rule in self._paginateClient(self.eventsClient, 'list_rules', 'Rules'):
                     if (rule.get('State') or '').upper() != 'ENABLED':
                         continue
-                    if not self._patternMatchesBackup(rule.get('EventPattern')):
+                    if not self._patternMatchesBackupFailure(rule.get('EventPattern')):
                         continue
                     targets = self.eventsClient.list_targets_by_rule(
                         Rule=rule['Name'], EventBusName=rule.get('EventBusName') or 'default'
@@ -452,7 +463,7 @@ class BackupAccount(Evaluator):
             except botocore.exceptions.ClientError as e:
                 unknown.append(f"events:{self._code(e)}")
 
-        # c) CloudWatch alarm with actions on an AWS/Backup failure metric
+        # b) CloudWatch alarm with actions on an AWS/Backup failure metric
         if not evidence and self.cloudwatchClient is not None:
             try:
                 for alarm in self._paginateClient(self.cloudwatchClient, 'describe_alarms',
@@ -467,6 +478,32 @@ class BackupAccount(Evaluator):
 
         if evidence:
             self.results[key] = [1, f"Failure alerting found: {evidence[0]}"]
+            return
+
+        # c) Vault notifications (SNS) for failure events, on every vault
+        #    that backup rules write to.
+        allNames = [v.get('_name') for v in vaults if v.get('_name')]
+        targeted = self._ruleTargetVaultNames()
+        names = [n for n in allNames if targeted is None or n in targeted] or allNames
+        covered, uncovered = [], []
+        for name in names:
+            try:
+                resp = self.backupClient.get_backup_vault_notifications(BackupVaultName=name)
+                hit = set(resp.get('BackupVaultEvents') or []) & self.FAILURE_NOTIFICATION_EVENTS
+                (covered if hit and resp.get('SNSTopicArn') else uncovered).append(name)
+            except botocore.exceptions.ClientError as e:
+                code = self._code(e)
+                # ResourceNotFoundException == no notifications configured.
+                if code == 'ResourceNotFoundException':
+                    uncovered.append(name)
+                else:
+                    unknown.append(f"get_backup_vault_notifications:{code}")
+
+        if covered and not uncovered and not unknown:
+            self.results[key] = [
+                1, f"Failure alerting found: vault notifications for job failures on all "
+                   f"{len(covered)} vault(s) used by backup rules"
+            ]
         elif unknown:
             self.results[key] = [
                 0,
@@ -474,11 +511,28 @@ class BackupAccount(Evaluator):
                 "no failure alerting found in the sources that could be read"
             ]
         else:
+            more = f" (+{len(uncovered) - 5} more)" if len(uncovered) > 5 else ""
+            vaultPart = (f"vault(s) without failure notifications: {', '.join(uncovered[:5])}{more}"
+                         if uncovered else "no vaults to notify from")
             self.results[key] = [
                 -1,
-                "No vault notification for BACKUP_JOB_FAILED/COPY_JOB_FAILED, no enabled EventBridge rule "
-                "for source aws.backup with a target, and no CloudWatch alarm on AWS/Backup failure metrics"
+                "No enabled EventBridge rule matching failed aws.backup job events with a target, "
+                f"no CloudWatch alarm on AWS/Backup failure metrics, and {vaultPart}"
+                + (f" ({len(covered)} vault(s) do notify)" if covered else "")
             ]
+
+    def _ruleTargetVaultNames(self):
+        """Names of vaults that backup rules write to, or None when any plan's
+        rules are unknown (checkpointed / unreadable) - then all vaults count."""
+        names = set()
+        for plan in self.account.get('_plans') or []:
+            rules = plan.get('_rules')
+            if rules is None:
+                return None
+            for rule in rules:
+                if rule.get('TargetBackupVaultName'):
+                    names.add(rule['TargetBackupVaultName'])
+        return names
 
     # ------------------------------------------------------------------ #
     # 11. No restore testing plan (or plan with no selections)
@@ -608,37 +662,116 @@ class BackupAccount(Evaluator):
             return arn.split('/')[-1]
         return arn.split(':')[-1]
 
-    def _isLocalLagVaultArn(self, arn):
-        """True if `arn` is a logically air-gapped vault in this Region."""
-        parts = (arn or '').split(':')
-        if len(parts) < 7 or parts[3] != self.account.get('_region'):
-            return False
-        name = ':'.join(parts[6:])
-        return any(
-            v.get('_name') == name and (v.get('_vaultType') or '').upper() == self.LOGICALLY_AIR_GAPPED
-            for v in self.account.get('_vaults') or []
-        )
+    def _isLagVaultArn(self, arn):
+        """Classify a same-account copy destination vault ARN.
 
-    @staticmethod
-    def _patternMatchesBackup(pattern):
-        """True if an EventBridge EventPattern matches events from aws.backup."""
+        Returns (True, None) if it is a logically air-gapped vault,
+        (False, None) if it is a readable non-air-gapped vault, and
+        (False, reason) if the vault could not be read (the caller must not
+        FAIL on that basis). Vaults in this Region are resolved from the
+        discovered vault list; vaults in other Regions through vaultLookup
+        (Backup._lookupVault, a cached describe_backup_vault)."""
+        parts = (arn or '').split(':')
+        if len(parts) < 7 or parts[2] != 'backup' or parts[5] != 'backup-vault':
+            return False, 'unparseable ARN'
+        region, name = parts[3], ':'.join(parts[6:])
+        if region == self.account.get('_region'):
+            localVaults = self.account.get('_vaults') or []
+            if not localVaults:
+                return False, 'vault list unavailable'
+            for v in localVaults:
+                if v.get('_name') == name:
+                    return (v.get('_vaultType') or '').upper() == self.LOGICALLY_AIR_GAPPED, None
+            # Not in this Region's vault list (deleted / renamed): a copy to
+            # it cannot be isolating anything.
+            return False, None
+        if self.vaultLookup is None:
+            return False, 'other Region not resolvable'
+        try:
+            summary, reason = self.vaultLookup(arn)
+        except Exception as e:  # defensive: never let a lookup crash the check
+            return False, type(e).__name__
+        if summary is None:
+            return False, reason or 'unknown'
+        return (summary.get('VaultType') or '').upper() == self.LOGICALLY_AIR_GAPPED, None
+
+    # EventBridge detail-types / detail.state values of a failed job.
+    JOB_DETAIL_TYPES = ('Backup Job State Change', 'Copy Job State Change')
+    FAILED_EVENT_STATES = ('FAILED', 'ABORTED', 'EXPIRED')
+
+    @classmethod
+    def _patternMatchesBackupFailure(cls, pattern):
+        """True if an EventBridge EventPattern can match a failed AWS Backup
+        backup / copy job event: source aws.backup, a detail-type filter (if
+        any) that admits a Backup/Copy Job State Change, and a detail.state
+        filter (if any) that admits FAILED/ABORTED/EXPIRED. Rules that only
+        match COMPLETED jobs or plan/vault changes do not count."""
         if not pattern:
             return False
         try:
             parsed = json.loads(pattern)
         except (TypeError, ValueError):
             return False
-        src = parsed.get('source') if isinstance(parsed, dict) else None
-        if isinstance(src, str):
-            src = [src]
-        if not isinstance(src, list):
+        if not isinstance(parsed, dict):
             return False
-        for s in src:
-            if s == 'aws.backup':
-                return True
-            if isinstance(s, dict) and isinstance(s.get('prefix'), str) and s['prefix'] \
-                    and 'aws.backup'.startswith(s['prefix']):
-                return True
+        if 'source' not in parsed or not cls._matcherAdmits(parsed.get('source'), ('aws.backup',)):
+            return False
+        if 'detail-type' in parsed and not cls._matcherAdmits(parsed['detail-type'], cls.JOB_DETAIL_TYPES):
+            return False
+        detail = parsed.get('detail')
+        if isinstance(detail, dict) and 'state' in detail \
+                and not cls._matcherAdmits(detail['state'], cls.FAILED_EVENT_STATES):
+            return False
+        return True
+
+    @staticmethod
+    def _matcherAdmits(spec, candidates):
+        """True if an EventBridge field matcher can match at least one of the
+        candidate string values. Unrecognised matcher forms are treated as
+        admitting (benefit of the doubt - cannot be proven not to alert)."""
+        if isinstance(spec, str):
+            spec = [spec]
+        if not isinstance(spec, list):
+            return True
+        for m in spec:
+            if isinstance(m, str):
+                if m in candidates:
+                    return True
+                continue
+            if not isinstance(m, dict):
+                continue
+            if 'prefix' in m:
+                p = m['prefix']
+                if isinstance(p, dict):   # {"prefix": {"equals-ignore-case": ...}}
+                    p = p.get('equals-ignore-case')
+                    if isinstance(p, str) and any(c.lower().startswith(p.lower()) for c in candidates):
+                        return True
+                    continue
+                if isinstance(p, str) and any(c.startswith(p) for c in candidates):
+                    return True
+            elif 'suffix' in m:
+                sfx = m['suffix']
+                if not isinstance(sfx, str) or any(c.endswith(sfx) for c in candidates):
+                    return True
+            elif 'equals-ignore-case' in m:
+                v = m['equals-ignore-case']
+                if not isinstance(v, str) or any(c.lower() == v.lower() for c in candidates):
+                    return True
+            elif 'wildcard' in m:
+                import fnmatch
+                w = m['wildcard']
+                if not isinstance(w, str) or any(fnmatch.fnmatchcase(c, w) for c in candidates):
+                    return True
+            elif 'anything-but' in m:
+                ex = m['anything-but']
+                if isinstance(ex, str):
+                    ex = [ex]
+                if not isinstance(ex, list):
+                    return True   # anything-but {prefix: ...} etc.
+                if any(c not in ex for c in candidates):
+                    return True
+            else:
+                return True       # exists / numeric / cidr / unknown
         return False
 
     @classmethod

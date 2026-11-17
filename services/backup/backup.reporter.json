@@ -476,7 +476,7 @@
 	},
 	"backupRetentionBelowDetectionWindow": {
 		"category": "S",
-		"^description": "{$COUNT} AWS Backup plan(s) or locked vault(s) retain recovery points for less than 35 days: either the longest rule / copy retention (Lifecycle.DeleteAfterDays) of the plan or the Vault Lock MinRetentionDays is below 35. Compromises and silent data corruption are often detected weeks later; if every recovery point is younger than the detection window, no clean restore point remains. Extend retention (for example a monthly rule) or raise MinRetentionDays to cover your detection window.",
+		"^description": "{$COUNT} AWS Backup plan(s) or locked vault(s) do not keep a recovery point for at least 35 days: either the longest rule / copy retention (Lifecycle.DeleteAfterDays) of the plan is below 35 days, or the vault's Vault Lock guarantees a minimum retention of fewer than 35 days (MinRetentionDays below 35 or not set), so recovery points in that vault can be deleted before the detection window ends. Compromises and silent data corruption are often detected weeks later; if every recovery point is younger than the detection window, no clean restore point remains. Extend retention (for example a monthly rule) or raise MinRetentionDays to cover your detection window.",
 		"shortDesc": "Retain at least one recovery point beyond the detection window (35 days)",
 		"criticality": "M",
 		"downtime": 0,

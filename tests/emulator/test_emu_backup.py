@@ -221,6 +221,53 @@ def test_plan_no_cross_account_copy(emu, uid):
         _deleteVault(b, lag)
 
 
+def test_plan_cross_account_copy_other_region_air_gapped_vault(emu, uid):
+    """A copy to a logically air-gapped vault of this account in another
+    Region (a common DR setup) is isolation: resolved through the cached
+    describe_backup_vault lookup, not only this Region's vault list."""
+    b = emu.client('backup')
+    west = emu.client('backup', region_name='us-west-2')
+    assert west.meta.endpoint_url.startswith('https://127.0.0.1:'), west.meta.endpoint_url
+    vault, plan = f'ss-v-{uid}', f'ss-p-{uid}'
+    drStd, drLag = f'ss-dr-{uid}', f'ss-drlag-{uid}'
+    b.create_backup_vault(BackupVaultName=vault)
+    west.create_backup_vault(BackupVaultName=drStd)
+    west.create_logically_air_gapped_backup_vault(BackupVaultName=drLag, MinRetentionDays=35,
+                                                  MaxRetentionDays=365)
+    others = b.list_backup_plans()['BackupPlansList']
+    assert not others, (f'emulator already has {len(others)} backup plan(s); the account-level '
+                        'result would be ambiguous - run against a clean emulator')
+    acct = _acct(emu)
+
+    def westArn(name):
+        return f'arn:aws:backup:us-west-2:{acct}:backup-vault:{name}'
+
+    def body(dest):
+        return {'BackupPlanName': plan, 'Rules': [_rule(
+            vault, Lifecycle={'DeleteAfterDays': 90},
+            CopyActions=[{'DestinationBackupVaultArn': westArn(dest),
+                          'Lifecycle': {'DeleteAfterDays': 90}}])]}
+    planId = None
+    try:
+        def misconfigure():
+            nonlocal planId
+            planId = b.create_backup_plan(BackupPlan=body(drStd))['BackupPlanId']
+
+        def fix():
+            b.update_backup_plan(BackupPlanId=planId, BackupPlan=body(drLag))
+
+        assertFlagFixCycle(emu, 'backup', 'backupPlanNoCrossAccountCopy', 'Account::us-east-1',
+                           misconfigure, fix)
+        res = runCheck(emu, 'backup', 'backupPlanNoCrossAccountCopy', 'Account::us-east-1')
+        assert all(s == 1 for s in res.statuses().values()), res.results
+    finally:
+        if planId:
+            _deletePlan(b, planId)
+        _deleteVault(b, vault)
+        _deleteVault(west, drStd)
+        _deleteVault(west, drLag)
+
+
 # --------------------------------------------------------------------------- #
 # backupJobsFailing / backupRestoreJobsFailing - flag end to end.
 # Job history cannot be deleted, so the fix half is in test_stub_backup.py.
@@ -296,6 +343,15 @@ def test_no_failure_alerting_eventbridge(emu, uid):
     try:
         st = runCheck(emu, 'backup', 'backupNoFailureAlerting', 'Account::us-east-1').statuses()
         assert st and all(s == 0 for s in st.values()), st
+
+        # A targeted rule that only matches COMPLETED jobs is not failure alerting.
+        ev.put_rule(Name=rule, State='ENABLED', EventPattern=json.dumps({
+            'source': ['aws.backup'], 'detail-type': ['Backup Job State Change'],
+            'detail': {'state': ['COMPLETED']}}))
+        ev.put_targets(Rule=rule, Targets=[{'Id': '1', 'Arn': 'arn:aws:sns:us-east-1:000000000000:ss-alerts'}])
+        st = runCheck(emu, 'backup', 'backupNoFailureAlerting', 'Account::us-east-1').statuses()
+        assert st and all(s == 0 for s in st.values()), st
+        ev.remove_targets(Rule=rule, Ids=['1'])
 
         ev.put_rule(Name=rule, State='ENABLED', EventPattern=json.dumps({
             'source': ['aws.backup'], 'detail-type': ['Backup Job State Change'],
@@ -404,12 +460,14 @@ def test_air_gapped_vault_no_mpa(emu, uid):
 
 
 def test_air_gapped_mpa_not_applicable_to_standard_vault(emu, uid):
+    """MPA only applies to logically air-gapped vaults: a standard vault gets
+    no airGappedVaultNoMpa row at all (no per-vault 'not applicable' noise)."""
     b = emu.client('backup')
     vault = f'ss-v-{uid}'
     b.create_backup_vault(BackupVaultName=vault)
     try:
-        st = runCheck(emu, 'backup', 'airGappedVaultNoMpa', f'Vault::{vault}').statuses()
-        assert st and all(s == 0 for s in st.values()), st
+        res = runCheck(emu, 'backup', 'airGappedVaultNoMpa', f'Vault::{vault}')
+        assert not res.statuses(), res.results
     finally:
         _deleteVault(b, vault)
 
