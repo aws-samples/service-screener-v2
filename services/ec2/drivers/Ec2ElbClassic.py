@@ -160,3 +160,19 @@ class Ec2ElbClassic(Evaluator):
             self.results[key] = [0, 'Unable to evaluate (' + '; '.join(unknown) + ')']
         else:
             self.results[key] = [1, '; '.join(good)]
+
+    def _checkElbUsesIamOrImportedCert(self):
+        """HTTPS/SSL listeners serving a certificate stored in IAM
+        (SSLCertificateId arn:aws:iam::<acct>:server-certificate/...). ACM imported
+        certificates are reported by acm.acmImportedCertNoAutoRenewal."""
+        key = 'elbUsesIamOrImportedCert'
+        listeners = [ld.get('Listener', {}) for ld in self.elb.get('ListenerDescriptions', []) or []
+                     if str(ld.get('Listener', {}).get('Protocol', '')).upper() in ('HTTPS', 'SSL')]
+        if not listeners:
+            return
+        iam = [f"{l.get('Protocol')}:{l.get('LoadBalancerPort')} {l['SSLCertificateId'].split(':server-certificate/', 1)[1]}"
+               for l in listeners if ':server-certificate/' in str(l.get('SSLCertificateId') or '')]
+        if iam:
+            self.results[key] = [-1, f"IAM server certificate(s) in use: {'; '.join(iam)}"]
+        else:
+            self.results[key] = [1, f"{len(listeners)} TLS listener(s) use ACM certificates"]

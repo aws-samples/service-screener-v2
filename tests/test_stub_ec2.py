@@ -44,7 +44,14 @@ Why not the emulator:
 - vpcPeeringFullRoute (transit gateway path): emulator TGW attachments carry no Association
   and search_transit_gateway_routes returns no propagated routes, so the association ->
   route-table -> propagated-CIDR path, RAM-shared TGWs, IPv6 / prefix-list / blackhole
-  routes and AccessDenied responses are stubbed.
+  routes and AccessDenied responses are stubbed. The FAIL path (whole-CIDR route to a
+  peer VPC owned by ANOTHER account) needs a second account, which the single-account
+  emulator does not have.
+- albTargetGroupPlaintext: the FAIL path needs an ip target outside the VPC
+  (AvailabilityZone 'all') reported by describe_target_health; the emulator flag -> fix
+  test covers it where supported, the stub pins the real response shape.
+- elbUsesIamOrImportedCert: additional listener certificates (describe_listener_certificates
+  pages) and AccessDenied on that call are stubbed.
 
 Every client is a real botocore client (real API shapes / parameter validation) wrapped by
 botocore.stub.Stubber, pointed at an unroutable loopback endpoint with dummy credentials,
@@ -876,26 +883,115 @@ def test_alb_mtls_listener_access_denied_not_pass():
     assert res == [0, 'Unable to evaluate (AccessDenied)']
 
 
-def _tgResult(pages):
+def _tgResult(pages, health=None):
+    """health: {targetGroupArn: TargetHealthDescriptions | error code}"""
     elbv2 = _client('elbv2')
+    health = health or {}
     with Stubber(elbv2) as st:
         for i, groups in enumerate(pages):
             resp = {'TargetGroups': groups}
             if i < len(pages) - 1:
                 resp['NextMarker'] = f'm{i}'
             st.add_response('describe_target_groups', resp)
+        for groups in pages:
+            for g in groups:
+                if g.get('Protocol') == 'HTTP' and g.get('TargetType') == 'ip':
+                    h = health.get(g['TargetGroupArn'], [])
+                    if isinstance(h, str):
+                        st.add_client_error('describe_target_health', service_error_code=h, http_status_code=403)
+                    else:
+                        st.add_response('describe_target_health', {'TargetHealthDescriptions': h},
+                                        {'TargetGroupArn': g['TargetGroupArn']})
         res = _run(Ec2ElbCommon(_alb(), [], elbv2, None), '_checkAlbTargetGroupPlaintext').get('albTargetGroupPlaintext')
         st.assert_no_pending_responses()
     return res
 
 
+def _tg(name, protocol, targetType='instance'):
+    return {'TargetGroupName': name, 'Protocol': protocol, 'Port': 443 if protocol == 'HTTPS' else 80,
+            'TargetType': targetType,
+            'TargetGroupArn': f'arn:aws:elasticloadbalancing:us-east-1:111111111111:targetgroup/{name}/0123456789abcdef'}
+
+
+def _tgt(ip, az):
+    return {'Target': {'Id': ip, 'Port': 80, 'AvailabilityZone': az}, 'TargetHealth': {'State': 'healthy'}}
+
+
 def test_alb_target_group_plaintext_paginates_and_lambda_ignored():
-    https = {'TargetGroupName': 'tls', 'Protocol': 'HTTPS', 'Port': 443}
-    http = {'TargetGroupName': 'plain', 'Protocol': 'HTTP', 'Port': 80}
+    https = _tg('tls', 'HTTPS')
+    http = _tg('plain', 'HTTP')
     lam = {'TargetGroupName': 'fn', 'TargetType': 'lambda'}
-    assert _tgResult([[https], [http]]) == [-1, 'HTTP target group(s): plain']
+    # HTTP to instances inside the VPC: TLS terminated at the ALB is standard -> informational
+    res = _tgResult([[https], [http]])
+    assert res[0] == 0 and 'plain' in res[1]
     assert _tgResult([[https, lam]])[0] == 1
     assert _tgResult([[lam]]) is None
+
+
+def test_alb_target_group_plaintext_ip_outside_vpc_flag_fix():
+    ipTg = _tg('onprem', 'HTTP', 'ip')
+    bad = _tgResult([[ipTg]], {ipTg['TargetGroupArn']: [_tgt('10.0.1.5', 'us-east-1a'), _tgt('192.168.10.5', 'all')]})
+    assert bad[0] == -1 and '192.168.10.5' in bad[1] and '10.0.1.5' not in bad[1]
+    # fix: the out-of-VPC target moved to an HTTPS target group
+    fixed = _tgResult([[ipTg, _tg('onprem-tls', 'HTTPS', 'ip')]], {ipTg['TargetGroupArn']: [_tgt('10.0.1.5', 'us-east-1a')]})
+    assert fixed[0] == 0
+    assert _tgResult([[_tg('onprem-tls', 'HTTPS', 'ip')]])[0] == 1
+
+
+def test_alb_target_group_plaintext_health_access_denied_not_pass():
+    ipTg = _tg('onprem', 'HTTP', 'ip')
+    res = _tgResult([[ipTg]], {ipTg['TargetGroupArn']: 'AccessDenied'})
+    assert res[0] == 0 and 'AccessDenied' in res[1]
+
+
+# --------------------------------------------------------------------------- #
+# elbUsesIamOrImportedCert
+# --------------------------------------------------------------------------- #
+IAM_CERT = 'arn:aws:iam::111111111111:server-certificate/legacy-cert'
+ACM_CERT = 'arn:aws:acm:us-east-1:111111111111:certificate/01234567-89ab-cdef-0123-456789abcdef'
+
+
+def _certResult(default, extra=None, extraError=None, protocol='HTTPS'):
+    elbv2 = _client('elbv2')
+    larn = 'arn:aws:elasticloadbalancing:us-east-1:111111111111:listener/app/a/1/2'
+    with Stubber(elbv2) as st:
+        st.add_response('describe_listeners', {'Listeners': [
+            {'ListenerArn': larn, 'Protocol': protocol, 'Port': 443, 'Certificates': [{'CertificateArn': default}]}]})
+        if protocol in ('HTTPS', 'TLS'):
+            if extraError:
+                st.add_client_error('describe_listener_certificates', service_error_code=extraError, http_status_code=403)
+            else:
+                pages = extra or [[]]
+                for i, certs in enumerate(pages):
+                    resp = {'Certificates': [{'CertificateArn': c, 'IsDefault': False} for c in certs]}
+                    if i < len(pages) - 1:
+                        resp['NextMarker'] = f'm{i}'
+                    st.add_response('describe_listener_certificates', resp)
+        res = _run(Ec2ElbCommon(_alb(), [], elbv2, None), '_checkElbUsesIamOrImportedCert').get('elbUsesIamOrImportedCert')
+        st.assert_no_pending_responses()
+    return res
+
+
+def test_elb_iam_cert_flag_fix():
+    bad = _certResult(IAM_CERT)
+    assert bad[0] == -1 and 'legacy-cert' in bad[1]
+    assert _certResult(ACM_CERT)[0] == 1
+    # an IAM certificate attached as an additional (SNI) certificate on the second page
+    assert _certResult(ACM_CERT, extra=[[ACM_CERT], [IAM_CERT]])[0] == -1
+    assert _certResult(ACM_CERT, extraError='AccessDenied')[0] == 0
+    assert _certResult(ACM_CERT, protocol='HTTP') is None
+
+
+def test_elb_iam_cert_classic():
+    from services.ec2.drivers.Ec2ElbClassic import Ec2ElbClassic
+    def clb(cert, proto='HTTPS'):
+        return {'LoadBalancerName': 'c', 'ListenerDescriptions': [{'Listener': {
+            'Protocol': proto, 'LoadBalancerPort': 443, 'InstanceProtocol': 'HTTP', 'InstancePort': 80,
+            'SSLCertificateId': cert}, 'PolicyNames': []}]}
+    run = lambda lb: _run(Ec2ElbClassic(lb, _client('elb')), '_checkElbUsesIamOrImportedCert').get('elbUsesIamOrImportedCert')
+    assert run(clb(IAM_CERT))[0] == -1
+    assert run(clb(ACM_CERT))[0] == 1
+    assert run(clb(None, 'HTTP')) is None
 
 
 # --------------------------------------------------------------------------- #
@@ -1148,9 +1244,9 @@ def _ibResult(pipelines, images=None, instances=None, ibError=None, imageError=N
                 if imageError:
                     sec2.add_client_error('describe_images', service_error_code=imageError, http_status_code=400)
                     if imageError.startswith('InvalidAMIID'):
-                        sec2.add_response('describe_images', {'Images': images or []}, {'ImageIds': ['ami-0aaa']})
+                        sec2.add_response('describe_images', {'Images': images or []}, {'ImageIds': ['ami-0aaa'], 'IncludeDeprecated': True})
                 else:
-                    sec2.add_response('describe_images', {'Images': images or []}, {'ImageIds': ['ami-0aaa']})
+                    sec2.add_response('describe_images', {'Images': images or []}, {'ImageIds': ['ami-0aaa'], 'IncludeDeprecated': True})
         res = _run(Ec2ImageBuilder(ib, ec2, instances), '_checkImagebuilderNoPipeline')['imagebuilderNoPipeline']
         sib.assert_no_pending_responses()
         sec2.assert_no_pending_responses()
@@ -1233,10 +1329,10 @@ def _rtWith(*routes):
                              'Routes': base + list(routes), 'Associations': []}]}
 
 
-def _pcx(status='active'):
+def _pcx(status='active', peerOwner=OUTSIDER):
     return {'VpcPeeringConnectionId': PCX, 'Status': {'Code': status},
             'RequesterVpcInfo': {'VpcId': VPC_A, 'OwnerId': SELF, 'CidrBlock': '10.1.0.0/16'},
-            'AccepterVpcInfo': {'VpcId': VPC_B, 'OwnerId': OUTSIDER, 'CidrBlock': '10.2.0.0/16',
+            'AccepterVpcInfo': {'VpcId': VPC_B, 'OwnerId': peerOwner, 'CidrBlock': '10.2.0.0/16',
                                 'CidrBlockSet': [{'CidrBlock': '10.2.0.0/16'}, {'CidrBlock': '10.3.0.0/16'}],
                                 'Ipv6CidrBlockSet': [{'Ipv6CidrBlock': '2600:1f18:aa:bb00::/56'}]}}
 
@@ -1294,8 +1390,16 @@ def test_peering_full_cidr_flag_fix():
     assert good[0] == 1
 
 
+def test_peering_same_account_full_cidr_is_review_only():
+    # full-CIDR peering inside one account is the documented default -> INFO, not FAIL
+    res = _peerResult([_pcxRoute('10.2.0.0/16')], pcx=[_pcx(peerOwner=SELF)])
+    assert res[0] == 0 and res[1].startswith('Review') and VPC_B in res[1]
+    assert _peerResult([_pcxRoute('10.2.4.0/24')], pcx=[_pcx(peerOwner=SELF)])[0] == 1
+
+
 def test_peering_supernet_second_cidr_and_ipv6_flagged():
     # a supernet route covering the peer's secondary CIDR, and a whole-IPv6-block route
+    # (a peering connection carries only the peer's CIDRs, so a supernet is a full route)
     assert _peerResult([_pcxRoute('10.0.0.0/8')], pcx=[_pcx()])[0] == -1
     assert _peerResult([_pcxRoute('2600:1f18:aa:bb00::/56')], pcx=[_pcx()])[0] == -1
     assert _peerResult([_pcxRoute('2600:1f18:aa:bb00::/64')], pcx=[_pcx()])[0] == 1
@@ -1336,11 +1440,20 @@ PROPAGATED_B = [{'DestinationCidrBlock': '10.2.0.0/16', 'Type': 'propagated', 'S
                                                 'TransitGatewayAttachmentId': 'tgw-attach-0aaaaaaaaaaaaaaa1'}]}]
 
 
-def test_tgw_associated_route_table_flag_fix():
-    bad = _peerResult([_tgwRoute('10.0.0.0/8')], search=PROPAGATED_B)
-    assert bad[0] == -1 and VPC_B in bad[1] and VPC_A not in bad[1].split('covers')[1]
+def test_tgw_associated_route_table_review_fix():
+    # exact full-CIDR route to a TGW peer: review item (INFO), never a FAIL
+    review = _peerResult([_tgwRoute('10.2.0.0/16')], search=PROPAGATED_B)
+    assert review[0] == 0 and VPC_B in review[1] and VPC_A not in review[1].split('covers')[1]
     good = _peerResult([_tgwRoute('10.2.1.0/24')], search=PROPAGATED_B)
     assert good[0] == 1
+
+
+def test_tgw_default_and_summary_routes_not_full_peer_routes():
+    # hub-and-spoke centralized egress / inspection: 0.0.0.0/0 and 10.0.0.0/8 -> tgw
+    # with peers 10.2.0.0/16 must not be reported as opening whole peer VPCs
+    for dest in ('0.0.0.0/0', '10.0.0.0/8'):
+        res = _peerResult([_tgwRoute(dest)], search=PROPAGATED_B)
+        assert res[0] == 1 and 'summary' in res[1], res
 
 
 def test_tgw_default_route_with_isolated_route_table_passes():
@@ -1349,11 +1462,11 @@ def test_tgw_default_route_with_isolated_route_table_passes():
 
 
 def test_tgw_search_access_denied_not_pass():
-    res = _peerResult([_tgwRoute('10.0.0.0/8')], search='UnauthorizedOperation')
+    res = _peerResult([_tgwRoute('10.2.0.0/16')], search='UnauthorizedOperation')
     assert res[0] == 0 and 'UnauthorizedOperation' in res[1]
 
 
 def test_tgw_shared_from_other_account_without_association_not_pass():
-    res = _peerResult([_tgwRoute('10.0.0.0/8')], attachments=_tgwAttachments(assoc=False, tgwOwner=OUTSIDER))
+    res = _peerResult([_tgwRoute('10.2.0.0/16')], attachments=_tgwAttachments(assoc=False, tgwOwner=OUTSIDER))
     assert res[0] == 0 and 'shared' in res[1]
 

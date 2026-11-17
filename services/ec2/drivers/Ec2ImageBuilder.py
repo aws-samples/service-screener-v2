@@ -42,14 +42,14 @@ class Ec2ImageBuilder(Evaluator):
         for i in range(0, len(ids), 100):
             batch = ids[i:i+100]
             try:
-                resp = self.ec2Client.describe_images(ImageIds=batch)
+                resp = self.ec2Client.describe_images(ImageIds=batch, IncludeDeprecated=True)
             except botocore.exceptions.ClientError as e:
                 if _errCode(e) not in ('InvalidAMIID.NotFound', 'InvalidAMIID.Unavailable', 'InvalidAMIID.Malformed'):
                     raise
                 # one unknown/deregistered AMI fails the whole batch: look them up one by one
                 for iid in batch:
                     try:
-                        resp = self.ec2Client.describe_images(ImageIds=[iid])
+                        resp = self.ec2Client.describe_images(ImageIds=[iid], IncludeDeprecated=True)
                     except botocore.exceptions.ClientError as e2:
                         if _errCode(e2).startswith('InvalidAMIID'):
                             continue

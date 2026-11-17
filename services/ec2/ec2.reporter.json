@@ -1455,6 +1455,24 @@
 		"remediation_risk": "medium",
 		"remediation_doc": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-update-certificates.html"
 	},
+	"elbUsesIamOrImportedCert": {
+		"category": "S",
+		"^description": "Load balancer uses IAM server certificates: {$COUNT} load balancer(s) have HTTPS/TLS/SSL listeners serving a certificate stored in IAM (server-certificate). IAM server certificates are not renewed automatically, are only manageable through the API/CLI and expire silently unless tracked elsewhere. Use certificates issued by AWS Certificate Manager (ACM), which renew automatically. Imported ACM certificates (also not auto-renewed) are reported separately by the ACM check acmImportedCertNoAutoRenewal.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Load balancer listener uses an IAM server certificate",
+		"ref": [
+			"[Manage server certificates in IAM]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_server-certs.html>",
+			"[SSL certificates for your Application Load Balancer]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/https-listener-certificates.html>",
+			"[Managed renewal for ACM certificates]<https://docs.aws.amazon.com/acm/latest/userguide/managed-renewal.html>"
+		],
+		"remediation": "aws elbv2 modify-listener --listener-arn <listener-arn> --certificates CertificateArn=<acm-certificate-arn> (Classic: aws elb set-load-balancer-listener-ssl-certificate --load-balancer-name <name> --load-balancer-port 443 --ssl-certificate-id <acm-certificate-arn>)",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-update-certificates.html"
+	},
 	"ebsRecycleBinMissing": {
 		"category": "S",
 		"^description": "Recycle Bin not protecting backups: in {$COUNT} region(s) there is no Recycle Bin retention rule for EBS snapshots and/or AMIs, so deleted snapshots/AMIs cannot be recovered. Create region-level retention rules and lock them so they cannot be removed by a compromised principal.",
@@ -1642,13 +1660,13 @@
 	},
 	"vpcPeeringFullRoute": {
 		"category": "S",
-		"^description": "Peering / transit gateway routes open whole peer VPCs: {$COUNT} VPC(s) have a route to an active VPC peering connection or transit gateway whose destination equals or contains an entire CIDR block of a peer VPC, so every subnet of that peer is reachable from the associated subnets. This is a common default and is a review item, not necessarily a misconfiguration: where only some peer subnets need to be reached (for example a shared-services or data tier), route just those subnet CIDRs and keep security groups and network ACLs as the second layer of control.",
+		"^description": "Peering routes open whole VPCs of other accounts: {$COUNT} VPC(s) have a route to an active VPC peering connection whose destination equals or contains an entire CIDR block of a peer VPC owned by another AWS account, so every subnet of that external network is reachable from the associated subnets (and vice versa where the peer routes back). Where only some peer subnets need to be reached (for example a partner's API tier), route just those subnet CIDRs and keep security groups and network ACLs as the second layer of control. Same-account peering and transit gateway routes covering a whole peer CIDR are the documented default and are reported as review items (informational) only; default and summary routes to a transit gateway (hub-and-spoke egress / inspection) are not evaluated as full peer routes.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"criticality": "L",
 		"needFullTest": 0,
-		"shortDesc": "Peering/TGW routes cover a whole peer VPC CIDR",
+		"shortDesc": "Cross-account peering route covers whole peer VPC",
 		"ref": [
 			"[Update your route tables for a VPC peering connection]<https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-routing.html>",
 			"[VPC peering configurations with specific routes]<https://docs.aws.amazon.com/vpc/latest/peering/peering-configurations-partial-access.html>",
@@ -1693,16 +1711,17 @@
 	},
 	"albTargetGroupPlaintext": {
 		"category": "S",
-		"^description": "ALB target groups use HTTP: {$COUNT} Application Load Balancer(s) forward to target groups with protocol HTTP, so traffic between the load balancer and the targets is not encrypted even when the listener uses HTTPS. Terminating TLS at the ALB is common inside a VPC; use HTTPS target groups where data classification or compliance requires end-to-end encryption in transit.",
+		"^description": "ALB sends plaintext HTTP outside the VPC: {$COUNT} Application Load Balancer(s) forward to HTTP target groups of type ip with registered targets outside the load balancer's VPC (peered VPC or on-premises over VPN / Direct Connect), so unencrypted traffic leaves the VPC. Use HTTPS target groups for these targets. HTTP target groups whose targets are inside the VPC (TLS terminated at the ALB) are the standard pattern and are reported as informational only; use HTTPS there where data classification or compliance requires end-to-end encryption in transit.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"criticality": "L",
 		"needFullTest": 0,
-		"shortDesc": "ALB forwards to HTTP target groups",
+		"shortDesc": "ALB HTTP target group has targets outside VPC",
 		"ref": [
 			"[Target groups for your Application Load Balancers]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html>",
-			"[Encryption in transit - Elastic Load Balancing]<https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/data-protection.html>"
+			"[Encryption in transit - Elastic Load Balancing]<https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/data-protection.html>",
+			"[Register targets with your target group (IP targets outside the VPC)]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/target-group-register-targets.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -1789,12 +1808,12 @@
 		"shortDesc": "Self-managed database/cache on EC2",
 		"ref": [
 			"[SEC01-BP04 Stay up to date with security threats and recommendations]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_securely_operate_updated_threats.html>",
-			"[Shared Responsibility Model]<https://aws.amazon.com/compliance/shared-responsibility-model/>",
+			"[Shared Responsibility Model - AWS Risk and Compliance]<https://docs.aws.amazon.com/whitepapers/latest/aws-risk-and-compliance/shared-responsibility-model.html>",
 			"[AWS Systems Manager Inventory]<https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-inventory.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://aws.amazon.com/products/databases/"
+		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/aws-overview/database.html"
 	},
 	"sgIngressBroadCidr": {
 		"category": "S",
@@ -1802,7 +1821,7 @@
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
-		"criticality": "M",
+		"criticality": "L",
 		"needFullTest": 0,
 		"shortDesc": "SG ingress from very broad public CIDR",
 		"ref": [

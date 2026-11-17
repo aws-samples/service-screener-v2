@@ -614,29 +614,76 @@ def test_vpn_weak_tunnel_crypto(emu):
 
 
 def test_alb_target_group_plaintext(emu, uid, alb):
+    """HTTP to instances inside the VPC is informational (0) -> HTTPS target group (1);
+    an HTTP ip target group with a target outside the VPC (AvailabilityZone 'all') is the
+    FAIL -> deregistering it is the fix."""
     elbv2 = emu.client('elbv2')
     vpc = alb['VpcId']
     httpTg = elbv2.create_target_group(Name=f'ss-http-{uid}', Protocol='HTTP', Port=80, VpcId=vpc,
                                        TargetType='instance')['TargetGroups'][0]['TargetGroupArn']
     httpsTg = elbv2.create_target_group(Name=f'ss-https-{uid}', Protocol='HTTPS', Port=443, VpcId=vpc,
                                         TargetType='instance')['TargetGroups'][0]['TargetGroupArn']
+    ipTg = elbv2.create_target_group(Name=f'ss-ip-{uid}', Protocol='HTTP', Port=80, VpcId=vpc,
+                                     TargetType='ip')['TargetGroups'][0]['TargetGroupArn']
+    outside = {'Id': '192.168.77.10', 'Port': 80, 'AvailabilityZone': 'all'}
+    res = f"ELB::{alb['LoadBalancerName']}"
     listener = {}
     try:
+        listener.update(elbv2.create_listener(LoadBalancerArn=alb['LoadBalancerArn'], Protocol='HTTP', Port=80,
+                                              DefaultActions=[{'Type': 'forward', 'TargetGroupArn': httpTg}])['Listeners'][0])
+        assert runCheck(emu, 'ec2', 'albTargetGroupPlaintext', res).statuses() == {res: 0}
+
         def misconfigure():
-            listener.update(elbv2.create_listener(LoadBalancerArn=alb['LoadBalancerArn'], Protocol='HTTP', Port=80,
-                                                  DefaultActions=[{'Type': 'forward', 'TargetGroupArn': httpTg}])['Listeners'][0])
+            elbv2.modify_listener(ListenerArn=listener['ListenerArn'],
+                                  DefaultActions=[{'Type': 'forward', 'TargetGroupArn': ipTg}])
+            elbv2.register_targets(TargetGroupArn=ipTg, Targets=[outside])
 
         def fix():
+            elbv2.deregister_targets(TargetGroupArn=ipTg, Targets=[outside])
             elbv2.modify_listener(ListenerArn=listener['ListenerArn'],
                                   DefaultActions=[{'Type': 'forward', 'TargetGroupArn': httpsTg}])
 
-        _, after = assertFlagFixCycle(emu, 'ec2', 'albTargetGroupPlaintext', f"ELB::{alb['LoadBalancerName']}", misconfigure, fix)
+        _, after = assertFlagFixCycle(emu, 'ec2', 'albTargetGroupPlaintext', res, misconfigure, fix)
         assert list(after.values()) == [1]
     finally:
         if listener:
             elbv2.delete_listener(ListenerArn=listener['ListenerArn'])
-        elbv2.delete_target_group(TargetGroupArn=httpTg)
-        elbv2.delete_target_group(TargetGroupArn=httpsTg)
+        for tg in (httpTg, httpsTg, ipTg):
+            elbv2.delete_target_group(TargetGroupArn=tg)
+
+
+def test_elb_uses_iam_server_certificate(emu, uid, alb, certificate):
+    """HTTPS listener serving an IAM server certificate -> FAIL; switched to an ACM
+    certificate -> PASS."""
+    elbv2, iam = emu.client('elbv2'), emu.client('iam')
+    d = tempfile.mkdtemp()
+    subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', d + '/k.pem',
+                    '-out', d + '/c.pem', '-days', '30', '-subj', f'/CN=ss-iam-{uid}.example.com'],
+                   check=True, capture_output=True)
+    name = f'ss-iam-cert-{uid}'
+    iamArn = iam.upload_server_certificate(ServerCertificateName=name, CertificateBody=open(d + '/c.pem').read(),
+                                           PrivateKey=open(d + '/k.pem').read())['ServerCertificateMetadata']['Arn']
+    listener = {}
+    try:
+        def misconfigure():
+            listener.update(elbv2.create_listener(LoadBalancerArn=alb['LoadBalancerArn'], Protocol='HTTPS', Port=443,
+                                                  Certificates=[{'CertificateArn': iamArn}],
+                                                  DefaultActions=[{'Type': 'fixed-response',
+                                                                   'FixedResponseConfig': {'StatusCode': '200'}}])['Listeners'][0])
+
+        def fix():
+            elbv2.modify_listener(ListenerArn=listener['ListenerArn'], Certificates=[{'CertificateArn': certificate}])
+
+        _, after = assertFlagFixCycle(emu, 'ec2', 'elbUsesIamOrImportedCert', f"ELB::{alb['LoadBalancerName']}",
+                                      misconfigure, fix)
+        assert list(after.values()) == [1]
+    finally:
+        if listener:
+            elbv2.delete_listener(ListenerArn=listener['ListenerArn'])
+        iam.delete_server_certificate(ServerCertificateName=name)
+        for f in ('k.pem', 'c.pem'):
+            os.remove(os.path.join(d, f))
+        os.rmdir(d)
 
 
 def test_ec2_auto_recovery_disabled(emu):
@@ -943,6 +990,9 @@ def _peerVpcs(ec2, a, b):
 
 
 def test_vpc_peering_full_route(emu):
+    """Same-account full-CIDR peering is the documented default: review item (0), fixed
+    to a subnet route -> 1. The FAIL path (peer VPC in another account) needs a second
+    account and is covered in tests/test_stub_ec2.py."""
     ec2 = emu.client('ec2')
     va, vb = _peerVpcs(ec2, '10.211.0.0/16', '10.212.0.0/16')
     pcx = ec2.create_vpc_peering_connection(VpcId=va, PeerVpcId=vb)['VpcPeeringConnection']['VpcPeeringConnectionId']
@@ -956,8 +1006,12 @@ def test_vpc_peering_full_route(emu):
             ec2.delete_route(RouteTableId=rt, DestinationCidrBlock='10.212.0.0/16')
             ec2.create_route(RouteTableId=rt, DestinationCidrBlock='10.212.1.0/24', VpcPeeringConnectionId=pcx)
 
-        before, after = assertFlagFixCycle(emu, 'ec2', 'vpcPeeringFullRoute', f'VPC::{va}', misconfigure, fix)
-        assert list(after.values()) == [1]
+        misconfigure()
+        res = runCheck(emu, 'ec2', 'vpcPeeringFullRoute', f'VPC::{va}')
+        assert res.statuses() == {f'VPC::{va}': 0}, res.statuses()
+        assert res.results[f'VPC::{va}']['vpcPeeringFullRoute'][1].startswith('Review')
+        fix()
+        assert runCheck(emu, 'ec2', 'vpcPeeringFullRoute', f'VPC::{va}').statuses() == {f'VPC::{va}': 1}
         # the peer side without any peering route passes
         assert runCheck(emu, 'ec2', 'vpcPeeringFullRoute', f'VPC::{vb}').statuses() == {f'VPC::{vb}': 1}
     finally:
@@ -974,7 +1028,9 @@ def test_vpc_peering_full_route(emu):
 def test_vpc_tgw_full_route(emu):
     """The emulator returns no Association on TGW attachments, so this exercises the
     fallback (other VPC attachments of the same TGW); the association +
-    search_transit_gateway_routes path is stubbed in tests/test_stub_ec2.py."""
+    search_transit_gateway_routes path is stubbed in tests/test_stub_ec2.py.
+    A TGW route covering a whole peer CIDR is a review item (0, never -1); summary /
+    default routes (hub-and-spoke egress) are not full peer routes (1)."""
     ec2 = emu.client('ec2')
     va, vb = _peerVpcs(ec2, '10.213.0.0/16', '10.214.0.0/16')
     sa = ec2.create_subnet(VpcId=va, CidrBlock='10.213.1.0/24')['Subnet']['SubnetId']
@@ -984,17 +1040,17 @@ def test_vpc_tgw_full_route(emu):
             ['TransitGatewayVpcAttachment']['TransitGatewayAttachmentId'] for v, s in ((va, sa), (vb, sb))]
     rt = _mainRouteTable(ec2, va)
     try:
-        def misconfigure():
-            ec2.create_route(RouteTableId=rt, DestinationCidrBlock='10.0.0.0/8', TransitGatewayId=tgw)
-
-        def fix():
-            ec2.delete_route(RouteTableId=rt, DestinationCidrBlock='10.0.0.0/8')
-            ec2.create_route(RouteTableId=rt, DestinationCidrBlock='10.214.1.0/24', TransitGatewayId=tgw)
-
-        before, after = assertFlagFixCycle(emu, 'ec2', 'vpcPeeringFullRoute', f'VPC::{va}', misconfigure, fix)
-        assert list(after.values()) == [1]
+        res = f'VPC::{va}'
+        ec2.create_route(RouteTableId=rt, DestinationCidrBlock='10.0.0.0/8', TransitGatewayId=tgw)
+        assert runCheck(emu, 'ec2', 'vpcPeeringFullRoute', res).statuses() == {res: 1}       # summary route
+        ec2.delete_route(RouteTableId=rt, DestinationCidrBlock='10.0.0.0/8')
+        ec2.create_route(RouteTableId=rt, DestinationCidrBlock='10.214.0.0/16', TransitGatewayId=tgw)
+        assert runCheck(emu, 'ec2', 'vpcPeeringFullRoute', res).statuses() == {res: 0}       # whole peer CIDR
+        ec2.delete_route(RouteTableId=rt, DestinationCidrBlock='10.214.0.0/16')
+        ec2.create_route(RouteTableId=rt, DestinationCidrBlock='10.214.1.0/24', TransitGatewayId=tgw)
+        assert runCheck(emu, 'ec2', 'vpcPeeringFullRoute', res).statuses() == {res: 1}       # partial route
     finally:
-        for cidr in ('10.0.0.0/8', '10.214.1.0/24'):
+        for cidr in ('10.0.0.0/8', '10.214.0.0/16', '10.214.1.0/24'):
             try:
                 ec2.delete_route(RouteTableId=rt, DestinationCidrBlock=cidr)
             except Exception:

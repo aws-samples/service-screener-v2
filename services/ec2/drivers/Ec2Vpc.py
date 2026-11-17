@@ -364,8 +364,17 @@ class Ec2Vpc(Evaluator):
         connection or transit gateway whose destination equals or contains a whole
         CIDR block of a peer VPC makes every subnet of that peer reachable from the
         associated subnets. Least-privilege network design routes only the peer
-        subnets that are needed. Blackhole routes are ignored; prefix-list
-        destinations are not expanded (reported as not evaluated)."""
+        subnets that are needed.
+          -1   VPC peering route covering a whole CIDR of a peer VPC owned by ANOTHER
+               account (full network reachability across an account boundary)
+           0   same-account peering or transit gateway route covering a whole peer
+               CIDR (the documented default - review item only)
+           1   only partial peer routes, or only default / summary routes to a TGW
+        Default (0.0.0.0/0, ::/0) and summary routes to a transit gateway (prefix
+        shorter than this VPC's own CIDR, e.g. 10.0.0.0/8) are the standard
+        hub-and-spoke egress / inspection design and are not treated as full peer
+        routes; segmentation there is done by the TGW route tables. Blackhole routes
+        are ignored; prefix-list destinations are not expanded (not evaluated)."""
         key = 'vpcPeeringFullRoute'
         ctx = self.peerRouting
         if ctx is None:
@@ -378,8 +387,23 @@ class Ec2Vpc(Evaluator):
         if ctx.get('error'):
             self.results[key] = [0, f"Unable to evaluate ({ctx['error']})"]
             return
+        myAccount = self.selfAccount or owner
+        ownPrefix = {}
+        for c in _vpcCidrs(self.vpc):
+            try:
+                n = ipaddress.ip_network(c, strict=False)
+            except ValueError:
+                continue
+            ownPrefix[n.version] = min(ownPrefix.get(n.version, n.prefixlen), n.prefixlen)
 
-        findings, unknown, notes, checked = [], [], [], 0
+        def isSummary(dest):
+            try:
+                n = ipaddress.ip_network(dest, strict=False)
+            except ValueError:
+                return False
+            return n.prefixlen == 0 or (n.version in ownPrefix and n.prefixlen < ownPrefix[n.version])
+
+        crossAcct, review, unknown, notes, summaries, checked = [], [], [], [], [], 0
         for rt in ctx.get('routeTables', {}).get(vpcId, []):
             rtId = rt.get('RouteTableId')
             for r in rt.get('Routes', []) or []:
@@ -391,6 +415,7 @@ class Ec2Vpc(Evaluator):
                 if not dest:
                     unknown.append(f"{rtId} {r.get('DestinationPrefixListId') or '?'} -> {target} (prefix list)")
                     continue
+                peerOwner = None
                 if pcxId:
                     if ctx.get('peeringError'):
                         unknown.append(f"{rtId} {dest} -> {pcxId} ({ctx['peeringError']})")
@@ -400,8 +425,13 @@ class Ec2Vpc(Evaluator):
                         continue  # peering not active: route carries no traffic
                     req, acc = pcx.get('RequesterVpcInfo') or {}, pcx.get('AccepterVpcInfo') or {}
                     peerInfo = acc if req.get('VpcId') == vpcId else req
+                    peerOwner = peerInfo.get('OwnerId')
                     peers = {peerInfo.get('VpcId') or '?': _vpcCidrs(peerInfo)}
                 else:
+                    if isSummary(dest):
+                        summaries.append(f"{dest} -> {tgwId}")
+                        checked += 1
+                        continue
                     entry = ctx.get('tgwPeers', {}).get((tgwId, vpcId)) or {}
                     if entry.get('error'):
                         unknown.append(f"{rtId} {dest} -> {tgwId} ({entry['error']})")
@@ -414,22 +444,32 @@ class Ec2Vpc(Evaluator):
                     full = [c for c in cidrs if _covers(dest, c)]
                     if full:
                         hit = True
-                        findings.append(f"{rtId} {dest} -> {target} covers {peerVpc} {', '.join(full)}")
+                        if pcxId and peerOwner and myAccount and peerOwner != myAccount:
+                            crossAcct.append(f"{rtId} {dest} -> {target} covers {peerVpc} (account {peerOwner}) {', '.join(full)}")
+                        else:
+                            review.append(f"{rtId} {dest} -> {target} covers {peerVpc} {', '.join(full)}")
                 if not hit and tgwId and entry.get('partial'):
                     unknown.append(f"{rtId} {dest} -> {tgwId} (TGW shared from another account; peer VPCs not visible)")
                     continue
                 checked += 1
 
+        def _list(items):
+            return '; '.join(items[:5]) + (f" (+{len(items) - 5} more)" if len(items) > 5 else '')
+
+        if summaries:
+            notes.append(f"default/summary TGW route(s) not treated as full peer routes: {_list(summaries)}")
         noteTxt = (' [' + '; '.join(notes) + ']') if notes else ''
-        if findings:
-            shown = '; '.join(findings[:5]) + (f" (+{len(findings) - 5} more)" if len(findings) > 5 else '')
-            self.results[key] = [-1, f"{len(findings)} route(s) open a whole peer VPC CIDR: {shown}{noteTxt}"]
+        if crossAcct:
+            extra = f"; also {len(review)} same-account/TGW full route(s)" if review else ''
+            self.results[key] = [-1, f"{len(crossAcct)} peering route(s) open a whole VPC CIDR of another account: {_list(crossAcct)}{extra}{noteTxt}"]
             return
         if unknown:
-            shown = '; '.join(unknown[:5]) + (f" (+{len(unknown) - 5} more)" if len(unknown) > 5 else '')
-            self.results[key] = [0, f"Unable to evaluate {len(unknown)} route(s): {shown}{noteTxt}"]
+            self.results[key] = [0, f"Unable to evaluate {len(unknown)} route(s): {_list(unknown)}{noteTxt}"]
+            return
+        if review:
+            self.results[key] = [0, f"Review: {len(review)} route(s) cover a whole peer VPC CIDR (common default; route only the needed peer subnets where possible): {_list(review)}{noteTxt}"]
             return
         if not checked:
             self.results[key] = [1, 'No active VPC peering or transit gateway routes']
             return
-        self.results[key] = [1, f"{checked} peering/TGW route(s) limited to parts of the peer CIDRs{noteTxt}"]
+        self.results[key] = [1, f"{checked} peering/TGW route(s) limited to parts of the peer CIDRs or default/summary routes{noteTxt}"]

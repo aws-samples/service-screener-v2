@@ -303,7 +303,12 @@ class Ec2ElbCommon(Evaluator):
 
     def _checkAlbTargetGroupPlaintext(self):
         """ALB target groups using HTTP: traffic between the load balancer and the
-        targets is not encrypted, even when the listener terminates HTTPS."""
+        targets is not encrypted, even when the listener terminates HTTPS.
+        TLS termination at the ALB with HTTP to targets inside the VPC is the
+        standard pattern, so that case is informational (0). It is a finding (-1)
+        only when an HTTP target group of type 'ip' has registered targets outside
+        the load balancer's VPC (AvailabilityZone 'all': peered VPC, on-premises over
+        VPN / Direct Connect), where the plaintext hop leaves the VPC."""
         key = 'albTargetGroupPlaintext'
         if self.elb.get('Type') != 'application':
             return
@@ -316,9 +321,64 @@ class Ec2ElbCommon(Evaluator):
             self.results[key] = [0, f"Unable to evaluate ({e.response['Error']['Code']})"]
             return
 
-        plain = [g.get('TargetGroupName') for g in groups if g.get('Protocol') == 'HTTP']
+        plainGroups = [g for g in groups if g.get('Protocol') == 'HTTP']
+        plain = [g.get('TargetGroupName') for g in plainGroups]
         encrypted = [g.get('TargetGroupName') for g in groups if g.get('Protocol') == 'HTTPS']
-        if plain:
-            self.results[key] = [-1, f"HTTP target group(s): {', '.join(plain)}"]
+        outside, unreadable = [], []
+        for g in plainGroups:
+            if g.get('TargetType') != 'ip':
+                continue
+            try:
+                resp = self.elbClient.describe_target_health(TargetGroupArn=g['TargetGroupArn'])
+            except botocore.exceptions.ClientError as e:
+                unreadable.append(f"{g.get('TargetGroupName')} ({e.response['Error']['Code']})")
+                continue
+            ips = sorted({(d.get('Target') or {}).get('Id') for d in resp.get('TargetHealthDescriptions', [])
+                          if str((d.get('Target') or {}).get('AvailabilityZone', '')).lower() == 'all'} - {None})
+            if ips:
+                shown = ', '.join(ips[:5]) + (f" (+{len(ips) - 5} more)" if len(ips) > 5 else '')
+                outside.append(f"{g.get('TargetGroupName')} -> {shown}")
+
+        if outside:
+            self.results[key] = [-1, f"HTTP target group(s) with targets outside the VPC (plaintext leaves the VPC): {'; '.join(outside)}"]
+        elif unreadable:
+            self.results[key] = [0, f"HTTP target group(s): {', '.join(plain)}; Unable to evaluate target location of {', '.join(unreadable)}"]
+        elif plain:
+            self.results[key] = [0, f"HTTP target group(s) inside the VPC: {', '.join(plain)} (informational; TLS terminated at the ALB - use HTTPS where end-to-end encryption is required)"]
         elif encrypted:
             self.results[key] = [1, f"HTTPS target group(s): {', '.join(encrypted)}"]
+
+    def _checkElbUsesIamOrImportedCert(self):
+        """HTTPS/TLS listeners serving a certificate stored in IAM
+        (arn:aws:iam::<acct>:server-certificate/...). IAM server certificates are
+        not renewed automatically and cannot be managed / monitored like ACM
+        certificates. ACM certificates imported by the customer are reported by
+        acm.acmImportedCertNoAutoRenewal and are not repeated here."""
+        key = 'elbUsesIamOrImportedCert'
+        try:
+            listeners = [l for l in self._getListeners() if l.get('Protocol') in ('HTTPS', 'TLS')]
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({e.response['Error']['Code']})"]
+            return
+        if not listeners:
+            return
+
+        iam, unknown = [], []
+        for l in listeners:
+            label = f"{l.get('Protocol')}:{l.get('Port')}"
+            arns = [c.get('CertificateArn') for c in (l.get('Certificates') or []) if c.get('CertificateArn')]
+            try:
+                for page in self.elbClient.get_paginator('describe_listener_certificates').paginate(ListenerArn=l['ListenerArn']):
+                    arns.extend(c.get('CertificateArn') for c in page.get('Certificates', []) if c.get('CertificateArn'))
+            except botocore.exceptions.ClientError as e:
+                unknown.append(f"{label} additional certificates ({e.response['Error']['Code']})")
+            for arn in sorted(set(arns)):
+                if ':server-certificate/' in arn:
+                    iam.append(f"{label} {arn.split(':server-certificate/', 1)[1]}")
+
+        if iam:
+            self.results[key] = [-1, f"IAM server certificate(s) in use: {'; '.join(iam)}"]
+        elif unknown:
+            self.results[key] = [0, f"Unable to evaluate ({'; '.join(unknown)})"]
+        else:
+            self.results[key] = [1, f"{len(listeners)} TLS listener(s) use ACM certificates"]
