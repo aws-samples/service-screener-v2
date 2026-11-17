@@ -253,5 +253,58 @@
         "remediation": null,
         "remediation_risk": null,
         "remediation_doc": "https://docs.aws.amazon.com/codebuild/latest/userguide/how-to-tag-project.html"
+    },
+    "cbServiceRoleOverprivileged": {
+        "category": "S",
+        "^description": "{$COUNT} CodeBuild project(s) use a service role with administrator access (the AWS managed AdministratorAccess policy, or an attached/inline statement allowing Action \"*\" on Resource \"*\"). A build runs whatever its source, buildspec and downloaded dependencies tell it to, so the service role's permissions are effectively granted to every contributor and every third-party package in the build. A compromised dependency or a malicious commit can then take over the whole account. Scope the role to the specific buckets, repositories, log groups and keys the build needs.",
+        "shortDesc": "Scope the CodeBuild service role to least privilege",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Create a CodeBuild service role]<https://docs.aws.amazon.com/codebuild/latest/userguide/setting-up-service-role.html>",
+            "[Security best practices in IAM - least privilege]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>",
+            "[Permissions boundaries for IAM entities]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/codebuild/latest/userguide/setting-up-service-role.html"
+    },
+    "cbWebhookUnfiltered": {
+        "category": "S",
+        "^description": "{$COUNT} CodeBuild project(s) have a source webhook that builds pull requests from any actor: either the webhook has no filter groups, or a filter group matching PULL_REQUEST_CREATED/UPDATED/REOPENED/CLOSED has no ACTOR_ACCOUNT_ID filter, and comment approval for pull request builds is not required. Un-reviewed code from any contributor or fork then runs with the project's service role, secrets and network access. Restrict PR builds with an ACTOR_ACCOUNT_ID filter or require comment approval (pullRequestBuildPolicy). Repository visibility is not visible to this check; the risk is lower for private repositories with only trusted collaborators.",
+        "shortDesc": "Restrict webhook PR builds to trusted actors",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Filter GitHub webhook events]<https://docs.aws.amazon.com/codebuild/latest/userguide/github-webhook-events.html>",
+            "[Pull request comment approval]<https://docs.aws.amazon.com/codebuild/latest/userguide/pull-request-build-policy.html>",
+            "[Best practices for webhooks]<https://docs.aws.amazon.com/codebuild/latest/userguide/webhooks.html#webhook-best-practices>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/codebuild/latest/userguide/github-webhook-events.html"
+    },
+    "cbProjectNoTestReports": {
+        "category": "S",
+        "^description": "{$COUNT} CodeBuild project(s) show no evidence of publishing test or code-coverage reports: the inline buildspec has no reports section, or (for buildspecs kept in source) no CodeBuild report group holds reports from the project. Without reports, test and security-test outcomes are not recorded alongside the build, so regressions and skipped tests are hard to detect. This is a heuristic: reports are optional and some teams publish test results elsewhere.",
+        "shortDesc": "Publish test and coverage reports from the build",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Working with test reporting in CodeBuild]<https://docs.aws.amazon.com/codebuild/latest/userguide/test-reporting.html>",
+            "[Buildspec reports section]<https://docs.aws.amazon.com/codebuild/latest/userguide/build-spec-ref.html#reports-buildspec-file>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/codebuild/latest/userguide/test-reporting.html"
     }
 }
