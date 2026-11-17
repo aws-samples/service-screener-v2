@@ -279,3 +279,260 @@ def test_elb_tls_policy_clb(emu, clb):
         elb.set_load_balancer_policies_of_listener(LoadBalancerName=clb, LoadBalancerPort=443, PolicyNames=['ss-new'])
 
     assertFlagFixCycle(emu, 'ec2', 'elbTlsPolicyOutdated', f'ELB Classic::{clb}', misconfigure, fix)
+
+
+# --------------------------------------------------------------------------- #
+# WAFS2027 chunk 2: AMIs, snapshots, instances, launch templates, endpoints
+#
+# Emulator gaps (-> tests/test_stub_ec2.py):
+# - ec2AmiSharedExternally: ModifyImageAttribute is NotImplemented, and registering an
+#   AMI is permanent (DeregisterImage NotImplemented) - so no AMI is registered here.
+# - ec2AmiUntrustedOrStale: an instance's AMI cannot be changed and DeregisterImage /
+#   DisableImage are NotImplemented; the emulator test covers a missing AMI (FAIL) and
+#   an available Amazon AMI (PASS) on two instances, the same-instance cycle is stubbed.
+# - ec2InstanceWithKeyPair: EC2 instances cannot be registered as SSM managed nodes in
+#   the emulator; only the not-managed (INFO) and no-key (PASS) paths run here.
+# --------------------------------------------------------------------------- #
+def _amazonAmi(ec2):
+    return ec2.describe_images(Owners=['amazon'], MaxResults=5)['Images'][0]['ImageId']
+
+
+def _waitState(ec2, iid, state, tries=40):
+    for _ in range(tries):
+        if ec2.describe_instances(InstanceIds=[iid])['Reservations'][0]['Instances'][0]['State']['Name'] == state:
+            return
+        time.sleep(0.5)
+    raise AssertionError(f'{iid} did not reach {state}')
+
+
+def _terminate(ec2, *iids):
+    iids = [i for i in iids if i]
+    if iids:
+        ec2.terminate_instances(InstanceIds=iids)
+        for iid in iids:
+            _waitState(ec2, iid, 'terminated')
+
+
+def test_ec2_allowed_amis_not_enforced(emu):
+    ec2 = emu.client('ec2')
+    original = ec2.get_allowed_images_settings().get('State')
+    try:
+        assertFlagFixCycle(
+            emu, 'ec2', 'ec2AllowedAmisNotEnforced', REGIONAL,
+            misconfigure=lambda: ec2.disable_allowed_images_settings(),
+            fix=lambda: ec2.enable_allowed_images_settings(AllowedImagesSettingsState='enabled'))
+        assert list(runCheck(emu, 'ec2', 'ec2AllowedAmisNotEnforced', REGIONAL).statuses().values()) == [1]
+
+        # audit-mode only identifies non-allowed AMIs -> still flagged
+        ec2.enable_allowed_images_settings(AllowedImagesSettingsState='audit-mode')
+        assert list(runCheck(emu, 'ec2', 'ec2AllowedAmisNotEnforced', REGIONAL).statuses().values()) == [-1]
+    finally:
+        if original in ('enabled', 'audit-mode'):
+            ec2.enable_allowed_images_settings(AllowedImagesSettingsState=original)
+        else:
+            ec2.disable_allowed_images_settings()
+
+
+def test_ebs_snapshot_unencrypted(emu, uid):
+    """A snapshot's encryption cannot be changed in place: the fix is an encrypted
+    copy + deleting the original, so the cycle is asserted across both snapshot IDs."""
+    ec2 = emu.client('ec2')
+    vol = ec2.create_volume(AvailabilityZone='us-east-1a', Size=1, Encrypted=False,
+                            TagSpecifications=[{'ResourceType': 'volume', 'Tags': [{'Key': 'Name', 'Value': f'ss-test-{uid}'}]}])
+    created = []
+    try:
+        snap = ec2.create_snapshot(VolumeId=vol['VolumeId'])['SnapshotId']
+        created.append(snap)
+        before = runCheck(emu, 'ec2', 'ebsSnapshotUnencrypted', snap)
+        assert before.statuses() == {f'EBSSnapshot::{snap}': -1}, (before.results, before.errors[:1])
+
+        # fix: encrypted copy, delete the unencrypted original
+        copy = ec2.copy_snapshot(SourceSnapshotId=snap, SourceRegion='us-east-1', Encrypted=True)['SnapshotId']
+        created.append(copy)
+        ec2.delete_snapshot(SnapshotId=snap)
+        created.remove(snap)
+
+        after = runCheck(emu, 'ec2', 'ebsSnapshotUnencrypted', 'EBSSnapshot::')
+        statuses = after.statuses()
+        assert f'EBSSnapshot::{snap}' not in statuses
+        assert statuses.get(f'EBSSnapshot::{copy}') == 1, (after.results, after.errors[:1])
+    finally:
+        for s in created:
+            ec2.delete_snapshot(SnapshotId=s)
+        ec2.delete_volume(VolumeId=vol['VolumeId'])
+
+
+def test_ec2_ami_untrusted_or_stale(emu):
+    ec2 = emu.client('ec2')
+    stale = good = None
+    try:
+        # AMI that does not exist (deregistered / no longer shared)
+        stale = ec2.run_instances(ImageId='ami-0123456789abcdef0', MinCount=1, MaxCount=1,
+                                  InstanceType='t3.micro')['Instances'][0]['InstanceId']
+        good = ec2.run_instances(ImageId=_amazonAmi(ec2), MinCount=1, MaxCount=1,
+                                 InstanceType='t3.micro')['Instances'][0]['InstanceId']
+        _waitState(ec2, stale, 'running')
+        _waitState(ec2, good, 'running')
+        res = runCheck(emu, 'ec2', 'ec2AmiUntrustedOrStale', 'EC2::i-').statuses()
+        assert res.get(f'EC2::{stale}') == -1, res
+        assert res.get(f'EC2::{good}') == 1, res
+    finally:
+        _terminate(ec2, stale, good)
+
+
+@pytest.fixture
+def publicSubnet(emu):
+    """VPC with a subnet whose explicit route table sends 0.0.0.0/0 and ::/0 to an IGW."""
+    ec2 = emu.client('ec2')
+    vpc = ec2.create_vpc(CidrBlock='10.98.0.0/16')['Vpc']['VpcId']
+    sub = ec2.create_subnet(VpcId=vpc, CidrBlock='10.98.1.0/24', AvailabilityZone='us-east-1a')['Subnet']['SubnetId']
+    igw = ec2.create_internet_gateway()['InternetGateway']['InternetGatewayId']
+    ec2.attach_internet_gateway(InternetGatewayId=igw, VpcId=vpc)
+    rt = ec2.create_route_table(VpcId=vpc)['RouteTable']['RouteTableId']
+    assoc = ec2.associate_route_table(RouteTableId=rt, SubnetId=sub)['AssociationId']
+    ctx = {'vpc': vpc, 'subnet': sub, 'igw': igw, 'rt': rt}
+    try:
+        yield ctx
+    finally:
+        for dest in ({'DestinationCidrBlock': '0.0.0.0/0'}, {'DestinationIpv6CidrBlock': '::/0'}):
+            try:
+                ec2.delete_route(RouteTableId=rt, **dest)
+            except Exception:
+                pass
+        try:
+            ec2.disassociate_route_table(AssociationId=assoc)
+        except Exception:
+            pass
+        ec2.delete_subnet(SubnetId=sub)
+        ec2.delete_route_table(RouteTableId=rt)
+        ec2.detach_internet_gateway(InternetGatewayId=igw, VpcId=vpc)
+        ec2.delete_internet_gateway(InternetGatewayId=igw)
+        ec2.delete_vpc(VpcId=vpc)
+
+
+def test_ec2_instance_in_public_subnet(emu, publicSubnet):
+    ec2 = emu.client('ec2')
+    rt, igw = publicSubnet['rt'], publicSubnet['igw']
+    iid = ec2.run_instances(ImageId=_amazonAmi(ec2), MinCount=1, MaxCount=1, InstanceType='t3.micro',
+                            SubnetId=publicSubnet['subnet'])['Instances'][0]['InstanceId']
+    try:
+        def misconfigure():
+            ec2.create_route(RouteTableId=rt, DestinationCidrBlock='0.0.0.0/0', GatewayId=igw)
+
+        def fix():
+            ec2.delete_route(RouteTableId=rt, DestinationCidrBlock='0.0.0.0/0')
+
+        assertFlagFixCycle(emu, 'ec2', 'ec2InstanceInPublicSubnet', f'EC2::{iid}', misconfigure, fix)
+
+        # an IPv6 default route to the IGW is public too
+        ec2.create_route(RouteTableId=rt, DestinationIpv6CidrBlock='::/0', GatewayId=igw)
+        assert list(runCheck(emu, 'ec2', 'ec2InstanceInPublicSubnet', f'EC2::{iid}').statuses().values()) == [-1]
+    finally:
+        _terminate(ec2, iid)
+
+
+def test_ec2_instance_with_key_pair_not_managed(emu, uid):
+    """Not SSM-managed + key pair -> INFO (the key may be the only access path); no key -> PASS.
+    The SSM-managed FAIL path is in tests/test_stub_ec2.py."""
+    ec2 = emu.client('ec2')
+    kp = f'ss-test-{uid}'
+    ec2.create_key_pair(KeyName=kp)
+    withKey = noKey = None
+    try:
+        withKey = ec2.run_instances(ImageId=_amazonAmi(ec2), MinCount=1, MaxCount=1, InstanceType='t3.micro',
+                                    KeyName=kp)['Instances'][0]['InstanceId']
+        noKey = ec2.run_instances(ImageId=_amazonAmi(ec2), MinCount=1, MaxCount=1,
+                                  InstanceType='t3.micro')['Instances'][0]['InstanceId']
+        _waitState(ec2, withKey, 'running')
+        _waitState(ec2, noKey, 'running')
+        res = runCheck(emu, 'ec2', 'ec2InstanceWithKeyPair', 'SSM::').statuses()
+        assert res.get(f'SSM::{withKey}') == 0, res
+        assert res.get(f'SSM::{noKey}') == 1, res
+    finally:
+        _terminate(ec2, withKey, noKey)
+        ec2.delete_key_pair(KeyName=kp)
+
+
+# AWS documentation example credentials (not real)
+_SECRET_USER_DATA = ('#!/bin/bash\n'
+                     'export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n'
+                     'export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY\n')
+_CLEAN_USER_DATA = '#!/bin/bash\nexport DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id app --query SecretString --output text)\n'
+
+
+def test_ec2_user_data_secrets_instance(emu):
+    ec2 = emu.client('ec2')
+    iid = None
+    try:
+        def misconfigure():
+            nonlocal iid
+            iid = ec2.run_instances(ImageId=_amazonAmi(ec2), MinCount=1, MaxCount=1, InstanceType='t3.micro',
+                                    UserData=_SECRET_USER_DATA)['Instances'][0]['InstanceId']
+
+        def fix():
+            ec2.stop_instances(InstanceIds=[iid])
+            _waitState(ec2, iid, 'stopped')
+            ec2.modify_instance_attribute(InstanceId=iid, UserData={'Value': _CLEAN_USER_DATA.encode()})
+
+        misconfigure()
+        before = runCheck(emu, 'ec2', 'ec2UserDataSecrets', f'EC2::{iid}')
+        assert before.statuses() == {f'EC2::{iid}': -1}, (before.results, before.errors[:1])
+        msg = before.results[f'EC2::{iid}']['ec2UserDataSecrets'][1]
+        assert 'AKIAIOSFODNN7EXAMPLE' not in msg and 'wJalrXUtnFEMI' not in msg  # values masked
+        fix()
+        after = runCheck(emu, 'ec2', 'ec2UserDataSecrets', f'EC2::{iid}')
+        assert after.statuses() == {f'EC2::{iid}': 1}, after.results
+    finally:
+        _terminate(ec2, iid)
+
+
+def test_ec2_user_data_secrets_launch_template(emu, uid):
+    import base64
+    ec2 = emu.client('ec2')
+    name = f'ss-test-lt-{uid}'
+    lt = ec2.create_launch_template(LaunchTemplateName=name, LaunchTemplateData={
+        'ImageId': _amazonAmi(ec2), 'UserData': base64.b64encode(b'#!/bin/bash\necho hi\n').decode()})['LaunchTemplate']
+    ltId = lt['LaunchTemplateId']
+    try:
+        def misconfigure():
+            ec2.create_launch_template_version(LaunchTemplateId=ltId, SourceVersion='1', LaunchTemplateData={
+                'UserData': base64.b64encode(_SECRET_USER_DATA.encode()).decode()})
+
+        def fix():
+            # secrets stay readable in old versions: delete the version, not just the default pointer
+            ec2.delete_launch_template_versions(LaunchTemplateId=ltId, Versions=['2'])
+
+        assertFlagFixCycle(emu, 'ec2', 'ec2UserDataSecrets', f'LaunchTemplate::{ltId}', misconfigure, fix)
+    finally:
+        ec2.delete_launch_template(LaunchTemplateId=ltId)
+
+
+def test_vpc_endpoint_policy_full_access(emu):
+    ec2 = emu.client('ec2')
+    vpc = ec2.create_vpc(CidrBlock='10.97.0.0/16')['Vpc']['VpcId']
+    ep = {}
+    try:
+        def misconfigure():
+            # no PolicyDocument -> default full-access policy
+            ep.update(ec2.create_vpc_endpoint(VpcId=vpc, ServiceName='com.amazonaws.us-east-1.s3',
+                                              VpcEndpointType='Gateway')['VpcEndpoint'])
+
+        def fix():
+            ec2.modify_vpc_endpoint(VpcEndpointId=ep['VpcEndpointId'], PolicyDocument=json.dumps({
+                'Version': '2012-10-17',
+                'Statement': [{'Effect': 'Allow', 'Principal': '*', 'Action': '*', 'Resource': '*',
+                               'Condition': {'StringEquals': {'aws:PrincipalOrgID': 'o-exampleorgid',
+                                                              'aws:ResourceOrgID': 'o-exampleorgid'}}}]}))
+
+        # the endpoint ID only exists after misconfigure(), so the cycle is spelled out
+        misconfigure()
+        key = f"VPCEndpoint::{ep['VpcEndpointId']}"
+        before = runCheck(emu, 'ec2', 'vpcEndpointPolicyFullAccess', key).statuses()
+        assert before == {key: -1}, before
+        fix()
+        after = runCheck(emu, 'ec2', 'vpcEndpointPolicyFullAccess', key).statuses()
+        assert after == {key: 1}, after
+    finally:
+        if ep:
+            ec2.delete_vpc_endpoints(VpcEndpointIds=[ep['VpcEndpointId']])
+        ec2.delete_vpc(VpcId=vpc)

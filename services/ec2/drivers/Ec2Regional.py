@@ -207,6 +207,29 @@ class Ec2Regional(Evaluator):
         else:
             self.results[key] = [0, f"Unable to evaluate (unknown state: {state})"]
 
+    def _checkEc2AllowedAmisNotEnforced(self):
+        """Allowed AMIs restricts which AMIs can be discovered and launched. Only
+        'enabled' enforces the image criteria; 'audit-mode' only marks AMIs."""
+        key = 'ec2AllowedAmisNotEnforced'
+        try:
+            resp = self.ec2Client.get_allowed_images_settings()
+        except Exception as e:
+            self.results[key] = [0, f"Unable to evaluate ({self._errCode(e)})"]
+            return
+
+        state = resp.get('State')
+        managedBy = resp.get('ManagedBy')
+        suffix = f" (managed by {managedBy})" if managedBy else ''
+        criteria = len(resp.get('ImageCriteria') or [])
+        if state == 'enabled':
+            self.results[key] = [1, f"enabled with {criteria} image criteria{suffix}"]
+        elif state == 'audit-mode':
+            self.results[key] = [-1, f"audit-mode: non-allowed AMIs are only identified, not blocked{suffix}"]
+        elif state == 'disabled':
+            self.results[key] = [-1, f"disabled{suffix}"]
+        else:
+            self.results[key] = [0, f"Unable to evaluate (unknown state: {state})"]
+
     def _checkEc2ImdsDefaultNotRequired(self):
         """Account-level IMDS defaults for new launches should require IMDSv2
         (HttpTokens=required) with a hop limit no greater than 2."""

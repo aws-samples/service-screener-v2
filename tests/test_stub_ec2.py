@@ -10,6 +10,17 @@ Why not the emulator:
   deleted, so locking would leave permanent emulator state.
 - elbTlsPolicyOutdated (CLB policy with expanded Protocol-* attributes, unresolvable
   policy): exercises the real-AWS response shape that the emulator does not return.
+- ec2AmiSharedExternally: ModifyImageAttribute is NotImplemented (an AMI cannot be shared)
+  and DeregisterImage is NotImplemented (a registered test AMI could never be removed).
+- ec2AmiUntrustedOrStale: an instance's source AMI cannot be changed, and DeregisterImage /
+  DisableImage are NotImplemented and past deprecation times are rejected, so the
+  same-instance flag -> fix cycle (deprecated -> current, third-party -> verified) is stubbed.
+- ec2InstanceWithKeyPair: an EC2 instance cannot become an SSM managed node in the emulator,
+  so the FAIL path (SSM-managed, PingStatus Online, KeyName set) is stubbed.
+- ec2InstanceInPublicSubnet (RDS / ElastiCache / ECS interfaces, shared-VPC subnets): those
+  managed-service ENIs and RAM-shared subnets cannot be created in the emulator.
+- vpcEndpointPolicyFullAccess (services without endpoint-policy support, unknown service
+  names, perimeter Deny statements): response shapes the emulator does not produce.
 
 Every client is a real botocore client (real API shapes / parameter validation) wrapped by
 botocore.stub.Stubber, pointed at an unroutable loopback endpoint with dummy credentials,
@@ -225,6 +236,7 @@ def test_recycle_bin_access_denied_not_pass():
     ('get_image_block_public_access_state', '_checkEc2ImageBlockPublicAccessOff', 'ec2ImageBlockPublicAccessOff'),
     ('get_instance_metadata_defaults', '_checkEc2ImdsDefaultNotRequired', 'ec2ImdsDefaultNotRequired'),
     ('get_snapshot_block_public_access_state', '_checkEc2SnapshotBlockPublicAccessOff', 'ec2SnapshotBlockPublicAccessOff'),
+    ('get_allowed_images_settings', '_checkEc2AllowedAmisNotEnforced', 'ec2AllowedAmisNotEnforced'),
 ])
 def test_regional_access_denied_not_pass(op, method, key):
     ec2 = _client('ec2')
@@ -316,3 +328,379 @@ def test_elbv2_attributes_access_denied_not_pass():
         st.add_client_error('describe_load_balancer_attributes', service_error_code='AccessDenied', http_status_code=403)
         res = _run(Ec2ElbCommon(lb, [], elbv2, None), '_checkElbAccessLogsDisabled')['elbAccessLogsDisabled']
     assert res == [0, 'Unable to evaluate (AccessDenied)']
+
+
+# --------------------------------------------------------------------------- #
+# ec2AmiSharedExternally
+# --------------------------------------------------------------------------- #
+OWN_ORG = 'o-abc123defg'   # matches _orgContext()
+
+
+def _amiSharingResult(perms, mode):
+    ec2 = _client('ec2')
+    image = _image(False)
+    with Stubber(ec2) as st:
+        st.add_response('describe_image_attribute',
+                        {'ImageId': image['ImageId'], 'LaunchPermissions': perms},
+                        {'ImageId': image['ImageId'], 'Attribute': 'launchPermission'})
+        permsById = Ec2.getImageLaunchPermissions(types.SimpleNamespace(ec2Client=ec2), [image])
+        st.assert_no_pending_responses()
+    return _run(Ec2Ami(image, permsById[image['ImageId']], SELF, _orgContext(mode)),
+                '_checkEc2AmiSharedExternally')['ec2AmiSharedExternally']
+
+
+def test_ami_shared_outside_org_flag_fix_not_in_org():
+    assert _amiSharingResult([{'UserId': OUTSIDER}], 'none')[0] == -1    # misconfigured
+    assert _amiSharingResult([], 'none')[0] == 1                         # fixed: launch permission removed
+
+
+def test_ami_shared_outside_org_flag_fix_mgmt_account():
+    flagged = _amiSharingResult([{'UserId': ORG_MEMBER}, {'UserId': OUTSIDER}], 'mgmt')
+    assert flagged[0] == -1 and OUTSIDER in flagged[1] and ORG_MEMBER not in flagged[1]
+    assert _amiSharingResult([{'UserId': ORG_MEMBER}], 'mgmt')[0] == 1
+
+
+def test_ami_shared_with_own_org_or_ou_passes_foreign_org_fails():
+    own = [{'OrganizationArn': f'arn:aws:organizations::{SELF}:organization/{OWN_ORG}'},
+           {'OrganizationalUnitArn': f'arn:aws:organizations::{SELF}:ou/{OWN_ORG}/ou-ab12-cdef3456'}]
+    assert _amiSharingResult(own, 'member')[0] == 1
+    foreign = [{'OrganizationArn': f'arn:aws:organizations::{OUTSIDER}:organization/o-zzzzzzzzzz'}]
+    res = _amiSharingResult(foreign, 'member')
+    assert res[0] == -1 and 'o-zzzzzzzzzz' in res[1]
+
+
+def test_ami_shared_member_account_not_evaluable():
+    res = _amiSharingResult([{'UserId': OUTSIDER}], 'member')
+    assert res[0] == 0 and res[1].startswith('Not evaluable from member account')
+
+
+def test_ami_public_only_left_to_ec2AmiPublic():
+    assert _amiSharingResult([{'Group': 'all'}], 'none')[0] == 0
+
+
+def test_ami_attribute_error_not_pass():
+    ec2 = _client('ec2')
+    image = _image(False)
+    with Stubber(ec2) as st:
+        st.add_client_error('describe_image_attribute', service_error_code='UnauthorizedOperation', http_status_code=403)
+        permsById = Ec2.getImageLaunchPermissions(types.SimpleNamespace(ec2Client=ec2), [image])
+    res = _run(Ec2Ami(image, permsById[image['ImageId']], SELF, {'inOrg': False}), '_checkEc2AmiSharedExternally')
+    assert res['ec2AmiSharedExternally'] == [0, 'Unable to evaluate (UnauthorizedOperation)']
+
+
+def test_ami_sharing_not_fetched_records_nothing():
+    assert _run(Ec2Ami(_image(False)), '_checkEc2AmiSharedExternally') == {}
+
+
+# --------------------------------------------------------------------------- #
+# ebsSnapshotUnencrypted (main flag/fix cycle runs on the emulator)
+# --------------------------------------------------------------------------- #
+def test_snapshot_unencrypted_labels_ami_and_missing_field_not_pass():
+    res = _run(Ec2EbsSnapshotSharing(dict(SNAP, Encrypted=False), None, SELF, None, ['ami-1']),
+               '_checkEbsSnapshotUnencrypted')['ebsSnapshotUnencrypted']
+    assert res[0] == -1 and 'ami-1' in res[1]
+    assert _run(Ec2EbsSnapshotSharing(dict(SNAP, Encrypted=True), None, SELF, None),
+                '_checkEbsSnapshotUnencrypted')['ebsSnapshotUnencrypted'][0] == 1
+    assert _run(Ec2EbsSnapshotSharing(SNAP, None, SELF, None),
+                '_checkEbsSnapshotUnencrypted')['ebsSnapshotUnencrypted'][0] == 0
+    # sharing permissions not fetched -> sharing check records nothing
+    assert _run(Ec2EbsSnapshotSharing(SNAP, None, SELF, None), '_checkEbsSnapshotSharedExternally') == {}
+
+
+# --------------------------------------------------------------------------- #
+# ec2AmiUntrustedOrStale
+# --------------------------------------------------------------------------- #
+import datetime as _dt  # noqa: E402
+from services.ec2.drivers.Ec2Instance import Ec2Instance  # noqa: E402
+
+
+def _instance(imageId, state='running', **extra):
+    d = {'InstanceId': 'i-0123456789abcdef0', 'ImageId': imageId, 'InstanceType': 't3.micro',
+         'State': {'Name': state}, 'LaunchTime': _dt.datetime.now(_dt.timezone.utc)}
+    d.update(extra)
+    return d
+
+
+def _staleResult(imageId, imageResponse=None, error=None):
+    for k in ('ec2::image::' + imageId, 'ec2::imagestatus::' + imageId):
+        Config.set(k, '__unset__')
+    Config.set('stsInfo', {'Account': SELF})
+    ec2 = _client('ec2')
+    with Stubber(ec2) as st:
+        params = {'ImageIds': [imageId], 'IncludeDeprecated': True, 'IncludeDisabled': True}
+        if error:
+            st.add_client_error('describe_images', service_error_code=error, http_status_code=400, expected_params=params)
+        else:
+            st.add_response('describe_images', {'Images': imageResponse}, params)
+        inst = Ec2Instance(_instance(imageId), ec2, None)
+        st.assert_no_pending_responses()
+    for k in ('ec2::image::' + imageId, 'ec2::imagestatus::' + imageId):
+        Config.set(k, '__unset__')
+    return _run(inst, '_checkEc2AmiUntrustedOrStale').get('ec2AmiUntrustedOrStale')
+
+
+def _img(imageId, **kw):
+    d = {'ImageId': imageId, 'OwnerId': SELF, 'Public': False, 'State': 'available'}
+    d.update(kw)
+    return d
+
+
+def test_ami_stale_deprecated_flag_fix():
+    past = (_dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=10)).strftime('%Y-%m-%dT%H:%M:%S.000Z')
+    future = (_dt.datetime.now(_dt.timezone.utc) + _dt.timedelta(days=30)).strftime('%Y-%m-%dT%H:%M:%S.000Z')
+    assert _staleResult('ami-0aaa', [_img('ami-0aaa', DeprecationTime=past)])[0] == -1     # deprecated
+    assert _staleResult('ami-0aaa', [_img('ami-0aaa', DeprecationTime=future)])[0] == 1    # fixed: deprecation cancelled / pushed out
+    assert _staleResult('ami-0aaa', [_img('ami-0aaa')])[0] == 1
+
+
+def test_ami_untrusted_third_party_flag_fix():
+    res = _staleResult('ami-0bbb', [_img('ami-0bbb', OwnerId=OUTSIDER, Public=True)])
+    assert res[0] == -1 and OUTSIDER in res[1]
+    # fixed: rebuilt from an Amazon / verified-provider AMI (ImageOwnerAlias present)
+    assert _staleResult('ami-0bbb', [_img('ami-0bbb', OwnerId='137112412989', Public=True, ImageOwnerAlias='amazon')])[0] == 1
+    # privately shared (not public) AMIs from another account are not "unverified public" AMIs
+    assert _staleResult('ami-0bbb', [_img('ami-0bbb', OwnerId=ORG_MEMBER, Public=False)])[0] == 1
+
+
+def test_ami_deregistered_or_disabled_flagged():
+    assert _staleResult('ami-0ccc', [])[0] == -1                                    # empty result
+    assert _staleResult('ami-0ccc', error='InvalidAMIID.NotFound')[0] == -1         # NotFound error
+    assert _staleResult('ami-0ccc', [_img('ami-0ccc', State='disabled')])[0] == -1
+
+
+def test_ami_lookup_denied_not_pass():
+    assert _staleResult('ami-0ddd', error='UnauthorizedOperation') == [0, 'Unable to evaluate (UnauthorizedOperation)']
+
+
+def test_ami_stale_only_running_instances():
+    Config.set('ec2::image::ami-0eee', _img('ami-0eee', State='disabled'))
+    Config.set('ec2::imagestatus::ami-0eee', 'found')
+    inst = Ec2Instance(_instance('ami-0eee', state='stopped'), _client('ec2'), None)
+    Config.set('ec2::image::ami-0eee', '__unset__')
+    assert _run(inst, '_checkEc2AmiUntrustedOrStale') == {}
+
+
+# --------------------------------------------------------------------------- #
+# ec2InstanceWithKeyPair
+# --------------------------------------------------------------------------- #
+from services.ec2.drivers.Ec2SSM import Ec2SSM  # noqa: E402
+
+
+def _keyPairResult(instance, ssmInfo=None, ssmError=None):
+    ssm = _client('ssm')
+    ns = types.SimpleNamespace(ssmClient=ssm)
+    with Stubber(ssm) as st:
+        if ssmError:
+            st.add_client_error('describe_instance_information', service_error_code=ssmError, http_status_code=400)
+        else:
+            st.add_response('describe_instance_information', {'InstanceInformationList': ssmInfo or []}, {'MaxResults': 50})
+        managed = Ec2.getSSMManagedInstances(ns)
+        st.assert_no_pending_responses()
+    obj = Ec2SSM(instance['InstanceId'], managed, instance, ns.ssmError, ns.ssmPingStatus)
+    return _run(obj, '_checkEc2InstanceWithKeyPair').get('ec2InstanceWithKeyPair')
+
+
+def test_instance_with_key_pair_flag_fix():
+    online = [{'InstanceId': 'i-0123456789abcdef0', 'PingStatus': 'Online'}]
+    res = _keyPairResult(_instance('ami-1', KeyName='legacy-key'), online)
+    assert res[0] == -1 and 'legacy-key' in res[1]                         # SSM-managed + key pair
+    assert _keyPairResult(_instance('ami-1'), online)[0] == 1               # fixed: relaunched without a key pair
+
+
+def test_instance_with_key_pair_unmanaged_or_offline_info():
+    assert _keyPairResult(_instance('ami-1', KeyName='k'), [])[0] == 0
+    lost = [{'InstanceId': 'i-0123456789abcdef0', 'PingStatus': 'ConnectionLost'}]
+    assert _keyPairResult(_instance('ami-1', KeyName='k'), lost)[0] == 0
+
+
+def test_instance_with_key_pair_ssm_denied_not_pass():
+    res = _keyPairResult(_instance('ami-1', KeyName='k'), ssmError='AccessDeniedException')
+    assert res[0] == 0 and 'Unable to evaluate (AccessDeniedException)' in res[1]
+    # EC2SSMNotManaged keeps skipping when the lookup failed
+    assert _run(Ec2SSM('i-1', None), '_checkSSMManaged') == {}
+
+
+# --------------------------------------------------------------------------- #
+# ec2InstanceInPublicSubnet (managed-service ENIs, main route table, shared VPC)
+# --------------------------------------------------------------------------- #
+from services.ec2.drivers.Ec2NetworkInterface import Ec2NetworkInterface, classifyEni, getSubnetRouting  # noqa: E402
+
+_ROUTING_KEY = 'ec2::subnetRouting::us-east-1'
+
+
+def _routing(routeTables, subnets, error=None):
+    Config.set(_ROUTING_KEY, None)
+    ec2 = _client('ec2')
+    with Stubber(ec2) as st:
+        if error:
+            st.add_client_error('describe_route_tables', service_error_code=error, http_status_code=403)
+        else:
+            st.add_response('describe_route_tables', {'RouteTables': routeTables})
+            st.add_response('describe_subnets', {'Subnets': subnets})
+        ctx = getSubnetRouting(ec2)
+        st.assert_no_pending_responses()
+    Config.set(_ROUTING_KEY, None)
+    return ctx
+
+
+def _rt(rtId, vpc, routes, main=False, subnet=None):
+    assoc = {'RouteTableAssociationId': 'rtbassoc-' + rtId[4:], 'RouteTableId': rtId, 'Main': main,
+             'AssociationState': {'State': 'associated'}}
+    if subnet:
+        assoc['SubnetId'] = subnet
+    return {'RouteTableId': rtId, 'VpcId': vpc, 'Associations': [assoc],
+            'Routes': [{'DestinationCidrBlock': '10.0.0.0/16', 'GatewayId': 'local', 'State': 'active'}] + routes}
+
+
+IGW_ROUTE = {'DestinationCidrBlock': '0.0.0.0/0', 'GatewayId': 'igw-0123', 'State': 'active'}
+NAT_ROUTE = {'DestinationCidrBlock': '0.0.0.0/0', 'NatGatewayId': 'nat-0123', 'State': 'active'}
+RDS_ENI = {'NetworkInterfaceId': 'eni-0rds', 'SubnetId': 'subnet-a', 'VpcId': 'vpc-1',
+           'Description': 'RDSNetworkInterface', 'RequesterId': 'amazon-rds', 'InterfaceType': 'interface'}
+
+
+def _eniResult(eni, routing):
+    return _run(Ec2NetworkInterface(eni, classifyEni(eni), routing),
+                '_checkEc2InstanceInPublicSubnet')['ec2InstanceInPublicSubnet']
+
+
+def test_rds_eni_in_public_subnet_flag_fix():
+    subnets = [{'SubnetId': 'subnet-a', 'VpcId': 'vpc-1'}]
+    public = _routing([_rt('rtb-main', 'vpc-1', [], main=True), _rt('rtb-pub', 'vpc-1', [IGW_ROUTE], subnet='subnet-a')], subnets)
+    res = _eniResult(RDS_ENI, public)
+    assert res[0] == -1 and 'RDS' in res[1] and 'igw-0123' in res[1]
+    # fixed: default route via a NAT gateway instead of the IGW
+    private = _routing([_rt('rtb-main', 'vpc-1', [], main=True), _rt('rtb-pub', 'vpc-1', [NAT_ROUTE], subnet='subnet-a')], subnets)
+    assert _eniResult(RDS_ENI, private)[0] == 1
+
+
+def test_public_subnet_via_main_route_table_and_ipv6():
+    subnets = [{'SubnetId': 'subnet-a', 'VpcId': 'vpc-1'}]
+    v6 = {'DestinationIpv6CidrBlock': '::/0', 'GatewayId': 'igw-0123', 'State': 'active'}
+    assert _eniResult(RDS_ENI, _routing([_rt('rtb-main', 'vpc-1', [v6], main=True)], subnets))[0] == -1
+    blackhole = dict(IGW_ROUTE, State='blackhole')
+    assert _eniResult(RDS_ENI, _routing([_rt('rtb-main', 'vpc-1', [blackhole], main=True)], subnets))[0] == 1
+
+
+def test_public_subnet_shared_vpc_or_denied_not_pass():
+    # subnet visible (RAM share) but its route table belongs to the owner account
+    res = _eniResult(RDS_ENI, _routing([], [{'SubnetId': 'subnet-a', 'VpcId': 'vpc-1'}]))
+    assert res[0] == 0 and 'route table not visible' in res[1]
+    res = _eniResult(RDS_ENI, _routing([], [], error='UnauthorizedOperation'))
+    assert res[0] == 0 and 'Unable to evaluate (UnauthorizedOperation)' in res[1]
+
+
+def test_classify_eni():
+    assert classifyEni(RDS_ENI) == 'RDS'
+    assert classifyEni({'Description': 'ElastiCache my-redis-0001-001', 'RequesterId': 'amazon-elasticache'}) == 'ElastiCache'
+    assert classifyEni({'Description': 'arn:aws:ecs:us-east-1:111111111111:attachment/abc'}) == 'ECS'
+    assert classifyEni({'Description': 'ELB app/my-alb/123', 'RequesterId': 'amazon-elb'}) is None
+    assert classifyEni({'Description': 'Interface for NAT Gateway nat-1'}) is None
+
+
+# --------------------------------------------------------------------------- #
+# ec2UserDataSecrets - pattern accuracy (instance / launch-template cycles run on the emulator)
+# --------------------------------------------------------------------------- #
+import base64 as _b64  # noqa: E402
+import gzip as _gzip  # noqa: E402
+from services.ec2.drivers.Ec2UserDataScan import decodeUserData, findSecrets  # noqa: E402
+
+
+@pytest.mark.parametrize('text,expected', [
+    ('export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE', ['AWS access key ID']),
+    ('aws_secret_access_key = wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY', ['AWS secret access key']),
+    ('"SecretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"', ['AWS secret access key']),
+    ('-----BEGIN OPENSSH PRIVATE KEY-----\nabc', ['private key (PEM)']),
+    ('-----BEGIN RSA PRIVATE KEY-----', ['private key (PEM)']),
+    ('MYSQL_ROOT_PASSWORD=Sup3rS3cret!', ['password literal']),
+    ('password: "hunter22"', ['password literal']),
+    # no match: references, placeholders, unrelated words
+    ('export AWS_SECRET_ACCESS_KEY=$(aws secretsmanager get-secret-value --secret-id x)', []),
+    ('DB_PASSWORD=${DB_PASSWORD}', []),
+    ('password={{resolve:secretsmanager:db}}', []),
+    ('password=<changeme>', []),
+    ('docker login --password-stdin', []),
+    ('PWD=/home/ec2-user', []),
+    ('-----BEGIN PUBLIC KEY-----', []),
+    ('ssh-rsa AAAAB3NzaC1yc2E user@host', []),
+])
+def test_user_data_patterns(text, expected):
+    assert findSecrets(text) == expected
+
+
+def test_user_data_decoding_gzip_and_masking():
+    raw = b'#!/bin/bash\nexport AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE\n'
+    assert findSecrets(decodeUserData(_b64.b64encode(_gzip.compress(raw)).decode())) == ['AWS access key ID']
+    assert decodeUserData(None) == ''
+
+
+def test_launch_template_user_data_denied_not_pass():
+    from services.ec2.drivers.Ec2LaunchTemplate import Ec2LaunchTemplate
+    ec2 = _client('ec2')
+    with Stubber(ec2) as st:
+        st.add_client_error('describe_launch_template_versions', service_error_code='UnauthorizedOperation', http_status_code=403)
+        res = _run(Ec2LaunchTemplate({'LaunchTemplateId': 'lt-0123'}, ec2), '_checkEc2UserDataSecrets')
+    assert res['ec2UserDataSecrets'] == [0, 'Unable to evaluate (UnauthorizedOperation)']
+
+
+# --------------------------------------------------------------------------- #
+# vpcEndpointPolicyFullAccess
+# --------------------------------------------------------------------------- #
+import json as _json  # noqa: E402
+from services.ec2.drivers.Ec2VpcEndpoint import Ec2VpcEndpoint, evaluateEndpointPolicy  # noqa: E402
+
+FULL = {'Effect': 'Allow', 'Principal': '*', 'Action': '*', 'Resource': '*'}
+
+
+def _pol(*stmts):
+    return _json.dumps({'Version': '2012-10-17', 'Statement': list(stmts)})
+
+
+@pytest.mark.parametrize('policy,status', [
+    (_pol(FULL), -1),
+    (_pol(dict(FULL, Principal={'AWS': '*'})), -1),
+    (_pol(dict(FULL, Action=['*'], Resource=['*'])), -1),
+    # restricted
+    (_pol(dict(FULL, Condition={'StringEquals': {'aws:PrincipalOrgID': 'o-abc123defg'}})), 1),
+    (_pol(dict(FULL, Condition={'StringEquals': {'aws:ResourceOrgID': 'o-abc123defg'}})), 1),
+    (_pol(dict(FULL, Condition={'StringEquals': {'aws:PrincipalAccount': ['111111111111']}})), 1),
+    (_pol(FULL, {'Effect': 'Deny', 'Principal': '*', 'Action': '*', 'Resource': '*',
+                 'Condition': {'StringNotEquals': {'aws:PrincipalOrgID': 'o-abc123defg'}}}), 1),
+    (_pol(dict(FULL, Action='s3:GetObject', Resource='arn:aws:s3:::bucket/*')), 1),
+    # not restricting: wildcard value, unrelated key, narrow Deny
+    (_pol(dict(FULL, Condition={'StringLike': {'aws:PrincipalOrgID': '*'}})), -1),
+    (_pol(dict(FULL, Condition={'StringEquals': {'aws:SourceVpc': 'vpc-1'}})), -1),
+    (_pol(FULL, {'Effect': 'Deny', 'Principal': '*', 'Action': 's3:DeleteObject', 'Resource': '*',
+                 'Condition': {'StringNotEquals': {'aws:PrincipalOrgID': 'o-abc123defg'}}}), -1),
+    (None, 0),
+])
+def test_endpoint_policy_evaluation(policy, status):
+    assert evaluateEndpointPolicy(policy)[0] == status
+
+
+def _endpointResult(policy, supported=True, epType='Gateway', state='available'):
+    ep = {'VpcEndpointId': 'vpce-0123', 'VpcEndpointType': epType, 'ServiceName': 'com.amazonaws.us-east-1.s3',
+          'State': state, 'PolicyDocument': policy}
+    return _run(Ec2VpcEndpoint(ep, supported), '_checkVpcEndpointPolicyFullAccess').get('vpcEndpointPolicyFullAccess')
+
+
+def test_endpoint_policy_flag_fix_and_not_supported():
+    assert _endpointResult(_pol(FULL))[0] == -1
+    assert _endpointResult(_pol(dict(FULL, Condition={'StringEquals': {'aws:PrincipalOrgID': 'o-abc123defg'}})))[0] == 1
+    assert _endpointResult(_pol(FULL), supported=False)[0] == 0          # service has no endpoint policies
+    assert _endpointResult(_pol(FULL), supported=None)[0] == 0           # support unknown -> not evaluable
+    assert _endpointResult(None, epType='GatewayLoadBalancer')[0] == 0
+    assert _endpointResult(_pol(FULL), state='deleted') is None
+
+
+def test_endpoint_policy_support_lookup_falls_back_per_service():
+    ec2 = _client('ec2')
+    good, bad = 'com.amazonaws.us-east-1.s3', 'com.amazonaws.vpce.us-east-1.vpce-svc-gone'
+    with Stubber(ec2) as st:
+        st.add_client_error('describe_vpc_endpoint_services', service_error_code='InvalidServiceName', http_status_code=400)
+        st.add_response('describe_vpc_endpoint_services',
+                        {'ServiceDetails': [{'ServiceName': good, 'VpcEndpointPolicySupported': True}]},
+                        {'ServiceNames': [good]})
+        st.add_client_error('describe_vpc_endpoint_services', service_error_code='InvalidServiceName', http_status_code=400)
+        support, err = Ec2.getEndpointPolicySupport(types.SimpleNamespace(ec2Client=ec2), [good, bad])
+        st.assert_no_pending_responses()
+    assert support == {good: True} and err == 'InvalidServiceName'

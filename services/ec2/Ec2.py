@@ -31,6 +31,9 @@ from services.ec2.drivers.Ec2KeyPair import Ec2KeyPair
 from services.ec2.drivers.Ec2SSM import Ec2SSM
 from services.ec2.drivers.Ec2Ami import Ec2Ami
 from services.ec2.drivers.Ec2EbsSnapshotSharing import Ec2EbsSnapshotSharing
+from services.ec2.drivers.Ec2LaunchTemplate import Ec2LaunchTemplate
+from services.ec2.drivers.Ec2VpcEndpoint import Ec2VpcEndpoint
+from services.ec2.drivers.Ec2NetworkInterface import Ec2NetworkInterface, classifyEni, getSubnetRouting
 
 import concurrent.futures as cf
 
@@ -404,12 +407,16 @@ class Ec2(Service):
         instance as unmanaged (false positives).
         """
         managedSet = set()
+        pingStatus = {}
+        self.ssmError = None
+        self.ssmPingStatus = pingStatus
         try:
             # MaxResults=50 is the API maximum — request full pages to
             # minimize round-trips for large fleets.
             results = self.ssmClient.describe_instance_information(MaxResults=50)
             for info in results.get('InstanceInformationList', []):
                 managedSet.add(info['InstanceId'])
+                pingStatus[info['InstanceId']] = info.get('PingStatus')
             
             while results.get('NextToken'):
                 results = self.ssmClient.describe_instance_information(
@@ -418,10 +425,13 @@ class Ec2(Service):
                 )
                 for info in results.get('InstanceInformationList', []):
                     managedSet.add(info['InstanceId'])
+                    pingStatus[info['InstanceId']] = info.get('PingStatus')
         except botocore.exceptions.ClientError as e:
+            self.ssmError = e.response['Error']['Code']
             _warn("Unable to retrieve SSM managed instances ({}); skipping SSM check to avoid false positives.".format(e.response['Error']['Code']))
             return None
         except Exception as e:
+            self.ssmError = type(e).__name__
             _warn("Unable to retrieve SSM managed instances ({}); skipping SSM check to avoid false positives.".format(e))
             return None
         return managedSet
@@ -453,10 +463,11 @@ class Ec2(Service):
         if cached is not None:
             return cached
 
-        ctx = {'inOrg': None, 'accounts': None, 'error': None}
+        ctx = {'inOrg': None, 'accounts': None, 'error': None, 'orgId': None}
         try:
-            self.orgClient.describe_organization()
+            org = self.orgClient.describe_organization()
             ctx['inOrg'] = True
+            ctx['orgId'] = (org.get('Organization') or {}).get('Id')
         except botocore.exceptions.ClientError as e:
             code = e.response['Error']['Code']
             if code == 'AWSOrganizationsNotInUseException':
@@ -482,10 +493,8 @@ class Ec2(Service):
         Config.set(cacheKey, ctx)
         return ctx
 
-    def getSnapshotSharing(self):
-        """[(snapshot, {'perms': [...]} | {'error': code})] for every self-owned
-        snapshot. describe_snapshot_attribute is one call per snapshot, so the
-        calls are made concurrently (botocore clients are thread-safe)."""
+    def getSelfSnapshots(self):
+        """Self-owned EBS snapshots (paginated; tag filters applied)."""
         kwargs = {'OwnerIds': ['self']}
         if self.tags:
             kwargs['Filters'] = self.tags
@@ -493,6 +502,14 @@ class Ec2(Service):
         paginator = self.ec2Client.get_paginator('describe_snapshots')
         for page in paginator.paginate(**kwargs):
             snapshots.extend(page.get('Snapshots', []))
+        return snapshots
+
+    def getSnapshotSharing(self, snapshots=None):
+        """[(snapshot, {'perms': [...]} | {'error': code})] for every self-owned
+        snapshot. describe_snapshot_attribute is one call per snapshot, so the
+        calls are made concurrently (botocore clients are thread-safe)."""
+        if snapshots is None:
+            snapshots = Ec2.getSelfSnapshots(self)
 
         def fetch(snap):
             try:
@@ -511,6 +528,85 @@ class Ec2(Service):
         with cf.ThreadPoolExecutor(max_workers=8) as executor:
             perms = list(executor.map(fetch, snapshots))
         return list(zip(snapshots, perms))
+
+    def getImageLaunchPermissions(self, images):
+        """{imageId: {'perms': [...]} | {'error': code}} - describe_image_attribute
+        (launchPermission) is one call per AMI, so calls are made concurrently."""
+        def fetch(image):
+            try:
+                resp = self.ec2Client.describe_image_attribute(
+                    ImageId = image['ImageId'],
+                    Attribute = 'launchPermission'
+                )
+                return {'perms': resp.get('LaunchPermissions', [])}
+            except botocore.exceptions.ClientError as e:
+                return {'error': e.response['Error']['Code']}
+            except Exception as e:
+                return {'error': type(e).__name__}
+
+        if not images:
+            return {}
+        with cf.ThreadPoolExecutor(max_workers=8) as executor:
+            perms = list(executor.map(fetch, images))
+        return {img['ImageId']: p for img, p in zip(images, perms)}
+
+    def getLaunchTemplates(self):
+        kwargs = {}
+        if self.tags:
+            kwargs['Filters'] = self.tags
+        templates = []
+        paginator = self.ec2Client.get_paginator('describe_launch_templates')
+        for page in paginator.paginate(**kwargs):
+            templates.extend(page.get('LaunchTemplates', []))
+        return templates
+
+    def getVpcEndpoints(self):
+        kwargs = {}
+        if self.tags:
+            kwargs['Filters'] = self.tags
+        endpoints = []
+        paginator = self.ec2Client.get_paginator('describe_vpc_endpoints')
+        for page in paginator.paginate(**kwargs):
+            endpoints.extend(page.get('VpcEndpoints', []))
+        return endpoints
+
+    def getEndpointPolicySupport(self, serviceNames):
+        """({serviceName: VpcEndpointPolicySupported}, errorCode|None). Unknown /
+        unavailable service names are looked up one by one so one bad name does
+        not hide the rest."""
+        names = sorted({n for n in serviceNames if n})
+        support, error = {}, None
+
+        def lookup(batch):
+            out = {}
+            paginator = self.ec2Client.get_paginator('describe_vpc_endpoint_services')
+            for page in paginator.paginate(ServiceNames=batch):
+                for d in page.get('ServiceDetails', []):
+                    out[d.get('ServiceName')] = d.get('VpcEndpointPolicySupported')
+            return out
+
+        for i in range(0, len(names), 100):
+            batch = names[i:i+100]
+            try:
+                support.update(lookup(batch))
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                if code != 'InvalidServiceName':
+                    error = code
+                    continue
+                for name in batch:
+                    try:
+                        support.update(lookup([name]))
+                    except botocore.exceptions.ClientError as e2:
+                        error = e2.response['Error']['Code']
+        return support, error
+
+    def getNetworkInterfaces(self):
+        enis = []
+        paginator = self.ec2Client.get_paginator('describe_network_interfaces')
+        for page in paginator.paginate():
+            enis.extend(page.get('NetworkInterfaces', []))
+        return enis
 
     def getChartGenCost(self):
         '''
@@ -715,39 +811,113 @@ class Ec2(Service):
         obj.run(self.__class__)
         objs["EBS::Snapshots"] = obj.getInfo()
 
-        # EBS snapshot sharing (one describe_snapshot_attribute per snapshot -
-        # only fetched when the check is selected)
-        if self._ruleSelected('EbsSnapshotSharedExternally'):
-            try:
-                sharing = self.getSnapshotSharing()
-            except botocore.exceptions.ClientError as e:
-                code = e.response['Error']['Code']
-                _warn("Unable to list EBS snapshots for sharing check ({})".format(code))
-                objs["EBSSnapshot::unavailable"] = {'results': {'ebsSnapshotSharedExternally': [0, f"Unable to evaluate ({code})"]}, 'info': {}}
-                sharing = []
-            if sharing:
-                orgCtx = self.getOrgContext()
-                selfAccount = (Config.get('stsInfo', {}) or {}).get('Account')
-                for snap, perms in sharing:
-                    _pi('EBS::Snapshot Sharing', snap['SnapshotId'])
-                    obj = Ec2EbsSnapshotSharing(snap, perms, selfAccount, orgCtx)
-                    obj.run(self.__class__)
-                    objs[f"EBSSnapshot::{snap['SnapshotId']}"] = obj.getInfo()
+        selfAccount = (Config.get('stsInfo', {}) or {}).get('Account')
 
-        # Self-owned AMI checks
-        if self._ruleSelected('Ec2AmiPublic'):
+        # Self-owned AMIs (also used to label AMI backing snapshots)
+        amiKeys = [k for k in ('ec2AmiPublic', 'ec2AmiSharedExternally') if self._ruleSelected(k)]
+        images = None
+        if amiKeys:
             try:
                 images = self.getSelfImages()
             except botocore.exceptions.ClientError as e:
                 code = e.response['Error']['Code']
                 _warn("Unable to list self-owned AMIs ({})".format(code))
-                objs["AMI::unavailable"] = {'results': {'ec2AmiPublic': [0, f"Unable to evaluate ({code})"]}, 'info': {}}
-                images = []
-            for image in images:
-                _pi('EC2::AMI', image['ImageId'])
-                obj = Ec2Ami(image)
+                objs["AMI::unavailable"] = {'results': {k: [0, f"Unable to evaluate ({code})"] for k in amiKeys}, 'info': {}}
+            if images:
+                amiPerms = {}
+                amiOrgCtx = None
+                if self._ruleSelected('ec2AmiSharedExternally'):
+                    amiPerms = self.getImageLaunchPermissions(images)
+                    amiOrgCtx = self.getOrgContext()
+                for image in images:
+                    _pi('EC2::AMI', image['ImageId'])
+                    obj = Ec2Ami(image, amiPerms.get(image['ImageId']), selfAccount, amiOrgCtx)
+                    obj.run(self.__class__)
+                    objs[f"AMI::{image['ImageId']}"] = obj.getInfo()
+
+        # Per-snapshot checks (sharing: one describe_snapshot_attribute per
+        # snapshot - only fetched when that check is selected)
+        snapKeys = [k for k in ('ebsSnapshotSharedExternally', 'ebsSnapshotUnencrypted') if self._ruleSelected(k)]
+        if snapKeys:
+            try:
+                snapshots = self.getSelfSnapshots()
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                _warn("Unable to list EBS snapshots ({})".format(code))
+                objs["EBSSnapshot::unavailable"] = {'results': {k: [0, f"Unable to evaluate ({code})"] for k in snapKeys}, 'info': {}}
+                snapshots = []
+            if snapshots:
+                permsById = {}
+                orgCtx = None
+                if self._ruleSelected('ebsSnapshotSharedExternally'):
+                    permsById = {snap['SnapshotId']: perms for snap, perms in self.getSnapshotSharing(snapshots)}
+                    orgCtx = self.getOrgContext()
+                backing = {}
+                for image in images or []:
+                    for bdm in image.get('BlockDeviceMappings', []) or []:
+                        sid = (bdm.get('Ebs') or {}).get('SnapshotId')
+                        if sid:
+                            backing.setdefault(sid, []).append(image['ImageId'])
+                for snap in snapshots:
+                    _pi('EBS::Snapshot', snap['SnapshotId'])
+                    obj = Ec2EbsSnapshotSharing(snap, permsById.get(snap['SnapshotId']), selfAccount, orgCtx,
+                                                backing.get(snap['SnapshotId']))
+                    obj.run(self.__class__)
+                    objs[f"EBSSnapshot::{snap['SnapshotId']}"] = obj.getInfo()
+
+        # Launch template user data
+        if self._ruleSelected('ec2UserDataSecrets'):
+            try:
+                templates = self.getLaunchTemplates()
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                _warn("Unable to list launch templates ({})".format(code))
+                objs["LaunchTemplate::unavailable"] = {'results': {'ec2UserDataSecrets': [0, f"Unable to evaluate ({code})"]}, 'info': {}}
+                templates = []
+            for lt in templates:
+                _pi('EC2::Launch Template', lt['LaunchTemplateId'])
+                obj = Ec2LaunchTemplate(lt, self.ec2Client)
                 obj.run(self.__class__)
-                objs[f"AMI::{image['ImageId']}"] = obj.getInfo()
+                objs[f"LaunchTemplate::{lt['LaunchTemplateId']}"] = obj.getInfo()
+
+        # VPC endpoint policies
+        if self._ruleSelected('vpcEndpointPolicyFullAccess'):
+            try:
+                endpoints = self.getVpcEndpoints()
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                _warn("Unable to list VPC endpoints ({})".format(code))
+                objs["VPCEndpoint::unavailable"] = {'results': {'vpcEndpointPolicyFullAccess': [0, f"Unable to evaluate ({code})"]}, 'info': {}}
+                endpoints = []
+            if endpoints:
+                support, supportErr = self.getEndpointPolicySupport([ep.get('ServiceName') for ep in endpoints])
+                for ep in endpoints:
+                    _pi('VPC::Endpoint', ep['VpcEndpointId'])
+                    obj = Ec2VpcEndpoint(ep, support.get(ep.get('ServiceName')), supportErr)
+                    obj.run(self.__class__)
+                    objs[f"VPCEndpoint::{ep['VpcEndpointId']}"] = obj.getInfo()
+
+        # Internal-tier managed-service interfaces (RDS / ElastiCache / ECS) in public subnets;
+        # EC2 instances are evaluated by Ec2Instance
+        if self._ruleSelected('ec2InstanceInPublicSubnet'):
+            try:
+                enis = self.getNetworkInterfaces()
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                _warn("Unable to list network interfaces ({})".format(code))
+                objs["ENI::unavailable"] = {'results': {'ec2InstanceInPublicSubnet': [0, f"Unable to evaluate ({code})"]}, 'info': {}}
+                enis = []
+            routing = None
+            for eni in enis:
+                kind = classifyEni(eni)
+                if kind is None:
+                    continue
+                if routing is None:
+                    routing = getSubnetRouting(self.ec2Client)
+                _pi('EC2::Network Interface', eni['NetworkInterfaceId'])
+                obj = Ec2NetworkInterface(eni, kind, routing)
+                obj.run(self.__class__)
+                objs[f"ENI::{eni['NetworkInterfaceId']}"] = obj.getInfo()
         
         
         # ELB checks
@@ -836,15 +1006,17 @@ class Ec2(Service):
         
         # SSM Managed Instance Checks
         ssmManagedSet = self.getSSMManagedInstances()
-        # Skip the SSM check entirely if the managed-instance lookup failed
-        # (getSSMManagedInstances returns None) to avoid false positives.
-        if ssmManagedSet is not None:
+        # If the managed-instance lookup failed (getSSMManagedInstances returns
+        # None) EC2SSMNotManaged is skipped to avoid false positives;
+        # ec2InstanceWithKeyPair then reports "Unable to evaluate".
+        if ssmManagedSet is not None or self._ruleSelected('ec2InstanceWithKeyPair'):
             for instanceArr in instances:
                 for instanceData in instanceArr['Instances']:
                     if instanceData['State']['Name'] not in ('running', 'stopped'):
                         continue
                     _pi('EC2::SSM Check', instanceData['InstanceId'])
-                    obj = Ec2SSM(instanceData['InstanceId'], ssmManagedSet)
+                    obj = Ec2SSM(instanceData['InstanceId'], ssmManagedSet, instanceData,
+                                 getattr(self, 'ssmError', None), getattr(self, 'ssmPingStatus', None))
                     obj.run(self.__class__)
                     objs[f"SSM::{instanceData['InstanceId']}"] = obj.getInfo()
         

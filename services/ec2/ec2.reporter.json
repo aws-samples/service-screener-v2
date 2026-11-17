@@ -1487,5 +1487,140 @@
 		"remediation": "aws ec2 modify-snapshot-attribute --snapshot-id {ResourceId} --attribute createVolumePermission --operation-type remove --user-ids <account-id>",
 		"remediation_risk": "medium",
 		"remediation_doc": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-modifying-snapshot-permissions.html"
+	},
+	"ebsSnapshotUnencrypted": {
+		"category": "S",
+		"^description": "Unencrypted EBS snapshot: {$COUNT} self-owned EBS snapshot(s), including AMI backing snapshots, are not encrypted. Volumes and AMIs created from them are unencrypted, and anyone the snapshot is shared or copied to can read the data without KMS key access. Copy the snapshot with encryption enabled, update AMIs to use the encrypted copy and delete the unencrypted snapshot.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "EBS snapshot not encrypted",
+		"ref": [
+			"[Amazon EBS encryption]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-encryption.html>",
+			"[Copy an Amazon EBS snapshot]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-copy-snapshot.html>"
+		],
+		"remediation": "aws ec2 copy-snapshot --source-snapshot-id {ResourceId} --source-region <region> --encrypted --kms-key-id <kms-key-id>",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-copy-snapshot.html"
+	},
+	"ec2AllowedAmisNotEnforced": {
+		"category": "S",
+		"^description": "Allowed AMIs not enforced: Allowed AMIs is disabled or only in audit mode in {$COUNT} region(s). Without it any AMI, including unvetted public AMIs, can be discovered and launched. Define image criteria for your trusted AMI providers, validate them in audit mode, then enable the setting (or manage it with an EC2 declarative policy).",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Allowed AMIs disabled or audit-mode only",
+		"ref": [
+			"[Control the discovery and use of AMIs with Allowed AMIs]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-allowed-amis.html>"
+		],
+		"remediation": "aws ec2 replace-image-criteria-in-allowed-images-settings --image-criteria 'ImageProviders=[amazon,<account-id>]' && aws ec2 enable-allowed-images-settings --allowed-images-settings-state enabled",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-allowed-amis.html"
+	},
+	"ec2AmiSharedExternally": {
+		"category": "S",
+		"^description": "AMI shared outside the organization: {$COUNT} self-owned AMI(s) grant launch permission to AWS accounts or organizations outside your AWS Organization (or the account is not in an organization). Those accounts can launch the AMI and copy its snapshots. Remove sharing that is not required, or share with your organization or OUs instead.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "AMI shared with external accounts",
+		"ref": [
+			"[Share an AMI with specific AWS accounts]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-explicit.html>",
+			"[Share an AMI with organizations or OUs]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/share-amis-with-organizations-and-OUs.html>"
+		],
+		"remediation": "aws ec2 modify-image-attribute --image-id {ResourceId} --launch-permission \"Remove=[{UserId=<account-id>}]\"",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-explicit.html"
+	},
+	"ec2AmiUntrustedOrStale": {
+		"category": "S",
+		"^description": "Instances on stale or untrusted AMIs: {$COUNT} running instance(s) were launched from an AMI that is deregistered (or no longer shared), deprecated or disabled, or from a public AMI whose owner is not Amazon, AWS Marketplace or a verified provider. Their software provenance and patch baseline cannot be confirmed. Rebuild them from a current, trusted (ideally your own golden) AMI.",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Instance AMI stale or from unverified owner",
+		"ref": [
+			"[Deprecate an Amazon EC2 AMI]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ami-deprecate.html>",
+			"[Find shared AMIs and verified providers]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/usingsharedamis-finding.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ami-deprecate.html"
+	},
+	"ec2InstanceInPublicSubnet": {
+		"category": "S",
+		"^description": "Workloads in public subnets: {$COUNT} EC2 instance(s) or RDS / ElastiCache / ECS network interface(s) are in subnets whose route table sends 0.0.0.0/0 or ::/0 to an internet gateway. Internal tiers placed there are one public IP or security-group change away from internet exposure. Move internal tiers to private subnets and reach the internet through NAT gateways or VPC endpoints; keep only internet-facing load balancers and gateways in public subnets.",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Internal resource in a public subnet",
+		"ref": [
+			"[Subnets for your VPC]<https://docs.aws.amazon.com/vpc/latest/userguide/configure-subnets.html>",
+			"[Configure route tables]<https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Route_Tables.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/userguide/configure-subnets.html"
+	},
+	"ec2InstanceWithKeyPair": {
+		"category": "S",
+		"^description": "SSH key pair on SSM-managed instances: {$COUNT} running instance(s) reachable through Session Manager were launched with an SSH key pair. Long-lived SSH keys are hard to rotate and audit; Session Manager provides IAM-controlled, logged access without inbound ports. Remove the key from authorized_keys, close port 22 and launch new instances without a key pair. (KeyName shows only the launch-time key.)",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "SSH key pair on Session Manager instance",
+		"ref": [
+			"[AWS Systems Manager Session Manager]<https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html>",
+			"[Amazon EC2 key pairs]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html"
+	},
+	"ec2UserDataSecrets": {
+		"category": "S",
+		"^description": "Credentials in user data: {$COUNT} EC2 instance(s) or launch template(s) have user data containing AWS access keys, secret keys, private keys or literal passwords. User data is readable by anyone with ec2:DescribeInstanceAttribute or ec2:DescribeLaunchTemplateVersions and by any process on the instance through IMDS. Rotate the exposed credentials, then fetch secrets at boot from Secrets Manager or Parameter Store using the instance role. Matched values are masked in this report.",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "H",
+		"needFullTest": 0,
+		"shortDesc": "Credentials embedded in user data",
+		"ref": [
+			"[Run commands when you launch an EC2 instance with user data input]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/user-data.html>",
+			"[What is AWS Secrets Manager?]<https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/user-data.html"
+	},
+	"vpcEndpointPolicyFullAccess": {
+		"category": "S",
+		"^description": "VPC endpoint with full-access policy: {$COUNT} VPC endpoint(s) use the default full-access endpoint policy (Principal, Action and Resource '*') without an organization or account condition. Any credentials, including those from other accounts, can reach any resource of the service through the endpoint. Restrict the policy with aws:PrincipalOrgID / aws:ResourceOrgID conditions as part of a data perimeter.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "VPC endpoint uses default full-access policy",
+		"ref": [
+			"[Control access to VPC endpoints using endpoint policies]<https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-access.html>",
+			"[Building a data perimeter on AWS]<https://docs.aws.amazon.com/whitepapers/latest/building-a-data-perimeter-on-aws/building-a-data-perimeter-on-aws.html>"
+		],
+		"remediation": "aws ec2 modify-vpc-endpoint --vpc-endpoint-id {ResourceId} --policy-document file://endpoint-policy.json",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-access.html"
 	}
 }
