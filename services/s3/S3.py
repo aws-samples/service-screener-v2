@@ -202,7 +202,7 @@ class S3(Service):
         
         for name, listError in self.getAccessPoints():
             _pi('S3AccessPoint', name)
-            obj = S3AccessPoint(name, self.s3Control, self._accountId(), listError)
+            obj = S3AccessPoint(name, self.s3Control, self._accountId(), listError, s3Client=self.s3Client)
             obj.run(self.__class__)
             objs["AccessPoint::" + name] = obj.getInfo()
             del obj

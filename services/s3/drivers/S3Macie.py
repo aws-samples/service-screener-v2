@@ -112,9 +112,13 @@ class S3Macie(Evaluator):
             resp = self.macieV2Client.describe_organization_configuration()
         except botocore.exceptions.ClientError as e:
             code = S3Macie._errCode(e)
+            msg = (e.response.get('Error', {}).get('Message') or '').lower()
             # Only the Macie delegated administrator can read the org config;
-            # standalone/member accounts get AccessDenied/Validation errors.
-            if code in ('AccessDeniedException', 'ValidationException', 'ResourceNotFoundException', 'ConflictException'):
+            # standalone/member accounts get an error saying so. A plain IAM
+            # AccessDenied (e.g. a delegated admin missing
+            # macie2:DescribeOrganizationConfiguration) is reported as such.
+            notAdmin = 'administrator' in msg or 'admin account' in msg
+            if notAdmin or code in ('ValidationException', 'ResourceNotFoundException', 'ConflictException'):
                 self.results[key] = [0, 'Not evaluable from member account']
             else:
                 self.results[key] = [0, f'Unable to evaluate ({code})']

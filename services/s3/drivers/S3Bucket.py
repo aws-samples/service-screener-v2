@@ -889,6 +889,9 @@ class S3Bucket(Evaluator):
             self.results[key] = [1, 'Monitored by automated sensitive data discovery']
         elif jobs.get('isMonitoredByJob') == 'TRUE':
             self.results[key] = [1, 'Monitored by a recurring classification job']
+        elif 'UNKNOWN' in (jobs.get('isMonitoredByJob'), jobs.get('isDefinedInJob')):
+            # Macie could not retrieve job data for this bucket.
+            self.results[key] = [0, 'Unable to evaluate (job data unavailable)']
         elif jobs.get('isDefinedInJob') == 'TRUE':
             self.results[key] = [-1, 'Only covered by one-time classification job(s); not continuously monitored']
         else:

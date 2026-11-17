@@ -114,6 +114,20 @@ def test_macie_org_auto_enable_member_account_not_evaluable():
         [0, 'Not evaluable from member account']
 
 
+def test_macie_org_auto_enable_iam_access_denied_is_unable_to_evaluate():
+    """A delegated admin that only lacks macie2:DescribeOrganizationConfiguration
+    must not be told it is a member account."""
+    def iamDenied(s):
+        _session(s['macie2'])
+        s['macie2'].add_client_error(
+            'describe_organization_configuration', 'AccessDeniedException',
+            'User: arn:aws:iam::111122223333:role/r is not authorized to perform: '
+            'macie2:DescribeOrganizationConfiguration')
+
+    assert _run(_macie, '_checkMacieOrgAutoEnable', 'macieOrgAutoEnableOff', iamDenied) == \
+        [0, 'Unable to evaluate (AccessDeniedException)']
+
+
 def test_macie_org_auto_enable_macie_disabled_not_evaluable():
     def disabled(s):
         s['macie2'].add_client_error('get_macie_session', 'AccessDeniedException', 'Macie is not enabled.')
@@ -218,6 +232,22 @@ def test_macie_bucket_recurring_job_counts_as_monitored_one_time_does_not():
     assert _run(_bucket(), '_checkMacieBucketMonitored', key, oneTime)[0] == -1
 
 
+def test_macie_bucket_job_data_unknown_is_info():
+    """isMonitoredByJob/isDefinedInJob = UNKNOWN means Macie could not retrieve
+    job data; that is not evidence the bucket is unmonitored."""
+    key = 'macieBucketsNotMonitored'
+    unknown = lambda s: _describeBuckets(s, {  # noqa: E731
+        'bucketName': 'my-bucket', 'automatedDiscoveryMonitoringStatus': 'NOT_MONITORED',
+        'jobDetails': {'isDefinedInJob': 'UNKNOWN', 'isMonitoredByJob': 'UNKNOWN'}})
+    assert _run(_bucket(), '_checkMacieBucketMonitored', key, unknown) == \
+        [0, 'Unable to evaluate (job data unavailable)']
+    # Automated discovery MONITORED still passes even when job data is unknown.
+    monitored = lambda s: _describeBuckets(s, {  # noqa: E731
+        'bucketName': 'my-bucket', 'automatedDiscoveryMonitoringStatus': 'MONITORED',
+        'jobDetails': {'isDefinedInJob': 'UNKNOWN', 'isMonitoredByJob': 'UNKNOWN'}})
+    assert _run(_bucket(), '_checkMacieBucketMonitored', key, monitored)[0] == 1
+
+
 def test_macie_bucket_inventory_paginated_and_missing_bucket_is_info():
     def pages(s):
         s['macie2'].add_response('describe_buckets', {'buckets': [{'bucketName': 'other'}], 'nextToken': 't'})
@@ -240,21 +270,25 @@ def test_macie_bucket_macie_disabled_not_evaluable():
 # --------------------------------------------------------------------------- #
 def _ap(name='my-ap', listError=None):
     def factory():
-        # Account-level BPA is cached per scan; start each run with a cold cache.
-        Config.retrieveAllCache().pop(f's3::accountBpaAllOn::{ACCOUNT}', None)
+        # Account/bucket BPA are cached per scan; start each run with a cold cache.
+        cache = Config.retrieveAllCache()
+        cache.pop(f's3::accountBpa::{ACCOUNT}', None)
+        cache.pop('s3::bucketBpa::b', None)
         c = _client('s3control')
-        return {'s3control': c}, S3AccessPoint(name, c, ACCOUNT, listError)
+        s3 = _client('s3')
+        return {'s3control': c, 's3': s3}, S3AccessPoint(name, c, ACCOUNT, listError, s3Client=s3)
     return factory
 
 
-def _apResponses(s, isPublic, bpa, accountBpa=None, noPolicy=False):
+def _apResponses(s, isPublic, bpa, accountBpa=None, noPolicy=False, bucketBpa=None,
+                 networkOrigin='Internet', bucketAccountId=ACCOUNT):
     p = {'AccountId': ACCOUNT, 'Name': 'my-ap'}
     if noPolicy:
         s['s3control'].add_client_error('get_access_point_policy_status', 'NoSuchAccessPointPolicy', 'none', 404, None, p)
     else:
         s['s3control'].add_response('get_access_point_policy_status', {'PolicyStatus': {'IsPublic': isPublic}}, p)
     s['s3control'].add_response('get_access_point', {
-        'Name': 'my-ap', 'Bucket': 'b', 'NetworkOrigin': 'Internet',
+        'Name': 'my-ap', 'Bucket': 'b', 'NetworkOrigin': networkOrigin, 'BucketAccountId': bucketAccountId,
         'PublicAccessBlockConfiguration': bpa}, p)
     if accountBpa == 'missing':
         s['s3control'].add_client_error('get_public_access_block', 'NoSuchPublicAccessBlockConfiguration',
@@ -262,12 +296,21 @@ def _apResponses(s, isPublic, bpa, accountBpa=None, noPolicy=False):
     elif accountBpa is not None:
         s['s3control'].add_response('get_public_access_block',
                                     {'PublicAccessBlockConfiguration': accountBpa}, {'AccountId': ACCOUNT})
+    if bucketBpa == 'missing':
+        s['s3'].add_client_error('get_public_access_block', 'NoSuchPublicAccessBlockConfiguration',
+                                 'none', 404, None, {'Bucket': 'b'})
+    elif bucketBpa == 'denied':
+        s['s3'].add_client_error('get_public_access_block', 'AccessDenied', 'denied', 403, None, {'Bucket': 'b'})
+    elif bucketBpa is not None:
+        s['s3'].add_response('get_public_access_block',
+                             {'PublicAccessBlockConfiguration': bucketBpa}, {'Bucket': 'b'})
 
 
 def test_access_point_public_policy_flag_fix():
     key = 's3AccessPointPublic'
     flagged = _run(_ap(), '_checkAccessPointPublic', key,
-                   lambda s: _apResponses(s, True, ALL_ON, accountBpa='missing'))
+                   lambda s: _apResponses(s, True, dict(ALL_ON, RestrictPublicBuckets=False),
+                                          accountBpa='missing', bucketBpa='missing'))
     assert flagged[0] == -1 and 'policy is public' in flagged[1]
     assert _run(_ap(), '_checkAccessPointPublic', key,
                 lambda s: _apResponses(s, False, ALL_ON, noPolicy=True))[0] == 1
@@ -276,11 +319,69 @@ def test_access_point_public_policy_flag_fix():
 def test_access_point_bpa_off_flag_and_account_bpa_mitigates():
     key = 's3AccessPointPublic'
     partial = dict(ALL_ON, RestrictPublicBuckets=False)
-    assert _run(_ap(), '_checkAccessPointPublic', key,
-                lambda s: _apResponses(s, False, ALL_OFF, accountBpa=partial))[0] == -1
+    flagged = _run(_ap(), '_checkAccessPointPublic', key,
+                   lambda s: _apResponses(s, False, ALL_OFF, accountBpa=partial, bucketBpa=partial))
+    assert flagged[0] == -1 and 'RestrictPublicBuckets' in flagged[1]
     # Fix: account-level Block Public Access fully on overrides access point settings.
     assert _run(_ap(), '_checkAccessPointPublic', key,
-                lambda s: _apResponses(s, False, ALL_OFF, accountBpa=ALL_ON))[0] == 1
+                lambda s: _apResponses(s, False, ALL_OFF, accountBpa=ALL_ON, bucketBpa='missing'))[0] == 1
+
+
+def test_access_point_bpa_off_mitigated_by_bucket_bpa():
+    """S3 blocks the request if the access point, the bucket OR the account
+    blocks it: AP BPA off on a bucket with all four BPA settings on is not
+    public even when account BPA is not fully on (previously a false FAIL)."""
+    key = 's3AccessPointPublic'
+    partial = dict(ALL_OFF, BlockPublicAcls=True)
+    # Flag: bucket BPA also off -> nothing blocks public access.
+    assert _run(_ap(), '_checkAccessPointPublic', key,
+                lambda s: _apResponses(s, False, ALL_OFF, accountBpa=partial, bucketBpa='missing'))[0] == -1
+    # Fix: bucket BPA fully on -> mitigated.
+    fixed = _run(_ap(), '_checkAccessPointPublic', key,
+                 lambda s: _apResponses(s, False, ALL_OFF, accountBpa=partial, bucketBpa=ALL_ON))
+    assert fixed[0] == 1 and 'Mitigated' in fixed[1]
+    # Bucket and account each cover different settings -> combined they block everything.
+    split = _run(_ap(), '_checkAccessPointPublic', key,
+                 lambda s: _apResponses(s, False, ALL_OFF,
+                                        accountBpa=dict(ALL_OFF, BlockPublicAcls=True, IgnorePublicAcls=True),
+                                        bucketBpa=dict(ALL_OFF, BlockPublicPolicy=True, RestrictPublicBuckets=True)))
+    assert split[0] == 1
+
+
+def test_access_point_public_policy_mitigated_by_bucket_restrict_public_buckets():
+    key = 's3AccessPointPublic'
+    assert _run(_ap(), '_checkAccessPointPublic', key,
+                lambda s: _apResponses(s, True, ALL_OFF, accountBpa='missing', bucketBpa='missing'))[0] == -1
+    restrict = dict(ALL_OFF, BlockPublicPolicy=True, RestrictPublicBuckets=True)
+    # Policy is neutralised by RestrictPublicBuckets, but ACL settings remain off everywhere.
+    res = _run(_ap(), '_checkAccessPointPublic', key,
+               lambda s: _apResponses(s, True, ALL_OFF, accountBpa='missing', bucketBpa=restrict))
+    assert res[0] == -1 and 'policy is public' not in res[1]
+    assert _run(_ap(), '_checkAccessPointPublic', key,
+                lambda s: _apResponses(s, True, restrict, accountBpa='missing', bucketBpa=ALL_ON))[0] == 1
+
+
+def test_access_point_bucket_bpa_unreadable_is_info():
+    key = 's3AccessPointPublic'
+    denied = _run(_ap(), '_checkAccessPointPublic', key,
+                  lambda s: _apResponses(s, False, ALL_OFF, accountBpa='missing', bucketBpa='denied'))
+    assert denied[0] == 0 and 'Unable to evaluate' in denied[1]
+    # Cross-account bucket: bucket BPA is not read (owner's settings unknown) -> INFO.
+    xacct = _run(_ap(), '_checkAccessPointPublic', key,
+                 lambda s: _apResponses(s, True, ALL_OFF, accountBpa='missing', bucketAccountId='444455556666'))
+    assert xacct[0] == 0 and '444455556666' in xacct[1]
+
+
+def test_access_point_vpc_origin_bpa_off_without_public_policy_is_info():
+    key = 's3AccessPointPublic'
+    res = _run(_ap(), '_checkAccessPointPublic', key,
+               lambda s: _apResponses(s, False, ALL_OFF, accountBpa='missing', bucketBpa='missing',
+                                      networkOrigin='VPC'))
+    assert res[0] == 0 and 'VPC-only' in res[1]
+    # A public policy on a VPC access point is still reported.
+    assert _run(_ap(), '_checkAccessPointPublic', key,
+                lambda s: _apResponses(s, True, ALL_OFF, accountBpa='missing', bucketBpa='missing',
+                                       networkOrigin='VPC'))[0] == -1
 
 
 def test_access_point_unreadable_is_info_and_list_error_is_info():

@@ -483,7 +483,7 @@
 	},
 	"s3AccessPointPublic": {
 		"category": "S",
-		"^description": "You have {$COUNT} S3 access points that either have a public access point policy or do not have all S3 Block Public Access settings enabled, and account-level Block Public Access does not fully override them. Data in the underlying bucket may be reachable by anyone through the access point. Access point Block Public Access settings cannot be changed after creation, so replace the access point with one that blocks public access, or enable account-level Block Public Access.",
+		"^description": "You have {$COUNT} S3 access points that have a public access point policy or Block Public Access settings off, where neither the underlying bucket nor the account-level Block Public Access blocks the same settings. S3 blocks a request if the access point, the bucket or the account blocks it, so only settings that are off at all three levels are reported. Data in the underlying bucket may be reachable by anyone through the access point. Access point Block Public Access settings cannot be changed after creation, so replace the access point with one that blocks public access, or enable Block Public Access on the bucket or the account.",
 		"shortDesc": "Block public access on S3 access points",
 		"criticality": "H",
 		"downtime": 0,
@@ -534,7 +534,7 @@
 		"remediation_doc": "https://docs.aws.amazon.com/macie/latest/user/discovery-asdd-account-manage-s3.html"
 	},
 	"s3ReplicationNoMetrics": {
-		"category": "S",
+		"category": "RS",
 		"^description": "{$COUNT} S3 buckets replicate objects without S3 Replication metrics enabled. Without metrics (and S3 Replication Time Control, which requires them) you cannot see pending bytes, replication latency or failed operations, so a broken replication path that your recovery plan depends on can go unnoticed.",
 		"shortDesc": "Enable S3 Replication metrics",
 		"criticality": "L",
@@ -551,8 +551,8 @@
 		"remediation_doc": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/repl-metrics.html"
 	},
 	"s3VersionedNoNoncurrentExpiry": {
-		"category": "S",
-		"^description": "{$COUNT} versioned S3 buckets have no lifecycle rule that expires noncurrent object versions. Every overwritten or deleted object is retained indefinitely, which increases cost and keeps data (including data you intended to delete) beyond its required retention period. Add a NoncurrentVersionExpiration rule that matches your retention requirements.",
+		"category": "CS",
+		"^description": "{$COUNT} versioned S3 buckets have no lifecycle rule that expires noncurrent object versions. Every overwritten or deleted object is retained indefinitely, which increases cost and keeps data (including data you intended to delete) beyond its required retention period. Add a NoncurrentVersionExpiration rule that matches your retention requirements. A bucket with no lifecycle configuration at all is also reported under BucketLifecycle; this check additionally flags versioned buckets whose lifecycle rules only handle current objects.",
 		"shortDesc": "Expire noncurrent object versions",
 		"criticality": "L",
 		"downtime": 0,
