@@ -125,3 +125,38 @@ class SsoData:
         return self._cached('assign::{}::{}'.format(psArn, accountId), lambda: self._paginate(
             client, 'list_account_assignments', 'AccountAssignments',
             InstanceArn=iArn, AccountId=accountId, PermissionSetArn=psArn))
+
+    # ------------------------------------------------------------------ #
+    # Identity Store and trusted identity propagation (TIP) data
+    # ------------------------------------------------------------------ #
+    def identityStoreUsers(self, inst):
+        """All users of the instance's identity store (identitystore is
+        called in the Region where the instance was found)."""
+        storeId = inst['Instance'].get('IdentityStoreId')
+        region = inst['Region']
+
+        def fetch():
+            with self._lock:
+                key = 'ids::' + region
+                if key not in self._clients:
+                    self._clients[key] = self.ssBoto.client('identitystore', config=bConfig(region_name=region))
+                client = self._clients[key]
+            return self._paginate(client, 'list_users', 'Users', IdentityStoreId=storeId)
+        return self._cached('users::' + str(storeId), fetch)
+
+    def applications(self, inst):
+        client, iArn = inst['Client'], inst['Instance']['InstanceArn']
+        return self._cached('apps::' + iArn, lambda: self._paginate(
+            client, 'list_applications', 'Applications', InstanceArn=iArn))
+
+    def trustedTokenIssuers(self, inst):
+        client, iArn = inst['Client'], inst['Instance']['InstanceArn']
+        return self._cached('tti::' + iArn, lambda: self._paginate(
+            client, 'list_trusted_token_issuers', 'TrustedTokenIssuers', InstanceArn=iArn))
+
+    def applicationProviderProtocols(self, inst):
+        """{ApplicationProviderArn: FederationProtocol ('SAML'|'OAUTH')}"""
+        client, region = inst['Client'], inst['Region']
+        return self._cached('providers::' + region, lambda: {
+            p.get('ApplicationProviderArn'): p.get('FederationProtocol')
+            for p in self._paginate(client, 'list_application_providers', 'ApplicationProviders')})

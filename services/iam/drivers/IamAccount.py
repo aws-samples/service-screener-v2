@@ -214,21 +214,38 @@ class IamAccount(IamCommon):
             self.results['hasSSORoles'] = [-1, '']
     
     def _checkHasExternalProvider(self):
-        hasOpID = False
-        hasSaml = False
-        resp = self.iamClient.list_open_id_connect_providers()
-        if 'OpenIDConnectProviderList' in resp:
-            if len(resp['OpenIDConnectProviderList']) > 0:
-                hasOpID = True
-        
-        resp = self.iamClient.list_saml_providers()
-        if 'SAMLProviderList' in resp:
-            if len(resp['SAMLProviderList']) > 0:
-                hasSaml = True
-        
-        if hasOpID == False and hasSaml == False:
-            self.results['hasExternalIdentityProvider'] = [-1, '']
-    
+        """FAIL when the account has no IAM SAML and no IAM OIDC provider.
+
+        Also covers the WAFS2027 'no direct IAM SAML fallback for an IAM
+        Identity Center outage' proposal (FND05-BP02): when Identity Center is
+        visible from this account and no IAM SAML provider exists, the message
+        says so. Whether this account is the designated emergency-access
+        account cannot be determined, so that context is informational only."""
+        key = 'hasExternalIdentityProvider'
+        counts, errors = {}, []
+        for label, op, rkey in (('SAML', 'list_saml_providers', 'SAMLProviderList'),
+                                ('OIDC', 'list_open_id_connect_providers', 'OpenIDConnectProviderList')):
+            try:
+                counts[label] = len(getattr(self.iamClient, op)().get(rkey, []) or [])
+            except botocore.exceptions.ClientError as e:
+                errors.append('iam.{}: {}'.format(op, e.response['Error']['Code']))
+
+        if counts.get('SAML') or counts.get('OIDC'):
+            self.results[key] = [1, 'IAM identity providers: {} SAML, {} OIDC'.format(
+                counts.get('SAML', 'unreadable'), counts.get('OIDC', 'unreadable'))]
+            return
+        if errors:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(errors[0].split(': ')[-1])]
+            return
+
+        msg = 'No IAM SAML or OIDC identity provider exists in this account.'
+        insts, _ = self.ssoData.instances()
+        if insts:
+            msg += (' IAM Identity Center is in use ({} instance(s)); there is no direct IAM SAML federation to fall back on'
+                    ' during an Identity Center outage. If this is your designated emergency-access account, configure'
+                    ' an IAM SAML provider or documented break-glass access.').format(len(insts))
+        self.results[key] = [-1, msg]
+
     def _checkHasGuardDuty(self):
         ssBoto = self.ssBoto
         regions = Config.get("REGIONS_SELECTED")
@@ -1253,10 +1270,11 @@ class IamAccount(IamCommon):
     MAX_SSO_SESSION_SECONDS = 8 * 3600
     ADMIN_MANAGED_POLICY_ARN = 'arn:aws:iam::aws:policy/AdministratorAccess'
 
-    def _ssoOrgInstances(self, key):
-        """Organization instances, or None after recording a [0, ...] result."""
+    def _ssoOrgInstances(self, key, orgOnly=True):
+        """Organization instances (or any instance when orgOnly is False), or
+        None after recording a [0, ...] result."""
         insts, errors = self.ssoData.instances()
-        orgInsts = [i for i in insts if i['Kind'] == 'ORG']
+        orgInsts = [i for i in insts if i['Kind'] == 'ORG' or not orgOnly]
         if orgInsts:
             return orgInsts
         if errors:
@@ -1372,6 +1390,140 @@ class IamAccount(IamCommon):
             self.results[key] = [0, 'INFO: {}. Ensure these are limited to a small, group-based audience.'.format(adminNote)]
         else:
             self.results[key] = [1, '{} permission set(s): none grant full admin or a session longer than 8 hours'.format(count)]
+
+    def _checkSsoUsersNotScimProvisioned(self):
+        """FAIL only when an identity store mixes externally provisioned users
+        (ExternalIds set, i.e. SCIM/IdP-sourced) with enabled users that have
+        no ExternalIds: those were created by hand and are not deprovisioned
+        by the identity provider. A store where no user has ExternalIds is
+        normal for the Identity Center directory (and some AD setups); the
+        identity source cannot be read through the API, so that is INFO."""
+        key = 'ssoUsersNotScimProvisioned'
+        insts = self._ssoOrgInstances(key, orgOnly=False)
+        if insts is None:
+            return
+        flagged, info, ok, errors, total = [], [], [], [], 0
+        for inst in insts:
+            storeId = inst['Instance'].get('IdentityStoreId')
+            if not storeId:
+                errors.append('IdentityStoreId not returned')
+                continue
+            users, err = self.ssoData.identityStoreUsers(inst)
+            if err:
+                errors.append(err)
+                continue
+            enabled = [u for u in users if (u.get('UserStatus') or 'ENABLED') == 'ENABLED']
+            total += len(enabled)
+            external = [u for u in enabled if u.get('ExternalIds')]
+            manual = [u for u in enabled if not u.get('ExternalIds')]
+            if external and manual:
+                names = ', '.join(str(u.get('UserName') or u.get('UserId')) for u in manual[:10])
+                flagged.append('{}: {} of {} enabled user(s) have no ExternalIds while {} are provisioned by an external identity provider ({}{})'.format(
+                    storeId, len(manual), len(enabled), len(external), names, ', ...' if len(manual) > 10 else ''))
+            elif manual:
+                info.append('{}: {} enabled user(s), none with ExternalIds'.format(storeId, len(manual)))
+            elif external:
+                ok.append('{}: all {} enabled user(s) are externally provisioned'.format(storeId, len(external)))
+        if flagged:
+            msg = 'Manually created users in an externally provisioned identity store (they are not deprovisioned when people leave the IdP):<br>{}'.format(
+                self._detail(flagged))
+            if errors:
+                msg += '<br>Unable to read {} identity store(s) ({})'.format(len(errors), errors[0])
+            self.results[key] = [-1, msg]
+        elif errors:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(errors[0])]
+        elif info:
+            self.results[key] = [0, 'INFO: no user carries ExternalIds, so SCIM provisioning is not in use. This is expected when the '
+                                    'Identity Center directory is the identity source; if your workforce lives in an external IdP, '
+                                    'enable automatic (SCIM) provisioning:<br>{}'.format(self._detail(info + ok))]
+        elif ok:
+            self.results[key] = [1, self._detail(ok)]
+        else:
+            self.results[key] = [0, 'Not applicable: no enabled users in the identity store']
+
+    # Trusted identity propagation (informational, never a finding)
+    def _tipRegional(self, regions, accountId, found, errors):
+        def missing(e):
+            code = e.response.get('Error', {}).get('Code', '')
+            status = e.response.get('ResponseMetadata', {}).get('HTTPStatusCode')
+            return status == 404 or any(k in code for k in ('NotFound', 'NotExist', 'NoSuch'))
+
+        for region in regions:
+            try:
+                lf = self.ssBoto.client('lakeformation', config=bConfig(region_name=region))
+                cfg = lf.describe_lake_formation_identity_center_configuration()
+                if cfg.get('InstanceArn') or cfg.get('ApplicationArn'):
+                    found.append('Lake Formation Identity Center integration ({})'.format(region))
+            except botocore.exceptions.ClientError as e:
+                if not missing(e):
+                    errors.append('lakeformation {}: {}'.format(region, e.response['Error']['Code']))
+            except botocore.exceptions.BotoCoreError as e:
+                errors.append('lakeformation {}: {}'.format(region, type(e).__name__))
+
+            if not accountId:
+                errors.append('s3control {}: account ID unknown'.format(region))
+                continue
+            try:
+                s3c = self.ssBoto.client('s3control', config=bConfig(region_name=region))
+                ag = s3c.get_access_grants_instance(AccountId=accountId)
+                if ag.get('IdentityCenterArn') or ag.get('IdentityCenterInstanceArn') or ag.get('IdentityCenterApplicationArn'):
+                    found.append('S3 Access Grants instance associated with Identity Center ({})'.format(region))
+            except botocore.exceptions.ClientError as e:
+                if not missing(e):
+                    errors.append('s3control {}: {}'.format(region, e.response['Error']['Code']))
+            except botocore.exceptions.BotoCoreError as e:
+                errors.append('s3control {}: {}'.format(region, type(e).__name__))
+
+    def _checkTrustedIdentityPropagationUnused(self):
+        """Feature-adoption signal: is workforce identity propagated to data
+        services? Evidence: OAuth (TIP-capable) Identity Center applications,
+        trusted token issuers, the Lake Formation Identity Center integration
+        and S3 Access Grants associated with Identity Center. PASS when any is
+        found; otherwise INFO (0). Never a finding: not every workload needs
+        user-level data access auditing."""
+        key = 'trustedIdentityPropagationUnused'
+        found, errors = [], []
+        insts, instErr = self.ssoData.instances()
+        errors.extend('sso-admin {}'.format(e) for e in instErr)
+        for inst in insts:
+            iid = inst['Instance'].get('InstanceArn', '').rsplit('/', 1)[-1]
+            apps, err = self.ssoData.applications(inst)
+            if err:
+                errors.append('sso-admin.list_applications {}: {}'.format(iid, err))
+            elif apps:
+                protocols, perr = self.ssoData.applicationProviderProtocols(inst)
+                if perr:
+                    errors.append('sso-admin.list_application_providers: {}'.format(perr))
+                    protocols = {}
+                oauth = [a for a in apps if protocols.get(a.get('ApplicationProviderArn')) == 'OAUTH']
+                if oauth:
+                    found.append('{} OAuth (TIP-capable) Identity Center application(s) on {}: {}'.format(
+                        len(oauth), iid, ', '.join('{} ({})'.format(a.get('Name', ''), str(a.get('ApplicationProviderArn', '')).rsplit('/', 1)[-1])
+                                                   for a in oauth[:10])))
+            ttis, err = self.ssoData.trustedTokenIssuers(inst)
+            if err:
+                errors.append('sso-admin.list_trusted_token_issuers {}: {}'.format(iid, err))
+            elif ttis:
+                found.append('{} trusted token issuer(s) on {}: {}'.format(
+                    len(ttis), iid, ', '.join(str(t.get('Name', '')) for t in ttis[:10])))
+
+        accountId = (Config.get('stsInfo', {}) or {}).get('Account')
+        self._tipRegional(self.ssoData.regions, accountId, found, errors)
+
+        if found:
+            msg = 'Trusted identity propagation in use:<br>{}'.format(self._detail(found))
+            if errors:
+                msg += '<br>Unreadable: {}'.format(', '.join(errors[:5]))
+            self.results[key] = [1, msg]
+        elif errors:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(', '.join(errors[:5]))]
+        else:
+            self.results[key] = [0, 'INFO: no trusted identity propagation found ({}) in scanned Regions ({}). Consider it where '
+                                    'data access (Athena, Redshift, Lake Formation, S3 Access Grants, Amazon Q) must be '
+                                    'authorized and audited per workforce user.'.format(
+                                        'no IAM Identity Center instance visible from this account' if not insts else
+                                        'no OAuth applications, trusted token issuers, Lake Formation or S3 Access Grants integration',
+                                        ', '.join(self.ssoData.regions) or 'none')]
 
     # ------------------------------------------------------------------ #
     # Organization hygiene heuristics (WAFS2027 tier 3, low criticality).

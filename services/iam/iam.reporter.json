@@ -453,7 +453,7 @@
 	},
 	"hasExternalIdentityProvider": {
 		"category": "O",
-		"^description": "This enables your users to sign in to the AWS access portal with their corporate credentials. They can then navigate to their assigned accounts, roles, and applications hosted in external IdPs. For example, you can connect an external IdP such as Okta or Azure Active Directory (AD), to IAM Identity Center. Your users can then sign in to the AWS access portal with their existing Okta or Azure credentials. In addition, you can assign access permissions centrally for your users across all the accounts and applications in your AWS organization. In addition, developers can simply sign in to the AWS Command Line Interface (AWS CLI) using their existing credentials, and benefit from automatic short-term credential generation and rotation.",
+		"^description": "This enables your users to sign in to the AWS access portal with their corporate credentials. They can then navigate to their assigned accounts, roles, and applications hosted in external IdPs. For example, you can connect an external IdP such as Okta or Azure Active Directory (AD), to IAM Identity Center. Your users can then sign in to the AWS access portal with their existing Okta or Azure credentials. In addition, you can assign access permissions centrally for your users across all the accounts and applications in your AWS organization. In addition, developers can simply sign in to the AWS Command Line Interface (AWS CLI) using their existing credentials, and benefit from automatic short-term credential generation and rotation. When IAM Identity Center is in use but no IAM SAML provider exists, the finding also notes that there is no direct IAM federation to fall back on during an Identity Center outage; this matters for your designated emergency-access account.",
 		"shortDesc": "Use External Identity Provider",
 		"criticality": "M",
 		"downtime": 0,
@@ -1199,5 +1199,39 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers.html"
+	},
+	"ssoUsersNotScimProvisioned": {
+		"category": "S",
+		"^description": "IAM Identity Center identity store contains enabled users without ExternalIds alongside users provisioned from an external identity provider (SCIM). Manually created users are not updated or deprovisioned when people leave or change roles in your identity provider. Provision users automatically from the IdP and remove manually created users (keep only documented break-glass users). Stores where no user has ExternalIds are reported for information only, because that is expected when the Identity Center directory is the identity source.",
+		"shortDesc": "Provision Identity Center users from your identity provider (SCIM)",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Automatic provisioning (SCIM)]<https://docs.aws.amazon.com/singlesignon/latest/userguide/provision-automatically.html>",
+			"[Manage your identity source]<https://docs.aws.amazon.com/singlesignon/latest/userguide/manage-your-identity-source.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/singlesignon/latest/userguide/provision-automatically.html"
+	},
+	"trustedIdentityPropagationUnused": {
+		"category": "S",
+		"^description": "Informational: whether trusted identity propagation is used, so that access to data services (Amazon Athena, Amazon Redshift, AWS Lake Formation, Amazon S3 Access Grants, Amazon Q and others) is authorized and logged per workforce user instead of per shared IAM role. Evidence: OAuth Identity Center applications, trusted token issuers, the Lake Formation Identity Center integration and S3 Access Grants instances associated with Identity Center in the scanned Regions. This check never reports a finding.",
+		"shortDesc": "Consider trusted identity propagation for data access",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Trusted identity propagation overview]<https://docs.aws.amazon.com/singlesignon/latest/userguide/trustedidentitypropagation-overview.html>",
+			"[SEC02-BP04 Rely on a centralized identity provider]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_identities_identity_provider.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/singlesignon/latest/userguide/trustedidentitypropagation-overview.html"
 	}
 }
