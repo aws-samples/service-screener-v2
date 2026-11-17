@@ -66,3 +66,35 @@ Keys are self-describing, so the report is readable without the WA Tool:
 ```bash
 python -m pytest tests/test_wafs2027.py -q
 ```
+
+## IAM permissions
+
+The scanning identity needs the AWS managed `ReadOnlyAccess` policy (see the main README). A few
+WAFS2027 checks call APIs that `ReadOnlyAccess` does not include. Without them those checks report
+`Unable to evaluate` instead of a result; nothing fails. For full coverage add:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "ServiceScreenerWAFS2027Extras",
+    "Effect": "Allow",
+    "Action": [
+      "access-analyzer:ListFindingsV2",
+      "cognito-identity:GetPrincipalTagAttributeMap",
+      "controltower:GetLandingZone",
+      "controltower:ListLandingZones",
+      "controltower:ListEnabledBaselines",
+      "controltower:ListEnabledControls",
+      "cur:DescribeReportDefinitions",
+      "lakeformation:DescribeLakeFormationIdentityCenterConfiguration",
+      "security-ir:GetMembership",
+      "security-ir:ListMemberships"
+    ],
+    "Resource": "*"
+  }]
+}
+```
+
+Organizations-level checks give a full answer only from the management account or a delegated
+administrator account; elsewhere they report `Not evaluable from member account`.
