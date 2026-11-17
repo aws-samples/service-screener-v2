@@ -367,5 +367,23 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/cloudwatch-alarms.html"
+	},
+	"AccessPolicyPublic": {
+		"category": "S",
+		"^description": "{$COUNT} OpenSearch domain(s) use a public endpoint and have an access policy that allows any principal (\"*\") to call the OpenSearch HTTP APIs without an aws:SourceIp, aws:SourceVpce or aws:PrincipalOrgID restriction. Anyone who can reach the endpoint can read, write or delete data. Fine-grained access control with an internal user database does not remove this network exposure.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "H",
+		"needFullTest": 1,
+		"shortDesc": "Restrict the domain access policy to specific IAM principals or source IPs, or move the domain into a VPC.",
+		"ref": [
+			"[Identity and Access Management in Amazon OpenSearch Service]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ac.html>",
+			"[Security best practices for Amazon OpenSearch Service]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/security-best-practices.html>",
+			"[Launching your Amazon OpenSearch Service domains within a VPC]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ac.html"
 	}
 }
