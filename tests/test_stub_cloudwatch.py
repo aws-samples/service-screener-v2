@@ -318,3 +318,152 @@ def test_detection_rule_without_target_flagged_with_target_passes(clients):
         d = _driver(clients)
         d._checkDetectionDisableAlarm()
         assert d.results['detectionDisableNoAlarm'][0] == expected
+
+
+# --------------------------------------------------------------------------- #
+# replicationLagNotAlarmed
+# Stubber because the emulator rejects PutMetricData into reserved 'AWS/'
+# namespaces and does not vend RDS/DynamoDB/S3 replication metrics, so the
+# replication-lag metric streams the check keys on cannot be produced there.
+# --------------------------------------------------------------------------- #
+LAG_DIMS = [{'Name': 'DBInstanceIdentifier', 'Value': 'db-replica-1'}]
+SNS = 'arn:aws:sns:us-east-1:111122223333:ops'
+
+
+def _lagMetrics(clients, found=None, error=None):
+    """Queue one list_metrics response per REPLICATION_LAG_METRICS entry."""
+    st = clients.stub('cloudwatch')
+    for ns, mn in CloudwatchAccount.REPLICATION_LAG_METRICS:
+        if error:
+            _denied(st, 'list_metrics')
+            continue
+        metrics = [{'Namespace': ns, 'MetricName': mn, 'Dimensions': d}
+                   for (fns, fmn, d) in (found or []) if (fns, fmn) == (ns, mn)]
+        st.add_response('list_metrics', {'Metrics': metrics},
+                        {'Namespace': ns, 'MetricName': mn, 'RecentlyActive': 'PT3H'})
+
+
+def _lagAlarm(dims=LAG_DIMS, actions=True, name='replica-lag'):
+    return {'AlarmName': name, 'AlarmArn': f'arn:aws:cloudwatch:us-east-1:{ACCT}:alarm:{name}',
+            'Namespace': 'AWS/RDS', 'MetricName': 'ReplicaLag', 'Dimensions': dims,
+            'ActionsEnabled': True, 'AlarmActions': [SNS] if actions else []}
+
+
+def _runLag(clients, alarms=None, composites=None, found=None, error=None):
+    _lagMetrics(clients, found=found, error=error)
+    d = CloudwatchAccount(REGION, clients, [], [], alarms or [], composites or [])
+    d._checkReplicationLagAlarm()
+    clients.stub('cloudwatch').assert_no_pending_responses()
+    return d.results['replicationLagNotAlarmed']
+
+
+def test_replication_lag_flag_fix(clients):
+    found = [('AWS/RDS', 'ReplicaLag', LAG_DIMS)]
+    flagged = _runLag(clients, alarms=[], found=found)
+    assert flagged[0] == -1 and 'DBInstanceIdentifier=db-replica-1' in flagged[1]
+    ## Alarm exists but has no alarm action -> still flagged.
+    assert _runLag(clients, alarms=[_lagAlarm(actions=False)], found=found)[0] == -1
+    ## Alarm on another instance does not cover this one.
+    other = _lagAlarm(dims=[{'Name': 'DBInstanceIdentifier', 'Value': 'other'}])
+    found2 = found + [('AWS/RDS', 'ReplicaLag', other['Dimensions'])]
+    r = _runLag(clients, alarms=[other], found=found2)
+    assert r[0] == -1 and '1 of 2' in r[1]
+    ## Fix: alarm with an SNS action on the replica's metric.
+    assert _runLag(clients, alarms=[_lagAlarm()], found=found)[0] == 1
+
+
+def test_replication_lag_composite_and_math_coverage(clients):
+    found = [('AWS/DynamoDB', 'ReplicationLatency',
+              [{'Name': 'TableName', 'Value': 't'}, {'Name': 'ReceivingRegion', 'Value': 'eu-west-1'}])]
+    child = {'AlarmName': 'ddb-lag', 'Namespace': 'AWS/DynamoDB', 'MetricName': 'ReplicationLatency',
+             'Dimensions': found[0][2], 'ActionsEnabled': True, 'AlarmActions': []}
+    composite = {'AlarmName': 'c', 'ActionsEnabled': True, 'AlarmActions': [SNS],
+                 'AlarmRule': 'ALARM("ddb-lag") OR ALARM("x")'}
+    assert _runLag(clients, alarms=[child], found=found)[0] == -1
+    assert _runLag(clients, alarms=[child], composites=[composite], found=found)[0] == 1
+    search = {'AlarmName': 's', 'ActionsEnabled': True, 'AlarmActions': [SNS], 'Metrics': [
+        {'Id': 'e1', 'Expression': "MAX(SEARCH('{AWS/DynamoDB,TableName,ReceivingRegion} MetricName=\"ReplicationLatency\"', 'Maximum', 60))"}]}
+    assert _runLag(clients, alarms=[search], found=found)[0] == 1
+    ## A SEARCH on the same metric name in another namespace does not count.
+    s3search = {'AlarmName': 's3', 'ActionsEnabled': True, 'AlarmActions': [SNS], 'Metrics': [
+        {'Id': 'e1', 'Expression': "MAX(SEARCH('{AWS/S3,SourceBucket} MetricName=\"ReplicationLatency\"', 'Maximum', 60))"}]}
+    assert _runLag(clients, alarms=[s3search], found=found)[0] == -1
+
+
+def test_replication_lag_no_replicas_or_unreadable(clients):
+    assert _runLag(clients, found=[])[0] == 0
+    r = _runLag(clients, error=True)
+    assert r[0] == 0 and 'Unable to evaluate (' in r[1]
+
+
+# --------------------------------------------------------------------------- #
+# telemetryRulesNotConfigured
+# Stubber because the emulator does not implement
+# ListTelemetryRulesForOrganization (organization-wide rules), and cannot act as
+# a member or standalone account.
+# --------------------------------------------------------------------------- #
+def _tRule(name):
+    return {'RuleName': name, 'RuleArn': f'arn:aws:observabilityadmin:us-east-1:{ACCT}:telemetry-rule/{name}',
+            'ResourceType': 'AWS::EC2::VPC', 'TelemetryType': 'Logs'}
+
+
+def _telemetry(clients, acctStatus='NOT_STARTED', acctRules=(), org=ACCT, orgStatus='NOT_STARTED',
+               orgRules=(), orgDenied=False):
+    st = clients.stub('observabilityadmin')
+    st.add_response('get_telemetry_evaluation_status', {'Status': acctStatus})
+    st.add_response('list_telemetry_rules', {'TelemetryRuleSummaries': list(acctRules)})
+    if acctRules and acctStatus == 'RUNNING':
+        return
+    if org is None:
+        clients.stub('organizations').add_client_error('describe_organization',
+                                                       service_error_code='AWSOrganizationsNotInUseException')
+        return
+    _org(clients, org)
+    if orgDenied:
+        _denied(st, 'get_telemetry_evaluation_status_for_organization')
+        return
+    st.add_response('get_telemetry_evaluation_status_for_organization', {'Status': orgStatus})
+    st.add_response('list_telemetry_rules_for_organization', {'TelemetryRuleSummaries': list(orgRules)})
+
+
+def _runTelemetry(clients, **kw):
+    _telemetry(clients, **kw)
+    d = _driver(clients)
+    d._checkTelemetryRules()
+    clients.stub('observabilityadmin').assert_no_pending_responses()
+    return d.results['telemetryRulesNotConfigured']
+
+
+def test_telemetry_rules_mgmt_flag_fix(clients):
+    assert _runTelemetry(clients)[0] == -1
+    ## Rule exists but evaluation never started -> still flagged.
+    assert _runTelemetry(clients, orgRules=[_tRule('org-vpc')])[0] == -1
+    assert _runTelemetry(clients, orgStatus='RUNNING', orgRules=[_tRule('org-vpc')])[0] == 1
+
+
+def test_telemetry_rules_account_rule_passes(clients):
+    assert _runTelemetry(clients, acctStatus='RUNNING', acctRules=[_tRule('acct-vpc')])[0] == 1
+
+
+def test_telemetry_rules_standalone_flag_fix(clients):
+    r = _runTelemetry(clients, org=None)
+    assert r[0] == -1 and 'organization' not in r[1]
+    assert _runTelemetry(clients, org=None, acctStatus='RUNNING', acctRules=[_tRule('acct')])[0] == 1
+
+
+def test_telemetry_rules_member_account_not_evaluable(clients):
+    r = _runTelemetry(clients, org=MGMT, orgDenied=True)
+    assert r == [0, 'Not evaluable from member account']
+
+
+def test_telemetry_rules_mgmt_denied_or_account_unreadable(clients):
+    r = _runTelemetry(clients, org=ACCT, orgDenied=True)
+    assert r[0] == 0 and 'Unable to evaluate (AccessDeniedException)' in r[1]
+    st = clients.stub('observabilityadmin')
+    _denied(st, 'get_telemetry_evaluation_status')
+    _org(clients, ACCT)
+    st.add_response('get_telemetry_evaluation_status_for_organization', {'Status': 'NOT_STARTED'})
+    st.add_response('list_telemetry_rules_for_organization', {'TelemetryRuleSummaries': []})
+    d = _driver(clients)
+    d._checkTelemetryRules()
+    assert d.results['telemetryRulesNotConfigured'][0] == 0

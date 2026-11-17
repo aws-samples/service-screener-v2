@@ -116,7 +116,20 @@ class CloudwatchAccount(Evaluator):
 
     ACTIVE_ANOMALY_STATES = ('INITIALIZING', 'TRAINING', 'ANALYZING')
 
-    def __init__(self, region, clientFn, ctLogs, logGroups, alarms):
+    ## Replication lag / latency metrics that indicate data is being replicated
+    ## to another copy (read replica, global database/table, S3 replication).
+    ## Intra-cluster reader lag (AuroraReplicaLag, ElastiCache ReplicationLag)
+    ## is deliberately excluded: it is not a recovery-point signal.
+    REPLICATION_LAG_METRICS = (
+        ('AWS/RDS', 'ReplicaLag'),
+        ('AWS/RDS', 'AuroraGlobalDBReplicationLag'),
+        ('AWS/RDS', 'AuroraBinlogReplicaLag'),
+        ('AWS/DynamoDB', 'ReplicationLatency'),
+        ('AWS/S3', 'ReplicationLatency'),
+        ('AWS/ElastiCache', 'GlobalDatastoreReplicationLag'),
+    )
+
+    def __init__(self, region, clientFn, ctLogs, logGroups, alarms, compositeAlarms=None):
         super().__init__()
         self.init()
 
@@ -126,6 +139,7 @@ class CloudwatchAccount(Evaluator):
         self.ctLogs = ctLogs or []
         self.logGroups = logGroups or []
         self.alarms = alarms or []
+        self.compositeAlarms = compositeAlarms or []
         self.accountId = (Config.get('stsInfo', {}) or {}).get('Account')
 
         self._lock = threading.RLock()
@@ -541,3 +555,141 @@ class CloudwatchAccount(Evaluator):
             self.results[key] = [0, 'No CloudTrail, VPC Flow Logs or Resolver query log groups to evaluate']
         else:
             self.results[key] = [-1, f'No anomaly detector on security metrics or on {len(securityGroups)} security log group(s)']
+
+    def _alarmMetricDims(self, alarm):
+        """(namespace, metricName, frozenset(dimensions)) entries an alarm evaluates."""
+        out = set()
+
+        def dims(lst):
+            return frozenset((d.get('Name'), d.get('Value')) for d in (lst or []))
+        if alarm.get('MetricName'):
+            out.add((alarm.get('Namespace'), alarm.get('MetricName'), dims(alarm.get('Dimensions'))))
+        for m in alarm.get('Metrics', []) or []:
+            metric = (m.get('MetricStat') or {}).get('Metric') or {}
+            if metric.get('MetricName'):
+                out.add((metric.get('Namespace'), metric.get('MetricName'), dims(metric.get('Dimensions'))))
+        return out
+
+    def _notifyingAlarms(self):
+        """Metric alarms whose ALARM state triggers an action, directly or through
+        a composite alarm (with actions) that references them."""
+        viaComposite = set()
+        for c in self.compositeAlarms:
+            if c.get('ActionsEnabled', True) is False or not c.get('AlarmActions'):
+                continue
+            for ref in re.findall(r'ALARM\(\s*"?([^")]+?)"?\s*\)', c.get('AlarmRule', '') or ''):
+                viaComposite.add(ref.strip())
+        out = []
+        for a in self.alarms:
+            direct = a.get('ActionsEnabled', True) is not False and bool(a.get('AlarmActions'))
+            if direct or a.get('AlarmName') in viaComposite or a.get('AlarmArn') in viaComposite:
+                out.append(a)
+        return out
+
+    def _checkReplicationLagAlarm(self):
+        key = 'replicationLagNotAlarmed'
+        cw = self._client('cloudwatch')
+        streams = {}
+        errors = []
+        for ns, mn in self.REPLICATION_LAG_METRICS:
+            try:
+                for page in cw.get_paginator('list_metrics').paginate(
+                        Namespace=ns, MetricName=mn, RecentlyActive='PT3H'):
+                    for m in page.get('Metrics', []) or []:
+                        d = frozenset((x.get('Name'), x.get('Value')) for x in m.get('Dimensions', []) or [])
+                        streams.setdefault((ns, mn), set()).add(d)
+            except Exception as e:
+                errors.append(f'{ns}/{mn}: {_errCode(e)}')
+
+        if not streams:
+            if errors:
+                self.results[key] = [0, f'Unable to evaluate ({"; ".join(errors)})']
+            else:
+                self.results[key] = [0, 'No replication lag metrics reported in this region in the last 3 hours']
+            return
+
+        notifying = self._notifyingAlarms()
+        alarmEntries = set()
+        expressions = []
+        for a in notifying:
+            alarmEntries |= self._alarmMetricDims(a)
+            for m in a.get('Metrics', []) or []:
+                if m.get('Expression'):
+                    expressions.append(m['Expression'])
+
+        uncovered = []
+        total = 0
+        for (ns, mn), dimSets in sorted(streams.items()):
+            onMetric = {e[2] for e in alarmEntries if e[0] == ns and e[1] == mn}
+            ## An alarm on an aggregate of this metric (dimension set that is not
+            ## one of the per-resource streams) or a SEARCH/metric-math expression
+            ## naming the metric covers every stream: do not FAIL those.
+            aggregate = any(d not in dimSets for d in onMetric) or \
+                any(re.search(r'\b' + re.escape(mn) + r'\b', x) and (ns in x or 'AWS/' not in x)
+                    for x in expressions)
+            for d in dimSets:
+                total += 1
+                if aggregate or d in onMetric:
+                    continue
+                label = ','.join(f'{k}={v}' for k, v in sorted(d, key=lambda kv: (kv[0] or '', kv[1] or ''))) or 'no dimensions'
+                uncovered.append(f'{ns}/{mn} [{label}]')
+
+        if uncovered:
+            shown = uncovered[:10]
+            more = f' (+{len(uncovered) - 10} more)' if len(uncovered) > 10 else ''
+            self.results[key] = [-1, f'{len(uncovered)} of {total} replication lag metric stream(s) have no alarm with an alarm action: '
+                                     + '; '.join(shown) + more]
+        elif errors:
+            self.results[key] = [0, f'Unable to evaluate ({"; ".join(errors)})']
+        else:
+            self.results[key] = [1, f'All {total} replication lag metric stream(s) have an alarm with an alarm action']
+
+    def _checkTelemetryRules(self):
+        key = 'telemetryRulesNotConfigured'
+        oa = self._client('observabilityadmin')
+
+        def rules(op):
+            out = []
+            for page in oa.get_paginator(op).paginate():
+                out.extend(page.get('TelemetryRuleSummaries', []) or [])
+            return out
+
+        acctErr = None
+        acctRules, acctStatus = [], None
+        try:
+            acctStatus = oa.get_telemetry_evaluation_status().get('Status')
+            acctRules = rules('list_telemetry_rules')
+        except Exception as e:
+            acctErr = _errCode(e)
+        if acctRules and acctStatus == 'RUNNING':
+            self.results[key] = [1, f'{len(acctRules)} account telemetry rule(s); telemetry evaluation RUNNING']
+            return
+
+        inOrg, mgmt = self._orgInfo()
+        orgErr = None
+        orgRules, orgStatus = [], None
+        if inOrg is not False:
+            try:
+                orgStatus = oa.get_telemetry_evaluation_status_for_organization().get('Status')
+                orgRules = rules('list_telemetry_rules_for_organization')
+            except Exception as e:
+                orgErr = _errCode(e)
+            if not orgErr and orgRules and orgStatus == 'RUNNING':
+                self.results[key] = [1, f'{len(orgRules)} organization telemetry rule(s); organization telemetry evaluation RUNNING']
+                return
+
+        if acctErr:
+            self.results[key] = [0, f'Unable to evaluate ({acctErr})']
+            return
+        if inOrg is not False and orgErr:
+            ## Organization-wide rules may cover this account but cannot be read here.
+            if mgmt and self.accountId and mgmt != self.accountId:
+                self.results[key] = [0, 'Not evaluable from member account']
+            else:
+                self.results[key] = [0, f'Unable to evaluate ({orgErr})']
+            return
+
+        detail = [f'account: {len(acctRules)} rule(s), evaluation {acctStatus or "unknown"}']
+        if inOrg is not False:
+            detail.append(f'organization: {len(orgRules)} rule(s), evaluation {orgStatus or "unknown"}')
+        self.results[key] = [-1, 'No active CloudWatch telemetry enablement rule (' + '; '.join(detail) + ')']

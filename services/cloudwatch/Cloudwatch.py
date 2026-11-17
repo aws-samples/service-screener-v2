@@ -587,7 +587,7 @@ class Cloudwatch(Service):
         _pi('CloudWatch Account', self.region)
         obj = CloudwatchAccount(self.region, lambda svc, region=None: self.ssBoto.client(
                                     svc, config=self.bConfig, region_name=region or self.region),
-                                self.ctLogs, self.logGroups, self.alarms)
+                                self.ctLogs, self.logGroups, self.alarms, self.compositeAlarms)
         obj.run(self.__class__)
         objs[f"Account::{self.region}"] = obj.getInfo()
         del obj

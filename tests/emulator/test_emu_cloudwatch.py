@@ -379,3 +379,58 @@ def test_cw_no_anomaly_detection(emu, uid):
         if cleanupTrail:
             cleanupTrail()
         _quiet(logs.delete_log_group, logGroupName=lg)
+
+
+def test_lambda_log_group_retention_unset_covered_by_set_retention_days(emu, uid):
+    """WAFS2027 'lambdaLogRetentionUnset' is covered by the existing
+    SetRetentionDays check, which evaluates every log group including the
+    /aws/lambda/<function> groups Lambda creates. This proves the existing key
+    flags a never-expiring Lambda log group and clears once retention is set."""
+    logs = emu.client('logs')
+    name = f'/aws/lambda/ss-fn-{uid}'
+    try:
+        res = f'Log::{name}'
+        logs.create_log_group(logGroupName=name)
+        before = runCheck(emu, 'cloudwatch', 'SetRetentionDays', res).statuses()
+        assert before and all(s == -1 for s in before.values()), before
+
+        logs.put_retention_policy(logGroupName=name, retentionInDays=400)
+        ## SetRetentionDays (legacy) only records a result when it fails, so
+        ## after the fix the key is absent for the resource: never -1.
+        after = runCheck(emu, 'cloudwatch', 'SetRetentionDays', res).statuses()
+        assert all(s != -1 for s in after.values()), after
+        assert logs.describe_log_groups(logGroupNamePrefix=name)['logGroups'][0]['retentionInDays'] == 400
+    finally:
+        _quiet(logs.delete_log_group, logGroupName=name)
+
+
+def test_telemetry_rules_account_rule_end_to_end(emu, uid):
+    """telemetryRulesNotConfigured, account-level path against the emulator.
+
+    The emulator does not implement ListTelemetryRulesForOrganization, so the
+    FAIL verdict (which requires organization rules to be readable) is covered
+    by Stubber tests in tests/test_stub_cloudwatch.py. Here we prove the
+    unconfigured state is never a PASS and that an account telemetry rule with
+    telemetry evaluation started clears the check (real API shapes)."""
+    import time
+    oa = emu.client('observabilityadmin')
+    name = f'ss-telemetry-{uid}'
+    origStatus = oa.get_telemetry_evaluation_status().get('Status')
+    try:
+        assert not oa.list_telemetry_rules()['TelemetryRuleSummaries']
+        before = runCheck(emu, 'cloudwatch', 'telemetryRulesNotConfigured', ACCOUNT_RES).statuses()
+        assert before and all(s != 1 for s in before.values()), before
+
+        oa.create_telemetry_rule(RuleName=name, Rule={'ResourceType': 'AWS::EC2::VPC', 'TelemetryType': 'Logs'})
+        if origStatus != 'RUNNING':
+            oa.start_telemetry_evaluation()
+        for _ in range(30):
+            if oa.get_telemetry_evaluation_status().get('Status') == 'RUNNING':
+                break
+            time.sleep(0.5)
+        after = runCheck(emu, 'cloudwatch', 'telemetryRulesNotConfigured', ACCOUNT_RES).statuses()
+        assert after and set(after.values()) == {1}, after
+    finally:
+        _quiet(oa.delete_telemetry_rule, RuleIdentifier=name)
+        if origStatus != 'RUNNING':
+            _quiet(oa.stop_telemetry_evaluation)
