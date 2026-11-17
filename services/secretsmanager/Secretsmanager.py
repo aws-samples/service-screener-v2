@@ -1,9 +1,11 @@
 import botocore
+from botocore.config import Config as bConfig
 
 from utils.Tools import _pi
 from services.Service import Service
 
 from services.secretsmanager.drivers.SecretsmanagerCommon import SecretsmanagerCommon
+from services.secretsmanager.drivers.SecretsmanagerAccount import SecretsmanagerAccount
 
 
 class Secretsmanager(Service):
@@ -161,7 +163,30 @@ class Secretsmanager(Service):
             except Exception as e:
                 print(f"Error processing secret {secret.get('_arn')}: {e}")
 
+        # Account/region-level checks only matter where secrets exist.
+        if secrets:
+            try:
+                obj = SecretsmanagerAccount(
+                    {'region': self.region, 'account': self._currentAccount()},
+                    self.ssBoto.client('events', config=self.bConfig),
+                    self.ssBoto.client('cloudtrail', config=self.bConfig),
+                    self._regionalClient,
+                )
+                obj.run(self.__class__)
+                objs['Secretsmanager::Account'] = obj.getInfo()
+                del obj
+            except Exception as e:
+                print(f"Error processing Secrets Manager account checks in {self.region}: {e}")
+
         return objs
+
+    def _regionalClient(self, serviceName, region):
+        """Client for a (possibly different) region, e.g. the region holding a
+        multi-region trail's CloudWatch Logs log group."""
+        if region == self.region:
+            return self.ssBoto.client(serviceName, config=self.bConfig)
+        cfg = bConfig(region_name=region, retries={'mode': 'standard', 'max_attempts': 5})
+        return self.ssBoto.client(serviceName, region_name=region, config=cfg)
 
     # ------------------------------------------------------------------ #
     # Helpers
