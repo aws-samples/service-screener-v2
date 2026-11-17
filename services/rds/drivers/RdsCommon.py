@@ -131,7 +131,7 @@ class RdsCommon(Evaluator):
             )
 
             for param in results.get('Parameters'):
-                if param['IsModifiable'] == 1 and 'ParameterValue' in param:
+                if param.get('IsModifiable', True) == 1 and 'ParameterValue' in param:
                     arr[param['ParameterName']] = param['ParameterValue']
             
             while results.get('Marker') is not None:
@@ -142,7 +142,7 @@ class RdsCommon(Evaluator):
 
                 for param in results.get('Parameters'):
                     #__pr(param['ParameterName'] + ' = ' + param['ParameterValue'] + ' || ' + param['IsModifiable'])
-                    if param['IsModifiable'] == 1 and 'ParameterValue' in param:
+                    if param.get('IsModifiable', True) == 1 and 'ParameterValue' in param:
                         arr[param['ParameterName']] = param['ParameterValue']
             
         else: 
@@ -152,7 +152,7 @@ class RdsCommon(Evaluator):
             )
 
             for param in results.get('Parameters'):
-                if param['IsModifiable'] == 1 and 'ParameterValue' in param:
+                if param.get('IsModifiable', True) == 1 and 'ParameterValue' in param:
                     arr[param['ParameterName']] = param['ParameterValue']
             
             while results.get('Marker') is not None:
@@ -163,7 +163,7 @@ class RdsCommon(Evaluator):
 
                 for param in results.get('Parameters'):
                     #__pr(param['ParameterName'] + ' = ' + param['ParameterValue'] + ' || ' + param['IsModifiable'])
-                    if param['IsModifiable'] == 1 and 'ParameterValue' in param:
+                    if param.get('IsModifiable', True) == 1 and 'ParameterValue' in param:
                         arr[param['ParameterName']] = param['ParameterValue']
             
 
@@ -207,8 +207,39 @@ class RdsCommon(Evaluator):
         if not self.engine in validEngine:
             return
         
-        if 'rds.force_ssl' in self.dbParams and self.dbParams['rds.force_ssl'] == '0':
-            self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [-1, 'rds.force_ssl==0']
+        val = self.dbParams.get('rds.force_ssl', None)
+        if val is not None:
+            if str(val).strip() == '0':
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [-1, 'rds.force_ssl==0']
+            elif str(val).strip() == '1':
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [1, 'rds.force_ssl==1']
+            return
+
+        # rds.force_ssl not returned by the parameter group: fall back to the
+        # engine default only where AWS documents it per major version. Aurora / Multi-AZ cluster member instances
+        # take the setting from the cluster parameter group (evaluated on the
+        # cluster object), so they are skipped here.
+        if self._isClusterMemberInstance():
+            return
+        # Documented engine defaults: RDS for PostgreSQL 15+ -> 1 (14 and
+        # older -> 0); Aurora PostgreSQL 17+ -> 1 (16 and older -> 0).
+        defaultOnFrom = {'postgres': 15, 'aurora-postgresql': 17}
+        if self.engine in defaultOnFrom:
+            try:
+                major = int(str(self.db.get('EngineVersion', '')).split('.')[0])
+            except ValueError:
+                major = None
+            minOn = defaultOnFrom[self.engine]
+            if major is None:
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [0, 'Unable to evaluate (rds.force_ssl not set; engine version unknown)']
+            elif major >= minOn:
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [1, 'rds.force_ssl not set (engine default 1 for {} {}+)'.format(self.engine, minOn)]
+            else:
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [-1, 'rds.force_ssl not set (engine default 0 before {} {})'.format(self.engine, minOn)]
+            return
+        # SQL Server: no version-specific default to rely on; never PASS (or
+        # FAIL) on an unknown value.
+        self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [0, 'Unable to evaluate (rds.force_ssl not returned by the parameter group)']
     
     def _checkMasterUsername(self):
         defaultMasterUser = {
@@ -869,3 +900,143 @@ class RdsCommon(Evaluator):
         
         if not hasSubscriptions:
             self.results['EventSubscriptionNotConfigured'] = [-1, 'No event subscriptions configured']
+
+    ## ---- WAFS2027 checks ----
+    def _isClusterMemberInstance(self):
+        # Aurora and Multi-AZ DB cluster members inherit log exports and the
+        # cluster parameter group from the cluster; evaluate them once on the
+        # cluster object instead of on every member instance.
+        return self.isCluster == False and bool(self.db.get('DBClusterIdentifier'))
+
+    def _hasAuditPluginOption(self):
+        # MySQL/MariaDB audit log only exists when MARIADB_AUDIT_PLUGIN is
+        # added to the instance's option group. Returns (found, errorCode);
+        # errorCode is set (and found is None) when an option group cannot
+        # be read.
+        found = False
+        for og in self.db.get('OptionGroupMemberships', []) or []:
+            name = og.get('OptionGroupName')
+            if not name:
+                continue
+            cacheKey = 'rds::optionGroupOptions::' + self.rdsClient.meta.region_name + '::' + name
+            options = Config.get(cacheKey, None)
+            if options is None:
+                try:
+                    resp = self.rdsClient.describe_option_groups(OptionGroupName=name)
+                    options = []
+                    for grp in resp.get('OptionGroupsList', []):
+                        options += [o.get('OptionName') for o in grp.get('Options', [])]
+                    Config.set(cacheKey, options)
+                except botocore.exceptions.ClientError as e:
+                    code = e.response.get('Error', {}).get('Code', 'ClientError')
+                    _warn("Unable to describe option group {}: {}".format(name, code))
+                    return None, code
+            if 'MARIADB_AUDIT_PLUGIN' in options:
+                found = True
+        return found, None
+
+    def _checkRdsLogExportsDisabled(self):
+        if self._isClusterMemberInstance():
+            return
+
+        auditUnknown = None
+        if self.engine in ('postgres', 'aurora-postgresql'):
+            required = ['postgresql']
+        elif self.engine == 'aurora-mysql':
+            required = ['audit']
+        elif self.engine in ('mysql', 'mariadb'):
+            required = ['error']
+            if self.isCluster == False:
+                hasAudit, auditUnknown = self._hasAuditPluginOption()
+                if hasAudit == True:
+                    required.append('audit')
+        elif self.engine == 'sqlserver':
+            required = ['error']
+        else:
+            # Oracle ('audit') is not evaluated: Rds.engineDriver has no Oracle
+            # driver, so Oracle instances never reach RdsCommon.
+            return
+
+        exported = self.db.get('EnabledCloudwatchLogsExports', []) or []
+        missing = [t for t in required if t not in exported]
+        if missing:
+            self.results['rdsLogExportsDisabled'] = [-1, 'Not exported to CloudWatch Logs: {} (exported: {})'.format(
+                ', '.join(missing), ', '.join(exported) if exported else 'none')]
+        elif auditUnknown and 'audit' not in exported:
+            # Option group unreadable: cannot tell whether an audit log export
+            # is also required, so do not PASS.
+            self.results['rdsLogExportsDisabled'] = [0, 'Unable to evaluate ({}) - option group unreadable; audit plugin status unknown'.format(auditUnknown)]
+        else:
+            self.results['rdsLogExportsDisabled'] = [1, 'Exported: ' + ', '.join(exported)]
+
+    def _checkRdsSecureTransportNotRequired(self):
+        # PostgreSQL / Aurora PostgreSQL / SQL Server rds.force_ssl is already
+        # reported by MSSQLorPG__TransportEncrpytionDisabled (_checkSSLParams).
+        if self.engine not in ('mysql', 'mariadb', 'aurora-mysql'):
+            return
+        if self._isClusterMemberInstance():
+            return
+        # Aurora MySQL sets require_secure_transport in the cluster parameter group.
+        if self.engine == 'aurora-mysql' and self.isCluster == False:
+            return
+
+        val = self.dbParams.get('require_secure_transport', None)
+        if val is None:
+            ver = self._engineVersionTuple()
+            if self.engine == 'mariadb' and ver is not None and ver < (10, 5):
+                # Parameter only exists on RDS for MariaDB 10.5 and higher.
+                self.results['rdsSecureTransportNotRequired'] = [0, 'require_secure_transport not supported on MariaDB ' + self.db.get('EngineVersion', '')]
+                return
+            if self.engine == 'mariadb' and ver is not None and ver >= (11, 8):
+                # RDS for MariaDB 11.8+ defaults require_secure_transport to ON.
+                self.results['rdsSecureTransportNotRequired'] = [1, 'require_secure_transport not set (engine default ON for MariaDB 11.8+)']
+                return
+            if self.engine == 'mariadb' and ver is None:
+                self.results['rdsSecureTransportNotRequired'] = [0, 'Unable to evaluate (engine version unknown; default depends on MariaDB version)']
+                return
+            # Engine default is OFF for RDS MySQL, Aurora MySQL and MariaDB 10.5 - 11.4.
+            self.results['rdsSecureTransportNotRequired'] = [-1, 'require_secure_transport not set (engine default OFF)']
+            return
+
+        if str(val).strip().lower() in ('1', 'on', 'true'):
+            self.results['rdsSecureTransportNotRequired'] = [1, 'require_secure_transport=' + str(val)]
+        else:
+            self.results['rdsSecureTransportNotRequired'] = [-1, 'require_secure_transport=' + str(val)]
+
+    def _engineVersionTuple(self):
+        # '10.11.6' -> (10, 11); None when unparsable / missing.
+        try:
+            parts = str(self.db.get('EngineVersion', '')).split('.')
+            return (int(parts[0]), int(parts[1]))
+        except (ValueError, IndexError):
+            return None
+
+    def _checkAuroraNoGlobalDatabase(self):
+        if self.isCluster == False or self.engine not in ('aurora-mysql', 'aurora-postgresql'):
+            return
+        if self.db.get('EngineMode', 'provisioned') not in ('provisioned', None):
+            # Aurora Serverless v1 / parallel query modes cannot join a global database.
+            return
+
+        if self.db.get('GlobalClusterIdentifier'):
+            self.results['auroraNoGlobalDatabase'] = [1, 'Member of global database ' + self.db['GlobalClusterIdentifier']]
+            return
+
+        cacheKey = 'rds::GlobalClusterMemberArns::' + self.rdsClient.meta.region_name
+        memberArns = Config.get(cacheKey, None)
+        if memberArns is None:
+            try:
+                memberArns = []
+                paginator = self.rdsClient.get_paginator('describe_global_clusters')
+                for page in paginator.paginate():
+                    for gc in page.get('GlobalClusters', []):
+                        memberArns += [m.get('DBClusterArn') for m in gc.get('GlobalClusterMembers', [])]
+                Config.set(cacheKey, memberArns)
+            except botocore.exceptions.ClientError as e:
+                self.results['auroraNoGlobalDatabase'] = [0, 'Unable to evaluate ({})'.format(e.response['Error']['Code'])]
+                return
+
+        if self.db.get('DBClusterArn') in memberArns:
+            self.results['auroraNoGlobalDatabase'] = [1, 'Member of a global database']
+        else:
+            self.results['auroraNoGlobalDatabase'] = [-1, 'Not part of an Aurora global database']
