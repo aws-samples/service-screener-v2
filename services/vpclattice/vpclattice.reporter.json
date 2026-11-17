@@ -1,0 +1,36 @@
+{
+    "latticeAuthTypeNone": {
+        "category": "S",
+        "^description": "{$COUNT} VPC Lattice service network(s) or service(s) do not authenticate callers: the auth type is NONE, or it is AWS_IAM but the auth policy allows Principal \"*\" to invoke with no Condition, which also admits anonymous (unsigned) callers. Any workload in a VPC connected to the service network can then reach the service at this layer without SigV4 authentication or IAM authorisation. Security groups and network ACLs still filter by address, but they cannot tell which principal is calling. Enforce AWS_IAM with an auth policy that names principals or scopes them with conditions such as aws:PrincipalOrgID, or that excludes aws:PrincipalType Anonymous.",
+        "shortDesc": "Enforce IAM auth on VPC Lattice",
+        "criticality": "M",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Control access to VPC Lattice services using auth policies]<https://docs.aws.amazon.com/vpc-lattice/latest/ug/auth-policies.html>",
+            "[SIGv4 authenticated requests for VPC Lattice]<https://docs.aws.amazon.com/vpc-lattice/latest/ug/sigv4-authenticated-requests.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/vpc-lattice/latest/ug/auth-policies.html"
+    },
+    "latticeAccessLogsDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} VPC Lattice service network(s) or service(s) have no access log subscription covering service traffic. Access logs record each request's caller principal, source VPC, path, response code and authorisation-denied reason; without them there is no record of who called a service, so unauthorised or anomalous access cannot be investigated. A service without its own subscription is accepted when every service network it is associated with logs service traffic.",
+        "shortDesc": "Enable VPC Lattice access logs",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[Access logs for Amazon VPC Lattice]<https://docs.aws.amazon.com/vpc-lattice/latest/ug/monitoring-access-logs.html>",
+            "[CreateAccessLogSubscription]<https://docs.aws.amazon.com/vpc-lattice/latest/APIReference/API_CreateAccessLogSubscription.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/vpc-lattice/latest/ug/monitoring-access-logs.html"
+    }
+}
