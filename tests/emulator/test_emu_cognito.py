@@ -111,6 +111,39 @@ def test_identity_pool_guest_role_sync_all_identities_then_per_identity(emu, uid
         _silent(iam.delete_role, RoleName=role)
 
 
+def test_identity_pool_guest_role_dynamodb_forallvalues_then_plain_condition(emu, uid):
+    """dynamodb:* on a table with ForAllValues:StringEquals LeadingKeys = ${sub} is
+    flagged (ForAllValues is true for DeleteTable / Scan, which carry no
+    LeadingKeys); the plain StringEquals form (key required) is not."""
+    ci, iam = emu.client('cognito-identity'), emu.client('iam')
+    role = f'ss-guest4-{uid}'
+    arn = iam.create_role(RoleName=role, AssumeRolePolicyDocument=TRUST)['Role']['Arn']
+    ipid = ci.create_identity_pool(IdentityPoolName=f'ss_ip4_{uid}',
+                                   AllowUnauthenticatedIdentities=True)['IdentityPoolId']
+
+    def _put(op):
+        iam.put_role_policy(RoleName=role, PolicyName='ddb', PolicyDocument=json.dumps({
+            'Version': '2012-10-17', 'Statement': [{
+                'Effect': 'Allow', 'Action': 'dynamodb:*',
+                'Resource': f'arn:aws:dynamodb:us-east-1:000000000000:table/t-{uid}',
+                'Condition': {op: {'dynamodb:LeadingKeys': ['${cognito-identity.amazonaws.com:sub}']}}}]}))
+    try:
+        def misconfigure():
+            _put('ForAllValues:StringEquals')
+            ci.set_identity_pool_roles(IdentityPoolId=ipid, Roles={'unauthenticated': arn})
+
+        def fix():
+            _put('StringEquals')
+
+        before, after = assertFlagFixCycle(emu, 'cognito', 'cognitoIdentityPoolGuestRoleBroad', ipid,
+                                           misconfigure, fix)
+        assert list(after.values()) == [1]
+    finally:
+        _silent(ci.delete_identity_pool, IdentityPoolId=ipid)
+        _silent(iam.delete_role_policy, RoleName=role, PolicyName='ddb')
+        _silent(iam.delete_role, RoleName=role)
+
+
 # --------------------------------------------------------------------------- #
 # cognitoIdentityPoolNoRoleMapping
 # --------------------------------------------------------------------------- #

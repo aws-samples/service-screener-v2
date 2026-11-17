@@ -22,8 +22,11 @@ class CognitoIdentityPool(Evaluator):
               pool['_describeError']     -- error code when DescribeIdentityPool failed
     """
 
-    # AWS managed policies that grant broad access by name.
-    BROAD_MANAGED_POLICY_NAMES = ('AdministratorAccess', 'PowerUserAccess')
+    # AWS managed policies that grant broad access by name (admin, and the
+    # account-wide read / view job-function policies: anonymous read of every
+    # service's data or configuration).
+    BROAD_MANAGED_POLICY_NAMES = ('AdministratorAccess', 'PowerUserAccess', 'ReadOnlyAccess',
+                                  'ViewOnlyAccess', 'SecurityAudit')
 
     def __init__(self, pool):
         super().__init__()
@@ -41,12 +44,12 @@ class CognitoIdentityPool(Evaluator):
     # ------------------------------------------------------------------ #
     @staticmethod
     def loginProviders(pool):
-        """Return the list of identity-provider names configured on the pool,
-        in the form used by role mappings / principal tag maps.
+        """Return the distinct identity-provider names configured on the pool
+        (the names used by principal tag maps).
 
-        Cognito user pool providers are listed once per app client (role
-        mapping keys are '<provider>:<clientId>'), because each app client is a
-        distinct sign-in source."""
+        Several app clients of one Cognito user pool share one ProviderName
+        and are one sign-in source (one user directory), so they are counted
+        once."""
         out = []
         for p in pool.get('CognitoIdentityProviders') or []:
             name = p.get('ProviderName')
@@ -57,6 +60,26 @@ class CognitoIdentityPool(Evaluator):
         out.extend(pool.get('SamlProviderARNs') or [])
         if pool.get('DeveloperProviderName'):
             out.append(pool['DeveloperProviderName'])
+        seen, uniq = set(), []
+        for n in out:
+            if n not in seen:
+                seen.add(n)
+                uniq.append(n)
+        return uniq
+
+    @staticmethod
+    def userPoolClientProviders(pool):
+        """{providerName: ['<providerName>:<clientId>', ...]} for Cognito user
+        pool providers - the client-qualified form used as role-mapping keys,
+        tried as an alternative name for principal tag maps."""
+        out = {}
+        for p in pool.get('CognitoIdentityProviders') or []:
+            name, cid = p.get('ProviderName'), p.get('ClientId')
+            if name and cid:
+                out.setdefault(name, [])
+                q = f"{name}:{cid}"
+                if q not in out[name]:
+                    out[name].append(q)
         return out
 
     @staticmethod
@@ -79,19 +102,53 @@ class CognitoIdentityPool(Evaluator):
             return any(cls._mentionsIdentityVar(v) for v in value)
         return False
 
+    # Condition keys that confine a request to the caller's own data when their
+    # value is the caller's identity id (documented per-identity patterns).
+    PER_IDENTITY_KEYS = ('dynamodb:leadingkeys', 's3:prefix')
+
     @classmethod
     def _conditionKeyedOnIdentity(cls, cond):
-        """A positive string-match condition (StringEquals / StringLike, optionally
-        ForAllValues: / ForAnyValue:) whose value is the caller's identity id.
-        Negated (StringNot*) and ...IfExists operators do not confine the caller."""
+        """True when the Condition confines the caller to its own identity: a
+        positive string match (StringEquals / StringLike / StringEqualsIgnoreCase,
+        plain or ForAnyValue:) on a known per-identity key (dynamodb:LeadingKeys,
+        s3:prefix) whose every value is ${cognito-identity.amazonaws.com:sub}-based.
+
+        - Negated (StringNot*) and ...IfExists operators do not confine the caller.
+        - ForAllValues: evaluates to true when the key is absent from the request
+          (e.g. dynamodb:DeleteTable / Scan carry no LeadingKeys), so it only
+          counts when the same Condition also has Null {key: 'false'}.
+        - Other keys (e.g. cognito-identity.amazonaws.com:sub itself, or keys the
+          caller controls) are not accepted."""
         if not isinstance(cond, dict):
             return False
+        nullFalse = set()
         for op, kv in cond.items():
-            base = str(op).split(':')[-1]
+            if str(op).lower() == 'null' and isinstance(kv, dict):
+                for k, v in kv.items():
+                    vals = cls._asList(v)
+                    if vals and all(str(x).lower() == 'false' for x in vals):
+                        nullFalse.add(str(k).lower())
+        for op, kv in cond.items():
+            if not isinstance(kv, dict):
+                continue
+            parts = str(op).split(':')
+            if len(parts) > 2:
+                continue
+            qualifier = parts[0].lower() if len(parts) == 2 else ''
+            base = parts[-1]
             if base not in ('StringEquals', 'StringLike', 'StringEqualsIgnoreCase'):
                 continue
-            if cls._mentionsIdentityVar(kv):
-                return True
+            if qualifier not in ('', 'foranyvalue', 'forallvalues'):
+                continue
+            for k, v in kv.items():
+                key = str(k).lower()
+                if key not in cls.PER_IDENTITY_KEYS:
+                    continue
+                if qualifier == 'forallvalues' and key not in nullFalse:
+                    continue
+                vals = cls._asList(v)
+                if vals and all(isinstance(x, str) and cls._mentionsIdentityVar(x) for x in vals):
+                    return True
         return False
 
     @staticmethod
@@ -126,7 +183,27 @@ class CognitoIdentityPool(Evaluator):
 
     @staticmethod
     def _isServiceWildcard(a):
-        return isinstance(a, str) and (a.strip() == '*' or (a.strip().endswith(':*') and a.count(':') == 1))
+        """'*', '<svc>:*' (or ':**'), or a colon-less glob such as 's3*' (IAM
+        globbing matches every action of the service)."""
+        if not isinstance(a, str):
+            return False
+        s = a.strip()
+        if not s:
+            return False
+        if ':' not in s:
+            return s.endswith('*')
+        if s.count(':') != 1:
+            return False
+        name = s.split(':', 1)[1]
+        return bool(name) and set(name) == {'*'}
+
+    @staticmethod
+    def _actionService(a):
+        """Lower-cased service prefix of a wildcard action, or None for an
+        all-services pattern ('*', '*:*')."""
+        s = a.strip().lower()
+        svc = (s.split(':', 1)[0] if ':' in s else s).rstrip('*')
+        return svc or None
 
     @classmethod
     def denyLimits(cls, docs):
@@ -167,14 +244,18 @@ class CognitoIdentityPool(Evaluator):
         still a wildcard after the role's unconditional Deny statements?"""
         if limits['all']:
             return False
-        svc = None if action == '*' else action.split(':', 1)[0].lower()
+        svc = cls._actionService(action)
         if svc and svc in limits['services']:
             return False
         for cap in limits['notActionCaps']:
             ## Only actions listed in the Deny NotAction stay allowed.
-            keep = [c for c in cap if cls._isServiceWildcard(c)
-                    and (c.strip() == '*' or svc is None or c.split(':', 1)[0].lower() == svc)
-                    and (c.strip() == '*' or c.split(':', 1)[0].lower() not in limits['services'])]
+            keep = []
+            for c in cap:
+                if not cls._isServiceWildcard(c):
+                    continue
+                cs = cls._actionService(c)
+                if cs is None or ((svc is None or cs == svc) and cs not in limits['services']):
+                    keep.append(c)
             if not keep:
                 return False
         return True

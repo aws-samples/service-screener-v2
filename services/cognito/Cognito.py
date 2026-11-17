@@ -453,12 +453,35 @@ class Cognito(Service):
         ## several sign-in sources share the default authenticated role.
         if (not detail['_roles']['RoleMappings'] and roles.get('authenticated')
                 and len(providers) >= 2):
+            qualified = CognitoIdentityPool.userPoolClientProviders(detail)
             for prov in sorted(set(providers)):
-                detail['_principalTagMaps'][prov] = self._getPrincipalTagMap(ipid, prov)
+                detail['_principalTagMaps'][prov] = self._getProviderTagMap(
+                    ipid, prov, qualified.get(prov) or [])
 
         unauthArn = roles.get('unauthenticated')
         if detail.get('AllowUnauthenticatedIdentities') and unauthArn:
             detail['_unauthRole'] = self._fetchRoleEvaluation(unauthArn)
+
+    def _getProviderTagMap(self, ipid, provider, alternates):
+        """Principal tag map for one sign-in source. For Cognito user pool
+        providers the API name form is not pinned down by the docs (bare
+        '<provider>' vs the role-mapping style '<provider>:<clientId>'), so
+        every form is tried: configured if any form is configured, 'not
+        configured' (None) if any form is not found, otherwise the error."""
+        def configured(r):
+            return r is not None and not r.get('_error') and bool(r.get('UseDefaults') or r.get('PrincipalTags'))
+
+        results = [self._getPrincipalTagMap(ipid, provider)]
+        for alt in alternates:
+            if configured(results[-1]):
+                return results[-1]
+            results.append(self._getPrincipalTagMap(ipid, alt))
+        for r in results:
+            if configured(r):
+                return r
+        if any(r is None or not r.get('_error') for r in results):
+            return None
+        return results[0]
 
     def _getPrincipalTagMap(self, ipid, provider):
         try:

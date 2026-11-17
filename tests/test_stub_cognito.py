@@ -187,9 +187,34 @@ def test_policy_scope_rules():
     # s3:* on a per-identity prefix: documented pattern -> not broad
     assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:*',
                              'Resource': f'arn:aws:s3:::b/{sub}/*'}]}) == []
-    # dynamodb:* with LeadingKeys = sub on '*': per-identity -> not broad
+    # dynamodb:* with plain / ForAnyValue LeadingKeys = sub on '*': per-identity -> not broad
+    for op in ('StringEquals', 'ForAnyValue:StringEquals', 'StringLike'):
+        assert f({'Statement': [{'Effect': 'Allow', 'Action': 'dynamodb:*', 'Resource': '*',
+                                 'Condition': {op: {'dynamodb:LeadingKeys': [sub]}}}]}) == [], op
+    # ForAllValues is true when LeadingKeys is absent (DeleteTable, Scan...) -> broad
     assert f({'Statement': [{'Effect': 'Allow', 'Action': 'dynamodb:*', 'Resource': '*',
-                             'Condition': {'ForAllValues:StringEquals': {'dynamodb:LeadingKeys': [sub]}}}]}) == []
+                             'Condition': {'ForAllValues:StringEquals': {'dynamodb:LeadingKeys': [sub]}}}]})
+    # ... unless a Null {key: false} companion requires the key to be present
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': 'dynamodb:*', 'Resource': '*',
+                             'Condition': {'ForAllValues:StringEquals': {'dynamodb:LeadingKeys': [sub]},
+                                           'Null': {'dynamodb:LeadingKeys': 'false'}}}]}) == []
+    # ...IfExists does not confine
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': 'dynamodb:*', 'Resource': '*',
+                             'Condition': {'StringEqualsIfExists': {'dynamodb:LeadingKeys': [sub]}}}]})
+    # always-true / caller-controlled keys do not confine
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': '*', 'Resource': '*',
+                             'Condition': {'StringLike': {'cognito-identity.amazonaws.com:sub': sub}}}]})
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': '*', 'Resource': '*',
+                             'Condition': {'StringEquals': {'aws:RequestTag/owner': sub}}}]})
+    # a value list where one value is not identity-based does not confine
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:*', 'Resource': '*',
+                             'Condition': {'StringLike': {'s3:prefix': [f'{sub}/*', 'public/*']}}}]})
+    # colon-less glob 's3*' matches every s3 action -> broad
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3*', 'Resource': '*'}]}) == ["Action 's3*'"]
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:**', 'Resource': '*'}]}) == ["Action 's3:**'"]
+    # ... and is narrowed by Deny s3:*
+    lim = CognitoIdentityPool.denyLimits([{'Statement': [{'Effect': 'Deny', 'Action': 's3:*', 'Resource': '*'}]}])
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3*', 'Resource': '*'}]}, lim) == []
     # negated condition does not confine the caller
     assert f({'Statement': [{'Effect': 'Allow', 'Action': 'dynamodb:*', 'Resource': '*',
                              'Condition': {'StringNotEquals': {'dynamodb:LeadingKeys': [sub]}}}]})
@@ -198,6 +223,48 @@ def test_policy_scope_rules():
     assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:*', 'NotResource': 'arn:aws:s3:::x'}]}) == ["Action 's3:*'"]
     # partial wildcard is not broad
     assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:Get*', 'Resource': '*'}]}) == []
+
+
+def test_guest_role_dynamodb_forallvalues_leading_keys_flag_then_fix(svc):
+    """Review finding: ForAllValues:StringEquals on dynamodb:LeadingKeys is true
+    for requests without the key (DeleteTable, UpdateTable, Scan), so dynamodb:*
+    on the table is open to every guest -> -1. Plain StringEquals (key required)
+    confines each guest to its own partition -> not -1."""
+    m = '_checkCognitoIdentityPoolGuestRoleBroad'
+    sub = '${cognito-identity.amazonaws.com:sub}'
+    table = f'arn:aws:dynamodb:us-east-1:{ACCOUNT}:table/T'
+    docs = []
+    for op in ('ForAllValues:StringEquals', 'StringEquals'):
+        docs.append(__import__('json').dumps({'Version': '2012-10-17', 'Statement': [{
+            'Effect': 'Allow', 'Action': 'dynamodb:*', 'Resource': table,
+            'Condition': {op: {'dynamodb:LeadingKeys': [sub]}}}]}))
+    statuses = []
+    for doc in docs:
+        with Stubber(svc.iamClient) as st:
+            _stubRole(st, inline=('ddb', doc))
+            statuses.append(_run(CognitoIdentityPool(_guestPool(_unauthRole=svc._fetchRoleEvaluation(ROLE_ARN))), m))
+    assert statuses[0][0] == -1 and "dynamodb:*" in statuses[0][1], statuses
+    assert statuses[1][0] == 1, statuses
+    # same shape on Resource '*'
+    star = docs[0].replace(table, '*')
+    with Stubber(svc.iamClient) as st:
+        _stubRole(st, inline=('ddb', star))
+        assert _run(CognitoIdentityPool(_guestPool(_unauthRole=svc._fetchRoleEvaluation(ROLE_ARN))), m)[0] == -1
+
+
+def test_guest_role_readonlyaccess_flagged(svc):
+    m = '_checkCognitoIdentityPoolGuestRoleBroad'
+    ro = 'arn:aws:iam::aws:policy/ReadOnlyAccess'
+    doc = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:Get*","dynamodb:Scan"],"Resource":"*"}]}'
+    with Stubber(svc.iamClient) as st:
+        _stubRole(st, attached=[(ro, doc)])
+        bad = svc._fetchRoleEvaluation(ROLE_ARN)
+    r = _run(CognitoIdentityPool(_guestPool(_unauthRole=bad)), m)
+    assert r[0] == -1 and 'ReadOnlyAccess' in r[1]
+    with Stubber(svc.iamClient) as st:
+        _stubRole(st, inline=('scoped', SCOPED))
+        good = svc._fetchRoleEvaluation(ROLE_ARN)
+    assert _run(CognitoIdentityPool(_guestPool(_unauthRole=good)), m)[0] == 1
 
 
 def test_guest_role_allow_all_narrowed_by_deny_not_action(svc):
@@ -267,6 +334,11 @@ def test_no_role_mapping_flag_then_mapping(svc):
         for p in providers:
             st.add_client_error('get_principal_tag_attribute_map', 'ResourceNotFoundException',
                                 expected_params={'IdentityPoolId': IPID, 'IdentityProviderName': p})
+            if p.startswith('cognito-idp.'):
+                ## user pool providers are also tried in the '<provider>:<clientId>' form
+                st.add_client_error('get_principal_tag_attribute_map', 'ResourceNotFoundException',
+                                    expected_params={'IdentityPoolId': IPID,
+                                                     'IdentityProviderName': f'{p}:c1'})
         svc._hydrateIdentityPool(bad)
     assert _run(CognitoIdentityPool(bad), m)[0] == -1
 
@@ -284,11 +356,42 @@ def test_no_role_mapping_tag_map_denied_is_unable_to_evaluate(svc):
     with Stubber(svc.identityClient) as st:
         st.add_response('get_identity_pool_roles', {'IdentityPoolId': IPID,
                                                     'Roles': {'authenticated': ROLE_ARN}})
-        for _ in range(2):
+        for _ in range(3):  # google + user pool (bare and client-qualified forms)
             st.add_client_error('get_principal_tag_attribute_map', 'NotAuthorizedException')
         svc._hydrateIdentityPool(detail)
     assert _run(CognitoIdentityPool(detail), '_checkCognitoIdentityPoolNoRoleMapping') == \
         [0, 'Unable to evaluate (NotAuthorizedException)']
+
+
+def test_no_role_mapping_client_qualified_tag_map_counts_as_abac(svc):
+    """The API docs do not pin down the IdentityProviderName form for user pool
+    providers; when only the '<provider>:<clientId>' form returns a map, ABAC is
+    still recognised (no false -1)."""
+    detail = _twoProviderPool()
+    up = 'cognito-idp.us-east-1.amazonaws.com/us-east-1_a'
+    with Stubber(svc.identityClient) as st:
+        st.add_response('get_identity_pool_roles', {'IdentityPoolId': IPID,
+                                                    'Roles': {'authenticated': ROLE_ARN}})
+        st.add_client_error('get_principal_tag_attribute_map', 'ResourceNotFoundException',
+                            expected_params={'IdentityPoolId': IPID, 'IdentityProviderName': 'accounts.google.com'})
+        st.add_client_error('get_principal_tag_attribute_map', 'ResourceNotFoundException',
+                            expected_params={'IdentityPoolId': IPID, 'IdentityProviderName': up})
+        st.add_response('get_principal_tag_attribute_map',
+                        {'IdentityPoolId': IPID, 'IdentityProviderName': f'{up}:c1', 'UseDefaults': True},
+                        {'IdentityPoolId': IPID, 'IdentityProviderName': f'{up}:c1'})
+        svc._hydrateIdentityPool(detail)
+    assert _run(CognitoIdentityPool(detail), '_checkCognitoIdentityPoolNoRoleMapping')[0] == 1
+
+
+def test_no_role_mapping_two_clients_one_user_pool_is_one_source():
+    up = 'cognito-idp.us-east-1.amazonaws.com/us-east-1_a'
+    pool = {'IdentityPoolId': IPID, 'IdentityPoolName': 'p', '_resourceName': 'p',
+            'CognitoIdentityProviders': [{'ProviderName': up, 'ClientId': 'c1'},
+                                         {'ProviderName': up, 'ClientId': 'c2'}],
+            '_roles': {'Roles': {'authenticated': ROLE_ARN}, 'RoleMappings': {}}, '_principalTagMaps': {}}
+    assert CognitoIdentityPool.loginProviders(pool) == [up]
+    assert CognitoIdentityPool.userPoolClientProviders(pool) == {up: [f'{up}:c1', f'{up}:c2']}
+    assert _run(CognitoIdentityPool(pool), '_checkCognitoIdentityPoolNoRoleMapping')[0] == 0
 
 
 # --------------------------------------------------------------------------- #

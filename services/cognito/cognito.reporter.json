@@ -595,7 +595,7 @@
 	},
 	"cognitoIdentityPoolGuestRoleBroad": {
 		"category": "S",
-		"^description": "{$COUNT} Cognito identity pool(s) allow unauthenticated (guest) identities and map them to an IAM role with broad permissions (Action '*' or 'service:*' or NotAction on all resources or on resources shared by every guest, or an AWS managed AdministratorAccess / PowerUserAccess / *FullAccess policy). Wildcards confined to the caller's own identity with ${cognito-identity.amazonaws.com:sub} are not reported. Anyone on the internet can obtain temporary AWS credentials for this role without signing in.",
+		"^description": "{$COUNT} Cognito identity pool(s) allow unauthenticated (guest) identities and map them to an IAM role with broad permissions (Action '*' or 'service:*' or NotAction on all resources or on resources shared by every guest, or an AWS managed AdministratorAccess / PowerUserAccess / ReadOnlyAccess / ViewOnlyAccess / SecurityAudit / *FullAccess policy). Wildcards confined to the caller's own identity with ${cognito-identity.amazonaws.com:sub} in the resource, or in a required dynamodb:LeadingKeys / s3:prefix condition, are not reported. Anyone on the internet can obtain temporary AWS credentials for this role without signing in.",
 		"shortDesc": "Scope the identity pool guest role to least privilege or disable guest access",
 		"criticality": "H",
 		"downtime": 0,
@@ -613,7 +613,7 @@
 	},
 	"cognitoIdentityPoolNoRoleMapping": {
 		"category": "S",
-		"^description": "{$COUNT} Cognito identity pool(s) accept two or more sign-in sources (user pool app clients or federated identity providers) but give every authenticated user the same default IAM role, with no role-based access control (role mapping) and no attribute-based access control (principal tags). Users from all sources receive identical permissions.",
+		"^description": "{$COUNT} Cognito identity pool(s) accept two or more sign-in sources (distinct user pools or federated identity providers) but give every authenticated user the same default IAM role, with no role-based access control (role mapping) and no attribute-based access control (principal tags). Users from all sources receive identical permissions.",
 		"shortDesc": "Use role mapping or principal tags to scope identity pool permissions per user",
 		"criticality": "L",
 		"downtime": 0,
