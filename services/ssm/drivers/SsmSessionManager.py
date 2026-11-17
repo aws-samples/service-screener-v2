@@ -383,7 +383,8 @@ class SsmSessionManager(Evaluator):
             Operation=Install (AWS-RunPatchBaseline* default to Scan), or an
             association created by a Quick Setup patch policy that installs;
           - a task in an enabled maintenance window doing the same;
-          - a Quick Setup patch policy whose PatchOperation is ScanAndInstall.
+          - a Quick Setup patch policy whose PatchOperation is ScanAndInstall
+            and whose TargetRegions/TargetAccounts include this Region/account.
         Third-party patching tools are invisible to this check.
         """
         key = 'ssmNoAutomatedPatching'
@@ -497,10 +498,17 @@ class SsmSessionManager(Evaluator):
             if operation is not None:
                 installs = self._operationInstalls(operation)
             elif isPolicy and doc not in self.PATCH_OPERATION_DOCUMENTS:
-                ## Quick Setup patch policies create separate scan and install
-                ## associations; the name says which one this is.
-                lowered = str(assocName).lower()
-                installs = 'install' in lowered or 'scan' not in lowered
+                ## Quick Setup patch policies deploy several associations
+                ## (scan, install, IAM attach, agent update...). Only count one
+                ## as an installer on positive evidence: its name says
+                ## 'install'. Anything else is unknown, never an installer.
+                lowered = str(assocName or '').lower()
+                if 'install' in lowered:
+                    installers.append(label)
+                    return
+                if 'scan' in lowered:
+                    scanOnly.append(label)
+                continue
             else:
                 installs = False  # Operation defaults to Scan
 
@@ -589,6 +597,8 @@ class SsmSessionManager(Evaluator):
                                  f"'{manager.get('Name') or manager.get('ManagerArn')}'")
                         ## Patch policy option: 'Scan' or 'ScanAndInstall'.
                         params = summary.get('FirstClassParameters') or {}
+                        if not self._policyCoversHere(params):
+                            continue
                         op = (params.get('ConfigurationOptionsPatchOperation')
                               or params.get('PatchOperation') or '')
                         if 'install' in str(op).lower():
@@ -596,5 +606,34 @@ class SsmSessionManager(Evaluator):
                             return
                         scanOnly.append(label)
         except (botocore.exceptions.ClientError,
-                botocore.exceptions.EndpointConnectionError):
+                botocore.exceptions.BotoCoreError):
+            ## BotoCoreError covers EndpointConnectionError,
+            ## ConnectTimeoutError, etc. Enrichment only: never drop the result.
             return
+
+    @staticmethod
+    def _splitList(value):
+        if isinstance(value, (list, tuple)):
+            items = value
+        else:
+            items = str(value or '').split(',')
+        return [str(i).strip() for i in items if str(i).strip()]
+
+    def _policyCoversHere(self, params):
+        """
+        list_configuration_managers returns managers whose home Region is this
+        Region, but a patch policy may target other Regions/accounts only.
+        Exclude a policy when its TargetRegions / TargetAccounts explicitly
+        omit this Region / account. Organization/OU targets cannot be resolved
+        from here and are accepted.
+        """
+        region = self.detail.get('_region')
+        regions = self._splitList(params.get('TargetRegions'))
+        if region and regions and region not in regions:
+            return False
+        account = self.detail.get('_accountId')
+        accounts = self._splitList(params.get('TargetAccounts'))
+        ous = self._splitList(params.get('TargetOrganizationalUnits'))
+        if account and accounts and not ous and account not in accounts:
+            return False
+        return True

@@ -158,6 +158,67 @@ def test_patching_quick_setup_patch_policy():
     assert _runPatching(ssmSide, qsPolicy('ScanAndInstall'))[0] == 1
 
 
+def test_patching_quick_setup_non_install_association_is_not_an_installer():
+    """A Quick Setup patch-policy association that installs nothing (IAM
+    attach) must not turn a missing patch setup into PASS (review fix)."""
+    def flag(s):
+        _instances(s)
+        _assoc(s, {'AutomationAssumeRole': ['arn:aws:iam::111122223333:role/qs']},
+               name='AWSQuickSetup-PatchPolicy-AttachIAMToInstance',
+               assocName='AWS-QuickSetup-PatchPolicy-AttachIAM-abc')
+        _noWindows(s)
+    res = _runPatching(flag, _noQuickSetup)
+    assert res[0] == -1, res
+
+    def fixed(s):
+        _instances(s)
+        _assoc(s, {'AutomationAssumeRole': ['arn:aws:iam::111122223333:role/qs']},
+               name='AWSQuickSetup-PatchPolicy-InstallPatches',
+               assocName='AWS-QuickSetup-PatchPolicy-InstallPatches-abc')
+    assert _runPatching(fixed)[0] == 1
+
+
+def test_patching_quick_setup_policy_targeting_other_region_is_ignored():
+    def ssmSide(s):
+        _instances(s)
+        s.add_response('list_associations', {'Associations': []})
+        _noWindows(s)
+
+    def qsPolicy(params):
+        def setup(q):
+            q.add_response('list_configuration_managers', {'ConfigurationManagersList': [
+                {'ManagerArn': 'arn:aws:ssm-quicksetup:us-east-1:111122223333:configuration-manager/abc',
+                 'Name': 'patching',
+                 'ConfigurationDefinitionSummaries': [
+                     {'Id': 'def1', 'Type': 'AWSQuickSetupType-PatchPolicy',
+                      'FirstClassParameters': dict(
+                          {'ConfigurationOptionsPatchOperation': 'ScanAndInstall'},
+                          **params)}]}]})
+        return setup
+    assert _runPatching(ssmSide, qsPolicy({'TargetRegions': 'eu-west-1,ap-south-1'}))[0] == -1
+    assert _runPatching(ssmSide, qsPolicy({'TargetAccounts': '444455556666'}))[0] == -1
+    assert _runPatching(ssmSide, qsPolicy({'TargetRegions': 'eu-west-1,us-east-1',
+                                          'TargetAccounts': '111122223333'}))[0] == 1
+
+
+def test_patching_quick_setup_connect_timeout_keeps_result():
+    import botocore.exceptions as bex
+    from unittest import mock
+
+    def flag(s):
+        _instances(s)
+        s.add_response('list_associations', {'Associations': []})
+        _noWindows(s)
+    ssm, qs = _clients()
+    with Stubber(ssm) as s, mock.patch.object(
+            qs, 'get_paginator',
+            side_effect=bex.ConnectTimeoutError(endpoint_url='https://x')):
+        flag(s)
+        drv = SsmSessionManager(DETAIL, ssm, qs)
+        drv._checkSsmNoAutomatedPatching()
+    assert drv.results['ssmNoAutomatedPatching'][0] == -1
+
+
 def test_patching_window_tasks_denied_is_unable_to_evaluate():
     def setup(s):
         _instances(s)
