@@ -24,15 +24,21 @@ class SecretsmanagerAccount(Evaluator):
            matches the call, with a CloudWatch alarm on the resulting metric
            that has alarm actions (directly, or through a composite alarm that
            has actions).
+      Only trails that are logging, record write management events (event
+      selectors) and deliver to a log group in the scanned account count; a
+      trail log group in another account (e.g. an organization trail) cannot
+      be evaluated from here and yields "Unable to evaluate" unless another
+      path already covers both calls.
       Read-only APIs: events.list_rules, events.list_targets_by_rule,
       cloudtrail.describe_trails, cloudtrail.get_trail_status,
-      logs.describe_metric_filters, cloudwatch.describe_alarms.
+      cloudtrail.get_event_selectors, logs.describe_metric_filters,
+      cloudwatch.describe_alarms.
 
       Precision note: alerting may also live in a SIEM or third-party tool,
       which this check cannot see, so it is reported with Low criticality.
       Pattern matching is conservative: a pattern that additionally narrows on
       fields other than the event source/name (for example one specific secret
-      or principal) is not counted as covering the call.
+      or principal, or failed calls only) is not counted as covering the call.
     """
 
     REQUIRED_EVENTS = ('DeleteSecret', 'PutResourcePolicy')
@@ -45,11 +51,16 @@ class SecretsmanagerAccount(Evaluator):
         'UnauthorizedOperation', 'UnrecognizedClientException',
     )
 
-    # Metric-filter selectors that do not narrow coverage of an API call.
-    NEUTRAL_FILTER_FIELDS = {
-        'eventSource', 'eventName', 'eventType', 'eventCategory',
-        'awsRegion', 'recipientAccountId', 'readOnly', 'eventVersion',
+    # CloudTrail record fields that are always present on a real API-call
+    # event, and fields that are absent on a successful call. Used so that
+    # {"exists": ...} conditions are judged against a real event, not just the
+    # minimal sample built below.
+    ALWAYS_PRESENT_FIELDS = {
+        'id', 'time', 'resources', 'userIdentity', 'eventTime', 'eventID',
+        'requestID', 'sourceIPAddress', 'userAgent', 'recipientAccountId',
+        'eventVersion',
     }
+    KNOWN_ABSENT_FIELDS = {'errorCode', 'errorMessage'}
 
     def __init__(self, ctx, eventsClient, ctClient, regionalClient):
         """
@@ -173,8 +184,10 @@ class SecretsmanagerAccount(Evaluator):
     @classmethod
     def eventPatternMatches(cls, pattern, event):
         """Minimal EventBridge pattern matcher. Fields the pattern constrains
-        that are absent from the sample event cause a non-match (unless the
-        constraint is {"exists": false}), which keeps the check conservative."""
+        that are absent from the sample event cause a non-match, except
+        {"exists": ...} on fields known to be always present (userIdentity,
+        ...) or known to be absent on a successful call (errorCode), which
+        keeps the check conservative."""
         if not isinstance(pattern, dict):
             return False
         for key, cond in pattern.items():
@@ -186,37 +199,28 @@ class SecretsmanagerAccount(Evaluator):
             present = isinstance(event, dict) and key in event
             value = event.get(key) if present else None
             if isinstance(cond, dict):
+                # Nested condition on a field the sample does not model: its
+                # value in a real event is unknown, so do not count it.
                 if not present or not isinstance(value, dict):
-                    if not cls._allExistsFalse(cond):
-                        return False
-                    continue
+                    return False
                 if not cls.eventPatternMatches(cond, value):
                     return False
             elif isinstance(cond, list):
-                if not any(cls._matchElement(c, present, value) for c in cond):
+                if not any(cls._matchElement(c, key, present, value) for c in cond):
                     return False
             else:
                 return False
         return True
 
     @classmethod
-    def _allExistsFalse(cls, cond):
-        for v in cond.values():
-            if isinstance(v, dict):
-                if not cls._allExistsFalse(v):
-                    return False
-            elif isinstance(v, list):
-                if not any(isinstance(x, dict) and x.get('exists') is False for x in v):
-                    return False
-            else:
-                return False
-        return True
-
-    @classmethod
-    def _matchElement(cls, cond, present, value):
+    def _matchElement(cls, cond, key, present, value):
         if isinstance(cond, dict):
             if 'exists' in cond:
-                return bool(cond['exists']) == present
+                if present or key in cls.ALWAYS_PRESENT_FIELDS:
+                    return cond['exists'] is True
+                if key in cls.KNOWN_ABSENT_FIELDS:
+                    return cond['exists'] is False
+                return False  # unknown whether a real event has this field
             if not present:
                 return False
             if isinstance(value, list):
@@ -272,10 +276,21 @@ class SecretsmanagerAccount(Evaluator):
                 continue
             if not trail.get('IsMultiRegionTrail') and trail.get('HomeRegion') not in (None, self.region):
                 continue
-            if not self._trailIsLogging(trail):
+            lgRegion, lgAccount, lgName = self._parseLogGroupArn(lgArn)
+            if not lgName:
                 continue
-            lgRegion, lgName = self._parseLogGroupArn(lgArn)
-            if not lgName or (lgRegion, lgName) in seen:
+            if self.account and lgAccount and lgAccount != self.account:
+                # e.g. an organization trail delivering to a log group in the
+                # management account: its metric filters and alarms cannot be
+                # read from here, and a same-named local log group is not it.
+                self.errors.append('TrailLogGroupInOtherAccount')
+                continue
+            if (lgRegion, lgName) in seen:
+                continue
+            ctClient = self._trailClient(trail)
+            if not self._trailIsLogging(trail, ctClient):
+                continue
+            if not self._trailLogsWriteManagementEvents(trail, ctClient):
                 continue
             seen.add((lgRegion, lgName))
 
@@ -285,7 +300,8 @@ class SecretsmanagerAccount(Evaluator):
             alarmed = None
             for f in filters:
                 events = [e for e in self.REQUIRED_EVENTS
-                          if self.filterPatternMatches(f.get('filterPattern') or '', e)]
+                          if self.filterPatternMatches(f.get('filterPattern') or '', e,
+                                                       region=self.region, account=self.account)]
                 if not events:
                     continue
                 if alarmed is None:
@@ -296,25 +312,83 @@ class SecretsmanagerAccount(Evaluator):
                         break
         return out
 
-    def _trailIsLogging(self, trail):
+    def _trailClient(self, trail):
+        """CloudTrail client for the trail's home region (shadow trails of a
+        multi-region trail are managed from their home region)."""
+        home = trail.get('HomeRegion')
+        if home and home != self.region and self.regionalClient:
+            return self.regionalClient('cloudtrail', home)
+        return self.ctClient
+
+    def _trailIsLogging(self, trail, client):
         try:
-            resp = self.ctClient.get_trail_status(Name=trail.get('TrailARN') or trail.get('Name'))
-            return resp.get('IsLogging', True) is not False
-        except botocore.exceptions.ClientError:
-            # Shadow / organization trails may not be readable from here; do
-            # not discard them on that basis alone.
+            resp = client.get_trail_status(Name=trail.get('TrailARN') or trail.get('Name'))
+            return resp.get('IsLogging') is True
+        except botocore.exceptions.ClientError as e:
+            # Unknown logging state: do not count it as coverage.
+            self.errors.append(self._code(e))
+            return False
+
+    def _trailLogsWriteManagementEvents(self, trail, client):
+        """True when the trail records write management events from Secrets
+        Manager (DeleteSecret / PutResourcePolicy are write management events)."""
+        try:
+            resp = client.get_event_selectors(TrailName=trail.get('TrailARN') or trail.get('Name'))
+        except botocore.exceptions.ClientError as e:
+            self.errors.append(self._code(e))
+            return False
+        basic = resp.get('EventSelectors')
+        advanced = resp.get('AdvancedEventSelectors')
+        if not basic and not advanced:
+            # No selectors configured: CloudTrail logs all management events.
             return True
+        for sel in basic or []:
+            if sel.get('IncludeManagementEvents', True) is False:
+                continue
+            if sel.get('ReadWriteType', 'All') not in ('All', 'WriteOnly'):
+                continue
+            if self.EVENT_SOURCE in (sel.get('ExcludeManagementEventSources') or []):
+                continue
+            return True
+        for sel in advanced or []:
+            if self._advancedSelectorCovers(sel.get('FieldSelectors') or []):
+                return True
+        return False
+
+    def _advancedSelectorCovers(self, fieldSelectors):
+        values = {'eventCategory': 'Management', 'readOnly': 'false', 'eventSource': self.EVENT_SOURCE}
+        hasCategory = False
+        for fs in fieldSelectors:
+            field = fs.get('Field')
+            if field not in values:
+                return False  # unknown field narrows the selector
+            v = values[field]
+            if field == 'eventCategory':
+                hasCategory = True
+            if 'Equals' in fs and v not in (fs.get('Equals') or []):
+                return False
+            if 'StartsWith' in fs and not any(v.startswith(x) for x in fs.get('StartsWith') or []):
+                return False
+            if 'EndsWith' in fs and not any(v.endswith(x) for x in fs.get('EndsWith') or []):
+                return False
+            if v in (fs.get('NotEquals') or []):
+                return False
+            if any(v.startswith(x) for x in fs.get('NotStartsWith') or []):
+                return False
+            if any(v.endswith(x) for x in fs.get('NotEndsWith') or []):
+                return False
+        return hasCategory
 
     @staticmethod
     def _parseLogGroupArn(arn):
         # arn:aws:logs:<region>:<account>:log-group:<name>[:*]
         parts = arn.split(':')
         if len(parts) < 7 or parts[5] != 'log-group':
-            return None, None
+            return None, None, None
         name = ':'.join(parts[6:])
         if name.endswith(':*'):
             name = name[:-2]
-        return parts[3] or None, name
+        return parts[3] or None, parts[4] or None, name
 
     def _metricFilters(self, region, logGroupName):
         filters = []
@@ -362,49 +436,200 @@ class SecretsmanagerAccount(Evaluator):
                     out.add((metric.get('Namespace'), metric.get('MetricName')))
         return out
 
-    # Matches `$.field = value`, `$.field != value` (value optionally quoted).
-    _TERM_RE = re.compile(r'\$\.([A-Za-z0-9_.\[\]]+)\s*(!=|=)\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s)&|]+))')
-    _SELECTOR_RE = re.compile(r'\$\.([A-Za-z0-9_]+)')
+    # ------------------------------------------------------------------ #
+    # CloudWatch Logs filter pattern evaluation
+    # ------------------------------------------------------------------ #
+    # Tokens of a JSON filter pattern body.
+    _JSON_TOKEN_RE = re.compile(r'''
+        \s*(?:
+          (?P<lp>\() | (?P<rp>\)) | (?P<and>&&) | (?P<or>\|\|)
+        | (?P<sel>\$\.[A-Za-z0-9_.\[\]\-]+)
+        | (?P<op>!=|<=|>=|=|<|>)
+        | (?P<str>"(?:[^"\\]|\\.)*")
+        | (?P<re>%(?:[^%\\]|\\.)*%)
+        | (?P<word>[^\s()&|{}"=!<>]+)
+        )''', re.X)
+
+    _UNKNOWN = object()   # field value not known for a real CloudTrail event
+    _ABSENT = object()    # field known to be absent (successful call)
+
+    class _ParseError(Exception):
+        pass
 
     @classmethod
-    def filterPatternMatches(cls, pattern, eventName):
-        """Heuristic: does a CloudWatch Logs filter pattern applied to CloudTrail
-        logs match the Secrets Manager `eventName` call?"""
+    def _sampleRecord(cls, eventName, region=None, account=None):
+        rec = {
+            'eventSource': cls.EVENT_SOURCE,
+            'eventName': eventName,
+            'eventType': 'AwsApiCall',
+            'eventCategory': 'Management',
+            'readOnly': False,
+            'managementEvent': True,
+            # A successful call carries no error fields; alerting only on
+            # failures does not cover the change itself.
+            'errorCode': cls._ABSENT,
+            'errorMessage': cls._ABSENT,
+        }
+        if region:
+            rec['awsRegion'] = region
+        if account:
+            rec['recipientAccountId'] = account
+        return rec
+
+    @classmethod
+    def filterPatternMatches(cls, pattern, eventName, region=None, account=None):
+        """Does a CloudWatch Logs filter pattern applied to CloudTrail logs
+        match every successful Secrets Manager `eventName` call?
+
+        JSON patterns are parsed and evaluated with three-valued logic against
+        a sample CloudTrail record: comparisons on fields whose value differs
+        between calls (principal, secret id, source IP ...) are "unknown", and
+        the pattern only counts when it is definitely true. Term patterns only
+        count as a single term, or an OR (?term) list, naming the event."""
         pattern = (pattern or '').strip()
         if not pattern:
             return False
-        if not pattern.startswith('{'):
-            # Term-based pattern, e.g. "DeleteSecret" or ?DeleteSecret ?PutResourcePolicy
-            if '-' + eventName in pattern:
+        if pattern.startswith('{'):
+            if not pattern.endswith('}'):
                 return False
-            return re.search(r'(?<![A-Za-z0-9])' + re.escape(eventName) + r'(?![A-Za-z0-9])', pattern) is not None
-
-        # Any selector beyond the neutral ones narrows coverage -> not counted.
-        for field in cls._SELECTOR_RE.findall(pattern):
-            if field not in cls.NEUTRAL_FILTER_FIELDS:
+            try:
+                tokens = cls._tokenizeJson(pattern[1:-1])
+                expr, pos = cls._parseOr(tokens, 0)
+                if pos != len(tokens):
+                    raise cls._ParseError('trailing tokens')
+            except cls._ParseError:
                 return False
+            return cls._evalExpr(expr, cls._sampleRecord(eventName, region, account)) is True
+        if pattern.startswith('['):
+            return False  # space-delimited patterns do not apply to CloudTrail JSON
+        return cls._termPatternMatches(pattern, eventName)
 
-        nameEq, nameNe, srcEq, srcNe = [], [], [], []
-        for field, op, v1, v2, v3 in cls._TERM_RE.findall(pattern):
-            value = v1 or v2 or v3
-            if field == 'eventName':
-                (nameEq if op == '=' else nameNe).append(value)
-            elif field == 'eventSource':
-                (srcEq if op == '=' else srcNe).append(value)
+    @classmethod
+    def _termPatternMatches(cls, pattern, eventName):
+        terms = re.findall(r'[?-]?"(?:[^"\\]|\\.)*"|\S+', pattern)
 
-        def m(val, pats):
-            return any(fnmatch.fnmatchcase(val, p) for p in pats)
+        def unq(t):
+            return t[1:-1] if len(t) >= 2 and t[0] == '"' and t[-1] == '"' else t
 
-        if srcEq and not m(cls.EVENT_SOURCE, srcEq):
-            return False
-        if srcNe and m(cls.EVENT_SOURCE, srcNe):
-            return False
-        if nameNe and m(eventName, nameNe):
-            return False
-        if nameEq:
-            return m(eventName, nameEq)
-        # No eventName equality: only counts when scoped to the Secrets Manager source.
-        return bool(srcEq)
+        if len(terms) == 1 and terms[0][:1] not in ('?', '-'):
+            return unq(terms[0]) == eventName
+        # Space-separated terms are ANDed; only a pure OR list is broad enough.
+        if all(t.startswith('?') for t in terms):
+            return any(unq(t[1:]) == eventName for t in terms)
+        return False
+
+    @classmethod
+    def _tokenizeJson(cls, body):
+        tokens, pos = [], 0
+        while pos < len(body):
+            if body[pos:].strip() == '':
+                break
+            m = cls._JSON_TOKEN_RE.match(body, pos)
+            if not m or m.end() == pos:
+                raise cls._ParseError(body[pos:])
+            kind = m.lastgroup
+            tokens.append((kind, m.group(kind)))
+            pos = m.end()
+        return tokens
+
+    @classmethod
+    def _parseOr(cls, toks, i):
+        left, i = cls._parseAnd(toks, i)
+        node = [left]
+        while i < len(toks) and toks[i][0] == 'or':
+            right, i = cls._parseAnd(toks, i + 1)
+            node.append(right)
+        return (node[0] if len(node) == 1 else ('or', node)), i
+
+    @classmethod
+    def _parseAnd(cls, toks, i):
+        left, i = cls._parsePrimary(toks, i)
+        node = [left]
+        while i < len(toks) and toks[i][0] == 'and':
+            right, i = cls._parsePrimary(toks, i + 1)
+            node.append(right)
+        return (node[0] if len(node) == 1 else ('and', node)), i
+
+    @classmethod
+    def _parsePrimary(cls, toks, i):
+        if i >= len(toks):
+            raise cls._ParseError('unexpected end')
+        kind, val = toks[i]
+        if kind == 'lp':
+            expr, i = cls._parseOr(toks, i + 1)
+            if i >= len(toks) or toks[i][0] != 'rp':
+                raise cls._ParseError('missing )')
+            return expr, i + 1
+        if kind != 'sel':
+            raise cls._ParseError(val)
+        field = val[2:]
+        i += 1
+        if i >= len(toks):
+            raise cls._ParseError('missing operator')
+        kind, val = toks[i]
+        if kind == 'op':
+            if i + 1 >= len(toks) or toks[i + 1][0] not in ('str', 're', 'word'):
+                raise cls._ParseError('missing value')
+            vkind, vval = toks[i + 1]
+            if vkind == 'str':
+                vval = re.sub(r'\\(.)', r'\1', vval[1:-1])
+            elif vkind == 're':
+                vval = vval[1:-1]
+            return ('cmp', field, val, vkind, vval), i + 2
+        if kind == 'word':
+            kw = val.upper()
+            nxt = toks[i + 1][1].upper() if i + 1 < len(toks) and toks[i + 1][0] == 'word' else None
+            if kw == 'IS' and nxt in ('TRUE', 'FALSE', 'NULL'):
+                return ('is', field, nxt), i + 2
+            if kw == 'NOT' and nxt == 'EXISTS':
+                return ('exists', field, False), i + 2
+            if kw == 'EXISTS':
+                return ('exists', field, True), i + 1
+        raise cls._ParseError(val)
+
+    @classmethod
+    def _evalExpr(cls, node, rec):
+        """Kleene three-valued evaluation: True, False or None (unknown)."""
+        kind = node[0]
+        if kind in ('and', 'or'):
+            vals = [cls._evalExpr(n, rec) for n in node[1]]
+            if kind == 'and':
+                if any(v is False for v in vals):
+                    return False
+                return True if all(v is True for v in vals) else None
+            if any(v is True for v in vals):
+                return True
+            return False if all(v is False for v in vals) else None
+
+        field = node[1]
+        value = rec.get(field, cls._UNKNOWN)
+        if value is cls._UNKNOWN:
+            return None
+        if kind == 'exists':
+            return (value is not cls._ABSENT) == node[2]
+        if kind == 'is':
+            if value is cls._ABSENT:
+                return False
+            if node[2] == 'NULL':
+                return False
+            return value is (node[2] == 'TRUE')
+
+        _, _, op, vkind, target = node
+        if value is cls._ABSENT:
+            return False if op == '=' else None
+        if op in ('<', '>', '<=', '>='):
+            # Numeric comparison against a string/boolean field never matches.
+            return False if not isinstance(value, (int, float)) or isinstance(value, bool) else None
+        sval = str(value).lower() if isinstance(value, bool) else str(value)
+        if vkind == 're':
+            try:
+                eq = re.search(target, sval) is not None
+            except re.error:
+                return None
+        else:
+            rx = '^' + '.*'.join(re.escape(p) for p in target.split('*')) + '$'
+            eq = re.match(rx, sval) is not None
+        return eq if op == '=' else not eq
 
     @staticmethod
     def _code(e):

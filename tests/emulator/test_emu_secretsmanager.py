@@ -2,6 +2,7 @@
 against the local AWS Emulator. The check is account/region-level and reports
 under the 'Secretsmanager::Account' resource; it runs only when the region
 holds at least one secret, so each test creates one."""
+import contextlib
 import json
 
 from tests.emulator.conftest import assertFlagFixCycle, runCheck
@@ -98,18 +99,16 @@ def test_eventbridge_partial_coverage_flags_then_full_passes(emu, uid):
         _cleanupSecret(sm, name)
 
 
-def test_cloudtrail_metric_filter_needs_alarm(emu, uid):
-    sm, name = _secret(emu, uid)
+@contextlib.contextmanager
+def _loggingTrail(emu, uid):
+    """A logging multi-region trail delivering to a CloudWatch Logs group.
+    Yields (ctClient, trailName, logsClient, logGroupName)."""
     s3 = emu.client('s3')
     logs = emu.client('logs')
     iam = emu.client('iam')
     ct = emu.client('cloudtrail')
-    cw = emu.client('cloudwatch')
-    sns = emu.client('sns')
     acct = emu.client('sts').get_caller_identity()['Account']
     bucket, lg, role, trail = f'ss-ct-{uid}', f'ss-ct-{uid}', f'ss-ct-{uid}', f'ss-ct-{uid}'
-    alarm, ns, metric = f'ss-sm-{uid}', f'SS/{uid}', 'SecretChanges'
-    topic = sns.create_topic(Name=f'ss-sm-{uid}')['TopicArn']
     s3.create_bucket(Bucket=bucket)
     try:
         s3.put_bucket_policy(Bucket=bucket, Policy=json.dumps({
@@ -128,28 +127,86 @@ def test_cloudtrail_metric_filter_needs_alarm(emu, uid):
         ct.create_trail(Name=trail, S3BucketName=bucket, IsMultiRegionTrail=True,
                         CloudWatchLogsLogGroupArn=lgArn, CloudWatchLogsRoleArn=roleArn)
         ct.start_logging(Name=trail)
-
-        def misconfigure():
-            # Metric filter exists but no alarm watches the metric.
-            logs.put_metric_filter(
-                logGroupName=lg, filterName='secret-changes',
-                filterPattern='{ ($.eventSource = secretsmanager.amazonaws.com) && '
-                              '(($.eventName = DeleteSecret) || ($.eventName = PutResourcePolicy)) }',
-                metricTransformations=[{'metricName': metric, 'metricNamespace': ns, 'metricValue': '1'}])
-
-        def fix():
-            cw.put_metric_alarm(AlarmName=alarm, MetricName=metric, Namespace=ns, Statistic='Sum',
-                                Period=300, EvaluationPeriods=1, Threshold=1,
-                                ComparisonOperator='GreaterThanOrEqualToThreshold', AlarmActions=[topic])
-
-        assertFlagFixCycle(emu, 'secretsmanager', CHECK, RES, misconfigure, fix)
+        yield ct, trail, logs, lg
     finally:
-        for fn in (lambda: cw.delete_alarms(AlarmNames=[alarm]),
-                   lambda: ct.delete_trail(Name=trail),
+        for fn in (lambda: ct.delete_trail(Name=trail),
                    lambda: logs.delete_log_group(logGroupName=lg),
                    lambda: iam.delete_role(RoleName=role),
                    lambda: s3.delete_bucket_policy(Bucket=bucket),
-                   lambda: s3.delete_bucket(Bucket=bucket),
+                   lambda: s3.delete_bucket(Bucket=bucket)):
+            try:
+                fn()
+            except Exception:
+                pass
+
+
+def _putSecretsFilter(logs, lg, ns, metric):
+    logs.put_metric_filter(
+        logGroupName=lg, filterName='secret-changes',
+        filterPattern='{ ($.eventSource = secretsmanager.amazonaws.com) && '
+                      '(($.eventName = DeleteSecret) || ($.eventName = PutResourcePolicy)) }',
+        metricTransformations=[{'metricName': metric, 'metricNamespace': ns, 'metricValue': '1'}])
+
+
+def _putAlarm(cw, alarm, ns, metric, topic):
+    cw.put_metric_alarm(AlarmName=alarm, MetricName=metric, Namespace=ns, Statistic='Sum',
+                        Period=300, EvaluationPeriods=1, Threshold=1,
+                        ComparisonOperator='GreaterThanOrEqualToThreshold', AlarmActions=[topic])
+
+
+def test_cloudtrail_metric_filter_needs_alarm(emu, uid):
+    sm, name = _secret(emu, uid)
+    cw = emu.client('cloudwatch')
+    sns = emu.client('sns')
+    alarm, ns, metric = f'ss-sm-{uid}', f'SS/{uid}', 'SecretChanges'
+    topic = sns.create_topic(Name=f'ss-sm-{uid}')['TopicArn']
+    try:
+        with _loggingTrail(emu, uid) as (ct, trail, logs, lg):
+            def misconfigure():
+                # Metric filter exists but no alarm watches the metric.
+                _putSecretsFilter(logs, lg, ns, metric)
+
+            def fix():
+                _putAlarm(cw, alarm, ns, metric, topic)
+
+            _, after = assertFlagFixCycle(emu, 'secretsmanager', CHECK, RES, misconfigure, fix)
+            assert all(v == 1 for v in after.values()), after
+    finally:
+        for fn in (lambda: cw.delete_alarms(AlarmNames=[alarm]),
+                   lambda: sns.delete_topic(TopicArn=topic)):
+            try:
+                fn()
+            except Exception:
+                pass
+        _cleanupSecret(sm, name)
+
+
+def test_cloudtrail_data_events_only_trail_does_not_count(emu, uid):
+    """An alarmed filter on a trail that records only data events never sees
+    DeleteSecret / PutResourcePolicy (write management events)."""
+    sm, name = _secret(emu, uid)
+    cw = emu.client('cloudwatch')
+    sns = emu.client('sns')
+    alarm, ns, metric = f'ss-sm-{uid}', f'SS/{uid}', 'SecretChanges'
+    topic = sns.create_topic(Name=f'ss-sm-{uid}')['TopicArn']
+    try:
+        with _loggingTrail(emu, uid) as (ct, trail, logs, lg):
+            def misconfigure():
+                ct.put_event_selectors(TrailName=trail, AdvancedEventSelectors=[{
+                    'Name': 'data-only', 'FieldSelectors': [
+                        {'Field': 'eventCategory', 'Equals': ['Data']},
+                        {'Field': 'resources.type', 'Equals': ['AWS::S3::Object']}]}])
+                _putSecretsFilter(logs, lg, ns, metric)
+                _putAlarm(cw, alarm, ns, metric, topic)
+
+            def fix():
+                ct.put_event_selectors(TrailName=trail, EventSelectors=[
+                    {'ReadWriteType': 'All', 'IncludeManagementEvents': True}])
+
+            _, after = assertFlagFixCycle(emu, 'secretsmanager', CHECK, RES, misconfigure, fix)
+            assert all(v == 1 for v in after.values()), after
+    finally:
+        for fn in (lambda: cw.delete_alarms(AlarmNames=[alarm]),
                    lambda: sns.delete_topic(TopicArn=topic)):
             try:
                 fn()

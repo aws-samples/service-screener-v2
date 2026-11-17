@@ -110,7 +110,11 @@ def test_cross_region_trail_log_group_with_composite_alarm():
         ct.add_response('describe_trails', {'trailList': [{
             'Name': 'main', 'TrailARN': trailArn, 'HomeRegion': 'eu-west-1',
             'IsMultiRegionTrail': True, 'CloudWatchLogsLogGroupArn': lgArn}]})
-        ct.add_response('get_trail_status', {'IsLogging': True}, {'Name': trailArn})
+        # Trail status / selectors are read from the trail's home region.
+        homeCt = h.stub('cloudtrail', 'eu-west-1')
+        homeCt.add_response('get_trail_status', {'IsLogging': True}, {'Name': trailArn})
+        homeCt.add_response('get_event_selectors', {'TrailARN': trailArn, 'EventSelectors': [
+            {'ReadWriteType': 'All', 'IncludeManagementEvents': True}]}, {'TrailName': trailArn})
         h.stub('logs', 'eu-west-1').add_response('describe_metric_filters', {'metricFilters': [{
             'filterName': 'sm', 'logGroupName': 'org-trail',
             'filterPattern': '{($.eventName = DeleteSecret) || ($.eventName = PutResourcePolicy)}',
@@ -154,6 +158,14 @@ def test_event_pattern_matcher():
     assert not m({'detail': {'eventName': [{'anything-but': ['DeleteSecret']}]}}, ev)
     assert not m({'detail': {'userIdentity': {'type': ['Root']}}}, ev)
     assert m({'detail': {'errorCode': [{'exists': False}]}, 'source': ['aws.secretsmanager']}, ev)
+    # userIdentity is always present on a real CloudTrail event, so an
+    # exists:false condition on it (or on its children) never matches.
+    assert not m({'detail': {'userIdentity': [{'exists': False}], 'eventName': ['DeleteSecret']}}, ev)
+    assert not m({'detail': {'userIdentity': {'type': [{'exists': False}]}, 'eventName': ['DeleteSecret']}}, ev)
+    assert m({'detail': {'userIdentity': [{'exists': True}], 'eventName': ['DeleteSecret']}}, ev)
+    # Unknown optional field: cannot assume it is absent.
+    assert not m({'detail': {'additionalEventData': [{'exists': False}], 'eventName': ['DeleteSecret']}}, ev)
+    assert not m({'detail': {'eventName': ['DeleteSecret'], 'eventType': ['AwsConsoleSignIn']}}, ev)
 
 
 def test_filter_pattern_matcher():
@@ -165,3 +177,125 @@ def test_filter_pattern_matcher():
     assert not f('{ ($.eventName = DeleteSecret) && ($.userIdentity.type = Root) }', 'DeleteSecret')
     assert not f('{ $.eventName = DeleteSecretVersion }', 'DeleteSecret')
     assert not f('', 'DeleteSecret')
+
+
+def test_filter_pattern_closing_brace_without_space():
+    """Review fix: '}' directly after an unquoted value was captured into it."""
+    f = SecretsmanagerAccount.filterPatternMatches
+    assert f('{$.eventName=DeleteSecret}', 'DeleteSecret')
+    assert f('{ $.eventName = DeleteSecret}', 'DeleteSecret')
+    assert f('{($.eventName=DeleteSecret)||($.eventName=PutResourcePolicy)}', 'PutResourcePolicy')
+    assert not f('{$.eventName=DeleteSecretVersion}', 'DeleteSecret')
+
+
+def test_term_patterns_that_narrow_do_not_count():
+    """Review fix: space-separated terms are ANDed by CloudWatch Logs."""
+    f = SecretsmanagerAccount.filterPatternMatches
+    assert f('DeleteSecret', 'DeleteSecret')
+    assert f('"DeleteSecret"', 'DeleteSecret')
+    assert f('?DeleteSecret ?PutResourcePolicy', 'DeleteSecret')
+    assert f('?"DeleteSecret" ?"PutResourcePolicy"', 'PutResourcePolicy')
+    assert not f('DeleteSecret prod', 'DeleteSecret')
+    assert not f('"DeleteSecret" "AccessDenied"', 'DeleteSecret')
+    assert not f('DeleteSecret -prod', 'DeleteSecret')
+    assert not f('?DeleteSecret ?GetSecretValue', 'PutResourcePolicy')
+    assert not f('[ver, acct, DeleteSecret]', 'DeleteSecret')
+
+
+def test_json_filter_boolean_structure_and_field_values():
+    """Review fix: JSON patterns are evaluated as boolean expressions."""
+    f = SecretsmanagerAccount.filterPatternMatches
+    assert not f('{ ($.eventSource = kms.amazonaws.com && $.eventName = DeleteSecret) || '
+                 '($.eventSource = secretsmanager.amazonaws.com && $.eventName = GetSecretValue) }', 'DeleteSecret')
+    assert not f('{ $.eventSource = secretsmanager.amazonaws.com && $.readOnly IS TRUE }', 'DeleteSecret')
+    assert f('{ $.eventSource = secretsmanager.amazonaws.com && $.readOnly IS FALSE }', 'DeleteSecret')
+    assert not f('{ $.eventSource = secretsmanager.amazonaws.com && $.eventType = AwsConsoleSignIn }', 'DeleteSecret')
+    assert not f('{ $.eventSource = secretsmanager.amazonaws.com && $.eventCategory = Data }', 'DeleteSecret')
+    # Failed calls only: a successful deletion would not fire.
+    assert not f('{ $.eventName = DeleteSecret && $.errorCode = "AccessDenied*" }', 'DeleteSecret')
+    assert f('{ $.eventName = DeleteSecret && $.errorCode NOT EXISTS }', 'DeleteSecret')
+    # An OR with a narrowing branch still covers through the other branch.
+    assert f('{ ($.eventName = DeleteSecret) || ($.userIdentity.type = Root) }', 'DeleteSecret')
+    assert not f('{ $.eventSource = secretsmanager.amazonaws.com && $.eventName != DeleteSecret }', 'DeleteSecret')
+    assert f('{ $.eventName = %Delete.*% }', 'DeleteSecret')
+    assert not f('{ ($.eventName = DeleteSecret }', 'DeleteSecret')  # malformed
+
+
+LG = f'arn:aws:logs:us-east-1:{ACCT}:log-group:lg:*'
+TRAIL = f'arn:aws:cloudtrail:us-east-1:{ACCT}:trail/t'
+SM_FILTER = {'filterName': 'sm', 'logGroupName': 'lg',
+             'filterPattern': '{ $.eventSource = secretsmanager.amazonaws.com }',
+             'metricTransformations': [{'metricName': 'SM', 'metricNamespace': 'CIS', 'metricValue': '1'}]}
+SM_ALARMS = {'MetricAlarms': [{'AlarmName': 'a', 'MetricName': 'SM', 'Namespace': 'CIS', 'ActionsEnabled': True,
+                               'AlarmActions': [f'arn:aws:sns:us-east-1:{ACCT}:t']}], 'CompositeAlarms': []}
+
+
+def _localTrailHarness(selectors):
+    h = Harness()
+    ev, ct = h.stubs
+    ev.add_response('list_rules', {'Rules': []})
+    ct.add_response('describe_trails', {'trailList': [{
+        'Name': 't', 'TrailARN': TRAIL, 'HomeRegion': 'us-east-1', 'IsMultiRegionTrail': True,
+        'CloudWatchLogsLogGroupArn': LG}]})
+    ct.add_response('get_trail_status', {'IsLogging': True})
+    ct.add_response('get_event_selectors', dict({'TrailARN': TRAIL}, **selectors))
+    return h
+
+
+def _withAlarmedFilter(h):
+    h.stub('logs', 'us-east-1').add_response('describe_metric_filters', {'metricFilters': [SM_FILTER]})
+    h.stub('cloudwatch', 'us-east-1').add_response('describe_alarms', SM_ALARMS)
+    return h
+
+
+def test_trail_without_write_management_events_does_not_count():
+    """Review fix: event selectors are read. Data-event-only or read-only
+    trails do not deliver DeleteSecret / PutResourcePolicy to the log group."""
+    dataOnly = {'AdvancedEventSelectors': [{'Name': 'data', 'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Data']}, {'Field': 'resources.type', 'Equals': ['AWS::S3::Object']}]}]}
+    assert _localTrailHarness(dataOnly).run()[0] == -1
+    readOnly = {'EventSelectors': [{'ReadWriteType': 'ReadOnly', 'IncludeManagementEvents': True}]}
+    assert _localTrailHarness(readOnly).run()[0] == -1
+    excluded = {'AdvancedEventSelectors': [{'Name': 'mgmt', 'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Management']},
+        {'Field': 'eventSource', 'NotEquals': ['secretsmanager.amazonaws.com']}]}]}
+    assert _localTrailHarness(excluded).run()[0] == -1
+    # Fix: management events (write) are recorded.
+    mgmt = {'AdvancedEventSelectors': [{'Name': 'mgmt', 'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Management']}, {'Field': 'readOnly', 'Equals': ['false']}]}]}
+    assert _withAlarmedFilter(_localTrailHarness(mgmt)).run()[0] == 1
+    basic = {'EventSelectors': [{'ReadWriteType': 'WriteOnly', 'IncludeManagementEvents': True}]}
+    assert _withAlarmedFilter(_localTrailHarness(basic)).run()[0] == 1
+
+
+def test_trail_status_error_is_not_counted_as_logging():
+    h = Harness()
+    ev, ct = h.stubs
+    ev.add_response('list_rules', {'Rules': []})
+    ct.add_response('describe_trails', {'trailList': [{
+        'Name': 't', 'TrailARN': TRAIL, 'HomeRegion': 'us-east-1', 'IsMultiRegionTrail': True,
+        'CloudWatchLogsLogGroupArn': LG}]})
+    ct.add_client_error('get_trail_status', 'AccessDeniedException')
+    res = h.run()
+    assert res[0] == 0 and 'AccessDeniedException' in res[1]
+
+
+def test_trail_log_group_in_other_account_is_not_evaluable():
+    """Review fix: an organization trail delivering to the management
+    account's log group must not be evaluated against a local log group."""
+    def build(withRule):
+        h = Harness()
+        ev, ct = h.stubs
+        rules = [_rule('r', {'source': ['aws.secretsmanager']})] if withRule else []
+        ev.add_response('list_rules', {'Rules': rules})
+        if withRule:
+            ev.add_response('list_targets_by_rule', {'Targets': [{'Id': '1', 'Arn': f'arn:aws:sns:us-east-1:{ACCT}:t'}]})
+        ct.add_response('describe_trails', {'trailList': [{
+            'Name': 'org', 'TrailARN': 'arn:aws:cloudtrail:us-east-1:999988887777:trail/org',
+            'HomeRegion': 'us-east-1', 'IsMultiRegionTrail': True, 'IsOrganizationTrail': True,
+            'CloudWatchLogsLogGroupArn': 'arn:aws:logs:us-east-1:999988887777:log-group:org-lg:*'}]})
+        return h
+
+    res = build(False).run()
+    assert res[0] == 0 and 'TrailLogGroupInOtherAccount' in res[1]
+    assert build(True).run()[0] == 1
