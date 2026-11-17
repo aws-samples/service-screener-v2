@@ -1,6 +1,7 @@
 import boto3
 import botocore
 import datetime
+import re
 import urllib.parse
 from statistics import mean
 
@@ -8,6 +9,112 @@ from services.Service import Service
 from utils.Config import Config
 from utils.Policy import Policy
 from services.Evaluator import Evaluator
+from utils import PolicyPrincipal
+
+
+# Condition keys accepted as organisation scoping for cross-account grants.
+_ORG_CONDITION_KEYS = frozenset(('aws:principalorgid', 'aws:principalorgpaths'))
+# Positive-match string operators (negated / IfExists / ForAllValues forms do not restrict callers).
+_ORG_OPERATORS = frozenset(('stringequals', 'stringequalsignorecase', 'stringlike'))
+# Principal values that carry an account ID: "123456789012", arn:aws:iam::123456789012:..., arn:aws:sts::123456789012:...
+_ACCOUNT_IN_PRINCIPAL = re.compile(r'^(?:arn:aws[a-z-]*:(?:iam|sts)::)?(\d{12})(?::|$)')
+_OPEN_CIDRS = frozenset(('0.0.0.0/0', '::/0'))
+
+# Tag keys/values (case-insensitive, '-', '_' and spaces ignored) that mark a table as business critical.
+_CRITICALITY_TAG_KEYS = frozenset((
+    'criticality', 'critical', 'businesscriticality', 'datacriticality', 'servicecriticality',
+    'tier', 'servicetier', 'apptier', 'applicationtier', 'businesstier', 'drtier',
+))
+_CRITICALITY_TAG_VALUES = frozenset((
+    'critical', 'missioncritical', 'businesscritical', 'high', 'tier0', 'tier1', '0', '1',
+    'p0', 'p1', 'true', 'yes',
+))
+
+
+def _norm(value):
+    return re.sub(r'[\s_-]', '', str(value)).lower()
+
+
+def _asList(value):
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]
+
+
+def _conditionScopesToOrg(condition):
+    """True if the Condition pins aws:PrincipalOrgID / aws:PrincipalOrgPaths to concrete values."""
+    if not isinstance(condition, dict):
+        return False
+    for operator, block in condition.items():
+        if not isinstance(operator, str) or not isinstance(block, dict):
+            continue
+        op = operator.lower()
+        if op.startswith('foranyvalue:'):
+            op = op[len('foranyvalue:'):]
+        if op not in _ORG_OPERATORS:
+            continue
+        for key, value in block.items():
+            if str(key).lower() not in _ORG_CONDITION_KEYS:
+                continue
+            values = _asList(value)
+            if values and all(isinstance(v, str) and v and not set(v) <= {'*', '?'} for v in values):
+                return True
+    return False
+
+
+def _conditionScopesToNetwork(condition):
+    """True if the Condition pins aws:SourceIp to concrete, non-open CIDRs (IpAddress operator)."""
+    if not isinstance(condition, dict):
+        return False
+    for operator, block in condition.items():
+        if not isinstance(operator, str) or not isinstance(block, dict):
+            continue
+        op = operator.lower()
+        if op.startswith('foranyvalue:'):
+            op = op[len('foranyvalue:'):]
+        if op != 'ipaddress':
+            continue
+        for key, value in block.items():
+            if str(key).lower() != 'aws:sourceip':
+                continue
+            values = _asList(value)
+            if values and all(isinstance(v, str) and v.strip() not in _OPEN_CIDRS for v in values):
+                return True
+    return False
+
+
+def resourcePolicyIssues(policyDoc, ownAccount):
+    """
+    Return a list of human-readable issues for a DynamoDB table/stream resource policy:
+    - an Allow statement for any principal ("*", {"AWS": ["*"]}, NotPrincipal) that is not
+      restricted by a scoping Condition (org / account / source / VPC / fixed source IP), or
+    - an Allow statement for a principal in another AWS account without an
+      aws:PrincipalOrgID / aws:PrincipalOrgPaths condition.
+    Returns None if the policy cannot be parsed. Deny statements are not subtracted.
+    """
+    if PolicyPrincipal.parsePolicy(policyDoc) is None:
+        return None
+    issues = []
+    for stmt in PolicyPrincipal.iterStatements(policyDoc):
+        if str(stmt.get('Effect', '')).lower() != 'allow':
+            continue
+        sid = stmt.get('Sid')
+        label = 'statement ' + (str(sid) if sid else '(no Sid)')
+        condition = stmt.get('Condition')
+        if PolicyPrincipal.statementIsPublic(stmt) and not _conditionScopesToNetwork(condition):
+            issues.append(label + ' allows any principal without a restricting condition')
+            continue
+        principal = stmt.get('Principal')
+        awsValues = _asList(principal.get('AWS')) if isinstance(principal, dict) else []
+        external = set()
+        for value in awsValues:
+            m = _ACCOUNT_IN_PRINCIPAL.match(str(value).strip())
+            if m and m.group(1) != ownAccount:
+                external.add(m.group(1))
+        if external and not _conditionScopesToOrg(condition):
+            issues.append(label + ' allows cross-account principal(s) ' + ', '.join(sorted(external))
+                          + ' without aws:PrincipalOrgID')
+    return issues
 
 
 class DynamoDbCommon(Evaluator):
@@ -555,3 +662,101 @@ class DynamoDbCommon(Evaluator):
             ecode = e.response['Error']['Code']
             emsg = e.response['Error']['Message']
             print(ecode, emsg)
+
+    # Resource-based policy on the table (and its stream) must not grant access to any principal
+    # or to unscoped cross-account principals.
+    def _checkDynamodbResourcePolicyPublic(self):
+        table = self.tables['Table']
+        tableArn = table.get('TableArn')
+        if not tableArn:
+            self.results['dynamodbResourcePolicyPublic'] = [0, 'Unable to evaluate (TableArn missing)']
+            return
+        ownAccount = tableArn.split(':')[4] if len(tableArn.split(':')) > 4 else ''
+
+        targets = [('table', tableArn)]
+        if table.get('LatestStreamArn'):
+            targets.append(('stream', table['LatestStreamArn']))
+
+        issues = []
+        errors = []
+        for kind, arn in targets:
+            try:
+                resp = self.dynamoDbClient.get_resource_policy(ResourceArn=arn)
+            except botocore.exceptions.ClientError as e:
+                code = e.response.get('Error', {}).get('Code', 'Unknown')
+                if code == 'PolicyNotFoundException':
+                    continue
+                # A stream ARN that is no longer readable (stream disabled) has no policy to evaluate.
+                if kind == 'stream' and code == 'ResourceNotFoundException':
+                    continue
+                errors.append(code)
+                continue
+            found = resourcePolicyIssues(resp.get('Policy'), ownAccount)
+            if found is None:
+                errors.append('PolicyNotParseable')
+                continue
+            issues.extend(kind + ' policy ' + i for i in found)
+
+        if issues:
+            self.results['dynamodbResourcePolicyPublic'] = [-1, '; '.join(issues)]
+        elif errors:
+            self.results['dynamodbResourcePolicyPublic'] = [0, 'Unable to evaluate (' + ', '.join(sorted(set(errors))) + ')']
+        else:
+            self.results['dynamodbResourcePolicyPublic'] = [1, '']
+
+    # Heuristic (tier 3): a table tagged as business critical should have a replica in another
+    # Region (global table) for disaster recovery. Untagged tables are reported as INFO only.
+    def _checkDynamodbNoMultiRegionReplica(self):
+        key = 'dynamodbNoMultiRegionReplica'
+        table = self.tables['Table']
+        tableArn = table.get('TableArn', '')
+        arnParts = tableArn.split(':')
+        ownRegion = arnParts[3] if len(arnParts) > 3 else None
+
+        replicaRegions = set()
+        for r in table.get('Replicas') or []:
+            region = r.get('RegionName')
+            if region and region != ownRegion and r.get('ReplicaStatus') not in ('DELETING', 'REGION_DISABLED'):
+                replicaRegions.add(region)
+
+        # Legacy (2017.11.29) global tables report their replicas only via DescribeGlobalTable.
+        if not replicaRegions and table.get('GlobalTableVersion') == '2017.11.29':
+            try:
+                gt = self.dynamoDbClient.describe_global_table(GlobalTableName=self.tablename)
+                for r in gt.get('GlobalTableDescription', {}).get('ReplicationGroup', []) or []:
+                    region = r.get('RegionName')
+                    if region and region != ownRegion:
+                        replicaRegions.add(region)
+            except botocore.exceptions.ClientError as e:
+                code = e.response.get('Error', {}).get('Code', 'Unknown')
+                self.results[key] = [0, 'Unable to evaluate (' + code + ')']
+                return
+
+        if replicaRegions:
+            self.results[key] = [1, 'Replicas: ' + ', '.join(sorted(replicaRegions))]
+            return
+
+        try:
+            tags = []
+            kwargs = {'ResourceArn': tableArn}
+            while True:
+                resp = self.dynamoDbClient.list_tags_of_resource(**kwargs)
+                tags.extend(resp.get('Tags', []) or [])
+                if not resp.get('NextToken'):
+                    break
+                kwargs['NextToken'] = resp['NextToken']
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', 'Unknown')
+            self.results[key] = [0, 'Unable to evaluate (' + code + ')']
+            return
+
+        criticalTag = None
+        for t in tags:
+            if _norm(t.get('Key', '')) in _CRITICALITY_TAG_KEYS and _norm(t.get('Value', '')) in _CRITICALITY_TAG_VALUES:
+                criticalTag = str(t.get('Key')) + '=' + str(t.get('Value'))
+                break
+
+        if criticalTag:
+            self.results[key] = [-1, 'Table tagged ' + criticalTag + ' has no replica in another Region']
+        else:
+            self.results[key] = [0, 'No replica in another Region; table is not tagged as critical - review its DR requirements']
