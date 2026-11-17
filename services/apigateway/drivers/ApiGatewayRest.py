@@ -17,10 +17,63 @@ class ApiGatewayRest(Evaluator):
 
         return
 
+    ## Read-once helpers: several checks need the same API Gateway data. Each
+    ## returns the same response the inline call used to return (first page
+    ## only, as before) and re-raises the same exception to every caller.
+    def _region(self):
+        return self.apiClient.meta.region_name
+
+    def _stages(self):
+        return self._memo(('get_stages', self.api['id']),
+                          lambda: self.apiClient.get_stages(restApiId=self.api['id']))
+
+    def _restApi(self):
+        return self._memo(('get_rest_api', self.api['id']),
+                          lambda: self.apiClient.get_rest_api(restApiId=self.api['id']))
+
+    def _resources(self):
+        return self._memo(('get_resources', self.api['id']),
+                          lambda: self.apiClient.get_resources(restApiId=self.api['id']))
+
+    def _method(self, resourceId, httpMethod):
+        return self._memo(('get_method', self.api['id'], resourceId, httpMethod),
+                          lambda: self.apiClient.get_method(restApiId=self.api['id'],
+                                                            resourceId=resourceId,
+                                                            httpMethod=httpMethod))
+
+    def _authorizers(self):
+        return self._memo(('get_authorizers', self.api['id']),
+                          lambda: self.apiClient.get_authorizers(restApiId=self.api['id']))
+
+    ## Account/region-level data, identical for every REST API in the region.
+    def _domainNames(self):
+        return self._sharedMemo(('apigateway', self._region(), 'get_domain_names'),
+                                lambda: self.apiClient.get_domain_names())
+
+    def _basePathMappings(self, domainName):
+        return self._sharedMemo(('apigateway', self._region(), 'get_base_path_mappings', domainName),
+                                lambda: self.apiClient.get_base_path_mappings(domainName=domainName))
+
+    def _usagePlans(self):
+        return self._sharedMemo(('apigateway', self._region(), 'get_usage_plans'),
+                                lambda: self.apiClient.get_usage_plans())
+
+    def _alarmsForMetric(self, cloudwatch, metricName, apiName):
+        return self._memo(('describe_alarms_for_metric', cloudwatch.meta.region_name, metricName, apiName),
+                          lambda: cloudwatch.describe_alarms_for_metric(
+                              MetricName=metricName,
+                              Namespace='AWS/ApiGateway',
+                              Dimensions=[
+                                  {'Name': 'ApiName', 'Value': apiName}
+                              ]
+                          ))
+
+    def _dashboards(self, cloudwatch):
+        return self._sharedMemo(('cloudwatch', cloudwatch.meta.region_name, 'list_dashboards'),
+                                lambda: cloudwatch.list_dashboards())
+
     def _checkStage(self):
-        resp = self.apiClient.get_stages(
-            restApiId = self.api['id'],
-        )
+        resp = self._stages()
         item = resp['item']
         if item == []:
             self.results['IdleAPIGateway'] = [-1, "No stages found"]
@@ -62,7 +115,7 @@ class ApiGatewayRest(Evaluator):
         """
         try:
             # Get the full REST API details including policy
-            api_details = self.apiClient.get_rest_api(restApiId=self.api['id'])
+            api_details = self._restApi()
             
             # Check if policy exists and is not empty
             if 'policy' in api_details and api_details['policy']:
@@ -85,7 +138,7 @@ class ApiGatewayRest(Evaluator):
         """
         try:
             # Get all resources for this API
-            resources_resp = self.apiClient.get_resources(restApiId=self.api['id'])
+            resources_resp = self._resources()
             resources = resources_resp.get('items', [])
             
             methods_without_auth = []
@@ -97,11 +150,7 @@ class ApiGatewayRest(Evaluator):
                 for method_name, method_data in resource_methods.items():
                     # Get detailed method information
                     try:
-                        method_details = self.apiClient.get_method(
-                            restApiId=self.api['id'],
-                            resourceId=resource['id'],
-                            httpMethod=method_name
-                        )
+                        method_details = self._method(resource['id'], method_name)
                         
                         auth_type = method_details.get('authorizationType', 'NONE')
                         
@@ -129,7 +178,7 @@ class ApiGatewayRest(Evaluator):
         Throttling protects from traffic spikes and prevents backend overload.
         """
         try:
-            resp = self.apiClient.get_stages(restApiId=self.api['id'])
+            resp = self._stages()
             stages = resp.get('item', [])
             
             if not stages:
@@ -182,7 +231,7 @@ class ApiGatewayRest(Evaluator):
         """
         try:
             # Get full API details to check endpoint configuration
-            api_details = self.apiClient.get_rest_api(restApiId=self.api['id'])
+            api_details = self._restApi()
             
             endpoint_config = api_details.get('endpointConfiguration', {})
             endpoint_types = endpoint_config.get('types', [])
@@ -206,7 +255,7 @@ class ApiGatewayRest(Evaluator):
         """
         try:
             # Get all authorizers for this API
-            authorizers_resp = self.apiClient.get_authorizers(restApiId=self.api['id'])
+            authorizers_resp = self._authorizers()
             authorizers = authorizers_resp.get('items', [])
             
             # Filter for Lambda authorizers (TOKEN or REQUEST type)
@@ -234,7 +283,7 @@ class ApiGatewayRest(Evaluator):
         """
         try:
             # Get all authorizers for this API
-            authorizers_resp = self.apiClient.get_authorizers(restApiId=self.api['id'])
+            authorizers_resp = self._authorizers()
             authorizers = authorizers_resp.get('items', [])
             
             # Filter for Cognito authorizers
@@ -262,7 +311,7 @@ class ApiGatewayRest(Evaluator):
         """
         try:
             # Get all domain names
-            domains_resp = self.apiClient.get_domain_names()
+            domains_resp = self._domainNames()
             domains = domains_resp.get('items', [])
             
             # Check each domain for mutual TLS configuration
@@ -274,7 +323,7 @@ class ApiGatewayRest(Evaluator):
                 # Check if this domain is associated with our API
                 # We need to check base path mappings
                 try:
-                    mappings_resp = self.apiClient.get_base_path_mappings(domainName=domain_name)
+                    mappings_resp = self._basePathMappings(domain_name)
                     mappings = mappings_resp.get('items', [])
                     
                     # Check if any mapping points to our API
@@ -307,7 +356,7 @@ class ApiGatewayRest(Evaluator):
         """
         try:
             # Get all usage plans
-            usage_plans_resp = self.apiClient.get_usage_plans()
+            usage_plans_resp = self._usagePlans()
             usage_plans = usage_plans_resp.get('items', [])
             
             # Check if any usage plan is associated with our API
@@ -350,7 +399,7 @@ class ApiGatewayRest(Evaluator):
         """
         try:
             # Get full API details
-            api_details = self.apiClient.get_rest_api(restApiId=self.api['id'])
+            api_details = self._restApi()
             
             endpoint_config = api_details.get('endpointConfiguration', {})
             endpoint_types = endpoint_config.get('types', [])
@@ -382,7 +431,7 @@ class ApiGatewayRest(Evaluator):
                 return
             
             # Check if validators are actually used by methods
-            resources_resp = self.apiClient.get_resources(restApiId=self.api['id'])
+            resources_resp = self._resources()
             resources = resources_resp.get('items', [])
             
             validator_used = False
@@ -392,11 +441,7 @@ class ApiGatewayRest(Evaluator):
                 
                 for method_name in resource_methods.keys():
                     try:
-                        method_details = self.apiClient.get_method(
-                            restApiId=self.api['id'],
-                            resourceId=resource['id'],
-                            httpMethod=method_name
-                        )
+                        method_details = self._method(resource['id'], method_name)
                         
                         # Check if method has a request validator
                         if 'requestValidatorId' in method_details:
@@ -424,7 +469,7 @@ class ApiGatewayRest(Evaluator):
             issues = []
             
             # Check 1: Resource policy exists
-            api_details = self.apiClient.get_rest_api(restApiId=self.api['id'])
+            api_details = self._restApi()
             has_policy = False
             if 'policy' in api_details and api_details['policy']:
                 policy_str = api_details['policy']
@@ -435,7 +480,7 @@ class ApiGatewayRest(Evaluator):
                 issues.append("No resource policy")
             
             # Check 2: Verify methods don't use NONE authorization
-            resources_resp = self.apiClient.get_resources(restApiId=self.api['id'])
+            resources_resp = self._resources()
             resources = resources_resp.get('items', [])
             
             has_none_auth = False
@@ -443,11 +488,7 @@ class ApiGatewayRest(Evaluator):
                 resource_methods = resource.get('resourceMethods', {})
                 for method_name in resource_methods.keys():
                     try:
-                        method_details = self.apiClient.get_method(
-                            restApiId=self.api['id'],
-                            resourceId=resource['id'],
-                            httpMethod=method_name
-                        )
+                        method_details = self._method(resource['id'], method_name)
                         auth_type = method_details.get('authorizationType', 'NONE')
                         if auth_type == 'NONE':
                             has_none_auth = True
@@ -461,7 +502,7 @@ class ApiGatewayRest(Evaluator):
                 issues.append("Methods with NONE authorization")
             
             # Check 3: At least one authorizer should exist
-            authorizers_resp = self.apiClient.get_authorizers(restApiId=self.api['id'])
+            authorizers_resp = self._authorizers()
             authorizers = authorizers_resp.get('items', [])
             
             if len(authorizers) == 0:
@@ -487,7 +528,7 @@ class ApiGatewayRest(Evaluator):
             api_id = self.api['id']
             
             # Get stages to check alarms per stage
-            stages_resp = self.apiClient.get_stages(restApiId=api_id)
+            stages_resp = self._stages()
             stages = stages_resp.get('item', [])
             
             if not stages:
@@ -506,13 +547,7 @@ class ApiGatewayRest(Evaluator):
             
             for metric_name in critical_metrics:
                 try:
-                    response = cloudwatch.describe_alarms_for_metric(
-                        MetricName=metric_name,
-                        Namespace='AWS/ApiGateway',
-                        Dimensions=[
-                            {'Name': 'ApiName', 'Value': api_name}
-                        ]
-                    )
+                    response = self._alarmsForMetric(cloudwatch, metric_name, api_name)
                     
                     metric_alarms = response.get('MetricAlarms', [])
                     if metric_alarms:
@@ -542,7 +577,7 @@ class ApiGatewayRest(Evaluator):
         """
         try:
             # Get all resources and methods
-            resources_resp = self.apiClient.get_resources(restApiId=self.api['id'])
+            resources_resp = self._resources()
             resources = resources_resp.get('items', [])
             
             methods_with_api_key_only = []
@@ -553,11 +588,7 @@ class ApiGatewayRest(Evaluator):
                 
                 for method_name in resource_methods.keys():
                     try:
-                        method_details = self.apiClient.get_method(
-                            restApiId=self.api['id'],
-                            resourceId=resource['id'],
-                            httpMethod=method_name
-                        )
+                        method_details = self._method(resource['id'], method_name)
                         
                         # Check if API key is required
                         api_key_required = method_details.get('apiKeyRequired', False)
@@ -591,7 +622,7 @@ class ApiGatewayRest(Evaluator):
         """
         try:
             # Get API details including endpoint configuration
-            api_details = self.apiClient.get_rest_api(restApiId=self.api['id'])
+            api_details = self._restApi()
             
             endpoint_config = api_details.get('endpointConfiguration', {})
             endpoint_types = endpoint_config.get('types', [])
@@ -650,7 +681,7 @@ class ApiGatewayRest(Evaluator):
             api_name = self.api['name']
             
             # Check for CloudWatch dashboards
-            dashboards_resp = cloudwatch.list_dashboards()
+            dashboards_resp = self._dashboards(cloudwatch)
             dashboards = dashboards_resp.get('DashboardEntries', [])
             
             # Check if any dashboard name contains the API name or "apigateway"
@@ -664,13 +695,7 @@ class ApiGatewayRest(Evaluator):
             # Check for performance-related alarms (Latency metric)
             has_performance_alarm = False
             try:
-                response = cloudwatch.describe_alarms_for_metric(
-                    MetricName='Latency',
-                    Namespace='AWS/ApiGateway',
-                    Dimensions=[
-                        {'Name': 'ApiName', 'Value': api_name}
-                    ]
-                )
+                response = self._alarmsForMetric(cloudwatch, 'Latency', api_name)
                 
                 metric_alarms = response.get('MetricAlarms', [])
                 if metric_alarms:
@@ -694,7 +719,7 @@ class ApiGatewayRest(Evaluator):
         """
         try:
             # Get all stages
-            stages_resp = self.apiClient.get_stages(restApiId=self.api['id'])
+            stages_resp = self._stages()
             stages = stages_resp.get('item', [])
             
             if not stages:
@@ -731,7 +756,7 @@ class ApiGatewayRest(Evaluator):
         """
         try:
             # Get all stages
-            stages_resp = self.apiClient.get_stages(restApiId=self.api['id'])
+            stages_resp = self._stages()
             stages = stages_resp.get('item', [])
             
             if not stages:
@@ -765,7 +790,7 @@ class ApiGatewayRest(Evaluator):
         """
         try:
             # Get all stages
-            stages_resp = self.apiClient.get_stages(restApiId=self.api['id'])
+            stages_resp = self._stages()
             stages = stages_resp.get('item', [])
             
             if not stages:
@@ -802,7 +827,7 @@ class ApiGatewayRest(Evaluator):
         """
         try:
             # Get all resources
-            resources_resp = self.apiClient.get_resources(restApiId=self.api['id'])
+            resources_resp = self._resources()
             resources = resources_resp.get('items', [])
             
             # Check if any resource has OPTIONS method (CORS indicator)
@@ -814,11 +839,7 @@ class ApiGatewayRest(Evaluator):
                 if 'OPTIONS' in resource_methods:
                     # Check if OPTIONS method has CORS-related integration
                     try:
-                        method_details = self.apiClient.get_method(
-                            restApiId=self.api['id'],
-                            resourceId=resource['id'],
-                            httpMethod='OPTIONS'
-                        )
+                        method_details = self._method(resource['id'], 'OPTIONS')
                         
                         # Check integration response for CORS headers
                         integration_resp = self.apiClient.get_integration_response(
