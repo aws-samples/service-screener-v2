@@ -97,7 +97,7 @@
 	},
 	"AuthorizationType": {
 		"category": "S",
-		"^description": "API Gateway V2 WebSocket and HTTP routes should specify an authorization type. Specifying an authorization type ensures that access to the API is controlled and restricted to authorized users or processes.",
+		"^description": "API Gateway V2 HTTP routes and the WebSocket $connect route should specify an authorization type. Routes with authorization type NONE (and WebSocket APIs without a $connect route) can be invoked by anyone. CORS preflight (OPTIONS) routes and WebSocket routes other than $connect are not evaluated because authorization cannot or should not be applied to them.",
 		"shortDesc": "Specify an authorization type",
 		"criticality": "M",
 		"downtime": 0,
@@ -482,5 +482,22 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/apigateway/latest/developerguide/how-to-cors.html"
+	},
+	"apigwV2JwtAuthorizerNoAudience": {
+		"category": "S",
+		"^description": "{$COUNT} HTTP API(s) have a JWT authorizer with no audience (aud/client_id) restriction or a non-HTTPS issuer. Without an audience list, any token issued by the identity provider for another application is accepted by the API; a non-HTTPS issuer means signing keys are not retrieved over an authenticated channel.",
+		"shortDesc": "Restrict JWT authorizer audience and use an HTTPS issuer",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Controlling access to HTTP APIs with JWT authorizers]<https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html>",
+			"[JWTConfiguration - Amazon API Gateway v2 API reference]<https://docs.aws.amazon.com/apigatewayv2/latest/api-reference/apis-apiid-authorizers-authorizerid.html>"
+		],
+		"remediation": "aws apigatewayv2 update-authorizer --api-id <api-id> --authorizer-id <authorizer-id> --jwt-configuration Audience=<client-id>,Issuer=https://<issuer>",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html"
 	}
 }
