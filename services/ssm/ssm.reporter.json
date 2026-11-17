@@ -236,5 +236,58 @@
     "remediation": null,
     "remediation_risk": null,
     "remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-inventory.html"
+  },
+  "ssmDocumentPublic": {
+    "category": "S",
+    "^description": "{$COUNT} finding(s) of publicly exposed Systems Manager documents (each finding is a self-owned document or a region setting): either a self-owned document is shared with all AWS accounts (AccountIds contains 'all'), or the region's block public sharing setting is off (public-sharing-permission = Enable, the AWS default). A public document reveals its scripts, parameters and any embedded hostnames or credentials to every AWS account, and anyone can run it in their own account. Remove the 'all' permission from shared documents and turn on block public sharing for SSM documents.",
+    "shortDesc": "Stop sharing SSM documents publicly and block public sharing",
+    "criticality": "H",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": [
+      "[Best practices for shared SSM documents]<https://docs.aws.amazon.com/systems-manager/latest/userguide/documents-ssm-sharing.html>",
+      "[Block public sharing for SSM documents]<https://docs.aws.amazon.com/systems-manager/latest/userguide/documents-ssm-sharing.html#block-public-access>",
+      "[Security Hub controls for Systems Manager (SSM.4, SSM.7)]<https://docs.aws.amazon.com/securityhub/latest/userguide/ssm-controls.html>"
+    ],
+    "remediation": null,
+    "remediation_risk": null,
+    "remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/documents-ssm-sharing.html"
+  },
+  "ssmSessionPrefsWeak": {
+    "category": "S",
+    "^description": "{$COUNT} region(s) have weak Session Manager session limits: the idle session timeout is longer than 20 minutes, or no maximum session duration is set (the default). Long-lived or abandoned interactive shells on managed instances widen the window in which an unattended or hijacked session can be misused. Set idleSessionTimeout to 20 minutes or less and set maxSessionDuration in the Session Manager preferences.",
+    "shortDesc": "Set Session Manager idle timeout and maximum session duration",
+    "criticality": "L",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "ref": [
+      "[Specify an idle session timeout value]<https://docs.aws.amazon.com/systems-manager/latest/userguide/session-preferences-timeout.html>",
+      "[Specify maximum session duration]<https://docs.aws.amazon.com/systems-manager/latest/userguide/session-preferences-max-timeout.html>"
+    ],
+    "remediation": null,
+    "remediation_risk": null,
+    "remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-preferences-max-timeout.html"
+  },
+  "ssmNoAutomatedPatching": {
+    "category": "S",
+    "^description": "{$COUNT} region(s) have managed instances but no automated patch installation: no State Manager association or enabled maintenance window task runs AWS-RunPatchBaseline (or a related Patch Manager document) with Operation=Install, and no Quick Setup patch policy scans and installs. Patch Manager's default Operation is Scan, which only reports missing patches. Without a scheduled install, instances fall behind on security updates until someone patches them by hand. Create a Quick Setup patch policy or a State Manager association / maintenance window task with Operation=Install. If a third-party tool patches these instances, this finding can be accepted.",
+    "shortDesc": "Automate patch installation with Patch Manager",
+    "criticality": "M",
+    "downtime": 1,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 1,
+    "ref": [
+      "[Patch policy configurations in Quick Setup]<https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager-policies.html>",
+      "[SSM Command document for patching: AWS-RunPatchBaseline]<https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager-aws-runpatchbaseline.html>",
+      "[Patching schedules using maintenance windows]<https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager-scheduling.html>"
+    ],
+    "remediation": null,
+    "remediation_risk": null,
+    "remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/patch-manager-policies.html"
   }
 }
