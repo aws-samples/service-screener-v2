@@ -16,7 +16,6 @@ class EksCommon(Evaluator):
     def __init__(self, eksCluster, clusterInfo, eksClient, ec2Client, iamClient, ssmClient=None):
         super().__init__()
         self.ssmClient = ssmClient
-        self._ssmCache = {}
         self.cluster = eksCluster
         self.clusterInfo = clusterInfo
         self.eksClient = eksClient
@@ -24,9 +23,43 @@ class EksCommon(Evaluator):
         self.iamClient = iamClient
 
         self._resourceName = eksCluster
-        
+
         self.init()
-        
+
+    # ------------------------------------------------------------------ #
+    # Read-once accessors. Several checks read the same node groups / add-ons;
+    # account-level data (IAM, public SSM parameters, subnets) is shared by all
+    # clusters in the scan. Exceptions are cached and re-raised to each caller.
+    # ------------------------------------------------------------------ #
+    def _clusterListPage(self, op, token=None):
+        """One page of list_nodegroups / list_addons for this cluster."""
+        kw = {'clusterName': self.cluster}
+        if token is not None:
+            kw['nextToken'] = token
+        return self._memo((op, self.cluster, token), lambda: getattr(self.eksClient, op)(**kw))
+
+    def _clusterListPages(self, op):
+        """Yields every page of `op`, like get_paginator(op).paginate(clusterName=...)."""
+        token = None
+        while True:
+            page = self._clusterListPage(op, token)
+            yield page
+            token = page.get('nextToken')
+            if not token:
+                return
+
+    def _describeNodegroup(self, nodegroupName):
+        return self._memo(('describe_nodegroup', self.cluster, nodegroupName),
+                          lambda: self.eksClient.describe_nodegroup(clusterName=self.cluster, nodegroupName=nodegroupName))
+
+    def _describeSubnets(self, subnetIds):
+        key = ('ec2.describe_subnets', self.ec2Client.meta.region_name, tuple(subnetIds))
+        return self._sharedMemo(key, lambda: self.ec2Client.describe_subnets(SubnetIds=subnetIds))
+
+    def _iamShared(self, op, **kw):
+        key = ('iam.' + op, self.iamClient.meta.region_name, tuple(sorted(kw.items())))
+        return self._sharedMemo(key, lambda: getattr(self.iamClient, op)(**kw))
+
     def getNewerVersionCnt(self, versionList, clusterVersion):
         newerVersionCnt = 0
         for version in versionList:
@@ -208,15 +241,10 @@ class EksCommon(Evaluator):
         return
     
     def inlinePolicyLeastPrivilege(self, roleName):
-        response = self.iamClient.list_role_policies(
-            RoleName = roleName    
-        )
+        response = self._iamShared('list_role_policies', RoleName=roleName)
         
         for policyName in response.get('PolicyNames'):
-            policyResp = self.iamClient.get_role_policy(
-                RoleName=roleName,
-                PolicyName=policyName
-            )
+            policyResp = self._iamShared('get_role_policy', RoleName=roleName, PolicyName=policyName)
             document = policyResp.get('PolicyDocument')
             
             pObj = Policy(document)
@@ -227,14 +255,10 @@ class EksCommon(Evaluator):
         return True
         
     def attachedPolicyLeastPrivilege(self, roleName):
-        response = self.iamClient.list_attached_role_policies(
-            RoleName = roleName    
-        )
+        response = self._iamShared('list_attached_role_policies', RoleName=roleName)
         
         for policy in response.get('AttachedPolicies'):
-            policyInfoResp = self.iamClient.get_policy(
-                PolicyArn=policy.get('PolicyArn')
-            )
+            policyInfoResp = self._iamShared('get_policy', PolicyArn=policy.get('PolicyArn'))
             
             policyInfo = policyInfoResp.get('Policy')
             if len(policyInfo) == 0:
@@ -244,10 +268,7 @@ class EksCommon(Evaluator):
             policyArn = policyInfo.get('Arn')
             policyVersion = policyInfo.get('DefaultVersionId')
             
-            policyResp = self.iamClient.get_policy_version(
-                PolicyArn=policyArn,
-                VersionId=policyVersion
-            )
+            policyResp = self._iamShared('get_policy_version', PolicyArn=policyArn, VersionId=policyVersion)
             
             if len(policyResp.get('PolicyVersion')) == 0:
                 print("Skipped. Unable to retrieve policy permission for " + policy.get('PolicyArn') + " version " + policyVersion)
@@ -289,9 +310,7 @@ class EksCommon(Evaluator):
         Managed node groups provide automated provisioning and lifecycle management.
         """
         try:
-            response = self.eksClient.list_nodegroups(
-                clusterName=self.cluster
-            )
+            response = self._clusterListPage('list_nodegroups')
             
             nodeGroups = response.get('nodegroups', [])
             
@@ -313,19 +332,14 @@ class EksCommon(Evaluator):
         """
         try:
             # Get list of node groups
-            response = self.eksClient.list_nodegroups(
-                clusterName=self.cluster
-            )
+            response = self._clusterListPage('list_nodegroups')
             
             nodeGroups = response.get('nodegroups', [])
             
             for nodeGroupName in nodeGroups:
                 try:
                     # Get node group details
-                    ngResponse = self.eksClient.describe_nodegroup(
-                        clusterName=self.cluster,
-                        nodegroupName=nodeGroupName
-                    )
+                    ngResponse = self._describeNodegroup(nodeGroupName)
                     
                     nodeGroup = ngResponse.get('nodegroup', {})
                     subnets = nodeGroup.get('subnets', [])
@@ -334,9 +348,7 @@ class EksCommon(Evaluator):
                         continue
                     
                     # Get subnet details to determine AZs
-                    subnetResponse = self.ec2Client.describe_subnets(
-                        SubnetIds=subnets
-                    )
+                    subnetResponse = self._describeSubnets(subnets)
                     
                     # Extract unique availability zones
                     azs = set()
@@ -436,9 +448,7 @@ class EksCommon(Evaluator):
         """
         try:
             # Get list of node groups
-            response = self.eksClient.list_nodegroups(
-                clusterName=self.cluster
-            )
+            response = self._clusterListPage('list_nodegroups')
             
             nodeGroups = response.get('nodegroups', [])
             
@@ -448,10 +458,7 @@ class EksCommon(Evaluator):
             for nodeGroupName in nodeGroups:
                 try:
                     # Get node group details
-                    ngResponse = self.eksClient.describe_nodegroup(
-                        clusterName=self.cluster,
-                        nodegroupName=nodeGroupName
-                    )
+                    ngResponse = self._describeNodegroup(nodeGroupName)
                     
                     nodeGroup = ngResponse.get('nodegroup', {})
                     capacityType = nodeGroup.get('capacityType', 'ON_DEMAND')
@@ -484,9 +491,7 @@ class EksCommon(Evaluator):
         """
         try:
             # Get list of installed add-ons
-            response = self.eksClient.list_addons(
-                clusterName=self.cluster
-            )
+            response = self._clusterListPage('list_addons')
             
             addons = response.get('addons', [])
             
@@ -562,7 +567,7 @@ class EksCommon(Evaluator):
         if issuer:
             host = issuer.split('://', 1)[-1].rstrip('/').lower()
             try:
-                providers = self.iamClient.list_open_id_connect_providers().get('OpenIDConnectProviderList', []) or []
+                providers = self._iamShared('list_open_id_connect_providers').get('OpenIDConnectProviderList', []) or []
                 for p in providers:
                     arn = (p.get('Arn') or '').lower()
                     if arn.endswith(':oidc-provider/' + host):
@@ -587,8 +592,7 @@ class EksCommon(Evaluator):
             evidence.append('EKS Auto Mode (Pod Identity agent built in)')
         else:
             try:
-                paginator = self.eksClient.get_paginator('list_addons')
-                for page in paginator.paginate(clusterName=self.cluster):
+                for page in self._clusterListPages('list_addons'):
                     if 'eks-pod-identity-agent' in (page.get('addons', []) or []):
                         evidence.append('eks-pod-identity-agent add-on')
                         break
@@ -646,14 +650,13 @@ class EksCommon(Evaluator):
         return (ver, int(parts[1]))
 
     def _latestAmiRelease(self, path):
-        if path in self._ssmCache:
-            return self._ssmCache[path]
+        ## Public AWS parameter: identical for every cluster in the region, so read once per scan.
+        key = ('ssm.get_parameter', self.ssmClient.meta.region_name, path)
         try:
-            val = self.ssmClient.get_parameter(Name=path)['Parameter']['Value']
+            val = self._sharedMemo(key, lambda: self.ssmClient.get_parameter(Name=path))['Parameter']['Value']
             out = (val, None)
         except botocore.exceptions.ClientError as e:
             out = (None, self._errCode(e))
-        self._ssmCache[path] = out
         return out
 
     def _checkNodeGroupAmiOutdated(self):
@@ -665,7 +668,7 @@ class EksCommon(Evaluator):
         """
         try:
             nodeGroups = []
-            for page in self.eksClient.get_paginator('list_nodegroups').paginate(clusterName=self.cluster):
+            for page in self._clusterListPages('list_nodegroups'):
                 nodeGroups += page.get('nodegroups', []) or []
         except botocore.exceptions.ClientError as e:
             self.results['eksNodeGroupAmiOutdated'] = [0, 'Unable to evaluate (' + self._errCode(e) + ')']
@@ -681,7 +684,7 @@ class EksCommon(Evaluator):
         outdated, current, skipped, unable = [], [], [], []
         for ngName in nodeGroups:
             try:
-                ng = self.eksClient.describe_nodegroup(clusterName=self.cluster, nodegroupName=ngName).get('nodegroup', {}) or {}
+                ng = self._describeNodegroup(ngName).get('nodegroup', {}) or {}
             except botocore.exceptions.ClientError as e:
                 unable.append(ngName + ' (' + self._errCode(e) + ')')
                 continue
@@ -736,9 +739,7 @@ class EksCommon(Evaluator):
         """
         try:
             # Check 1: Look for Karpenter add-on
-            response = self.eksClient.list_addons(
-                clusterName=self.cluster
-            )
+            response = self._clusterListPage('list_addons')
             
             addons = response.get('addons', [])
             
@@ -754,9 +755,7 @@ class EksCommon(Evaluator):
                 return
             
             # Check 2: Look for node group autoscaling
-            ngResponse = self.eksClient.list_nodegroups(
-                clusterName=self.cluster
-            )
+            ngResponse = self._clusterListPage('list_nodegroups')
             
             nodeGroups = ngResponse.get('nodegroups', [])
             
@@ -764,10 +763,7 @@ class EksCommon(Evaluator):
             
             for nodeGroupName in nodeGroups:
                 try:
-                    ngDetailResponse = self.eksClient.describe_nodegroup(
-                        clusterName=self.cluster,
-                        nodegroupName=nodeGroupName
-                    )
+                    ngDetailResponse = self._describeNodegroup(nodeGroupName)
                     
                     nodeGroup = ngDetailResponse.get('nodegroup', {})
                     scalingConfig = nodeGroup.get('scalingConfig', {})
@@ -803,9 +799,7 @@ class EksCommon(Evaluator):
         """
         try:
             # Get list of installed add-ons
-            response = self.eksClient.list_addons(
-                clusterName=self.cluster
-            )
+            response = self._clusterListPage('list_addons')
             
             addons = response.get('addons', [])
             

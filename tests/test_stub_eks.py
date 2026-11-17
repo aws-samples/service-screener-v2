@@ -17,6 +17,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.insert(0, ROOT)
 
 from services.eks.drivers.EksCommon import EksCommon  # noqa: E402
+from utils.Config import Config  # noqa: E402
 
 CLUSTER = 'demo'
 CLUSTER_INFO = {'name': CLUSTER, 'version': '1.31'}
@@ -42,6 +43,7 @@ def _param(path, value):
 
 def _run(nodegroups, params):
     """nodegroups: list of describe_nodegroup responses; params: list of (path, value|errorCode)."""
+    Config.init()  # each run is a separate scan: drop the per-scan shared cache (public SSM parameters)
     eks, ssm = _clients()
     with Stubber(eks) as es, Stubber(ssm) as ss:
         es.add_response('list_nodegroups', {'nodegroups': [n['nodegroup']['nodegroupName'] for n in nodegroups]},
