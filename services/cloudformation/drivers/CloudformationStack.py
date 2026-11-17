@@ -1,11 +1,66 @@
+import re
 from datetime import datetime, timezone
 
 from services.Evaluator import Evaluator
 
 
+## Parameter names that suggest the value is a credential. Matched
+## case-insensitively against the ParameterKey.
+SECRET_NAME_RE = re.compile(
+    r'(passw(or)?d|passphrase|secret|token|api[_-]?key|private[_-]?key|'
+    r'access[_-]?key|client[_-]?secret|credential)', re.IGNORECASE)
+
+## Names that match the pattern above but describe metadata ABOUT a secret
+## (where it lives, how long it is, how it rotates), not the secret itself.
+## "DbPasswordSecretArn", "SecretName", "PasswordLength", "TokenTtl" ...
+SECRET_NAME_EXCLUDE_RE = re.compile(
+    r'(arn|name|id|ids|length|len|ttl|policy|rotation|rotationdays|expiry|'
+    r'expiration|enabled|enable|type|path|parameter|param|version|kms|'
+    r'kmskey|kmskeyid|keyid|duration|validity|header|count|days|minutes|'
+    r'seconds|hours|url|uri|endpoint|location|ref|reference|identifier)$',
+    re.IGNORECASE)
+
+## Values that are clearly not a secret.
+NON_SECRET_VALUES = ('', 'true', 'false', 'yes', 'no', 'none', 'null',
+                     'enabled', 'disabled')
+
+
+def plaintextSecretParams(stack):
+    """
+    Return the ParameterKeys of `stack` (a describe_stacks entry) whose name
+    looks like a credential AND whose value describe_stacks returns in clear
+    text. A NoEcho parameter is returned masked as '****' and is skipped; an
+    SSM parameter-type parameter (ResolvedValue present) holds a parameter
+    NAME, not the value, and is skipped; a dynamic reference or ARN is skipped.
+    """
+    found = []
+    for p in stack.get('Parameters') or []:
+        key = p.get('ParameterKey') or ''
+        if not key or not SECRET_NAME_RE.search(key):
+            continue
+        if SECRET_NAME_EXCLUDE_RE.search(key):
+            continue
+        if p.get('UsePreviousValue') and 'ParameterValue' not in p:
+            continue
+        if 'ResolvedValue' in p:
+            continue
+        value = p.get('ParameterValue')
+        if not isinstance(value, str):
+            continue
+        v = value.strip()
+        if v.lower() in NON_SECRET_VALUES:
+            continue
+        if set(v) == {'*'}:
+            continue
+        if v.startswith('{{resolve:') or v.startswith('arn:'):
+            continue
+        found.append(key)
+    return found
+
+
 class CloudformationStack(Evaluator):
     """
-    Per-stack AWS CloudFormation checks (9).
+    Per-stack AWS CloudFormation checks (11).
 
     Input:
       stack -- a describe_stacks entry plus '_region', '_tags' and
@@ -282,6 +337,37 @@ class CloudformationStack(Evaluator):
                 f"Stack '{self.name}' has no tags — CloudFormation propagates "
                 "stack tags to every resource it creates, so tagging the stack is "
                 "the cheapest way to tag a whole deployment at once"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 11. Secret-like parameters visible in clear text
+    # ------------------------------------------------------------------ #
+    def _checkCfnPlaintextSecretParams(self):
+        """
+        Reads the Parameters describe_stacks already returned. The parameter
+        VALUE is never copied into the message, only its key.
+        """
+        params = self.stack.get('Parameters') or []
+        exposed = plaintextSecretParams(self.stack)
+        if exposed:
+            self.results['cfnPlaintextSecretParams'] = [
+                -1,
+                f"Stack '{self.name}' returns secret-like parameter(s) "
+                + self._joinNames(exposed)
+                + " in clear text — anyone allowed cloudformation:DescribeStacks "
+                "can read the value. Declare them NoEcho, or better, resolve the "
+                "secret from Secrets Manager or SSM SecureString with a dynamic "
+                "reference"
+            ]
+        elif params:
+            self.results['cfnPlaintextSecretParams'] = [
+                1,
+                f"Stack '{self.name}' has no secret-like parameter returned in "
+                "clear text"
+            ]
+        else:
+            self.results['cfnPlaintextSecretParams'] = [
+                1, f"Stack '{self.name}' has no parameters"
             ]
 
     # ------------------------------------------------------------------ #

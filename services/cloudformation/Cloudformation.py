@@ -5,7 +5,12 @@ import botocore
 from utils.Tools import _pi, _warn
 from services.Service import Service
 
-from services.cloudformation.drivers.CloudformationStack import CloudformationStack
+from services.cloudformation.drivers.CloudformationStack import (
+    CloudformationStack, plaintextSecretParams)
+from services.cloudformation.drivers.CloudformationStackSet import \
+    CloudformationStackSet
+from services.cloudformation.drivers.CloudformationCommon import \
+    CloudformationCommon
 
 
 class Cloudformation(Service):
@@ -13,12 +18,19 @@ class Cloudformation(Service):
     AWS CloudFormation service scanner.
 
     Discovery: describe_stacks (paginated), filtered to settled stacks that are
-    either RECENT or INTERESTING (see RECENT_DAYS). All checks are per-stack, so
-    there is one driver.
+    either RECENT or INTERESTING (see RECENT_DAYS) -> CloudformationStack.
+    ACTIVE StackSets administered from this account -> CloudformationStackSet.
+    One account/region descriptor -> CloudformationCommon (hooks).
 
     Hydration calls (all read-only):
       - describe_stacks      (paginated; includes DriftInformation and Tags)
       - get_stack_policy     (per stack, SAMPLED — see STACK_POLICY_SAMPLE_LIMIT)
+      - list_types           (Type=HOOK, Visibility=PRIVATE: registered and
+                              activated hooks)
+      - batch_describe_type_configurations (hook HookInvocationStatus)
+      - list_stack_sets      (Status=ACTIVE, CallAs SELF and DELEGATED_ADMIN)
+      - describe_stack_set   (StackSetDriftDetectionDetails)
+      - list_stack_instances (MaxResults=1: does the StackSet have instances)
 
     READ-ONLY NOTE: this service deliberately does NOT call detect_stack_drift.
     That operation is a WRITE: its only output is a StackDriftDetectionId, and it
@@ -195,6 +207,10 @@ class Cloudformation(Service):
             return True
         if 'FAILED' in (stack.get('StackStatus') or ''):
             return True
+        ## A credential readable through DescribeStacks is exposed however old
+        ## the stack is; computed from data already in hand (no extra call).
+        if plaintextSecretParams(stack):
+            return True
         return False
 
     def _getStackPolicy(self, name):
@@ -213,6 +229,131 @@ class Cloudformation(Service):
             return None
 
     # ------------------------------------------------------------------ #
+    # Hooks (account/region level)
+    # ------------------------------------------------------------------ #
+    ## batch_describe_type_configurations accepts at most 100 identifiers.
+    TYPE_CONFIG_BATCH = 100
+
+    def getHookPosture(self):
+        """
+        Return {'_region', '_hooks', '_hooksError'}. Visibility=PRIVATE lists
+        both private hooks registered in this account and public hooks
+        activated in it (Guard / Lambda managed hooks, third-party hooks,
+        Control Tower proactive controls).
+        """
+        detail = {'_region': self.region, '_hooks': [], '_hooksError': None}
+        hooks = []
+        try:
+            paginator = self.cfnClient.get_paginator('list_types')
+            for page in paginator.paginate(Type='HOOK', Visibility='PRIVATE',
+                                           DeprecatedStatus='LIVE'):
+                hooks += page.get('TypeSummaries', []) or []
+        except botocore.exceptions.ClientError as e:
+            detail['_hooksError'] = self._errorCode(e)
+            self._logClientError('list_types(HOOK)', e)
+            return detail
+
+        byArn = {}
+        for h in hooks:
+            arn = h.get('TypeArn')
+            if not arn or arn in byArn:
+                continue
+            byArn[arn] = {'TypeName': h.get('TypeName'), 'TypeArn': arn,
+                          'Configurations': [], 'ConfigError': None}
+
+        arns = list(byArn)
+        for i in range(0, len(arns), self.TYPE_CONFIG_BATCH):
+            chunk = arns[i:i + self.TYPE_CONFIG_BATCH]
+            try:
+                resp = self.cfnClient.batch_describe_type_configurations(
+                    TypeConfigurationIdentifiers=[{'TypeArn': a} for a in chunk])
+            except botocore.exceptions.ClientError as e:
+                code = self._errorCode(e)
+                self._logClientError('batch_describe_type_configurations', e)
+                for a in chunk:
+                    byArn[a]['ConfigError'] = code
+                continue
+            for cfg in resp.get('TypeConfigurations', []) or []:
+                h = byArn.get(cfg.get('TypeArn'))
+                if h is not None:
+                    h['Configurations'].append(cfg.get('Configuration') or '{}')
+            ## A 404 "TypeConfiguration not found" means the hook was never
+            ## configured, i.e. it is not enabled — that is an answer, not an
+            ## evaluation failure. Anything else leaves the hook unknown.
+            for err in (resp.get('Errors', []) or []) + \
+                    (resp.get('UnprocessedTypeConfigurations', []) or []):
+                ident = err.get('TypeConfigurationIdentifier') or err
+                h = byArn.get(ident.get('TypeArn'))
+                if h is None:
+                    continue
+                code = str(err.get('ErrorCode', 'Unprocessed'))
+                if code not in ('404', 'NotFound', 'TypeConfigurationNotFound',
+                                'TypeConfigurationNotFoundException'):
+                    h['ConfigError'] = code
+        detail['_hooks'] = list(byArn.values())
+        return detail
+
+    # ------------------------------------------------------------------ #
+    # StackSets
+    # ------------------------------------------------------------------ #
+    def getStackSets(self):
+        """
+        Return (stackSets, errorCode). StackSets are listed as SELF (the
+        self-managed StackSets this account administers, and service-managed
+        ones in the management account) and as DELEGATED_ADMIN (service-managed
+        StackSets in a delegated administrator account; an error elsewhere,
+        which is ignored). errorCode is set only when the SELF listing failed.
+        """
+        found, seen, errorCode = [], set(), None
+        for callAs in ('SELF', 'DELEGATED_ADMIN'):
+            summaries = []
+            try:
+                paginator = self.cfnClient.get_paginator('list_stack_sets')
+                for page in paginator.paginate(Status='ACTIVE', CallAs=callAs):
+                    summaries += page.get('Summaries', []) or []
+            except botocore.exceptions.ClientError as e:
+                if callAs == 'SELF':
+                    errorCode = self._errorCode(e)
+                    self._logClientError('list_stack_sets', e)
+                continue
+            for summ in summaries:
+                ssId = summ.get('StackSetId') or summ.get('StackSetName')
+                if not ssId or ssId in seen:
+                    continue
+                if summ.get('Status') not in (None, 'ACTIVE'):
+                    continue
+                seen.add(ssId)
+                found.append(self._hydrateStackSet(summ, callAs))
+        if self.tags:
+            found = [s for s in found
+                     if self.resourceHasTags(s.get('Tags') or [])]
+        return found, errorCode
+
+    def _hydrateStackSet(self, summ, callAs):
+        name = summ.get('StackSetName')
+        detail = {'StackSetName': name, 'StackSetId': summ.get('StackSetId'),
+                  'PermissionModel': summ.get('PermissionModel')}
+        try:
+            resp = self.cfnClient.describe_stack_set(StackSetName=name,
+                                                     CallAs=callAs)
+            detail.update(resp.get('StackSet') or {})
+        except botocore.exceptions.ClientError as e:
+            detail['_describeError'] = self._errorCode(e)
+            self._logClientError(f'describe_stack_set({name})', e)
+        try:
+            resp = self.cfnClient.list_stack_instances(StackSetName=name,
+                                                       CallAs=callAs,
+                                                       MaxResults=1)
+            detail['_instanceCount'] = len(resp.get('Summaries', []) or [])
+        except botocore.exceptions.ClientError as e:
+            detail['_instanceCount'] = None
+            self._logClientError(f'list_stack_instances({name})', e)
+        detail['_region'] = self.region
+        detail['_callAs'] = callAs
+        _pi('Cloudformation', f"StackSet: {name}")
+        return detail
+
+    # ------------------------------------------------------------------ #
     # Advise
     # ------------------------------------------------------------------ #
     def advise(self):
@@ -226,11 +367,43 @@ class Cloudformation(Service):
                 del obj
             except Exception as e:
                 print(f"Error processing CloudFormation stack {name}: {e}")
+
+        try:
+            stackSets, ssError = self.getStackSets()
+            if ssError:
+                ## Listing failed: report "unknown" rather than nothing, so an
+                ## access problem does not read as "no StackSets, no drift".
+                stackSets = [{'StackSetName': 'StackSets', '_region': self.region,
+                              '_describeError': ssError}]
+            for ss in stackSets:
+                name = ss.get('StackSetName', 'unknown')
+                obj = CloudformationStackSet(ss)
+                obj.run(self.__class__)
+                objs[f"CloudFormation StackSet::{name}"] = obj.getInfo()
+                del obj
+        except botocore.exceptions.EndpointConnectionError as e:
+            print(f"CloudFormation not available in region {self.region}: {e}")
+        except Exception as e:
+            print(f"Error processing CloudFormation StackSets: {e}")
+
+        try:
+            obj = CloudformationCommon(self.getHookPosture())
+            obj.run(self.__class__)
+            objs['CloudFormation::Account'] = obj.getInfo()
+            del obj
+        except botocore.exceptions.EndpointConnectionError as e:
+            print(f"CloudFormation not available in region {self.region}: {e}")
+        except Exception as e:
+            print(f"Error processing CloudFormation account checks: {e}")
         return objs
 
     # ------------------------------------------------------------------ #
     # Helpers
     # ------------------------------------------------------------------ #
+    @staticmethod
+    def _errorCode(error):
+        return error.response.get('Error', {}).get('Code', 'Unknown')
+
     def _logClientError(self, where, error):
         code = error.response.get('Error', {}).get('Code', 'Unknown')
         if code in self.ACCESS_DENIED_CODES:
