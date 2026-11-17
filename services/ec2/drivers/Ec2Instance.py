@@ -8,6 +8,8 @@ from utils.Config import Config
 from datetime import timedelta
 from utils.Tools import aws_parseInstanceFamily, _warn
 from services.Evaluator import Evaluator
+from services.ec2.drivers.Ec2UserDataScan import decodeUserData, findSecrets
+from services.ec2.drivers.Ec2NetworkInterface import getSubnetRouting, evaluatePlacement
 
 import constants as _C
 
@@ -120,22 +122,35 @@ class Ec2Instance(Evaluator):
         
         self.launchTimeDeltaInDays = launchDay
         
+    # describe_images error codes meaning "this AMI no longer exists / is not visible"
+    IMAGE_NOT_FOUND_CODES = ('InvalidAMIID.NotFound', 'InvalidAMIID.Unavailable')
+
     def getImageInfo(self):
+        """Source AMI of the instance (cached per image).
+        self.ec2ImageInfo   - the image dict, or None
+        self.ec2ImageStatus - 'found' | 'missing' (deregistered / no longer shared) | 'error:<code>'
+        Deprecated and disabled AMIs are included so they can be reported."""
         imageId = self.ec2InstanceData['ImageId']
         cacheKey = 'ec2::image::' + imageId
+        statusKey = 'ec2::imagestatus::' + imageId
         cached = Config.get(cacheKey, "__unset__")
         if cached != "__unset__":
             self.ec2ImageInfo = cached
+            self.ec2ImageStatus = Config.get(statusKey, 'found' if cached else 'missing')
             return
 
-        resp = self.ec2Client.describe_images(ImageIds=[imageId])
-        images = resp.get('Images')
-
         self.ec2ImageInfo = None
-        for image in images:
-            self.ec2ImageInfo = image
+        try:
+            resp = self.ec2Client.describe_images(ImageIds=[imageId], IncludeDeprecated=True, IncludeDisabled=True)
+            for image in resp.get('Images', []):
+                self.ec2ImageInfo = image
+            self.ec2ImageStatus = 'found' if self.ec2ImageInfo else 'missing'
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', 'ClientError')
+            self.ec2ImageStatus = 'missing' if code in self.IMAGE_NOT_FOUND_CODES else 'error:' + code
 
         Config.set(cacheKey, self.ec2ImageInfo)
+        Config.set(statusKey, self.ec2ImageStatus)
 
     def _getInstanceTypeInfo(self, instanceTypeStr):
         """Cached describe_instance_types lookup - shared across every instance
@@ -753,3 +768,118 @@ class Ec2Instance(Evaluator):
         except Exception:
             return
 
+    # ------------------------------------------------------------------ #
+    # WAFS2027
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _parseTime(value):
+        if isinstance(value, datetime.datetime):
+            dt = value
+        else:
+            try:
+                dt = datetime.datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+            except ValueError:
+                return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return dt
+
+    def _checkEc2AmiUntrustedOrStale(self):
+        """Running instance launched from an AMI that is deregistered (or no longer
+        shared), deprecated, disabled, or a public AMI from an owner that is neither
+        this account nor Amazon / AWS Marketplace / a verified provider (no ImageOwnerAlias)."""
+        key = 'ec2AmiUntrustedOrStale'
+        instance = self.ec2InstanceData
+        if (instance.get('State') or {}).get('Name') != 'running':
+            return
+        imageId = instance.get('ImageId')
+        status = getattr(self, 'ec2ImageStatus', 'found' if self.ec2ImageInfo else 'missing')
+
+        if status.startswith('error:'):
+            self.results[key] = [0, f"Unable to evaluate ({status[6:]})"]
+            return
+        if status == 'missing' or not self.ec2ImageInfo:
+            self.results[key] = [-1, f"{imageId}: AMI no longer available (deregistered or no longer shared with this account)"]
+            return
+
+        image = self.ec2ImageInfo
+        issues = []
+        state = image.get('State')
+        if state in ('deregistered', 'disabled'):
+            issues.append(f"AMI {state}")
+
+        depTime = self._parseTime(image.get('DeprecationTime')) if image.get('DeprecationTime') else None
+        if depTime and depTime <= datetime.datetime.now(datetime.timezone.utc):
+            issues.append(f"AMI deprecated since {depTime.strftime('%Y-%m-%d')}")
+
+        selfAccount = (Config.get('stsInfo', {}) or {}).get('Account')
+        owner = image.get('OwnerId')
+        if image.get('Public') is True and owner and owner != selfAccount and not image.get('ImageOwnerAlias'):
+            issues.append(f"public AMI from unverified third-party owner {owner}")
+
+        if issues:
+            self.results[key] = [-1, f"{imageId}: " + '; '.join(issues)]
+        else:
+            self.results[key] = [1, f"{imageId}: available"]
+
+    def _checkEc2UserDataSecrets(self):
+        """Instance user data (readable by anyone with ec2:DescribeInstanceAttribute
+        and from inside the instance via IMDS) must not embed credentials.
+        Only the pattern names are reported, never the values."""
+        key = 'ec2UserDataSecrets'
+        instance = self.ec2InstanceData
+        if (instance.get('State') or {}).get('Name') in ('terminated', 'shutting-down'):
+            return
+        try:
+            resp = self.ec2Client.describe_instance_attribute(InstanceId=instance['InstanceId'], Attribute='userData')
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({e.response.get('Error', {}).get('Code', 'ClientError')})"]
+            return
+
+        value = (resp.get('UserData') or {}).get('Value')
+        if not value:
+            self.results[key] = [1, 'No user data']
+            return
+        found = findSecrets(decodeUserData(value))
+        if found:
+            self.results[key] = [-1, 'User data contains: ' + ', '.join(found) + ' (values masked)']
+        else:
+            self.results[key] = [1, 'No credential patterns in user data']
+
+    def _checkEc2InstanceInPublicSubnet(self):
+        """Instance network interfaces in a subnet whose effective route table sends
+        0.0.0.0/0 or ::/0 to an internet gateway. Whether the instance should be
+        internet-facing is design intent, so this is advisory."""
+        key = 'ec2InstanceInPublicSubnet'
+        instance = self.ec2InstanceData
+        if (instance.get('State') or {}).get('Name') in ('terminated', 'shutting-down'):
+            return
+        enis = instance.get('NetworkInterfaces', []) or []
+        subnetIds = {eni.get('SubnetId') for eni in enis} | {instance.get('SubnetId')}
+        subnetIds.discard(None)
+        if not subnetIds:
+            return
+
+        status, msg = evaluatePlacement(subnetIds, getSubnetRouting(self.ec2Client))
+        if status == -1:
+            publicIps = [instance.get('PublicIpAddress')] + [(eni.get('Association') or {}).get('PublicIp') for eni in enis]
+            publicIps = sorted({ip for ip in publicIps if ip})
+            hasIpv6 = any(eni.get('Ipv6Addresses') for eni in enis)
+            exposure = ', '.join(publicIps) if publicIps else 'none'
+            msg += f"; public IPv4: {exposure}{'; IPv6 assigned' if hasIpv6 else ''}"
+        self.results[key] = [status, msg]
+
+    def _checkEc2AutoRecoveryDisabled(self):
+        """Simplified automatic recovery restores the instance after a system status
+        check failure. It is on by default ('default'); flag only an explicit opt-out."""
+        key = 'ec2AutoRecoveryDisabled'
+        inst = self.ec2InstanceData
+        if (inst.get('State') or {}).get('Name') not in ('running', 'stopped'):
+            return
+        mode = (inst.get('MaintenanceOptions') or {}).get('AutoRecovery')
+        if mode == 'disabled':
+            self.results[key] = [-1, 'AutoRecovery=disabled']
+        elif mode == 'default':
+            self.results[key] = [1, 'AutoRecovery=default']
+        else:
+            self.results[key] = [0, 'Unable to evaluate (MaintenanceOptions.AutoRecovery not returned)']

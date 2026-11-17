@@ -1352,5 +1352,520 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/exporting-recommendations.html"
+	},
+	"ec2AmiPublic": {
+		"category": "S",
+		"^description": "Public AMI: {$COUNT} AMI(s) owned by this account are shared publicly (launch permission group 'all'). Anyone can launch them and read their snapshots, which can expose data, credentials and software. Make the AMIs private or share only with specific accounts/organizations.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "H",
+		"needFullTest": 0,
+		"shortDesc": "Self-owned AMI is public",
+		"ref": [
+			"[Make an AMI public or private]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-intro.html>",
+			"[Best practices for shared AMIs]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/building-shared-amis.html>"
+		],
+		"remediation": "aws ec2 modify-image-attribute --image-id {ResourceId} --launch-permission \"Remove=[{Group=all}]\"",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-intro.html"
+	},
+	"ec2ImageBlockPublicAccessOff": {
+		"category": "S",
+		"^description": "AMI Block Public Access disabled: block public access for AMIs is 'unblocked' in {$COUNT} region(s). Enable it (block-new-sharing) to prevent AMIs from being made public. Existing public AMIs are reported separately.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "Enable AMI Block Public Access",
+		"ref": [
+			"[Block public access to your AMIs]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/block-public-access-to-amis.html>"
+		],
+		"remediation": "aws ec2 enable-image-block-public-access --image-block-public-access-state block-new-sharing",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/manage-block-public-access-for-amis.html"
+	},
+	"ec2ImdsDefaultNotRequired": {
+		"category": "S",
+		"^description": "IMDSv2 not required by default: in {$COUNT} region(s) the account-level instance metadata defaults do not set HttpTokens=required (or set a hop limit above 2), so new instances can be launched with IMDSv1. Set the account default to require IMDSv2 so new launches are protected; existing instances are covered by EC2IMDSv2.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "M",
+		"needFullTest": 1,
+		"shortDesc": "Require IMDSv2 by default for new instances",
+		"ref": [
+			"[Set IMDSv2 as the default for the account]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-IMDS-new-instances.html#set-imdsv2-account-defaults>",
+			"[Use IMDSv2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html>"
+		],
+		"remediation": "aws ec2 modify-instance-metadata-defaults --http-tokens required --http-put-response-hop-limit 2",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-IMDS-new-instances.html"
+	},
+	"ec2SnapshotBlockPublicAccessOff": {
+		"category": "S",
+		"^description": "EBS snapshot Block Public Access disabled: block public access for EBS snapshots is 'unblocked' in {$COUNT} region(s), so snapshots can be shared publicly. Enable block-all-sharing (or at least block-new-sharing). Existing public snapshots are reported by EBSSnapshotIsPublic.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "Enable EBS snapshot Block Public Access",
+		"ref": [
+			"[Block public access for EBS snapshots]<https://docs.aws.amazon.com/ebs/latest/userguide/block-public-access-snapshots.html>"
+		],
+		"remediation": "aws ec2 enable-snapshot-block-public-access --state block-all-sharing",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/ebs/latest/userguide/block-public-access-snapshots-work.html"
+	},
+	"elbAccessLogsDisabled": {
+		"category": "S",
+		"^description": "Load balancer access logs disabled: {$COUNT} load balancer(s) do not deliver access logs to Amazon S3. Access logs are needed to investigate security events and troubleshoot traffic.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "Enable load balancer access logs",
+		"ref": [
+			"[ALB access logs]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html>",
+			"[NLB access logs]<https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-access-logs.html>",
+			"[Classic Load Balancer access logs]<https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/access-log-collection.html>"
+		],
+		"remediation": "aws elbv2 modify-load-balancer-attributes --load-balancer-arn {ResourceId} --attributes Key=access_logs.s3.enabled,Value=true Key=access_logs.s3.bucket,Value=<bucket>",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/enable-access-logging.html"
+	},
+	"elbTlsPolicyOutdated": {
+		"category": "S",
+		"^description": "Outdated TLS policy: {$COUNT} load balancer(s) have HTTPS/TLS/SSL listeners whose security policy still allows TLS 1.0, TLS 1.1 or SSLv3. Use a policy that supports only TLS 1.2 and later (e.g. ELBSecurityPolicy-TLS13-1-2-2021-06).",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "H",
+		"needFullTest": 1,
+		"shortDesc": "Load balancer TLS policy allows TLS 1.0/1.1",
+		"ref": [
+			"[ALB security policies]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/describe-ssl-policies.html>",
+			"[NLB security policies]<https://docs.aws.amazon.com/elasticloadbalancing/latest/network/describe-ssl-policies.html>",
+			"[Classic Load Balancer SSL negotiation configurations]<https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-ssl-security-policy.html>"
+		],
+		"remediation": "aws elbv2 modify-listener --listener-arn <listener-arn> --ssl-policy ELBSecurityPolicy-TLS13-1-2-2021-06",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-update-certificates.html"
+	},
+	"elbUsesIamOrImportedCert": {
+		"category": "S",
+		"^description": "Load balancer uses IAM server certificates: {$COUNT} load balancer(s) have HTTPS/TLS/SSL listeners serving a certificate stored in IAM (server-certificate). IAM server certificates are not renewed automatically, are only manageable through the API/CLI and expire silently unless tracked elsewhere. Use certificates issued by AWS Certificate Manager (ACM), which renew automatically. Imported ACM certificates (also not auto-renewed) are reported separately by the ACM check acmImportedCertNoAutoRenewal.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Load balancer listener uses an IAM server certificate",
+		"ref": [
+			"[Manage server certificates in IAM]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_server-certs.html>",
+			"[SSL certificates for your Application Load Balancer]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/https-listener-certificates.html>",
+			"[Managed renewal for ACM certificates]<https://docs.aws.amazon.com/acm/latest/userguide/managed-renewal.html>"
+		],
+		"remediation": "aws elbv2 modify-listener --listener-arn <listener-arn> --certificates CertificateArn=<acm-certificate-arn> (Classic: aws elb set-load-balancer-listener-ssl-certificate --load-balancer-name <name> --load-balancer-port 443 --ssl-certificate-id <acm-certificate-arn>)",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-update-certificates.html"
+	},
+	"ebsRecycleBinMissing": {
+		"category": "S",
+		"^description": "Recycle Bin not protecting backups: in {$COUNT} region(s) there is no Recycle Bin retention rule for EBS snapshots and/or AMIs, so deleted snapshots/AMIs cannot be recovered. Create region-level retention rules and lock them so they cannot be removed by a compromised principal.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "Create locked Recycle Bin rules for snapshots/AMIs",
+		"ref": [
+			"[Recycle Bin]<https://docs.aws.amazon.com/ebs/latest/userguide/recycle-bin.html>",
+			"[Lock Recycle Bin retention rules]<https://docs.aws.amazon.com/ebs/latest/userguide/recycle-bin-working-with-rules.html#recycle-bin-lock-rule>"
+		],
+		"remediation": "aws rbin create-rule --resource-type EBS_SNAPSHOT --retention-period RetentionPeriodValue=7,RetentionPeriodUnit=DAYS --lock-configuration 'UnlockDelay={UnlockDelayValue=7,UnlockDelayUnit=DAYS}'",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/ebs/latest/userguide/recycle-bin-working-with-rules.html"
+	},
+	"ebsSnapshotSharedExternally": {
+		"category": "S",
+		"^description": "EBS snapshot shared outside the organization: {$COUNT} self-owned EBS snapshot(s) grant createVolumePermission to AWS accounts outside your AWS Organization (or the account is not in an organization). Those accounts can copy the data. Remove sharing that is not required.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "Snapshot shared with external accounts",
+		"ref": [
+			"[Share an Amazon EBS snapshot]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-modifying-snapshot-permissions.html>"
+		],
+		"remediation": "aws ec2 modify-snapshot-attribute --snapshot-id {ResourceId} --attribute createVolumePermission --operation-type remove --user-ids <account-id>",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-modifying-snapshot-permissions.html"
+	},
+	"ebsSnapshotUnencrypted": {
+		"category": "S",
+		"^description": "Unencrypted EBS snapshot: {$COUNT} self-owned EBS snapshot(s), including AMI backing snapshots, are not encrypted. Volumes and AMIs created from them are unencrypted, and anyone the snapshot is shared or copied to can read the data without KMS key access. Copy the snapshot with encryption enabled, update AMIs to use the encrypted copy and delete the unencrypted snapshot.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "EBS snapshot not encrypted",
+		"ref": [
+			"[Amazon EBS encryption]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-encryption.html>",
+			"[Copy an Amazon EBS snapshot]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-copy-snapshot.html>"
+		],
+		"remediation": "aws ec2 copy-snapshot --source-snapshot-id {ResourceId} --source-region <region> --encrypted --kms-key-id <kms-key-id>",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-copy-snapshot.html"
+	},
+	"ec2AllowedAmisNotEnforced": {
+		"category": "S",
+		"^description": "Allowed AMIs not enforced: Allowed AMIs is disabled or only in audit mode in {$COUNT} region(s). Without it any AMI, including unvetted public AMIs, can be discovered and launched. Define image criteria for your trusted AMI providers, validate them in audit mode, then enable the setting (or manage it with an EC2 declarative policy).",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Allowed AMIs disabled or audit-mode only",
+		"ref": [
+			"[Control the discovery and use of AMIs with Allowed AMIs]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-allowed-amis.html>"
+		],
+		"remediation": "aws ec2 replace-image-criteria-in-allowed-images-settings --image-criteria 'ImageProviders=[amazon,<account-id>]' && aws ec2 enable-allowed-images-settings --allowed-images-settings-state enabled",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-allowed-amis.html"
+	},
+	"ec2AmiSharedExternally": {
+		"category": "S",
+		"^description": "AMI shared outside the organization: {$COUNT} self-owned AMI(s) grant launch permission to AWS accounts or organizations outside your AWS Organization (or the account is not in an organization). Those accounts can launch the AMI and copy its snapshots. Remove sharing that is not required, or share with your organization or OUs instead.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "AMI shared with external accounts",
+		"ref": [
+			"[Share an AMI with specific AWS accounts]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-explicit.html>",
+			"[Share an AMI with organizations or OUs]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/share-amis-with-organizations-and-OUs.html>"
+		],
+		"remediation": "aws ec2 modify-image-attribute --image-id {ResourceId} --launch-permission \"Remove=[{UserId=<account-id>}]\"",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-explicit.html"
+	},
+	"ec2AmiUntrustedOrStale": {
+		"category": "S",
+		"^description": "Instances on stale or untrusted AMIs: {$COUNT} running instance(s) were launched from an AMI that is deregistered (or no longer shared), deprecated or disabled, or from a public AMI whose owner is not Amazon, AWS Marketplace or a verified provider. Their software provenance and patch baseline cannot be confirmed. Rebuild them from a current, trusted (ideally your own golden) AMI.",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Instance AMI stale or from unverified owner",
+		"ref": [
+			"[Deprecate an Amazon EC2 AMI]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ami-deprecate.html>",
+			"[Find shared AMIs and verified providers]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/usingsharedamis-finding.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ami-deprecate.html"
+	},
+	"ec2InstanceInPublicSubnet": {
+		"category": "S",
+		"^description": "Workloads in public subnets: {$COUNT} EC2 instance(s) or RDS / ElastiCache / ECS network interface(s) are in subnets whose route table sends 0.0.0.0/0 or ::/0 to an internet gateway. Internal tiers placed there are one public IP or security-group change away from internet exposure. Move internal tiers to private subnets and reach the internet through NAT gateways or VPC endpoints; keep only internet-facing load balancers and gateways in public subnets.",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Internal resource in a public subnet",
+		"ref": [
+			"[Subnets for your VPC]<https://docs.aws.amazon.com/vpc/latest/userguide/configure-subnets.html>",
+			"[Configure route tables]<https://docs.aws.amazon.com/vpc/latest/userguide/VPC_Route_Tables.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/userguide/configure-subnets.html"
+	},
+	"ec2InstanceWithKeyPair": {
+		"category": "S",
+		"^description": "SSH key pair on SSM-managed instances: {$COUNT} running instance(s) reachable through Session Manager were launched with an SSH key pair. Long-lived SSH keys are hard to rotate and audit; Session Manager provides IAM-controlled, logged access without inbound ports. Remove the key from authorized_keys, close port 22 and launch new instances without a key pair. (KeyName shows only the launch-time key.)",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "SSH key pair on Session Manager instance",
+		"ref": [
+			"[AWS Systems Manager Session Manager]<https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html>",
+			"[Amazon EC2 key pairs]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-key-pairs.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html"
+	},
+	"ec2UserDataSecrets": {
+		"category": "S",
+		"^description": "Credentials in user data: {$COUNT} EC2 instance(s) or launch template(s) have user data containing AWS access keys, secret keys, private keys or literal passwords. User data is readable by anyone with ec2:DescribeInstanceAttribute or ec2:DescribeLaunchTemplateVersions and by any process on the instance through IMDS. Rotate the exposed credentials, then fetch secrets at boot from Secrets Manager or Parameter Store using the instance role. Matched values are masked in this report.",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "H",
+		"needFullTest": 0,
+		"shortDesc": "Credentials embedded in user data",
+		"ref": [
+			"[Run commands when you launch an EC2 instance with user data input]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/user-data.html>",
+			"[What is AWS Secrets Manager?]<https://docs.aws.amazon.com/secretsmanager/latest/userguide/intro.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/user-data.html"
+	},
+	"vpcEndpointPolicyFullAccess": {
+		"category": "S",
+		"^description": "VPC endpoint with full-access policy: {$COUNT} VPC endpoint(s) use the default full-access endpoint policy (Principal, Action and Resource '*') without an organization or account condition. Any credentials, including those from other accounts, can reach any resource of the service through the endpoint. Restrict the policy with aws:PrincipalOrgID / aws:ResourceOrgID conditions as part of a data perimeter.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "VPC endpoint uses default full-access policy",
+		"ref": [
+			"[Control access to VPC endpoints using endpoint policies]<https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-access.html>",
+			"[Building a data perimeter on AWS]<https://docs.aws.amazon.com/whitepapers/latest/building-a-data-perimeter-on-aws/building-a-data-perimeter-on-aws.html>"
+		],
+		"remediation": "aws ec2 modify-vpc-endpoint --vpc-endpoint-id {ResourceId} --policy-document file://endpoint-policy.json",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-access.html"
+	},
+	"vpcNoGatewayEndpoints": {
+		"category": "S",
+		"^description": "VPC private subnets without an S3 endpoint: {$COUNT} VPC(s) have private subnets (no default route to an internet gateway) whose route table is not associated with an S3 gateway endpoint, and the VPC has no S3 interface endpoint. S3 traffic from those subnets leaves the VPC through a NAT device and the public S3 endpoint (or cannot reach S3 at all), and cannot be restricted with an endpoint policy. Add a free S3 gateway endpoint (and a DynamoDB one if the VPC uses DynamoDB) and associate it with the private route tables.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Private subnets lack an S3 gateway endpoint",
+		"ref": [
+			"[Gateway endpoints for Amazon S3]<https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html>",
+			"[Gateway endpoints for Amazon DynamoDB]<https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-ddb.html>"
+		],
+		"remediation": "aws ec2 create-vpc-endpoint --vpc-id {ResourceId} --vpc-endpoint-type Gateway --service-name com.amazonaws.<region>.s3 --route-table-ids <private-route-table-ids>",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html"
+	},
+	"vpcPeeringFullRoute": {
+		"category": "S",
+		"^description": "Peering routes open whole VPCs of other accounts: {$COUNT} VPC(s) have a route to an active VPC peering connection whose destination equals or contains an entire CIDR block of a peer VPC owned by another AWS account, so every subnet of that external network is reachable from the associated subnets (and vice versa where the peer routes back). Where only some peer subnets need to be reached (for example a partner's API tier), route just those subnet CIDRs and keep security groups and network ACLs as the second layer of control. Same-account peering and transit gateway routes covering a whole peer CIDR are the documented default and are reported as review items (informational) only; default and summary routes to a transit gateway (hub-and-spoke egress / inspection) are not evaluated as full peer routes.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Cross-account peering route covers whole peer VPC",
+		"ref": [
+			"[Update your route tables for a VPC peering connection]<https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-routing.html>",
+			"[VPC peering configurations with specific routes]<https://docs.aws.amazon.com/vpc/latest/peering/peering-configurations-partial-access.html>",
+			"[Transit gateway route tables]<https://docs.aws.amazon.com/vpc/latest/tgw/tgw-route-tables.html>"
+		],
+		"remediation": "aws ec2 delete-route --route-table-id <route-table-id> --destination-cidr-block <peer-vpc-cidr> && aws ec2 create-route --route-table-id <route-table-id> --destination-cidr-block <required-peer-subnet-cidr> --vpc-peering-connection-id <pcx-id> (or --transit-gateway-id <tgw-id>)",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/peering/peering-configurations-partial-access.html"
+	},
+	"vpnWeakTunnelCrypto": {
+		"category": "S",
+		"^description": "Site-to-Site VPN tunnels allow weak cryptography: {$COUNT} VPN connection(s) have tunnels that still accept IKEv1, SHA1 integrity or weak Diffie-Hellman groups (2, 5, or only group 14). Empty tunnel option lists mean the AWS defaults, which include these legacy options for compatibility. Restrict each tunnel to IKEv2, SHA2-256 or stronger and DH groups 19-21 (coordinate with the customer gateway configuration first).",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "VPN tunnels permit IKEv1/SHA1/weak DH groups",
+		"ref": [
+			"[Tunnel options for your Site-to-Site VPN connection]<https://docs.aws.amazon.com/vpn/latest/s2svpn/VPNTunnels.html>",
+			"[Modify Site-to-Site VPN tunnel options]<https://docs.aws.amazon.com/vpn/latest/s2svpn/modify-vpn-tunnel-options.html>"
+		],
+		"remediation": "aws ec2 modify-vpn-tunnel-options --vpn-connection-id {ResourceId} --vpn-tunnel-outside-ip-address <ip> --tunnel-options 'IKEVersions=[{Value=ikev2}],Phase1IntegrityAlgorithms=[{Value=SHA2-256}],Phase2IntegrityAlgorithms=[{Value=SHA2-256}],Phase1DHGroupNumbers=[{Value=20}],Phase2DHGroupNumbers=[{Value=20}]'",
+		"remediation_risk": "high",
+		"remediation_doc": "https://docs.aws.amazon.com/vpn/latest/s2svpn/modify-vpn-tunnel-options.html"
+	},
+	"albMtlsOff": {
+		"category": "S",
+		"^description": "ALB mutual TLS accepts expired client certificates: {$COUNT} Application Load Balancer(s) have HTTPS listeners with mutual TLS in verify mode but IgnoreClientCertificateExpiry enabled, so clients presenting expired (and possibly no longer controlled) certificates are still authenticated. Disable IgnoreClientCertificateExpiry and keep a revocation list on the trust store. Listeners without mTLS (off) and passthrough mode are reported as informational only, because whether mTLS is needed depends on the clients (for service-to-service traffic consider mTLS in verify mode with a trust store).",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "ALB mTLS accepts expired client certificates",
+		"ref": [
+			"[Mutual authentication with TLS in Application Load Balancer]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/mutual-authentication.html>"
+		],
+		"remediation": "aws elbv2 modify-listener --listener-arn <listener-arn> --mutual-authentication Mode=verify,TrustStoreArn=<trust-store-arn>,IgnoreClientCertificateExpiry=false",
+		"remediation_risk": "high",
+		"remediation_doc": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/mutual-authentication.html"
+	},
+	"albTargetGroupPlaintext": {
+		"category": "S",
+		"^description": "ALB sends plaintext HTTP outside the VPC: {$COUNT} Application Load Balancer(s) forward to HTTP target groups of type ip with registered targets outside the load balancer's VPC (peered VPC or on-premises over VPN / Direct Connect), so unencrypted traffic leaves the VPC. Use HTTPS target groups for these targets. HTTP target groups whose targets are inside the VPC (TLS terminated at the ALB) are the standard pattern and are reported as informational only; use HTTPS there where data classification or compliance requires end-to-end encryption in transit.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "ALB HTTP target group has targets outside VPC",
+		"ref": [
+			"[Target groups for your Application Load Balancers]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html>",
+			"[Encryption in transit - Elastic Load Balancing]<https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/data-protection.html>",
+			"[Register targets with your target group (IP targets outside the VPC)]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/target-group-register-targets.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-target-group.html"
+	},
+	"ec2AutoRecoveryDisabled": {
+		"category": "R",
+		"^description": "EC2 automatic recovery disabled: {$COUNT} instance(s) have simplified automatic recovery explicitly disabled (MaintenanceOptions.AutoRecovery=disabled). After a system status check failure (underlying hardware issue) they are not moved to healthy hardware automatically.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "EC2 simplified auto recovery disabled",
+		"ref": [
+			"[Simplified automatic recovery for EC2 instances]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-configuration-recovery.html>"
+		],
+		"remediation": "aws ec2 modify-instance-maintenance-options --instance-id {ResourceId} --auto-recovery default",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-configuration-recovery.html"
+	},
+	"ec2SshdRunning": {
+		"category": "S",
+		"^description": "Remote login service running on SSM-managed instances: {$COUNT} Windows instance(s) reachable through Session Manager still run the RDP (TermService) or OpenSSH (sshd) service according to SSM Inventory (AWS:Service). Prefer Session Manager / Fleet Manager for interactive access and stop or disable the remote login service to reduce attack surface. SSM collects service inventory for Windows only, so Linux instances are not evaluated.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "RDP/SSH service running on managed instance",
+		"ref": [
+			"[Reduce manual management and interactive access]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_protect_compute_reduce_manual_management.html>",
+			"[AWS Systems Manager Inventory - metadata collected]<https://docs.aws.amazon.com/systems-manager/latest/userguide/inventory-schema.html>",
+			"[AWS Systems Manager Session Manager]<https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html"
+	},
+	"imagebuilderNoPipeline": {
+		"category": "S",
+		"^description": "No image build pipeline: in {$COUNT} Region(s) there is no enabled EC2 Image Builder pipeline and EC2 instances run stock Amazon-published AMIs directly, so hardening, patch baselines and security tooling are applied (if at all) at boot instead of being baked into a tested, versioned image. Build hardened golden images with EC2 Image Builder (for example with the CIS / STIG hardening components) or another pipeline (Packer, a central image factory account) and launch instances from them. Instances on self-owned, cross-account or AWS Marketplace (vendor appliance) AMIs are not flagged.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "No hardened image pipeline; instances use stock AMIs",
+		"ref": [
+			"[What is EC2 Image Builder?]<https://docs.aws.amazon.com/imagebuilder/latest/userguide/what-is-image-builder.html>",
+			"[Create an image pipeline]<https://docs.aws.amazon.com/imagebuilder/latest/userguide/start-build-image-pipeline.html>",
+			"[SEC06-BP02 Provision compute from hardened images]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_protect_compute_hardened_images.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/imagebuilder/latest/userguide/start-build-image-pipeline.html"
+	},
+	"naclAllowAllIngress": {
+		"category": "S",
+		"^description": "Custom Network ACL allows all inbound traffic: {$COUNT} custom (non-default) Network ACL(s) associated with subnets allow all protocols and ports from 0.0.0.0/0 or ::/0 with no lower-numbered deny rule, so they add no subnet-level filtering. Restrict the inbound rules to the ports and source ranges the subnet tier needs (e.g. only from the load balancer subnets for an application tier) to add a second layer of defence behind security groups. Default NACLs, which allow all traffic by design, are not flagged.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Custom NACL allows all inbound traffic",
+		"ref": [
+			"[Control subnet traffic with network access control lists]<https://docs.aws.amazon.com/vpc/latest/userguide/vpc-network-acls.html>",
+			"[Network ACL rules]<https://docs.aws.amazon.com/vpc/latest/userguide/nacl-rules.html>",
+			"[SEC05-BP02 Control traffic flow within your network layers]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_network_protection_layered.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/userguide/nacl-rules.html"
+	},
+	"selfManagedDataStoreOnEc2": {
+		"category": "S",
+		"^description": "Self-managed data store on EC2: {$COUNT} EC2 instance(s) appear to run a self-managed database, cache or search engine (a server package such as mysql-server, postgresql-server, redis or Microsoft SQL Server in SSM Inventory, or an attached security group that explicitly opens a default data-store port such as 3306, 5432, 1433, 1521, 27017, 6379, 11211, 9042 or 9200). You then own patching, encryption, backup and access control of the engine. Consider a managed service (Amazon RDS / Aurora, ElastiCache, DocumentDB, OpenSearch Service, Keyspaces) to shift that responsibility to AWS. This is a heuristic - port-only evidence on instances without SSM Inventory may be a proxy or a shared security group.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Self-managed database/cache on EC2",
+		"ref": [
+			"[SEC01-BP04 Stay up to date with security threats and recommendations]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_securely_operate_updated_threats.html>",
+			"[Shared Responsibility Model - AWS Risk and Compliance]<https://docs.aws.amazon.com/whitepapers/latest/aws-risk-and-compliance/shared-responsibility-model.html>",
+			"[AWS Systems Manager Inventory]<https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-inventory.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/aws-overview/database.html"
+	},
+	"sgIngressBroadCidr": {
+		"category": "S",
+		"^description": "Security group ingress from very broad public CIDRs: {$COUNT} security group(s) allow inbound traffic from public IPv4 ranges larger than /16 (or IPv6 ranges larger than /32) other than 0.0.0.0/0 / ::/0, for example 0.0.0.0/1, 52.0.0.0/8 or 2000::/3. Such ranges cover large parts of the internet and bypass checks that only look for 0.0.0.0/0. Restrict the source to the specific addresses, prefix lists or security groups that need access. Broad private ranges (RFC 1918, CGNAT, ULA) are not flagged.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "SG ingress from very broad public CIDR",
+		"ref": [
+			"[Security group rules]<https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html>",
+			"[Managed prefix lists]<https://docs.aws.amazon.com/vpc/latest/userguide/managed-prefix-lists.html>",
+			"[SEC05-BP02 Control traffic flow within your network layers]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_network_protection_layered.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html"
+	},
+	"sgUnrestrictedEgress": {
+		"category": "S",
+		"^description": "Data-tier security group with unrestricted egress: {$COUNT} security group(s) attached to managed data stores (RDS / Aurora / Neptune / DocumentDB, ElastiCache, Redshift or OpenSearch network interfaces) allow all outbound traffic (or all TCP/UDP ports) to 0.0.0.0/0 or ::/0. Data stores rarely need to initiate connections; open egress makes data exfiltration and command-and-control easier if the engine is compromised. Remove the default allow-all outbound rule and allow only the destinations the engine needs (e.g. a VPC endpoint or prefix list for S3 integration).",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Data-tier SG allows all outbound traffic",
+		"ref": [
+			"[Security group rules]<https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html>",
+			"[Controlling access with security groups (Amazon RDS)]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.RDSSecurityGroups.html>",
+			"[SEC05-BP02 Control traffic flow within your network layers]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_network_protection_layered.html>"
+		],
+		"remediation": "aws ec2 revoke-security-group-egress --group-id {ResourceId} --ip-permissions IpProtocol=-1,IpRanges=[{CidrIp=0.0.0.0/0}]",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html"
+	},
+	"ssmVpcEndpointsMissing": {
+		"category": "S",
+		"^description": "Isolated subnets without Systems Manager endpoints: {$COUNT} VPC(s) have EC2 instances in subnets with no default route (no internet gateway, NAT, transit gateway or other 0.0.0.0/0 / ::/0 path) and no ssm / ssmmessages interface VPC endpoint, so the SSM Agent cannot reach Systems Manager. These instances cannot be patched, inventoried or accessed through Session Manager, which pushes operators back to SSH keys and bastions. Create interface endpoints for com.amazonaws.<region>.ssm and ssmmessages (and ec2messages for SSM Agent < 3.3.40.0) with private DNS enabled.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Isolated subnets lack SSM interface endpoints",
+		"ref": [
+			"[Use VPC endpoints for Systems Manager]<https://docs.aws.amazon.com/systems-manager/latest/userguide/setup-create-vpc.html>",
+			"[SEC06-BP03 Reduce manual management and interactive access]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_protect_compute_reduce_manual_management.html>"
+		],
+		"remediation": "aws ec2 create-vpc-endpoint --vpc-id {ResourceId} --vpc-endpoint-type Interface --service-name com.amazonaws.<region>.ssm --subnet-ids <subnet-ids> --security-group-ids <sg-allowing-443> --private-dns-enabled",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/setup-create-vpc.html"
 	}
 }
