@@ -500,7 +500,7 @@
 	},
 	"signerProfileInvalid": {
 		"category": "S",
-		"^description": "Invalid Trusted Signing Profile: {$COUNT} of your Lambda code signing configurations trust a signing profile version that is revoked, canceled, superseded or no longer exists. Remove stale publishers from AllowedPublishers so only active, intended signing profiles are trusted.",
+		"^description": "Invalid Trusted Signing Profile: {$COUNT} of your Lambda code signing configurations trust a signing profile version that is revoked, canceled or no longer exists. Remove stale publishers from AllowedPublishers so only active, intended signing profiles are trusted.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,

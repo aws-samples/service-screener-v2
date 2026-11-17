@@ -2,7 +2,7 @@
 
 The emulator flag->fix->re-run tests live in tests/emulator/test_emu_lambda.py.
 These cover states the emulator cannot produce on demand: AccessDenied, cross-account
-signing profiles, superseded profile versions, undecryptable environment variables
+signing profiles, older (non-current) profile versions, cross-account not-found, undecryptable environment variables
 (Environment.Error), container-image functions and default (absent) CSC policy.
 Real boto3 clients wrapped by botocore Stubber validate the API shapes; no network.
 """
@@ -43,6 +43,7 @@ def _driver(fn, lam=None):
 # ---------------- lambdaDeprecatedRuntime ----------------
 @pytest.mark.parametrize('runtime,expected', [
     ('python3.8', -1), ('nodejs16.x', -1), ('go1.x', -1), ('provided', -1), ('java8', -1),
+    ('provided.al2', -1), ('python3.10', -1),
     ('python3.13', 1), ('nodejs22.x', 1), ('java21', 1), ('provided.al2023', 1),
 ])
 def test_deprecated_runtime(runtime, expected):
@@ -158,7 +159,8 @@ def _runSigner(add, arns=None):
 
 
 @pytest.mark.parametrize('status,version,expected', [
-    ('Active', '0000000001', 1), ('Revoked', '0000000001', -1), ('Canceled', '0000000001', -1), ('Active', '0000000002', -1),
+    ('Active', '0000000001', 1), ('Revoked', '0000000001', -1), ('Canceled', '0000000001', -1), ('Active', '0000000002', 0),
+    ('Revoked', '0000000002', 0), ('Canceled', '0000000002', -1),
 ])
 def test_signer_profile_status(status, version, expected):
     res = _runSigner(lambda st: st.add_response('get_signing_profile', _profile(status, version),
@@ -178,3 +180,37 @@ def test_signer_profile_access_denied_cross_account():
                                                                       'profileOwner': '444455556666'}),
                      arns=[other])
     assert res == [0, 'Unable to evaluate (prof (AccessDeniedException))']
+
+
+def test_signer_profile_not_found_cross_account_not_evaluable():
+    """A cross-account profile never shared with this account also returns not-found."""
+    other = f'arn:aws:signer:{REGION}:444455556666:/signing-profiles/prof/0000000001'
+    res = _runSigner(lambda st: st.add_client_error('get_signing_profile', 'ResourceNotFoundException',
+                                                     expected_params={'profileName': 'prof',
+                                                                      'profileOwner': '444455556666'}),
+                     arns=[other])
+    assert res[0] == 0, res
+
+
+def test_deprecated_runtime_future_date_passes(monkeypatch):
+    """Published future dates pass until reached, then flag automatically."""
+    d = _driver(_fn(Runtime='python3.11'))
+    d._checkLambdaDeprecatedRuntime()
+    assert d.results['lambdaDeprecatedRuntime'] == [1, 'python3.11 is scheduled for deprecation on 2027-06-30']
+    monkeypatch.setitem(LambdaCommon.DEPRECATED_RUNTIMES, 'python3.11', '2026-01-01')
+    d = _driver(_fn(Runtime='python3.11'))
+    d._checkLambdaDeprecatedRuntime()
+    assert d.results['lambdaDeprecatedRuntime'][0] == -1
+
+
+@pytest.mark.parametrize('env,expected', [
+    ({'REDIS_URL': 'redis://:s3cretpw@cache:6379'}, -1),
+    ({'REDIS_URL': 'redis://cache:6379'}, 1),
+    ({'API': 'https://api.example.com:443/v1'}, 1),
+    ({'DB_PASSWORD': '/prod/db/password'}, 1),
+    ({'DB_PASSWORD': 'hunter2 plaintext'}, -1),
+])
+def test_env_var_secrets_patterns(env, expected):
+    d = _driver(_fn(Environment={'Variables': env}))
+    d._checkLambdaEnvVarSecrets()
+    assert d.results['lambdaEnvVarSecrets'][0] == expected

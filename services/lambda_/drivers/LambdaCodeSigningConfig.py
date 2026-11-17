@@ -9,7 +9,9 @@ class LambdaCodeSigningConfig(Evaluator):
     """Per code-signing-config checks.
 
       - signerProfileInvalid (S/L) The config's AllowedPublishers trust a signing
-        profile version that is Revoked, Canceled, superseded or no longer exists.
+        profile version that is Revoked, Canceled or no longer exists (same account).
+        Older (non-current) trusted versions and cross-account not-found are not
+        evaluable (0) because their status cannot be read.
 
     Input:
       csc          -- item from lambda.list_code_signing_configs
@@ -52,24 +54,33 @@ class LambdaCodeSigningConfig(Evaluator):
             if m.group('region') != clientRegion:
                 unknown.append(f'{name} (other region)')
                 continue
+            crossAccount = bool(ownAccount and m.group('account') != ownAccount)
             kwargs = {'profileName': name}
-            if ownAccount and m.group('account') != ownAccount:
+            if crossAccount:
                 kwargs['profileOwner'] = m.group('account')
             try:
                 prof = self.signerClient.get_signing_profile(**kwargs)
             except botocore.exceptions.ClientError as e:
                 code = e.response['Error']['Code']
-                if code == 'ResourceNotFoundException':
+                if code == 'ResourceNotFoundException' and not crossAccount:
                     invalid.append(f'{name}/{version} (not found)')
                 else:
+                    # Cross-account: a profile not shared with this account also
+                    # returns not-found, so it cannot be judged from here.
                     unknown.append(f'{name} ({code})')
                 continue
 
             status = prof.get('status')
-            if status and status != 'Active':
+            currentVersion = prof.get('profileVersion')
+            if status == 'Canceled':
+                # Cancellation applies to the whole profile (every version).
+                invalid.append(f'{name}/{version} (Canceled)')
+            elif currentVersion and currentVersion != version:
+                # get_signing_profile only describes the current version; the
+                # status of an older trusted version cannot be determined.
+                unknown.append(f'{name}/{version} (older version; current is {currentVersion})')
+            elif status and status != 'Active':
                 invalid.append(f'{name}/{version} ({status})')
-            elif prof.get('profileVersion') and prof.get('profileVersion') != version:
-                invalid.append(f"{name}/{version} (superseded by {prof.get('profileVersion')})")
 
         if invalid:
             self.results[key] = [-1, 'Trusts invalid signing profile version(s): ' + ', '.join(invalid[:5])]

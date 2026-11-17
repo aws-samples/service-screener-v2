@@ -60,6 +60,14 @@ def test_lambda_deprecated_runtime(emu, uid):
                            lambda: f.update(Runtime='python3.13'))
 
 
+def test_lambda_deprecated_runtime_provided_al2(emu, uid):
+    """provided.al2 passed its AWS deprecation date on 2026-07-31."""
+    with _Fn(emu, uid, runtime='python3.12') as f:
+        assertFlagFixCycle(emu, 'lambda', 'lambdaDeprecatedRuntime', f.name,
+                           lambda: f.update(Runtime='provided.al2', Handler='bootstrap'),
+                           lambda: f.update(Runtime='provided.al2023', Handler='bootstrap'))
+
+
 def test_lambda_env_var_secrets(emu, uid):
     with _Fn(emu, uid, env={'LOG_LEVEL': 'INFO'}) as f:
         def misconfigure():
@@ -85,6 +93,11 @@ def test_lambda_env_var_secrets_value_patterns(emu, uid):
         assertFlagFixCycle(emu, 'lambda', 'lambdaEnvVarSecrets', f.name,
                            lambda: f.update(Environment={'Variables': {'K': 'AKIAIOSFODNN7EXAMPLE'}}),
                            lambda: f.update(Environment={'Variables': {'K': 'value'}}))
+        # empty-user Redis URL; fixed form references an SSM parameter path
+        assertFlagFixCycle(emu, 'lambda', 'lambdaEnvVarSecrets', f.name,
+                           lambda: f.update(Environment={'Variables': {'REDIS_URL': 'redis://:s3cretpw@cache:6379'}}),
+                           lambda: f.update(Environment={'Variables': {'REDIS_URL': 'redis://cache:6379',
+                                                                        'REDIS_PASSWORD': '/prod/redis/password'}}))
 
 
 def _signingProfile(emu, uid, suffix='p'):

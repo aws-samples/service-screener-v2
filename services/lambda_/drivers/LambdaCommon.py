@@ -31,14 +31,13 @@ class LambdaCommon(Evaluator):
     # from https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
     # ("Deprecated runtimes" / "Upcoming runtime deprecations"). Maintain this table
     # when AWS publishes new dates. A runtime is flagged only once its deprecation
-    # date is in the past. Runtimes still in support upstream whose AWS date is not
-    # yet confirmed (e.g. java8.al2, java11, java17, provided.al2, python3.11) are
-    # intentionally NOT listed to avoid false FAILs; lambdaRuntimeUpdate still
-    # reports that a newer version exists.
+    # date is in the past; published future dates are listed so they flag
+    # automatically once reached. Dates as published on the AWS runtimes page
+    # (checked 2026-11-17).
     DEPRECATED_RUNTIMES = {
-        'nodejs': '2016-10-31',
+        'nodejs': '2016-08-30',
         'nodejs4.3': '2020-03-05',
-        'nodejs4.3-edge': '2019-04-30',
+        'nodejs4.3-edge': '2020-03-05',
         'nodejs6.10': '2019-08-12',
         'nodejs8.10': '2020-03-06',
         'nodejs10.x': '2021-07-30',
@@ -47,19 +46,26 @@ class LambdaCommon(Evaluator):
         'nodejs16.x': '2024-06-12',
         'nodejs18.x': '2025-09-01',
         'nodejs20.x': '2026-04-30',
+        'nodejs22.x': '2027-05-30',
         'python2.7': '2021-07-15',
         'python3.6': '2022-07-18',
         'python3.7': '2023-12-04',
         'python3.8': '2024-10-14',
         'python3.9': '2025-12-15',
-        'python3.10': '2026-06-30',
+        'python3.10': '2026-10-31',
+        'python3.11': '2027-06-30',
         'ruby2.5': '2021-07-30',
         'ruby2.7': '2023-12-07',
         'ruby3.2': '2026-03-31',
+        'ruby3.3': '2027-03-31',
         'java8': '2024-01-08',
+        'java8.al2': '2027-06-30',
+        'java11': '2027-06-30',
+        'java17': '2027-06-30',
         'go1.x': '2024-01-08',
         'provided': '2024-01-08',
-        'dotnetcore1.0': '2019-07-30',
+        'provided.al2': '2026-07-31',
+        'dotnetcore1.0': '2019-06-27',
         'dotnetcore2.0': '2019-05-30',
         'dotnetcore2.1': '2022-01-05',
         'dotnetcore3.1': '2023-04-03',
@@ -88,10 +94,12 @@ class LambdaCommon(Evaluator):
         re.IGNORECASE)
     # Values that reference Secrets Manager / SSM Parameter Store instead of embedding a secret
     SECRET_REFERENCE_VALUE_RE = re.compile(r'^arn:aws[a-z-]*:(secretsmanager|ssm|kms):', re.IGNORECASE)
+    # SSM Parameter Store hierarchical path (e.g. /prod/db/password) - a reference, not the secret
+    SSM_PATH_VALUE_RE = re.compile(r'^/[A-Za-z0-9_.\-/]+$')
     BENIGN_VALUE_RE = re.compile(r'^(true|false|yes|no|on|off|none|null|enabled|disabled|\d{1,5})$', re.IGNORECASE)
     AWS_ACCESS_KEY_ID_RE = re.compile(r'\b(AKIA|ASIA)[0-9A-Z]{16}\b')
     PEM_PRIVATE_KEY_RE = re.compile(r'-----BEGIN [A-Z ]*PRIVATE KEY-----')
-    URL_WITH_PASSWORD_RE = re.compile(r'[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s@]+@', re.IGNORECASE)
+    URL_WITH_PASSWORD_RE = re.compile(r'[a-z][a-z0-9+.-]*://[^/\s:@]*:[^/\s@]+@', re.IGNORECASE)
 
     RUNTIME_PATH = _C.BOTOCORE_DIR + '/data/lambda/2015-03-31/service-2.json'
     CW_HISTORY_DAYS = [30, 7]
@@ -920,7 +928,10 @@ class LambdaCommon(Evaluator):
         if deprecated and date.fromisoformat(deprecated) <= today:
             self.results[key] = [-1, f"{runtime} deprecated since {deprecated}"]
         else:
-            self.results[key] = [1, f"{runtime} is not deprecated"]
+            if deprecated:
+                self.results[key] = [1, f"{runtime} is scheduled for deprecation on {deprecated}"]
+            else:
+                self.results[key] = [1, f"{runtime} has no published deprecation date"]
 
     def _checkLambdaEnvVarSecrets(self):
         """FAIL when environment variables look like they hold credentials.
@@ -954,7 +965,8 @@ class LambdaCommon(Evaluator):
             # Name-side: secret-like name holding a literal (not a reference)
             if name.upper().startswith('AWS_LAMBDA_') or self.SECRET_REFERENCE_NAME_RE.search(name):
                 continue
-            if self.SECRET_REFERENCE_VALUE_RE.match(val) or self.BENIGN_VALUE_RE.match(val):
+            if (self.SECRET_REFERENCE_VALUE_RE.match(val) or self.SSM_PATH_VALUE_RE.match(val)
+                    or self.BENIGN_VALUE_RE.match(val)):
                 continue
             if any(p.search(name) for p in self.SECRET_NAME_PATTERNS):
                 findings.append(name)
