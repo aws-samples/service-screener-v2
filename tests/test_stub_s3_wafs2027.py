@@ -430,7 +430,7 @@ def test_glacier_vault_policy_public_flag_fix():
     assert _run(_vault, '_checkVaultPolicyPublic', key, lambda s: _vaultPolicy(s, PUBLIC_STMT))[0] == -1
     fixed = dict(PUBLIC_STMT, Principal={'AWS': f'arn:aws:iam::{ACCOUNT}:root'})
     assert _run(_vault, '_checkVaultPolicyPublic', key, lambda s: _vaultPolicy(s, fixed))[0] == 1
-    scoped = dict(PUBLIC_STMT, Condition={'StringEquals': {'aws:PrincipalOrgID': 'o-abc123'}})
+    scoped = dict(PUBLIC_STMT, Condition={'StringEquals': {'aws:PrincipalOrgID': 'o-abc123defg'}})
     assert _run(_vault, '_checkVaultPolicyPublic', key, lambda s: _vaultPolicy(s, scoped))[0] == 1
 
 

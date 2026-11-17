@@ -703,7 +703,7 @@ def test_vault_policy_public_flag_fix_stub():
     key, m = 'backupVaultNoAccessPolicy', '_checkBackupVaultNoAccessPolicy'
     public = {'Effect': 'Allow', 'Principal': '*', 'Action': 'backup:*', 'Resource': '*'}
     assert _vaultResult(_describeVaultWithPolicy(_pol([public])), m, key)[0] == -1
-    scoped = dict(public, Condition={'StringEquals': {'aws:PrincipalOrgID': 'o-abc123'}})
+    scoped = dict(public, Condition={'StringEquals': {'aws:PrincipalOrgID': 'o-abc123defg'}})
     assert _vaultResult(_describeVaultWithPolicy(_pol([scoped])), m, key)[0] == 1
 
 

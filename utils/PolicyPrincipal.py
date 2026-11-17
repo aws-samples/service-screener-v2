@@ -21,6 +21,7 @@ reported as public.
 """
 import fnmatch
 import json
+import re
 
 # Condition keys that bind the caller to a known account, organisation,
 # source resource or network path. Compared case-insensitively.
@@ -100,10 +101,58 @@ def _valueIsWildcardOnly(value):
     return isinstance(value, str) and value != '' and set(value) <= {'*', '?'}
 
 
+ACCOUNT_KEYS = frozenset(('aws:principalaccount', 'aws:sourceaccount', 'aws:sourceowner', 'kms:calleraccount'))
+ORG_ID_KEYS = frozenset(('aws:principalorgid', 'aws:sourceorgid'))
+ORG_PATH_KEYS = frozenset(('aws:principalorgpaths', 'aws:sourceorgpaths'))
+ARN_KEYS = frozenset(('aws:principalarn', 'aws:sourcearn'))
+VPC_KEYS = {'aws:sourcevpc': 'vpc-', 'aws:sourcevpce': 'vpce-'}
+
+_ACCOUNT_RE = re.compile(r'^\d{12}$')
+_ORG_ID_RE = re.compile(r'^o-[a-z0-9]{10,32}$')
+_ORG_PATH_RE = re.compile(r'^o-[a-z0-9]{10,32}/')
+
+
+def _hasWildcard(value):
+    return '*' in value or '?' in value
+
+
+def _valueScopes(key, value):
+    """True if one condition value genuinely restricts the caller to a known
+    account, organization, network path or source resource.
+
+    Conservative: a value that could match callers outside the owner's
+    control (wildcards in an account/org ID, an ARN whose account is
+    wildcarded, '*') does not scope."""
+    if not isinstance(value, str) or value == '':
+        return False
+    if key in ACCOUNT_KEYS:
+        return bool(_ACCOUNT_RE.match(value))
+    if key in ORG_ID_KEYS:
+        return bool(_ORG_ID_RE.match(value))
+    if key in ORG_PATH_KEYS:
+        # The org-ID segment must be concrete; deeper segments may use wildcards.
+        return bool(_ORG_PATH_RE.match(value))
+    if key in ARN_KEYS:
+        parts = value.split(':', 5)
+        if len(parts) != 6 or parts[0] != 'arn':
+            return False
+        service, account, resource = parts[2], parts[4], parts[5]
+        if account:
+            # A concrete account confines the caller to that account, whatever the resource.
+            return bool(_ACCOUNT_RE.match(account))
+        # ARNs without an account field (S3 buckets) must name a concrete resource.
+        return service == 's3' and resource != '' and not _hasWildcard(resource.split('/', 1)[0])
+    if key in VPC_KEYS:
+        return value.startswith(VPC_KEYS[key]) and not _hasWildcard(value)
+    # Other (service-specific) scoping keys: any wildcard disqualifies.
+    return not _hasWildcard(value)
+
+
 def conditionScopes(condition, extraKeys=None):
     """
     True if the Condition block contains at least one positive-match operator
-    on a scoping key with a concrete (non-wildcard) value.
+    on a scoping key whose every value is concrete (see _valueScopes). A list
+    of values is OR-ed by IAM, so a single open value opens the statement.
 
     extraKeys: optional iterable of additional service-specific scoping keys
     (e.g. 'kms:CallerAccount'), compared case-insensitively.
@@ -124,10 +173,11 @@ def conditionScopes(condition, extraKeys=None):
         if op not in SCOPING_OPERATORS:
             continue
         for key, value in block.items():
-            if str(key).lower() not in scopingKeys:
+            k = str(key).lower()
+            if k not in scopingKeys:
                 continue
             values = _asList(value)
-            if values and not any(_valueIsWildcardOnly(v) for v in values):
+            if values and all(_valueScopes(k, v) for v in values):
                 return True
     return False
 
