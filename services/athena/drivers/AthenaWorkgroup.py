@@ -43,6 +43,15 @@ class AthenaWorkgroup(Evaluator):
         self.resultConfig = self.config.get('ResultConfiguration') or {}
         self.encryptionConfig = self.resultConfig.get(
             'EncryptionConfiguration') or {}
+        ## Managed query results: Athena stores and always encrypts the results
+        ## itself. The API rejects ResultConfiguration on such a workgroup, so
+        ## the settings above are always empty for it.
+        self.managedConfig = self.config.get(
+            'ManagedQueryResultsConfiguration') or {}
+        self.usesManagedQueryResults = self.managedConfig.get('Enabled') is True
+        ## Customer KMS key for managed query results; None = AWS owned key.
+        self.managedKmsKey = (self.managedConfig.get('EncryptionConfiguration')
+                              or {}).get('KmsKey')
         self.tags = workgroup.get('_tags') or []
         self.state = workgroup.get('State')
 
@@ -51,8 +60,8 @@ class AthenaWorkgroup(Evaluator):
         self.addII('state', self.state or 'N/A')
         self.addII('outputLocation',
                    self.resultConfig.get('OutputLocation', 'None'))
-        self.addII('encryptionOption',
-                   self.encryptionConfig.get('EncryptionOption', 'None'))
+        self.addII('managedQueryResults', str(self.usesManagedQueryResults))
+        self.addII('encryptionOption', self._encryptionOption())
         self.addII('enforceWorkGroupConfiguration',
                    str(self.config.get('EnforceWorkGroupConfiguration', 'N/A')))
         self.addII('engineVersion', self._effectiveEngineVersion() or 'N/A')
@@ -65,11 +74,21 @@ class AthenaWorkgroup(Evaluator):
     # ------------------------------------------------------------------ #
     def _checkAthenaWorkgroupNotEncrypted(self):
         """
-        Athena writes every query result to S3. Without an EncryptionConfiguration
-        on the workgroup, the result set -- which is a materialised extract of
+        Athena writes every query result to the results location. Without an
+        EncryptionConfiguration on the workgroup, the result set -- which is a materialised extract of
         whatever the query touched -- lands unencrypted at the Athena layer.
+
+        Managed query results are always encrypted, so they pass.
         """
-        if self.encryptionConfig.get('EncryptionOption'):
+        if self.usesManagedQueryResults:
+            keyDescription = (f"KMS key {self.managedKmsKey}"
+                              if self.managedKmsKey else "an AWS owned key")
+            self.results['athenaWorkgroupNotEncrypted'] = [
+                1,
+                f"Workgroup '{self.name}' uses managed query results, "
+                f"encrypted with {keyDescription}"
+            ]
+        elif self.encryptionConfig.get('EncryptionOption'):
             self.results['athenaWorkgroupNotEncrypted'] = [
                 1,
                 "Workgroup '{}' encrypts query results with {}".format(
@@ -114,7 +133,18 @@ class AthenaWorkgroup(Evaluator):
         EnableMinimumEncryptionConfiguration forces a floor on the encryption
         clients may select, so a client cannot downgrade to a weaker option.
         Complements athenaWorkgroupNoEnforcement.
+
+        Not applicable to managed query results: the setting only covers results
+        written to Amazon S3, and the API rejects it on such a workgroup.
         """
+        if self.usesManagedQueryResults:
+            self.results['athenaMinimumEncryptionDisabled'] = [
+                0,
+                f"Workgroup '{self.name}' uses managed query results — minimum "
+                "encryption applies only to a customer results location"
+            ]
+            return
+
         if not self.encryptionConfig.get('EncryptionOption'):
             self.results['athenaMinimumEncryptionDisabled'] = [
                 0,
@@ -139,6 +169,12 @@ class AthenaWorkgroup(Evaluator):
     # 4. Output location is a bucket root
     # ------------------------------------------------------------------ #
     def _checkAthenaWorkgroupS3OutputNoPrefix(self):
+        if self.usesManagedQueryResults:
+            self.results['athenaWorkgroupS3OutputNoPrefix'] = [
+                0, self._managedNoResultsLocationMessage()
+            ]
+            return
+
         location = self.resultConfig.get('OutputLocation') or ''
         if not location:
             self.results['athenaWorkgroupS3OutputNoPrefix'] = [
@@ -175,6 +211,12 @@ class AthenaWorkgroup(Evaluator):
         section should not have to cross-reference the S3 section to learn that
         its results land unencrypted.
         """
+        if self.usesManagedQueryResults:
+            self.results['athenaS3OutputNotEncrypted'] = [
+                0, self._managedNoResultsLocationMessage()
+            ]
+            return
+
         location = self.resultConfig.get('OutputLocation') or ''
         if not location.startswith('s3://'):
             self.results['athenaS3OutputNotEncrypted'] = [
@@ -351,6 +393,21 @@ class AthenaWorkgroup(Evaluator):
     # ------------------------------------------------------------------ #
     # Helpers
     # ------------------------------------------------------------------ #
+    def _encryptionOption(self):
+        """
+        Inventory value for encryptionOption. For a customer results location
+        this is the API's EncryptionOption (SSE_S3, SSE_KMS, CSE_KMS). Managed
+        query results have no such field, so two Service Screener values are
+        used instead: AWS_OWNED_KEY or CUSTOMER_KMS_KEY.
+        """
+        if self.usesManagedQueryResults:
+            return 'CUSTOMER_KMS_KEY' if self.managedKmsKey else 'AWS_OWNED_KEY'
+        return self.encryptionConfig.get('EncryptionOption', 'None')
+
+    def _managedNoResultsLocationMessage(self):
+        return (f"Workgroup '{self.name}' uses managed query results — no "
+                "customer results location to check")
+
     def _effectiveEngineVersion(self):
         ev = self.config.get('EngineVersion') or {}
         return ev.get('EffectiveEngineVersion') or ev.get(

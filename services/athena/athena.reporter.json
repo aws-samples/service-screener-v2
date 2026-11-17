@@ -1,7 +1,7 @@
 {
     "athenaWorkgroupNotEncrypted": {
         "category": "S",
-        "^description": "{$COUNT} Athena workgroup(s) have no result EncryptionConfiguration. Athena writes the output of every query to S3, and a result set is a materialised extract of whatever the query selected \u2014 often the most sensitive columns of a much larger dataset, flattened into a single file. Without workgroup-level encryption those extracts land unencrypted, and they persist long after the query that produced them is forgotten.",
+        "^description": "{$COUNT} Athena workgroup(s) have no result EncryptionConfiguration. Athena writes the output of every query to S3, and a result set is a materialised extract of whatever the query selected \u2014 often the most sensitive columns of a much larger dataset, flattened into a single file. Without workgroup-level encryption those extracts land unencrypted, and they persist long after the query that produced them is forgotten. Workgroups that use managed query results are always encrypted by Athena and pass this check.",
         "shortDesc": "Encrypt Athena query results",
         "criticality": "H",
         "downtime": 0,
