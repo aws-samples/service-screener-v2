@@ -17,6 +17,7 @@ class Kinesis(Service):
       - list_stream_consumers          (enhanced fan-out consumers)
       - kms.get_key_rotation_status    (only for customer-managed CMKs)
       - cloudwatch.describe_alarms_for_metric (per stream, for alarm coverage)
+      - get_resource_policy            (stream + each EFO consumer)
 
     Account-level metadata fetched once per scan and shared across streams:
       - describe_limits                (account-wide shard limit)
@@ -86,6 +87,7 @@ class Kinesis(Service):
                     '_consumers': [],
                     '_kmsRotation': 'unknown',
                     '_hasCloudWatchAlarms': None,
+                    '_resourcePolicies': None,
                     '_shardLimit': self._shardLimit,
                     '_totalOpenShards': 0,
                 })
@@ -95,12 +97,14 @@ class Kinesis(Service):
             if self.tags and not self.resourceHasTags(tags):
                 continue
 
+            consumers = self._listConsumers(arn)
             detail = {
                 '_name': name,
                 '_arn': arn,
                 '_summary': summary,
                 '_tags': tags,
-                '_consumers': self._listConsumers(arn),
+                '_consumers': consumers,
+                '_resourcePolicies': self._fetchResourcePolicies(arn, consumers),
                 '_kmsRotation': self._kmsRotationFor(summary),
                 '_hasCloudWatchAlarms': self._hasCloudWatchAlarms(name),
                 '_shardLimit': self._shardLimit,
@@ -183,6 +187,43 @@ class Kinesis(Service):
         except botocore.exceptions.ClientError as e:
             self._logClientError(f'list_stream_consumers({streamArn})', e)
         return consumers
+
+    def _fetchResourcePolicies(self, streamArn, consumers):
+        """
+        Read the resource-based policy attached to the stream and to each
+        enhanced fan-out consumer.
+
+        Returns {'policies': [(label, policyJson)], 'errors': [(label, code)]}.
+        An empty policy ('{}' or missing) is simply omitted from 'policies'.
+        """
+        out = {'policies': [], 'errors': []}
+        targets = []
+        if streamArn:
+            targets.append(('stream', streamArn))
+        else:
+            out['errors'].append(('stream', 'MissingStreamARN'))
+        for c in consumers or []:
+            cArn = c.get('ConsumerARN')
+            if cArn:
+                targets.append((f"consumer {c.get('ConsumerName', cArn)}", cArn))
+
+        for label, resArn in targets:
+            try:
+                resp = self.kinesisClient.get_resource_policy(ResourceARN=resArn)
+            except botocore.exceptions.ClientError as e:
+                code = e.response.get('Error', {}).get('Code', 'Unknown')
+                # A consumer can disappear between list and get; nothing to evaluate.
+                if label != 'stream' and code == 'ResourceNotFoundException':
+                    continue
+                out['errors'].append((label, code))
+                continue
+            except botocore.exceptions.BotoCoreError as e:
+                out['errors'].append((label, type(e).__name__))
+                continue
+            policy = resp.get('Policy')
+            if policy and policy.strip() not in ('{}', ''):
+                out['policies'].append((label, policy))
+        return out
 
     def _fetchShardLimit(self):
         """

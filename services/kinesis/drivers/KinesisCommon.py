@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
 
 from services.Evaluator import Evaluator
+from utils import PolicyPrincipal
 
 
 class KinesisCommon(Evaluator):
     """
-    All 14 Amazon Kinesis Data Streams checks.
+    All 15 Amazon Kinesis Data Streams checks.
 
     Input:
       stream -- dict produced by Kinesis.py.getResources with keys:
@@ -13,6 +14,7 @@ class KinesisCommon(Evaluator):
         '_tags' (list of {'Key','Value'}), '_consumers' (list of EFO consumers),
         '_kmsRotation' ('enabled'|'disabled'|'unknown'|'not_applicable'),
         '_hasCloudWatchAlarms' (True|False|None),
+        '_resourcePolicies' ({'policies': [(label, json)], 'errors': [(label, code)]} or None),
         '_shardLimit' (int), '_totalOpenShards' (int).
       kinesisClient -- boto3 kinesis client (kept for future per-check calls).
     """
@@ -387,6 +389,51 @@ class KinesisCommon(Evaluator):
                 -1, "No CloudWatch alarms on IteratorAge / "
                     "WriteProvisionedThroughputExceeded / ReadProvisionedThroughputExceeded"
             ]
+
+    # ------------------------------------------------------------------ #
+    # 15. Stream / consumer resource policy allows any principal
+    # ------------------------------------------------------------------ #
+    def _checkKinesisResourcePolicyPublic(self):
+        key = 'kinesisResourcePolicyPublic'
+        data = self.stream.get('_resourcePolicies')
+        if not isinstance(data, dict):
+            self.results[key] = [0, 'Unable to evaluate (resource policy not retrieved)']
+            return
+
+        public = []
+        unparseable = []
+        for label, policy in data.get('policies') or []:
+            if PolicyPrincipal.parsePolicy(policy) is None:
+                unparseable.append(label)
+                continue
+            sids = [str(st.get('Sid') or f'#{i}')
+                    for i, st in enumerate(PolicyPrincipal.iterStatements(policy))
+                    if PolicyPrincipal.statementIsPublic(st)]
+            if sids:
+                public.append(f"{label} (statement {', '.join(sids[:3])})")
+
+        if public:
+            self.results[key] = [
+                -1, "Resource policy allows any principal (Principal '*' / NotPrincipal) "
+                    f"without a scoping condition: {'; '.join(public[:5])}"
+                    + (f" (+{len(public)-5} more)" if len(public) > 5 else "")
+            ]
+            return
+
+        errors = data.get('errors') or []
+        if errors:
+            codes = sorted({code for _, code in errors})
+            self.results[key] = [0, f"Unable to evaluate ({', '.join(codes)})"]
+            return
+        if unparseable:
+            self.results[key] = [0, f"Unable to evaluate (unparseable policy on {', '.join(unparseable)})"]
+            return
+
+        count = len(data.get('policies') or [])
+        if count:
+            self.results[key] = [1, f"{count} resource policy(ies) present; none allow an unscoped wildcard principal"]
+        else:
+            self.results[key] = [1, "No resource-based policy attached to stream or consumers"]
 
     # ------------------------------------------------------------------ #
     # Helpers
