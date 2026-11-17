@@ -4,6 +4,11 @@ from utils.Tools import _pi
 from services.Service import Service
 
 from services.wafv2.drivers.Wafv2Common import Wafv2Common
+from services.wafv2.drivers.Wafv2Shield import (
+    Wafv2Shield, Wafv2ShieldProtection, listShieldProtections,
+    arnRegion, isAlbArn, isCloudFrontArn,
+)
+from services.wafv2.drivers.Wafv2Fms import Wafv2Fms
 
 
 class Wafv2(Service):
@@ -50,6 +55,15 @@ class Wafv2(Service):
         self.apigwClient = ssBoto.client('apigateway', config=self.bConfig)
         self.appsyncClient = ssBoto.client('appsync', config=self.bConfig)
         self.cognitoClient = ssBoto.client('cognito-idp', config=self.bConfig)
+        # Shield Advanced is global and served from us-east-1 only; Firewall
+        # Manager is regional. Used by the Shield/FMS drivers (read-only).
+        from botocore.config import Config as _BotoConfig
+        self.shieldClient = ssBoto.client(
+            'shield', config=self.bConfig.merge(_BotoConfig(region_name='us-east-1')))
+        self.fmsClient = ssBoto.client('fms', config=self.bConfig)
+        self.ec2Client = ssBoto.client('ec2', config=self.bConfig)
+        self.elbClassicClient = ssBoto.client('elb', config=self.bConfig)
+        self.route53Client = ssBoto.client('route53', config=self.bConfig)
         # Cached per-region: {'ipSets','regexPatternSets','ruleGroups','crossService'}
         self._regionAssets = None
 
@@ -712,6 +726,91 @@ class Wafv2(Service):
             except Exception as e:
                 print(f"Error processing Wafv2 WebACL {acl.get('_arn')}: {e}")
 
+        objs.update(self._adviseShieldAndFms())
+        return objs
+
+    # ------------------------------------------------------------------ #
+    # Shield Advanced + Firewall Manager (account / region level)
+    # ------------------------------------------------------------------ #
+    SHIELD_GLOBAL_CLAIM_KEY = 'wafv2::shieldGlobalScanRegion'
+
+    def _claimShieldGlobalRegion(self):
+        """First region of the scan evaluates the global Shield items
+        (proactive engagement, CloudFront, hosted zones) so a multi-region
+        scan never reports them twice."""
+        from utils.Config import Config
+        existing = Config.get(self.SHIELD_GLOBAL_CLAIM_KEY, None)
+        if not existing:
+            Config.set(self.SHIELD_GLOBAL_CLAIM_KEY, self.region)
+            return True
+        return existing == self.region
+
+    def _partition(self):
+        from utils.Config import Config
+        arn = (Config.get('stsInfo', {}) or {}).get('Arn', '') or ''
+        parts = arn.split(':')
+        return parts[1] if len(parts) > 1 and parts[1] else 'aws'
+
+    SHIELD_FMS_RULES = (
+        'shieldadvancednoproactiveengagement',
+        'shieldadvancedpublicresourcesunprotected',
+        'shieldautol7mitigationdisabled',
+        'fmsnonetworkpolicies',
+    )
+
+    def _adviseShieldAndFms(self):
+        objs = {}
+        from utils.Config import Config
+        rules = Config.get(self.RULESPREFIX, []) or []
+        if rules and not any(r in self.SHIELD_FMS_RULES for r in rules):
+            return objs  # a --rules filter excludes every Shield/FMS check
+        isGlobal = self._claimShieldGlobalRegion()
+        acct = self._currentAccount()
+        clients = {
+            'shield': self.shieldClient, 'elbv2': self.elbClient,
+            'elb': self.elbClassicClient, 'ec2': self.ec2Client,
+            'cloudfront': self.cfClient, 'route53': self.route53Client,
+        }
+        try:
+            obj = Wafv2Shield(clients, self.region, acct, self._partition(), isGlobal)
+            obj.run(self.__class__)
+            objs['Shield::Account'] = obj.getInfo()
+            del obj
+        except Exception as e:
+            print(f"Error processing Shield Advanced posture: {e}")
+
+        # Per-protection L7 auto-mitigation: ALB protections of this region,
+        # CloudFront protections in the global-claim region only.
+        protections = []
+        try:
+            state = self.shieldClient.get_subscription_state().get('SubscriptionState')
+            if state == 'ACTIVE':
+                protections = listShieldProtections(self.shieldClient)
+        except botocore.exceptions.ClientError as e:
+            self._logClientError('shield.list_protections', e)
+        except botocore.exceptions.EndpointConnectionError:
+            pass
+        for p in protections:
+            arn = p.get('ResourceArn', '')
+            inScope = (isAlbArn(arn) and arnRegion(arn) == self.region) or \
+                      (isCloudFrontArn(arn) and isGlobal)
+            if not inScope:
+                continue
+            try:
+                obj = Wafv2ShieldProtection(p, self.shieldClient)
+                obj.run(self.__class__)
+                objs[f"ShieldProtection::{obj._resourceName}"] = obj.getInfo()
+                del obj
+            except Exception as e:
+                print(f"Error processing Shield protection {arn}: {e}")
+
+        try:
+            obj = Wafv2Fms(self.fmsClient, self.region, acct)
+            obj.run(self.__class__)
+            objs['FirewallManager::Account'] = obj.getInfo()
+            del obj
+        except Exception as e:
+            print(f"Error processing Firewall Manager posture: {e}")
         return objs
 
     # ------------------------------------------------------------------ #

@@ -662,5 +662,73 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-waf.html"
+	},
+	"shieldAdvancedNoProactiveEngagement": {
+		"category": "S",
+		"^description": "Shield Advanced is active but proactive engagement is not enabled or no emergency contacts are configured. Without them the Shield Response Team (SRT) cannot contact you when a health-check-based DDoS event affects your protected resources, delaying incident response. Reported once per account.",
+		"shortDesc": "Enable Shield Advanced proactive engagement and configure emergency contacts",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Configuring proactive engagement]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-srt-proactive-engagement.html>",
+			"[Managing emergency contacts]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-edit-emergency-contacts.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/ddos-srt-proactive-engagement.html"
+	},
+	"shieldAdvancedPublicResourcesUnprotected": {
+		"category": "S",
+		"^description": "Shield Advanced is subscribed but {$COUNT} scope(s) contain internet-facing resources (internet-facing ALB/CLB, associated Elastic IPs, CloudFront distributions, public Route 53 hosted zones) with no Shield Advanced protection. The subscription only covers resources that are explicitly added as protections, so these resources get no enhanced DDoS detection, SRT support or cost protection. Accounts without a subscription are reported as INFO only.",
+		"shortDesc": "Add Shield Advanced protections for every internet-facing resource",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Adding AWS Shield Advanced protection to AWS resources]<https://docs.aws.amazon.com/waf/latest/developerguide/configure-new-protection.html>",
+			"[Resources that AWS Shield Advanced protects]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-advanced-summary-protected-resources.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/configure-new-protection.html"
+	},
+	"shieldAutoL7MitigationDisabled": {
+		"category": "S",
+		"^description": "{$COUNT} Shield Advanced protection(s) on CloudFront distributions or Application Load Balancers do not have automatic application layer DDoS mitigation enabled. Without it, Shield Advanced will not create and deploy WAF rules automatically to counter HTTP floods, so mitigation of L7 attacks depends on manual action.",
+		"shortDesc": "Enable automatic application layer DDoS mitigation on CloudFront/ALB protections",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Automating application layer DDoS mitigation with Shield Advanced]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-automatic-app-layer-response.html>",
+			"[Enabling automatic application layer DDoS mitigation]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-automatic-app-layer-response-enable.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/ddos-automatic-app-layer-response.html"
+	},
+	"fmsNoNetworkPolicies": {
+		"category": "S",
+		"^description": "This account is an AWS Firewall Manager administrator but has no Firewall Manager policies in {$COUNT} region(s). WAF, Shield Advanced, security group, Network Firewall and DNS Firewall baselines are therefore not centrally enforced on new accounts and resources in the organization. Only evaluated from the Firewall Manager administrator account; other mechanisms (CloudFormation StackSets, Landing Zone Accelerator) are valid alternatives.",
+		"shortDesc": "Define Firewall Manager policies to enforce network protections organization-wide",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[AWS Firewall Manager policies]<https://docs.aws.amazon.com/waf/latest/developerguide/working-with-policies.html>",
+			"[Getting started with AWS Firewall Manager]<https://docs.aws.amazon.com/waf/latest/developerguide/getting-started-fms.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/working-with-policies.html"
 	}
 }
