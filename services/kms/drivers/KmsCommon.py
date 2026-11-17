@@ -72,6 +72,16 @@ class KmsCommon(Evaluator):
         # self.__configPrefix = 'kms::' +  + '::' + db['EngineVersion'] + '::'
         self.init()
 
+    ## Read-once helpers: several checks need the same key policy / grants.
+    def _keyPolicy(self):
+        return self._memo(('get_key_policy', self.kms['KeyId'], 'default'),
+                          lambda: self.kmsClient.get_key_policy(KeyId=self.kms['KeyId'], PolicyName='default'))
+
+    def _grantsFirstPage(self):
+        """First list_grants page (Limit=100), shared by the grant checks."""
+        return self._memo(('list_grants', self.kms['KeyId'], 100),
+                          lambda: self.kmsClient.list_grants(KeyId=self.kms['KeyId'], Limit=100))
+
     def _checkKeyInfo(self):
         if self.kms['KeyRotationEnabled'] == False:
             self.results['KeyRotationEnabled'] = [-1, False]
@@ -86,10 +96,7 @@ class KmsCommon(Evaluator):
     def _checkGrantPermissions(self):
         """Check grant permissions for security issues (Tier 1 + Tier 2)"""
         try:
-            resp = self.kmsClient.list_grants(
-                KeyId = self.kms['KeyId'],
-                Limit = 100
-            )
+            resp = self._grantsFirstPage()
             
             grants = resp.get('Grants', [])
             
@@ -208,10 +215,7 @@ class KmsCommon(Evaluator):
     
     def _checkPolicyAdminUser(self):
         """Check key policy for security issues (Tier 1 + Tier 2)"""
-        resp = self.kmsClient.get_key_policy(
-            KeyId = self.kms['KeyId'],
-            PolicyName = 'default'
-        )
+        resp = self._keyPolicy()
         
         pDoc = resp.get('Policy')
         pObj = Policy(pDoc)
@@ -408,10 +412,9 @@ class KmsCommon(Evaluator):
             
             # Check 2: No grants
             try:
-                resp = self.kmsClient.list_grants(
-                    KeyId = self.kms['KeyId'],
-                    Limit = 1
-                )
+                ## Any grant on the first page means the key has grants; reuse
+                ## the page the other grant checks read instead of a Limit=1 call.
+                resp = self._grantsFirstPage()
                 has_grants = len(resp.get('Grants', [])) > 0
                 
                 if not has_grants:
@@ -448,10 +451,7 @@ class KmsCommon(Evaluator):
             key_account = self.kms['Arn'].split(':')[4]
             
             # Check 1: Cross-account principals in key policy
-            resp = self.kmsClient.get_key_policy(
-                KeyId = self.kms['KeyId'],
-                PolicyName = 'default'
-            )
+            resp = self._keyPolicy()
             
             pDoc = resp.get('Policy')
             pObj = Policy(pDoc)
@@ -476,10 +476,7 @@ class KmsCommon(Evaluator):
             
             # Check 2: Cross-account grants
             try:
-                resp = self.kmsClient.list_grants(
-                    KeyId = self.kms['KeyId'],
-                    Limit = 100
-                )
+                resp = self._grantsFirstPage()
                 
                 grants = resp.get('Grants', [])
                 
@@ -607,14 +604,18 @@ class KmsCommon(Evaluator):
         organisation specific, so this is low criticality."""
         if self.kms.get('KeyState') == 'PendingDeletion':
             return
-        tags = []
-        try:
-            paginator = self.kmsClient.get_paginator('list_resource_tags')
-            for page in paginator.paginate(KeyId=self.kms['KeyId']):
-                tags.extend(page.get('Tags', []) or [])
-        except botocore.exceptions.ClientError as e:
-            self.results['KeyMissingOwnershipTags'] = [0, f'Unable to evaluate ({self._errorCode(e)})']
-            return
+        if '_resourceTags' in self.kms:
+            ## Complete tag list already read by the service class (tag filter).
+            tags = list(self.kms['_resourceTags'])
+        else:
+            tags = []
+            try:
+                paginator = self.kmsClient.get_paginator('list_resource_tags')
+                for page in paginator.paginate(KeyId=self.kms['KeyId']):
+                    tags.extend(page.get('Tags', []) or [])
+            except botocore.exceptions.ClientError as e:
+                self.results['KeyMissingOwnershipTags'] = [0, f'Unable to evaluate ({self._errorCode(e)})']
+                return
 
         keys = [self._normTagKey(t.get('TagKey', '')) for t in tags]
         hasOwner = any(h in k for k in keys for h in self.OWNERSHIP_TAG_HINTS)
