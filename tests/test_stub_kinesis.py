@@ -107,3 +107,33 @@ def test_scoped_conditions_and_notprincipal():
 def test_not_retrieved_and_unparseable():
     assert _evaluate(None)[0] == 0
     assert _evaluate({'policies': [('stream', 'not-json')], 'errors': []})[0] == 0
+
+
+def test_consumer_listing_denied_is_not_a_pass():
+    """list_stream_consumers AccessDenied: consumer policies were never read,
+    so an empty stream policy must not produce a PASS."""
+    client = _client()
+    svc = _svc(client)
+    svc._logClientError = lambda *a, **k: None
+    with Stubber(client) as st:
+        st.add_client_error('list_stream_consumers', service_error_code='AccessDeniedException',
+                            expected_params={'StreamARN': STREAM_ARN, 'MaxResults': 100})
+        st.add_response('get_resource_policy', {'Policy': '{}'},
+                        expected_params={'ResourceARN': STREAM_ARN})
+        errs = []
+        consumers = svc._listConsumers(STREAM_ARN, errs)
+        out = svc._fetchResourcePolicies(STREAM_ARN, consumers, errs)
+        st.assert_no_pending_responses()
+    assert consumers == [] and errs == ['AccessDeniedException']
+    res = _evaluate(out)
+    assert res[0] == 0 and 'AccessDeniedException' in res[1]
+
+    # Fixed: listing succeeds with no consumers -> PASS
+    with Stubber(client) as st:
+        st.add_response('list_stream_consumers', {'Consumers': []},
+                        expected_params={'StreamARN': STREAM_ARN, 'MaxResults': 100})
+        st.add_response('get_resource_policy', {'Policy': '{}'},
+                        expected_params={'ResourceARN': STREAM_ARN})
+        errs = []
+        out = svc._fetchResourcePolicies(STREAM_ARN, svc._listConsumers(STREAM_ARN, errs), errs)
+    assert _evaluate(out)[0] == 1

@@ -97,14 +97,15 @@ class Kinesis(Service):
             if self.tags and not self.resourceHasTags(tags):
                 continue
 
-            consumers = self._listConsumers(arn)
+            consumerErrors = []
+            consumers = self._listConsumers(arn, consumerErrors)
             detail = {
                 '_name': name,
                 '_arn': arn,
                 '_summary': summary,
                 '_tags': tags,
                 '_consumers': consumers,
-                '_resourcePolicies': self._fetchResourcePolicies(arn, consumers),
+                '_resourcePolicies': self._fetchResourcePolicies(arn, consumers, consumerErrors),
                 '_kmsRotation': self._kmsRotationFor(summary),
                 '_hasCloudWatchAlarms': self._hasCloudWatchAlarms(name),
                 '_shardLimit': self._shardLimit,
@@ -167,8 +168,13 @@ class Kinesis(Service):
             self._logClientError(f'list_tags_for_stream({streamName})', e)
         return tags
 
-    def _listConsumers(self, streamArn):
-        """list_stream_consumers returns Enhanced Fan-Out consumers only."""
+    def _listConsumers(self, streamArn, errors=None):
+        """
+        list_stream_consumers returns Enhanced Fan-Out consumers only.
+
+        If `errors` (a list) is given, the error code of a failed listing is
+        appended to it so callers can tell "no consumers" from "could not list".
+        """
         if not streamArn:
             return []
         consumers = []
@@ -186,17 +192,28 @@ class Kinesis(Service):
                     break
         except botocore.exceptions.ClientError as e:
             self._logClientError(f'list_stream_consumers({streamArn})', e)
+            if errors is not None:
+                errors.append(e.response.get('Error', {}).get('Code', 'Unknown'))
+        except botocore.exceptions.BotoCoreError as e:
+            if errors is not None:
+                errors.append(type(e).__name__)
         return consumers
 
-    def _fetchResourcePolicies(self, streamArn, consumers):
+    def _fetchResourcePolicies(self, streamArn, consumers, consumerListErrors=None):
         """
         Read the resource-based policy attached to the stream and to each
         enhanced fan-out consumer.
+
+        consumerListErrors: error codes from list_stream_consumers. If consumers
+        could not be listed their policies were never read, so the codes are
+        recorded as errors (result becomes 'Unable to evaluate', not PASS).
 
         Returns {'policies': [(label, policyJson)], 'errors': [(label, code)]}.
         An empty policy ('{}' or missing) is simply omitted from 'policies'.
         """
         out = {'policies': [], 'errors': []}
+        for code in consumerListErrors or []:
+            out['errors'].append(('consumers (list_stream_consumers)', code))
         targets = []
         if streamArn:
             targets.append(('stream', streamArn))

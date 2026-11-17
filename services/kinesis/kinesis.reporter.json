@@ -238,11 +238,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Controlling access to Kinesis Data Streams with resource-based policies]<https://docs.aws.amazon.com/streams/latest/dev/resource-based-policies.html>",
+			"[Share access using resource-based policies]<https://docs.aws.amazon.com/streams/latest/dev/resource-based-policy-examples.html>",
 			"[IAM JSON policy elements: Principal]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html>"
 		],
 		"remediation": "aws kinesis get-resource-policy --resource-arn <stream-arn>  # replace the wildcard principal with specific account/role ARNs (or add an aws:PrincipalOrgID condition), then: aws kinesis put-resource-policy --resource-arn <stream-arn> --policy file://policy.json",
 		"remediation_risk": "medium",
-		"remediation_doc": "https://docs.aws.amazon.com/streams/latest/dev/resource-based-policies.html"
+		"remediation_doc": "https://docs.aws.amazon.com/streams/latest/dev/resource-based-policy-examples.html"
 	}
 }
