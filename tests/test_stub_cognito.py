@@ -187,10 +187,11 @@ def test_policy_scope_rules():
     # s3:* on a per-identity prefix: documented pattern -> not broad
     assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:*',
                              'Resource': f'arn:aws:s3:::b/{sub}/*'}]}) == []
-    # dynamodb:* with plain / ForAnyValue LeadingKeys = sub on '*': per-identity -> not broad
-    for op in ('StringEquals', 'ForAnyValue:StringEquals', 'StringLike'):
+    # dynamodb:LeadingKeys is multivalued: a plain / ForAnyValue match passes when ANY
+    # key in a BatchGetItem/BatchWriteItem is the caller's own -> still broad
+    for op in ('StringEquals', 'ForAnyValue:StringEquals', 'StringLike', 'ForAnyValue:StringLike'):
         assert f({'Statement': [{'Effect': 'Allow', 'Action': 'dynamodb:*', 'Resource': '*',
-                                 'Condition': {op: {'dynamodb:LeadingKeys': [sub]}}}]}) == [], op
+                                 'Condition': {op: {'dynamodb:LeadingKeys': [sub]}}}]}), op
     # ForAllValues is true when LeadingKeys is absent (DeleteTable, Scan...) -> broad
     assert f({'Statement': [{'Effect': 'Allow', 'Action': 'dynamodb:*', 'Resource': '*',
                              'Condition': {'ForAllValues:StringEquals': {'dynamodb:LeadingKeys': [sub]}}}]})
@@ -226,25 +227,32 @@ def test_policy_scope_rules():
 
 
 def test_guest_role_dynamodb_forallvalues_leading_keys_flag_then_fix(svc):
-    """Review finding: ForAllValues:StringEquals on dynamodb:LeadingKeys is true
-    for requests without the key (DeleteTable, UpdateTable, Scan), so dynamodb:*
-    on the table is open to every guest -> -1. Plain StringEquals (key required)
-    confines each guest to its own partition -> not -1."""
+    """dynamodb:LeadingKeys conditions on a guest role:
+    - ForAllValues without Null false: true for requests without the key
+      (DeleteTable, UpdateTable, Scan) -> -1
+    - plain / ForAnyValue: LeadingKeys is multivalued, so a batch request with
+      the caller's own key plus other identities' keys matches -> -1
+    - ForAllValues + Null {LeadingKeys: false} (the documented fine-grained
+      access pattern) confines each guest to its own partition -> not -1"""
     m = '_checkCognitoIdentityPoolGuestRoleBroad'
     sub = '${cognito-identity.amazonaws.com:sub}'
     table = f'arn:aws:dynamodb:us-east-1:{ACCOUNT}:table/T'
-    docs = []
-    for op in ('ForAllValues:StringEquals', 'StringEquals'):
-        docs.append(__import__('json').dumps({'Version': '2012-10-17', 'Statement': [{
-            'Effect': 'Allow', 'Action': 'dynamodb:*', 'Resource': table,
-            'Condition': {op: {'dynamodb:LeadingKeys': [sub]}}}]}))
+    conditions = [
+        {'ForAllValues:StringEquals': {'dynamodb:LeadingKeys': [sub]}},
+        {'ForAnyValue:StringEquals': {'dynamodb:LeadingKeys': [sub]}},
+        {'StringEquals': {'dynamodb:LeadingKeys': [sub]}},
+        {'ForAllValues:StringEquals': {'dynamodb:LeadingKeys': [sub]}, 'Null': {'dynamodb:LeadingKeys': 'false'}},
+    ]
+    docs = [__import__('json').dumps({'Version': '2012-10-17', 'Statement': [{
+        'Effect': 'Allow', 'Action': 'dynamodb:*', 'Resource': table, 'Condition': c}]}) for c in conditions]
     statuses = []
     for doc in docs:
         with Stubber(svc.iamClient) as st:
             _stubRole(st, inline=('ddb', doc))
             statuses.append(_run(CognitoIdentityPool(_guestPool(_unauthRole=svc._fetchRoleEvaluation(ROLE_ARN))), m))
-    assert statuses[0][0] == -1 and "dynamodb:*" in statuses[0][1], statuses
-    assert statuses[1][0] == 1, statuses
+    for st_ in statuses[:3]:
+        assert st_[0] == -1 and "dynamodb:*" in st_[1], statuses
+    assert statuses[3][0] == 1, statuses
     # same shape on Resource '*'
     star = docs[0].replace(table, '*')
     with Stubber(svc.iamClient) as st:

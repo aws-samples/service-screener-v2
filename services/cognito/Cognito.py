@@ -549,6 +549,8 @@ class Cognito(Service):
                     try:
                         doc = self._asDoc(self.iamClient.get_role_policy(
                             RoleName=roleName, PolicyName=pname).get('PolicyDocument'))
+                        if doc is None:
+                            res['policyErrors'].append('UnparseablePolicyDocument')
                         res['policies'].append({'name': pname, 'arn': None,
                                                 'managedByAws': False, 'document': doc})
                     except botocore.exceptions.ClientError as e:
@@ -561,6 +563,8 @@ class Cognito(Service):
                              'arn': arn, 'managedByAws': self._isAwsManaged(arn), 'document': None}
                     try:
                         entry['document'] = self._policyDocument(arn)
+                        if entry['document'] is None:
+                            res['policyErrors'].append('UnparseablePolicyDocument')
                     except botocore.exceptions.ClientError as e:
                         res['policyErrors'].append(self._errCode(e))
                     res['policies'].append(entry)
@@ -570,6 +574,8 @@ class Cognito(Service):
                      'managedByAws': self._isAwsManaged(pbArn), 'document': None, 'error': None}
                 try:
                     b['document'] = self._policyDocument(pbArn)
+                    if b['document'] is None:
+                        b['error'] = 'UnparseablePolicyDocument'
                 except botocore.exceptions.ClientError as e:
                     b['error'] = self._errCode(e)
                 res['boundary'] = b

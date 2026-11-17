@@ -114,6 +114,8 @@ class CognitoIdentityPool(Evaluator):
         s3:prefix) whose every value is ${cognito-identity.amazonaws.com:sub}-based.
 
         - Negated (StringNot*) and ...IfExists operators do not confine the caller.
+        - dynamodb:LeadingKeys is multivalued: only ForAllValues: (with Null
+          {key: 'false'}) confines the caller; plain and ForAnyValue: do not.
         - ForAllValues: evaluates to true when the key is absent from the request
           (e.g. dynamodb:DeleteTable / Scan carry no LeadingKeys), so it only
           counts when the same Condition also has Null {key: 'false'}.
@@ -145,6 +147,12 @@ class CognitoIdentityPool(Evaluator):
                 if key not in cls.PER_IDENTITY_KEYS:
                     continue
                 if qualifier == 'forallvalues' and key not in nullFalse:
+                    continue
+                # dynamodb:LeadingKeys is multivalued (BatchGetItem/BatchWriteItem
+                # carry several partition keys). Only ForAllValues + Null false
+                # confines every key to the caller; a plain or ForAnyValue match
+                # passes when just one key is the caller's own.
+                if key == 'dynamodb:leadingkeys' and qualifier != 'forallvalues':
                     continue
                 vals = cls._asList(v)
                 if vals and all(isinstance(x, str) and cls._mentionsIdentityVar(x) for x in vals):
