@@ -1,7 +1,10 @@
+import re
+
 import boto3
+import botocore
 
 import time
-from datetime import datetime, tzinfo
+from datetime import datetime, timedelta, timezone, tzinfo
 
 from utils.Config import Config
 from utils.Tools import _pr
@@ -10,6 +13,52 @@ from utils.Tools import _warn
 from utils.Policy import Policy
 from utils import PolicyPrincipal
 from services.Evaluator import Evaluator
+
+# Condition keys that confine a cross-account principal to the caller's AWS
+# Organization. aws:PrincipalAccount is deliberately NOT accepted: the Principal
+# element already names the external account, so a matching PrincipalAccount
+# condition adds no boundary.
+ORG_SCOPING_KEYS = ('aws:principalorgid', 'aws:principalorgpaths')
+_POSITIVE_OPERATORS = ('stringequals', 'stringequalsignorecase', 'stringlike')
+_ACCOUNT_ARN_RE = re.compile(r'^arn:aws[a-z-]*:(?:iam|sts)::(\d{12}):')
+
+
+def principalAccountId(principal):
+    """Account ID of an AWS principal given as an IAM/STS ARN or a bare
+    12-digit account ID; None when it cannot be determined."""
+    if not isinstance(principal, str):
+        return None
+    if re.fullmatch(r'\d{12}', principal):
+        return principal
+    m = _ACCOUNT_ARN_RE.match(principal)
+    return m.group(1) if m else None
+
+
+def orgConditionScopes(condition):
+    """True if the Condition restricts callers to an AWS Organization (or OU
+    path) with a positive-match operator and a concrete value. IfExists,
+    negated and ForAllValues operators are not accepted because they also
+    match callers that carry no organization at all."""
+    if not isinstance(condition, dict):
+        return False
+    for operator, block in condition.items():
+        if not isinstance(operator, str) or not isinstance(block, dict):
+            continue
+        op = operator.lower()
+        if op.startswith('forallvalues:'):
+            continue
+        if op.startswith('foranyvalue:'):
+            op = op[len('foranyvalue:'):]
+        if op not in _POSITIVE_OPERATORS:
+            continue
+        for key, value in block.items():
+            if str(key).lower() not in ORG_SCOPING_KEYS:
+                continue
+            values = value if isinstance(value, list) else [value]
+            if values and all(isinstance(v, str) and v and set(v) - {'*', '?'} for v in values):
+                return True
+    return False
+
 
 class KmsCommon(Evaluator):
     def __init__(self, kms, kmsClient):
@@ -172,6 +221,7 @@ class KmsCommon(Evaluator):
         admins = []
         users = []
         cross_account_principals = []
+        org_scoped_cross_account = []
         wildcard_principals = []
         wildcard_actions = []
         has_root_access = False
@@ -204,18 +254,26 @@ class KmsCommon(Evaluator):
                             if isinstance(aws_principals, str):
                                 aws_principals = [aws_principals]
                             
+                            org_scoped = orgConditionScopes(condition)
                             for principal in aws_principals:
+                                if not isinstance(principal, str):
+                                    continue
                                 if principal == '*':
                                     if not wildcard_scoped:
                                         wildcard_principals.append(f"Statement {sid}: AWS Principal is *")
-                                # Check for root access
-                                elif f":iam::{key_account}:root" in principal:
+                                # Check for root access ("arn:...:root" or the bare account ID form)
+                                elif f":iam::{key_account}:root" in principal or principal == key_account:
                                     has_root_access = True
                                 # Tier 1: Check for cross-account access (KeyPolicyCrossAccount)
-                                elif ':iam::' in principal:
-                                    principal_account = principal.split(':')[4]
-                                    if principal_account != key_account:
-                                        cross_account_principals.append(f"Statement {sid}: {principal}")
+                                else:
+                                    principal_account = principalAccountId(principal)
+                                    if principal_account and principal_account != key_account:
+                                        if org_scoped:
+                                            # aws:PrincipalOrgID / aws:PrincipalOrgPaths keeps the
+                                            # grant inside the organization boundary.
+                                            org_scoped_cross_account.append(f"Statement {sid}: {principal}")
+                                        else:
+                                            cross_account_principals.append(f"Statement {sid}: {principal}")
                 
                 # Tier 1: Check for wildcard actions (KeyPolicyWildcardAction)
                 # Tier 2: Check for sensitive actions and missing conditions
@@ -303,6 +361,10 @@ class KmsCommon(Evaluator):
         # Tier 1: New security checks
         if cross_account_principals:
             self.results['KeyPolicyCrossAccount'] = [-1, "<br>".join(cross_account_principals)]
+        elif org_scoped_cross_account:
+            self.results['KeyPolicyCrossAccount'] = [1, "Cross-account access restricted by aws:PrincipalOrgID/aws:PrincipalOrgPaths: " + "<br>".join(org_scoped_cross_account)]
+        else:
+            self.results['KeyPolicyCrossAccount'] = [1, "No cross-account principals in key policy"]
         
         if wildcard_principals:
             self.results['KeyPolicyWildcardPrincipal'] = [-1, "<br>".join(wildcard_principals)]
@@ -439,3 +501,132 @@ class KmsCommon(Evaluator):
         except Exception as e:
             # Log error but don't fail the check
             pass
+
+    # ------------------------------------------------------------------ #
+    # WAFS2027 checks
+    # ------------------------------------------------------------------ #
+    ## Imported key material that expires within this many days is reported.
+    IMPORTED_MATERIAL_WARN_DAYS = 30
+
+    ## AWS default (and most common compliance baseline) automatic rotation period.
+    MAX_ROTATION_PERIOD_DAYS = 365
+
+    ## Normalised (lowercase, separators removed) tag-key fragments.
+    OWNERSHIP_TAG_HINTS = ('owner', 'team', 'contact', 'custodian', 'steward')
+    CLASSIFICATION_TAG_HINTS = ('classification', 'confidentiality', 'sensitivity')
+
+    @staticmethod
+    def _errorCode(e):
+        return e.response.get('Error', {}).get('Code', 'ClientError')
+
+    def _checkImportedKeyMaterialExpiring(self):
+        """EXTERNAL-origin key whose imported key material is missing or expires
+        within IMPORTED_MATERIAL_WARN_DAYS. When imported material expires KMS
+        deletes it and every ciphertext under that material is undecryptable
+        until the same material is re-imported."""
+        if self.kms.get('Origin') != 'EXTERNAL':
+            return
+        state = self.kms.get('KeyState')
+        if state == 'PendingDeletion':
+            return
+
+        if state == 'PendingImport':
+            self.results['ImportedKeyMaterialExpiring'] = [-1, 'Key state is PendingImport: no key material is imported (never imported, expired or deleted); the key cannot be used']
+            return
+
+        now = datetime.now(timezone.utc)
+        threshold = now + timedelta(days=self.IMPORTED_MATERIAL_WARN_DAYS)
+
+        ## Current key material from describe_key, plus every imported key
+        ## material version (on-demand rotation of imported keys keeps older
+        ## material, which can expire independently).
+        materials = {}
+        if self.kms.get('ExpirationModel') == 'KEY_MATERIAL_EXPIRES':
+            materials[self.kms.get('CurrentKeyMaterialId') or 'current'] = self.kms.get('ValidTo')
+
+        note = ''
+        try:
+            paginator = self.kmsClient.get_paginator('list_key_rotations')
+            for page in paginator.paginate(KeyId=self.kms['KeyId'], IncludeKeyMaterial='ALL_KEY_MATERIAL'):
+                for rot in page.get('Rotations', []) or []:
+                    if rot.get('ImportState') != 'IMPORTED':
+                        continue
+                    if rot.get('ExpirationModel') != 'KEY_MATERIAL_EXPIRES':
+                        continue
+                    materials[rot.get('KeyMaterialId') or 'unknown'] = rot.get('ValidTo')
+        except botocore.exceptions.ClientError as e:
+            note = f" (non-current key material not checked: {self._errorCode(e)})"
+
+        expiring = []
+        for materialId, validTo in materials.items():
+            if not isinstance(validTo, datetime):
+                continue
+            if validTo.tzinfo is None:
+                validTo = validTo.replace(tzinfo=timezone.utc)
+            if validTo < threshold:
+                days = (validTo - now).days
+                expiring.append(f"Key material {materialId} expires {validTo.strftime('%Y-%m-%d %H:%M:%S %Z')} ({days} days)")
+
+        if expiring:
+            self.results['ImportedKeyMaterialExpiring'] = [-1, "<br>".join(expiring) + note]
+        elif materials:
+            self.results['ImportedKeyMaterialExpiring'] = [1, f"Imported key material valid for more than {self.IMPORTED_MATERIAL_WARN_DAYS} days" + note]
+        else:
+            self.results['ImportedKeyMaterialExpiring'] = [1, 'Imported key material does not expire' + note]
+
+    def _checkRotationPeriodTooLong(self):
+        """Automatic rotation is enabled but RotationPeriodInDays exceeds 365.
+        Keys without rotation are reported by KeyRotationEnabled instead."""
+        if self.kms.get('KeyState') == 'PendingDeletion':
+            return
+        err = self.kms.get('_rotationError')
+        if self.kms.get('KeyRotationEnabled') is None:
+            ## Asymmetric, HMAC, imported and custom key store keys do not
+            ## support automatic rotation: not applicable.
+            if err and err not in ('UnsupportedOperationException',):
+                self.results['RotationPeriodTooLong'] = [0, f'Unable to evaluate ({err})']
+            return
+        if self.kms.get('KeyRotationEnabled') is not True:
+            return
+
+        period = self.kms.get('_rotationPeriodInDays')
+        if period is None:
+            self.results['RotationPeriodTooLong'] = [0, 'Unable to evaluate (RotationPeriodInDays not returned)']
+        elif period > self.MAX_ROTATION_PERIOD_DAYS:
+            self.results['RotationPeriodTooLong'] = [-1, f'Rotation period is {period} days (> {self.MAX_ROTATION_PERIOD_DAYS})']
+        else:
+            self.results['RotationPeriodTooLong'] = [1, f'Rotation period is {period} days']
+
+    @staticmethod
+    def _normTagKey(key):
+        return re.sub(r'[^a-z0-9]', '', str(key).lower())
+
+    def _checkKeyMissingOwnershipTags(self):
+        """Customer managed key without an ownership tag (owner/team/contact...)
+        or a data classification tag. Heuristic: tag conventions are
+        organisation specific, so this is low criticality."""
+        if self.kms.get('KeyState') == 'PendingDeletion':
+            return
+        tags = []
+        try:
+            paginator = self.kmsClient.get_paginator('list_resource_tags')
+            for page in paginator.paginate(KeyId=self.kms['KeyId']):
+                tags.extend(page.get('Tags', []) or [])
+        except botocore.exceptions.ClientError as e:
+            self.results['KeyMissingOwnershipTags'] = [0, f'Unable to evaluate ({self._errorCode(e)})']
+            return
+
+        keys = [self._normTagKey(t.get('TagKey', '')) for t in tags]
+        hasOwner = any(h in k for k in keys for h in self.OWNERSHIP_TAG_HINTS)
+        hasClass = any(h in k for k in keys for h in self.CLASSIFICATION_TAG_HINTS)
+
+        missing = []
+        if not hasOwner:
+            missing.append('ownership (e.g. Owner, Team)')
+        if not hasClass:
+            missing.append('data classification (e.g. DataClassification)')
+
+        if missing:
+            self.results['KeyMissingOwnershipTags'] = [-1, 'Missing tag: ' + ', '.join(missing)]
+        else:
+            self.results['KeyMissingOwnershipTags'] = [1, 'Ownership and classification tags present']
