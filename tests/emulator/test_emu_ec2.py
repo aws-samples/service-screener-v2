@@ -700,3 +700,234 @@ def test_alb_mtls_off_internal(emu, uid, certificate):
         for f in ('ca.key', 'ca.pem'):
             os.remove(os.path.join(d, f))
         os.rmdir(d)
+
+
+# --------------------------------------------------------------------------- #
+# WAFS2027 chunk 4: NACL / security groups / data stores / image pipeline / SSM endpoints
+# Not covered here (emulator gaps -> tests/test_stub_ec2.py):
+# - selfManagedDataStoreOnEc2 inventory paths: emulator instances cannot become SSM managed
+#   nodes, so AWS:Application inventory evidence is stubbed.
+# - imagebuilderNoPipeline custom / cross-account AMI (INFO) and AccessDenied paths.
+# --------------------------------------------------------------------------- #
+@pytest.fixture
+def isolatedVpc(emu):
+    """VPC with one subnet on the main route table (local route only = isolated)."""
+    ec2 = emu.client('ec2')
+    vpc = ec2.create_vpc(CidrBlock='10.94.0.0/16')['Vpc']['VpcId']
+    sub = ec2.create_subnet(VpcId=vpc, CidrBlock='10.94.1.0/24', AvailabilityZone='us-east-1a')['Subnet']['SubnetId']
+    try:
+        yield {'vpc': vpc, 'subnet': sub}
+    finally:
+        ec2.delete_subnet(SubnetId=sub)
+        for sg in ec2.describe_security_groups(Filters=[{'Name': 'vpc-id', 'Values': [vpc]}])['SecurityGroups']:
+            if sg['GroupName'] != 'default':
+                ec2.delete_security_group(GroupId=sg['GroupId'])
+        ec2.delete_vpc(VpcId=vpc)
+
+
+def test_nacl_allow_all_ingress(emu, isolatedVpc):
+    ec2 = emu.client('ec2')
+    vpc, sub = isolatedVpc['vpc'], isolatedVpc['subnet']
+    nacl = ec2.create_network_acl(VpcId=vpc)['NetworkAcl']['NetworkAclId']
+    current = ec2.describe_network_acls(Filters=[{'Name': 'association.subnet-id', 'Values': [sub]}])['NetworkAcls'][0]
+    defaultNacl = current['NetworkAclId']
+    assocId = next(a['NetworkAclAssociationId'] for a in current['Associations'] if a['SubnetId'] == sub)
+    assocId = ec2.replace_network_acl_association(AssociationId=assocId, NetworkAclId=nacl)['NewAssociationId']
+    try:
+        def misconfigure():
+            ec2.create_network_acl_entry(NetworkAclId=nacl, RuleNumber=100, Protocol='-1', RuleAction='allow',
+                                         Egress=False, CidrBlock='0.0.0.0/0')
+
+        def fix():
+            ec2.replace_network_acl_entry(NetworkAclId=nacl, RuleNumber=100, Protocol='6', RuleAction='allow',
+                                          Egress=False, CidrBlock='0.0.0.0/0', PortRange={'From': 443, 'To': 443})
+
+        _, after = assertFlagFixCycle(emu, 'ec2', 'naclAllowAllIngress', f'NACL::{nacl}', misconfigure, fix)
+        assert list(after.values()) == [1]
+
+        # a lower-numbered deny before the allow-all rule -> not flagged
+        ec2.replace_network_acl_entry(NetworkAclId=nacl, RuleNumber=100, Protocol='-1', RuleAction='allow',
+                                      Egress=False, CidrBlock='0.0.0.0/0')
+        ec2.create_network_acl_entry(NetworkAclId=nacl, RuleNumber=50, Protocol='6', RuleAction='deny',
+                                     Egress=False, CidrBlock='0.0.0.0/0', PortRange={'From': 22, 'To': 22})
+        res = runCheck(emu, 'ec2', 'naclAllowAllIngress', f'NACL::{nacl}').statuses()
+        assert list(res.values()) == [1], res
+        # the default NACL allows all by design -> INFO, never FAIL
+        res = runCheck(emu, 'ec2', 'naclAllowAllIngress', f'NACL::{defaultNacl}').statuses()
+        assert -1 not in res.values(), res
+    finally:
+        ec2.replace_network_acl_association(AssociationId=assocId, NetworkAclId=defaultNacl)
+        ec2.delete_network_acl(NetworkAclId=nacl)
+
+
+@pytest.fixture
+def sgInstance(emu, uid):
+    """An instance in the default VPC with its own (initially ingress-free) security group."""
+    ec2 = emu.client('ec2')
+    sg = ec2.create_security_group(GroupName=f'ss-test-{uid}', Description='ss test')['GroupId']
+    iid = None
+    try:
+        iid = ec2.run_instances(ImageId=_amazonAmi(ec2), MinCount=1, MaxCount=1, InstanceType='t3.micro',
+                                SecurityGroupIds=[sg])['Instances'][0]['InstanceId']
+        _waitState(ec2, iid, 'running')
+        yield {'sg': sg, 'instance': iid}
+    finally:
+        _terminate(ec2, iid)
+        ec2.delete_security_group(GroupId=sg)
+
+
+def _ingress(cidr, port, v6=False):
+    rng = {'Ipv6Ranges': [{'CidrIpv6': cidr}]} if v6 else {'IpRanges': [{'CidrIp': cidr}]}
+    return [dict(IpProtocol='tcp', FromPort=port, ToPort=port, **rng)]
+
+
+def test_sg_ingress_broad_cidr(emu, sgInstance):
+    ec2 = emu.client('ec2')
+    sg = sgInstance['sg']
+
+    def misconfigure():
+        ec2.authorize_security_group_ingress(GroupId=sg, IpPermissions=_ingress('0.0.0.0/1', 443))
+
+    def fix():
+        ec2.revoke_security_group_ingress(GroupId=sg, IpPermissions=_ingress('0.0.0.0/1', 443))
+        ec2.authorize_security_group_ingress(GroupId=sg, IpPermissions=_ingress('203.0.113.0/24', 443)
+                                             + _ingress('10.0.0.0/8', 8443))
+
+    _, after = assertFlagFixCycle(emu, 'ec2', 'sgIngressBroadCidr', f'SG::{sg}', misconfigure, fix)
+    assert list(after.values()) == [1]
+    # a broad public IPv6 range is flagged too
+    ec2.authorize_security_group_ingress(GroupId=sg, IpPermissions=_ingress('2000::/3', 443, v6=True))
+    assert list(runCheck(emu, 'ec2', 'sgIngressBroadCidr', f'SG::{sg}').statuses().values()) == [-1]
+
+
+def test_sg_sensitive_port_open_to_all_per_permission(emu, sgInstance):
+    """Regression: an open CIDR on one permission (443 from 0.0.0.0/0) must not make another
+    permission's sensitive port (22 from a private range) count as open to all."""
+    ec2 = emu.client('ec2')
+    sg = sgInstance['sg']
+    ec2.authorize_security_group_ingress(GroupId=sg, IpPermissions=_ingress('0.0.0.0/0', 443))
+
+    def misconfigure():
+        ec2.authorize_security_group_ingress(GroupId=sg, IpPermissions=_ingress('0.0.0.0/0', 22))
+
+    def fix():
+        ec2.revoke_security_group_ingress(GroupId=sg, IpPermissions=_ingress('0.0.0.0/0', 22))
+        ec2.authorize_security_group_ingress(GroupId=sg, IpPermissions=_ingress('10.0.0.0/16', 22))
+
+    res = runCheck(emu, 'ec2', 'SGSensitivePortOpenToAll', f'SG::{sg}').results
+    assert 'SGSensitivePortOpenToAll' not in res.get(f'SG::{sg}', {}), res
+    misconfigure()
+    res = runCheck(emu, 'ec2', 'SGSensitivePortOpenToAll', f'SG::{sg}').results
+    assert res[f'SG::{sg}']['SGSensitivePortOpenToAll'][0] == -1, res
+    fix()
+    res = runCheck(emu, 'ec2', 'SGSensitivePortOpenToAll', f'SG::{sg}').results
+    assert 'SGSensitivePortOpenToAll' not in res.get(f'SG::{sg}', {}), res
+
+
+def test_self_managed_datastore_on_ec2(emu, sgInstance):
+    """Port evidence only (emulator instances are never SSM managed nodes)."""
+    ec2 = emu.client('ec2')
+    sg, iid = sgInstance['sg'], sgInstance['instance']
+    perm = _ingress('10.0.0.0/16', 5432)
+    _, after = assertFlagFixCycle(
+        emu, 'ec2', 'selfManagedDataStoreOnEc2', f'SSM::{iid}',
+        misconfigure=lambda: ec2.authorize_security_group_ingress(GroupId=sg, IpPermissions=perm),
+        fix=lambda: ec2.revoke_security_group_ingress(GroupId=sg, IpPermissions=perm))
+    assert list(after.values()) == [1]
+    # an all-traffic rule is not data-store evidence
+    allTraffic = [{'IpProtocol': '-1', 'IpRanges': [{'CidrIp': '10.0.0.0/16'}]}]
+    ec2.authorize_security_group_ingress(GroupId=sg, IpPermissions=allTraffic)
+    assert list(runCheck(emu, 'ec2', 'selfManagedDataStoreOnEc2', f'SSM::{iid}').statuses().values()) == [1]
+
+
+def test_sg_unrestricted_egress_data_tier(emu, uid):
+    """An ENI described as an RDS interface marks its SG as data tier (classifyDataTierEni)."""
+    ec2 = emu.client('ec2')
+    sg = ec2.create_security_group(GroupName=f'ss-db-{uid}', Description='ss db test')['GroupId']
+    subnet = ec2.describe_subnets(Filters=[{'Name': 'default-for-az', 'Values': ['true']}])['Subnets'][0]['SubnetId']
+    eni = ec2.create_network_interface(SubnetId=subnet, Groups=[sg], Description='RDSNetworkInterface')
+    eniId = eni['NetworkInterface']['NetworkInterfaceId']
+    allOut = [{'IpProtocol': '-1', 'IpRanges': [{'CidrIp': '0.0.0.0/0'}]}]
+    try:
+        def misconfigure():
+            groups = ec2.describe_security_groups(GroupIds=[sg])['SecurityGroups'][0]
+            if not any(p['IpProtocol'] == '-1' for p in groups['IpPermissionsEgress']):
+                ec2.authorize_security_group_egress(GroupId=sg, IpPermissions=allOut)
+
+        def fix():
+            ec2.revoke_security_group_egress(GroupId=sg, IpPermissions=allOut)
+            ec2.authorize_security_group_egress(GroupId=sg, IpPermissions=[
+                {'IpProtocol': 'tcp', 'FromPort': 443, 'ToPort': 443, 'IpRanges': [{'CidrIp': '10.0.0.0/8'}]}])
+
+        _, after = assertFlagFixCycle(emu, 'ec2', 'sgUnrestrictedEgress', f'DataTierSG::{sg}', misconfigure, fix)
+        assert list(after.values()) == [1]
+    finally:
+        ec2.delete_network_interface(NetworkInterfaceId=eniId)
+        ec2.delete_security_group(GroupId=sg)
+
+
+def test_imagebuilder_no_pipeline(emu, uid):
+    ec2, ib, iam = emu.client('ec2'), emu.client('imagebuilder'), emu.client('iam')
+    assert not ib.list_image_pipelines()['imagePipelineList'], 'emulator already has Image Builder pipelines'
+    ami = _amazonAmi(ec2)
+    iid = ec2.run_instances(ImageId=ami, MinCount=1, MaxCount=1, InstanceType='t3.micro')['Instances'][0]['InstanceId']
+    doc = ("name: ss\nschemaVersion: 1.0\nphases:\n  - name: build\n    steps:\n      - name: s\n"
+           "        action: ExecuteBash\n        inputs:\n          commands: ['echo ok']\n")
+    made = {}
+    try:
+        def fix():
+            iam.create_instance_profile(InstanceProfileName=f'ss-ib-{uid}')
+            made['profile'] = f'ss-ib-{uid}'
+            made['component'] = ib.create_component(name=f'ss-c-{uid}', semanticVersion='1.0.0', platform='Linux',
+                                                    data=doc)['componentBuildVersionArn']
+            made['recipe'] = ib.create_image_recipe(name=f'ss-r-{uid}', semanticVersion='1.0.0', parentImage=ami,
+                                                    components=[{'componentArn': made['component']}])['imageRecipeArn']
+            made['infra'] = ib.create_infrastructure_configuration(
+                name=f'ss-i-{uid}', instanceProfileName=made['profile'])['infrastructureConfigurationArn']
+            made['pipeline'] = ib.create_image_pipeline(name=f'ss-p-{uid}', imageRecipeArn=made['recipe'],
+                                                        infrastructureConfigurationArn=made['infra'])['imagePipelineArn']
+
+        # misconfigure: an instance on a stock Amazon AMI and no pipeline
+        _, after = assertFlagFixCycle(emu, 'ec2', 'imagebuilderNoPipeline', 'EC2::ImageBuilder', lambda: None, fix)
+        assert list(after.values()) == [1]
+
+        # a disabled pipeline does not count
+        ib.update_image_pipeline(imagePipelineArn=made['pipeline'], imageRecipeArn=made['recipe'],
+                                 infrastructureConfigurationArn=made['infra'], status='DISABLED')
+        assert list(runCheck(emu, 'ec2', 'imagebuilderNoPipeline', 'EC2::ImageBuilder').statuses().values()) == [-1]
+    finally:
+        _terminate(ec2, iid)
+        if 'pipeline' in made:
+            ib.delete_image_pipeline(imagePipelineArn=made['pipeline'])
+        if 'infra' in made:
+            ib.delete_infrastructure_configuration(infrastructureConfigurationArn=made['infra'])
+        if 'recipe' in made:
+            ib.delete_image_recipe(imageRecipeArn=made['recipe'])
+        if 'component' in made:
+            ib.delete_component(componentBuildVersionArn=made['component'])
+        if 'profile' in made:
+            iam.delete_instance_profile(InstanceProfileName=made['profile'])
+
+
+def test_ssm_vpc_endpoints_missing(emu, isolatedVpc):
+    ec2 = emu.client('ec2')
+    vpc, sub = isolatedVpc['vpc'], isolatedVpc['subnet']
+    iid = ec2.run_instances(ImageId=_amazonAmi(ec2), MinCount=1, MaxCount=1, InstanceType='t3.micro',
+                            SubnetId=sub)['Instances'][0]['InstanceId']
+    eps = []
+    try:
+        def fix():
+            ec2.modify_vpc_attribute(VpcId=vpc, EnableDnsSupport={'Value': True})
+            ec2.modify_vpc_attribute(VpcId=vpc, EnableDnsHostnames={'Value': True})
+            for svc in ('ssm', 'ssmmessages'):
+                eps.append(ec2.create_vpc_endpoint(VpcId=vpc, VpcEndpointType='Interface', SubnetIds=[sub],
+                                                   ServiceName=f'com.amazonaws.us-east-1.{svc}',
+                                                   PrivateDnsEnabled=True)['VpcEndpoint']['VpcEndpointId'])
+
+        # misconfigure: instance in a subnet without any default route and no SSM endpoints
+        _, after = assertFlagFixCycle(emu, 'ec2', 'ssmVpcEndpointsMissing', f'VPC::{vpc}', lambda: None, fix)
+        assert list(after.values()) == [1]
+    finally:
+        if eps:
+            ec2.delete_vpc_endpoints(VpcEndpointIds=eps)
+        _terminate(ec2, iid)

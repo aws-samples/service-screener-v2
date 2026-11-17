@@ -34,6 +34,8 @@ from services.ec2.drivers.Ec2EbsSnapshotSharing import Ec2EbsSnapshotSharing
 from services.ec2.drivers.Ec2LaunchTemplate import Ec2LaunchTemplate
 from services.ec2.drivers.Ec2VpcEndpoint import Ec2VpcEndpoint
 from services.ec2.drivers.Ec2VpnConnection import Ec2VpnConnection
+from services.ec2.drivers.Ec2DataTierSecGroup import Ec2DataTierSecGroup, classifyDataTierEni
+from services.ec2.drivers.Ec2ImageBuilder import Ec2ImageBuilder
 from services.ec2.drivers.Ec2NetworkInterface import Ec2NetworkInterface, classifyEni, getSubnetRouting
 
 import concurrent.futures as cf
@@ -59,6 +61,7 @@ class Ec2(Service):
         self.cwClient = ssBoto.client('cloudwatch', config=self.bConfig)
         self.rbinClient = ssBoto.client('rbin', config=self.bConfig)
         self.orgClient = ssBoto.client('organizations', config=self.bConfig)
+        self.ibClient = ssBoto.client('imagebuilder', config=self.bConfig)
         
         self.getOutdateSQLVersion()
         self.getWindowsVersion()
@@ -368,15 +371,46 @@ class Ec2(Service):
         return flowLogList
         
     def getNetworkACLs(self):
-        result = self.ec2Client.describe_network_acls()
-        
-        networkACLs = result.get('NetworkAcls')
-        while result.get('NextToken') is not None:
-            result = self.ec2Client.describe_network_acls(
-                NextToken = result.get('NextToken')
-            )
-        networkACLs = networkACLs + result.get('NetworkAcls')
+        networkACLs = []
+        paginator = self.ec2Client.get_paginator('describe_network_acls')
+        for page in paginator.paginate():
+            networkACLs.extend(page.get('NetworkAcls', []))
         return networkACLs
+
+    def getInstanceAllSecurityGroups(self, instance):
+        """Every security group on the instance's network interfaces (no tag filter:
+        the groups decide what the instance accepts). None when unreadable."""
+        ids = {g.get('GroupId') for g in instance.get('SecurityGroups', []) or []}
+        for eni in instance.get('NetworkInterfaces', []) or []:
+            ids.update(g.get('GroupId') for g in eni.get('Groups', []) or [])
+        try:
+            allSGs = self._getAllSecurityGroupsCached()
+        except botocore.exceptions.ClientError:
+            return None
+        return [allSGs[i] for i in sorted(i for i in ids if i) if i in allSGs]
+
+    def getDataTierSecurityGroups(self, enis):
+        """{groupId: (group, {kind: [eniId, ...]})} for security groups attached to
+        managed data-store network interfaces (tag filter applied to the groups)."""
+        usage = {}
+        for eni in enis:
+            kind = classifyDataTierEni(eni)
+            if kind is None:
+                continue
+            for g in eni.get('Groups', []) or []:
+                usage.setdefault(g.get('GroupId'), {}).setdefault(kind, []).append(eni.get('NetworkInterfaceId'))
+        if not usage:
+            return {}
+        allSGs = self._getAllSecurityGroupsCached()
+        out = {}
+        for gid, kinds in usage.items():
+            group = allSGs.get(gid)
+            if group is None:
+                continue
+            if self.tags and not ('Tags' in group and self.resourceHasTags(group['Tags'])):
+                continue
+            out[gid] = (group, kinds)
+        return out
 
     def getKeyPairs(self):
         filters = []
@@ -923,14 +957,16 @@ class Ec2(Service):
 
         # Internal-tier managed-service interfaces (RDS / ElastiCache / ECS) in public subnets;
         # EC2 instances are evaluated by Ec2Instance
-        if self._ruleSelected('ec2InstanceInPublicSubnet'):
+        eniKeys = [k for k in ('ec2InstanceInPublicSubnet', 'sgUnrestrictedEgress') if self._ruleSelected(k)]
+        enis = []
+        if eniKeys:
             try:
                 enis = self.getNetworkInterfaces()
             except botocore.exceptions.ClientError as e:
                 code = e.response['Error']['Code']
                 _warn("Unable to list network interfaces ({})".format(code))
-                objs["ENI::unavailable"] = {'results': {'ec2InstanceInPublicSubnet': [0, f"Unable to evaluate ({code})"]}, 'info': {}}
-                enis = []
+                objs["ENI::unavailable"] = {'results': {k: [0, f"Unable to evaluate ({code})"] for k in eniKeys}, 'info': {}}
+        if self._ruleSelected('ec2InstanceInPublicSubnet'):
             routing = None
             for eni in enis:
                 kind = classifyEni(eni)
@@ -942,6 +978,21 @@ class Ec2(Service):
                 obj = Ec2NetworkInterface(eni, kind, routing)
                 obj.run(self.__class__)
                 objs[f"ENI::{eni['NetworkInterfaceId']}"] = obj.getInfo()
+
+        # Security groups of managed data stores (RDS / ElastiCache / Redshift / OpenSearch)
+        if enis and self._ruleSelected('sgUnrestrictedEgress'):
+            for gid, (group, usage) in self.getDataTierSecurityGroups(enis).items():
+                _pi('EC2::Data-tier Security Group', gid)
+                obj = Ec2DataTierSecGroup(group, usage)
+                obj.run(self.__class__)
+                objs[f"DataTierSG::{gid}"] = obj.getInfo()
+
+        # Image pipelines (region level)
+        if self._ruleSelected('imagebuilderNoPipeline'):
+            _pi('EC2::Image Builder')
+            obj = Ec2ImageBuilder(self.ibClient, self.ec2Client, list(instancesById.values()))
+            obj.run(self.__class__)
+            objs['EC2::ImageBuilder'] = obj.getInfo()
         
         
         # ELB checks
@@ -1005,12 +1056,14 @@ class Ec2(Service):
         vpcs = self.getVpcs()
         flowLogs = self.getFlowLogs()
         vpcRouting, allEndpoints, allEndpointsErr = None, None, None
-        if vpcs and self._ruleSelected('vpcNoGatewayEndpoints'):
+        if vpcs and (self._ruleSelected('vpcNoGatewayEndpoints') or self._ruleSelected('ssmVpcEndpointsMissing')):
             vpcRouting = getSubnetRouting(self.ec2Client)
             allEndpoints, allEndpointsErr = self.getAllVpcEndpoints()
+        vpcInstances = list(instancesById.values()) if self._ruleSelected('ssmVpcEndpointsMissing') else None
         for vpc in vpcs:
             _pi('VPC::Virtual Private Cloud', vpc['VpcId'])
-            obj = Ec2Vpc(vpc, flowLogs, self.ec2Client, vpcRouting, allEndpoints, allEndpointsErr, selfAccount)
+            obj = Ec2Vpc(vpc, flowLogs, self.ec2Client, vpcRouting, allEndpoints, allEndpointsErr, selfAccount,
+                         vpcInstances)
             obj.run(self.__class__)
             objs[f"VPC::{vpc['VpcId']}"] = obj.getInfo()
             
@@ -1055,7 +1108,7 @@ class Ec2(Service):
         # None) EC2SSMNotManaged is skipped to avoid false positives;
         # ec2InstanceWithKeyPair then reports "Unable to evaluate".
         if (ssmManagedSet is not None or self._ruleSelected('ec2InstanceWithKeyPair')
-                or self._ruleSelected('ec2SshdRunning')):
+                or self._ruleSelected('ec2SshdRunning') or self._ruleSelected('selfManagedDataStoreOnEc2')):
             for instanceArr in instances:
                 for instanceData in instanceArr['Instances']:
                     if instanceData['State']['Name'] not in ('running', 'stopped'):
@@ -1063,7 +1116,9 @@ class Ec2(Service):
                     _pi('EC2::SSM Check', instanceData['InstanceId'])
                     obj = Ec2SSM(instanceData['InstanceId'], ssmManagedSet, instanceData,
                                  getattr(self, 'ssmError', None), getattr(self, 'ssmPingStatus', None),
-                                 self.ssmClient, getattr(self, 'ssmPlatform', None))
+                                 self.ssmClient, getattr(self, 'ssmPlatform', None),
+                                 self.getInstanceAllSecurityGroups(instanceData)
+                                 if self._ruleSelected('selfManagedDataStoreOnEc2') else None)
                     obj.run(self.__class__)
                     objs[f"SSM::{instanceData['InstanceId']}"] = obj.getInfo()
         

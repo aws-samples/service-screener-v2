@@ -30,6 +30,17 @@ Why not the emulator:
   (shared VPC, interface endpoint, unassociated route table): response shapes beyond the
   emulator flag -> fix test.
 - EBSUpToDateSnapshot: DescribeSnapshots result ordering (newest not first).
+- selfManagedDataStoreOnEc2: emulator instances cannot become SSM managed nodes, so the
+  AWS:Application inventory evidence (server package FAIL, port-only INFO, client-library
+  non-match) is stubbed.
+- imagebuilderNoPipeline: custom / cross-account AMIs (INFO), deregistered AMIs in a
+  describe_images batch and AccessDenied responses are shapes the emulator cannot produce
+  on demand.
+- ssmVpcEndpointsMissing: NAT / transit-gateway default routes, private-DNS-disabled
+  endpoints and shared VPCs (RAM) are beyond the emulator flag -> fix test.
+- naclAllowAllIngress (IPv6 / deny-ordering details) and sgUnrestrictedEgress ENI
+  classification (ElastiCache / Redshift / OpenSearch interfaces cannot be created).
+- getNetworkACLs pagination (NextToken) - the emulator returns a single page.
 
 Every client is a real botocore client (real API shapes / parameter validation) wrapped by
 botocore.stub.Stubber, pointed at an unroutable loopback endpoint with dummy credentials,
@@ -981,4 +992,218 @@ def _snapshotFreshness(ages):
 def test_up_to_date_snapshot_uses_newest():
     assert _snapshotFreshness([30, 1]) == {}                        # oldest returned first: still up to date
     assert _snapshotFreshness([30, 20])['EBSUpToDateSnapshot'][0] == -1
+
+
+# --------------------------------------------------------------------------- #
+# WAFS2027 chunk 4
+# --------------------------------------------------------------------------- #
+from services.ec2.drivers.Ec2NACL import Ec2NACL  # noqa: E402
+from services.ec2.drivers.Ec2SecGroup import Ec2SecGroup  # noqa: E402
+from services.ec2.drivers.Ec2DataTierSecGroup import Ec2DataTierSecGroup, classifyDataTierEni  # noqa: E402
+from services.ec2.drivers.Ec2ImageBuilder import Ec2ImageBuilder  # noqa: E402
+
+
+def _naclResult(entries, default=False, assoc=True):
+    nacl = {'NetworkAclId': 'acl-1', 'IsDefault': default, 'Entries': entries,
+            'Associations': [{'SubnetId': 'subnet-a'}] if assoc else []}
+    return _run(Ec2NACL(nacl, None), '_checkNaclAllowAllIngress').get('naclAllowAllIngress')
+
+
+def _entry(num, action, proto='-1', cidr='0.0.0.0/0', egress=False, v6=False):
+    e = {'RuleNumber': num, 'RuleAction': action, 'Protocol': proto, 'Egress': egress}
+    e['Ipv6CidrBlock' if v6 else 'CidrBlock'] = cidr
+    return e
+
+
+IMPLICIT = [_entry(32767, 'deny'), _entry(32768, 'deny', cidr='::/0', v6=True)]
+
+
+def test_nacl_allow_all_ingress_flag_fix():
+    assert _naclResult([_entry(100, 'allow')] + IMPLICIT)[0] == -1
+    assert _naclResult([_entry(100, 'allow', proto='6')] + IMPLICIT)[0] == 1        # tcp only
+    assert _naclResult([_entry(100, 'allow', cidr='::/0', v6=True)] + IMPLICIT)[0] == -1
+    # IPv4 deny before allow-all, IPv6 still open
+    res = _naclResult([_entry(50, 'deny', proto='6'), _entry(100, 'allow'),
+                       _entry(101, 'allow', cidr='::/0', v6=True)] + IMPLICIT)
+    assert res[0] == -1 and '::/0' in res[1] and 'rule 100' not in res[1]
+    assert _naclResult([_entry(100, 'allow', egress=True)] + IMPLICIT)[0] == 1     # egress only
+    assert _naclResult([_entry(100, 'allow')] + IMPLICIT, default=True)[0] == 0     # default NACL: INFO
+    assert _naclResult([_entry(100, 'allow')] + IMPLICIT, assoc=False) is None      # not associated
+
+
+def test_network_acls_paginate():
+    ec2 = _client('ec2')
+    with Stubber(ec2) as st:
+        st.add_response('describe_network_acls', {'NetworkAcls': [{'NetworkAclId': 'acl-1'}], 'NextToken': 't'}, {})
+        st.add_response('describe_network_acls', {'NetworkAcls': [{'NetworkAclId': 'acl-2'}]}, {'NextToken': 't'})
+        nacls = Ec2.getNetworkACLs(types.SimpleNamespace(ec2Client=ec2))
+        st.assert_no_pending_responses()
+    assert [n['NetworkAclId'] for n in nacls] == ['acl-1', 'acl-2']
+
+
+def _sg(ingress=None, egress=None):
+    return {'GroupId': 'sg-1', 'GroupName': 'app', 'IpPermissions': ingress or [], 'IpPermissionsEgress': egress or []}
+
+
+def _perm(proto, lo, hi, v4=(), v6=()):
+    p = {'IpProtocol': proto, 'IpRanges': [{'CidrIp': c} for c in v4], 'Ipv6Ranges': [{'CidrIpv6': c} for c in v6],
+         'UserIdGroupPairs': [], 'PrefixListIds': []}
+    if proto != '-1':
+        p.update(FromPort=lo, ToPort=hi)
+    return p
+
+
+def test_sg_ingress_broad_cidr_flag_fix():
+    run = lambda perms: _run(Ec2SecGroup(_sg(perms), None), '_checkSgIngressBroadCidr')['sgIngressBroadCidr']
+    for cidr in ('0.0.0.0/1', '128.0.0.0/1', '52.0.0.0/8', '10.0.0.0/7'):
+        assert run([_perm('tcp', 443, 443, v4=[cidr])])[0] == -1, cidr
+    assert run([_perm('-1', None, None, v6=['2000::/3'])])[0] == -1
+    # fixed / not in scope: 0.0.0.0/0 (other checks), /16 or narrower, private ranges, ULA
+    for cidr in ('0.0.0.0/0', '52.94.0.0/16', '203.0.113.0/24', '10.0.0.0/8', '172.16.0.0/12', '100.64.0.0/10'):
+        assert run([_perm('tcp', 443, 443, v4=[cidr])])[0] == 1, cidr
+    assert run([_perm('tcp', 443, 443, v6=['::/0', 'fc00::/7', '2001:db8::/32'])])[0] == 1
+
+
+def test_sg_sensitive_port_open_to_all_per_permission():
+    def run(perms):
+        return _run(Ec2SecGroup(_sg(perms), None), '_checkSensitivePortOpenToAll').get('SGSensitivePortOpenToAll')
+    web = _perm('tcp', 443, 443, v4=['0.0.0.0/0'])
+    assert run([web, _perm('tcp', 22, 22, v4=['10.0.0.0/8'])]) is None        # was a false FAIL
+    assert run([web, _perm('tcp', 22, 22, v4=['0.0.0.0/0'])])[0] == -1
+    assert run([_perm('tcp', 0, 65535, v6=['::/0'])])[0] == -1
+    assert run([_perm('-1', None, None, v4=['0.0.0.0/0'])])[0] == -1
+    assert run([_perm('udp', 3389, 3389, v4=['0.0.0.0/0'])]) is None          # RDP is tcp in the port map
+    assert run([_perm('udp', 53, 53, v4=['0.0.0.0/0'])])[0] == -1              # DNS: tcp and udp
+    # ICMP (FromPort -1) open to all is not "all ports open to all"
+    icmp = _perm('icmp', -1, -1, v4=['0.0.0.0/0'])
+    assert 'SGAllPortOpenToAll' not in _run(Ec2SecGroup(_sg([icmp]), None), '_checkAllPortOpenToAll')
+
+
+def test_sg_unrestricted_egress_classification_and_rules():
+    assert classifyDataTierEni({'RequesterId': 'amazon-elasticache'}) == 'ElastiCache'
+    assert classifyDataTierEni({'Description': 'RedshiftNetworkInterface'}) == 'Redshift'
+    assert classifyDataTierEni({'RequesterId': 'amazon-elasticsearch', 'Description': 'ES my-domain'}) == 'OpenSearch'
+    assert classifyDataTierEni({'Description': 'Primary network interface'}) is None
+    run = lambda egress: _run(Ec2DataTierSecGroup(_sg(egress=egress), {'RDS': ['eni-1']}),
+                              '_checkSgUnrestrictedEgress')['sgUnrestrictedEgress']
+    assert run([_perm('-1', None, None, v4=['0.0.0.0/0'])])[0] == -1
+    assert run([_perm('tcp', 0, 65535, v6=['::/0'])])[0] == -1
+    assert run([_perm('tcp', 443, 443, v4=['0.0.0.0/0'])])[0] == 1
+    assert run([_perm('-1', None, None, v4=['10.0.0.0/16'])])[0] == 1
+    assert run([])[0] == 1
+
+
+def _dsResult(perms, managed=True, entries=None, invError=None):
+    ssm = _client('ssm')
+    sgs = [_sg(perms)]
+    with Stubber(ssm) as st:
+        if managed:
+            if invError:
+                st.add_client_error('list_inventory_entries', service_error_code=invError, http_status_code=400)
+            else:
+                st.add_response('list_inventory_entries',
+                                {'TypeName': 'AWS:Application', 'InstanceId': IID, 'Entries': entries or []},
+                                {'InstanceId': IID, 'TypeName': 'AWS:Application', 'MaxResults': 50})
+        obj = Ec2SSM(IID, {IID} if managed else set(), {'InstanceId': IID, 'State': {'Name': 'running'}},
+                     None, {IID: 'Online'}, ssm, {IID: 'Linux'}, sgs)
+        res = _run(obj, '_checkSelfManagedDataStoreOnEc2').get('selfManagedDataStoreOnEc2')
+        st.assert_no_pending_responses()
+    return res
+
+
+def test_self_managed_datastore_inventory_flag_fix():
+    pkg = lambda n: {'Name': n, 'Version': '1'}
+    res = _dsResult([], entries=[pkg('bash'), pkg('postgresql15-server'), pkg('postgresql15')])
+    assert res[0] == -1 and 'postgresql15-server' in res[1]
+    assert _dsResult([], entries=[pkg('Microsoft SQL Server 2019 (64-bit)')])[0] == -1
+    assert _dsResult([], entries=[pkg('redis6')])[0] == -1
+    # fixed: engine removed, only clients / libraries left
+    assert _dsResult([], entries=[pkg('postgresql15'), pkg('mysql-community-client'), pkg('libpq'),
+                                  pkg('redis-tools'), pkg('python3-redis')])[0] == 1
+    # port evidence with clean inventory -> INFO (proxy / shared SG)
+    pg = _perm('tcp', 5432, 5432, v4=['10.0.0.0/16'])
+    assert _dsResult([pg], entries=[pkg('pgbouncer')])[0] == 0
+    # port evidence without inventory -> heuristic FAIL; wide ranges are not evidence
+    assert _dsResult([pg], managed=False)[0] == -1
+    assert _dsResult([pg], entries=[])[0] == -1                                # inventory not collected
+    assert _dsResult([pg], invError='InvalidInstanceId')[0] == -1
+    assert _dsResult([_perm('tcp', 0, 65535, v4=['10.0.0.0/16'])], managed=False)[0] == 1
+
+
+def _ibResult(pipelines, images=None, instances=None, ibError=None, imageError=None):
+    ib, ec2 = _client('imagebuilder'), _client('ec2')
+    instances = instances if instances is not None else [
+        {'InstanceId': IID, 'ImageId': 'ami-0aaa', 'State': {'Name': 'running'}}]
+    with Stubber(ib) as sib, Stubber(ec2) as sec2:
+        if instances:
+            if ibError:
+                sib.add_client_error('list_image_pipelines', service_error_code=ibError, http_status_code=403)
+            else:
+                sib.add_response('list_image_pipelines', {'imagePipelineList': pipelines})
+            if not ibError and not any(p.get('status') == 'ENABLED' for p in pipelines):
+                if imageError:
+                    sec2.add_client_error('describe_images', service_error_code=imageError, http_status_code=400)
+                    if imageError.startswith('InvalidAMIID'):
+                        sec2.add_response('describe_images', {'Images': images or []}, {'ImageIds': ['ami-0aaa']})
+                else:
+                    sec2.add_response('describe_images', {'Images': images or []}, {'ImageIds': ['ami-0aaa']})
+        res = _run(Ec2ImageBuilder(ib, ec2, instances), '_checkImagebuilderNoPipeline')['imagebuilderNoPipeline']
+        sib.assert_no_pending_responses()
+        sec2.assert_no_pending_responses()
+    return res
+
+
+def test_imagebuilder_no_pipeline_paths():
+    stock = [{'ImageId': 'ami-0aaa', 'ImageOwnerAlias': 'amazon', 'OwnerId': '137112412989'}]
+    pipe = lambda status: {'arn': 'arn:aws:imagebuilder:us-east-1:111111111111:image-pipeline/p', 'status': status}
+    assert _ibResult([], stock)[0] == -1
+    assert _ibResult([pipe('DISABLED')], stock)[0] == -1
+    assert _ibResult([pipe('ENABLED')])[0] == 1
+    # self-owned / cross-account / Image Builder-tagged AMIs: possibly built by other tooling -> INFO
+    assert _ibResult([], [{'ImageId': 'ami-0aaa', 'OwnerId': SELF}])[0] == 0
+    assert _ibResult([], [{'ImageId': 'ami-0aaa', 'OwnerId': ORG_MEMBER}])[0] == 0
+    assert _ibResult([], [{'ImageId': 'ami-0aaa', 'ImageOwnerAlias': 'amazon',
+                           'Tags': [{'Key': 'Ec2ImageBuilderArn', 'Value': 'x'}]}])[0] == 0
+    # deregistered AMI -> per-image retry, still not evaluable
+    assert _ibResult([], [], imageError='InvalidAMIID.NotFound')[0] == 0
+    assert _ibResult([], ibError='AccessDeniedException') == [0, 'Unable to evaluate (AccessDeniedException)']
+    assert _ibResult([], stock, imageError='UnauthorizedOperation')[0] == 0
+    assert _ibResult([], instances=[]) == [1, 'No EC2 instances in region']
+
+
+def _ssmEpResult(endpoints, routes=(), vpc=VPC, endpointsError=None, instSubnet='subnet-a'):
+    routing = _routing([_rt('rtb-main', 'vpc-1', list(routes), main=True)],
+                       [{'SubnetId': 'subnet-a', 'VpcId': 'vpc-1'}])
+    inst = [{'InstanceId': IID, 'VpcId': 'vpc-1', 'SubnetId': instSubnet, 'State': {'Name': 'running'}},
+            {'InstanceId': 'i-gone', 'VpcId': 'vpc-1', 'SubnetId': 'subnet-a', 'State': {'Name': 'terminated'}}]
+    obj = Ec2Vpc(vpc, [], None, routing, endpoints, endpointsError, SELF, inst)
+    return _run(obj, '_checkSsmVpcEndpointsMissing').get('ssmVpcEndpointsMissing')
+
+
+def _iep(service, dns=True, state='available'):
+    return {'VpcEndpointId': 'vpce-' + service, 'VpcId': 'vpc-1', 'VpcEndpointType': 'Interface', 'State': state,
+            'ServiceName': f'com.amazonaws.us-east-1.{service}', 'PrivateDnsEnabled': dns}
+
+
+def test_ssm_vpc_endpoints_missing_flag_fix():
+    res = _ssmEpResult([])
+    assert res[0] == -1 and IID in res[1] and 'i-gone' not in res[1]
+    assert _ssmEpResult([_iep('ssm')])[0] == -1                                  # ssmmessages missing
+    assert _ssmEpResult([_iep('ssm'), _iep('ssmmessages', state='deleted')])[0] == -1
+    res = _ssmEpResult([_iep('ssm'), _iep('ssmmessages')])
+    assert res[0] == 1 and 'ec2messages' in res[1]
+    # private DNS disabled on the endpoints -> verify a private hosted zone (INFO)
+    assert _ssmEpResult([_iep('ssm', dns=False), _iep('ssmmessages', dns=False)])[0] == 0
+
+
+def test_ssm_vpc_endpoints_not_flagged_paths():
+    # any default route (NAT, transit gateway) is a valid path to the public SSM endpoints
+    assert _ssmEpResult([], routes=[NAT_ROUTE])[0] == 1
+    tgw = {'DestinationCidrBlock': '0.0.0.0/0', 'TransitGatewayId': 'tgw-1', 'State': 'active'}
+    assert _ssmEpResult([], routes=[tgw])[0] == 1
+    # a blackholed default route does not count
+    assert _ssmEpResult([], routes=[dict(NAT_ROUTE, State='blackhole')])[0] == -1
+    assert _ssmEpResult([], vpc={'VpcId': 'vpc-1', 'OwnerId': OUTSIDER})[0] == 0
+    assert _ssmEpResult(None, endpointsError='UnauthorizedOperation') == [0, 'Unable to evaluate (UnauthorizedOperation)']
+    assert _ssmEpResult([], instSubnet='subnet-shared')[0] == 0                  # route table not visible
 

@@ -27,10 +27,28 @@ def _igwDefaultRoutes(routeTable):
     return out
 
 
+_ROUTE_TARGETS = ('GatewayId', 'NatGatewayId', 'TransitGatewayId', 'NetworkInterfaceId', 'InstanceId',
+                  'VpcPeeringConnectionId', 'EgressOnlyInternetGatewayId', 'CarrierGatewayId',
+                  'LocalGatewayId', 'CoreNetworkArn')
+
+
+def _defaultRoutes(routeTable):
+    """'0.0.0.0/0 -> <target>' strings for every active default route (any target:
+    IGW, NAT, transit gateway, appliance ENI, peering, ...)."""
+    out = []
+    for r in routeTable.get('Routes', []) or []:
+        dest = r.get('DestinationCidrBlock') or r.get('DestinationIpv6CidrBlock')
+        if dest not in DEFAULT_ROUTES or r.get('State') == 'blackhole':
+            continue
+        target = next((r[k] for k in _ROUTE_TARGETS if r.get(k)), 'unknown')
+        out.append(f"{dest} -> {target}")
+    return out
+
+
 def getSubnetRouting(ec2Client):
     """Effective route table per subnet (explicit association, else the VPC main
     route table), memoized per region:
-      {'subnets': {subnetId: {'routeTableId': .., 'igwRoutes': [..]}},
+      {'subnets': {subnetId: {'routeTableId': .., 'igwRoutes': [..], 'defaultRoutes': [..]}},
        'subnetVpc': {subnetId: vpcId}, 'error': None|code}
     A subnet missing from 'subnets' has no visible route table (e.g. a subnet shared
     from another account through AWS RAM - participants cannot read its route table)."""
@@ -55,7 +73,8 @@ def getSubnetRouting(ec2Client):
 
     mainByVpc, explicit = {}, {}
     for rt in routeTables:
-        entry = {'routeTableId': rt.get('RouteTableId'), 'igwRoutes': _igwDefaultRoutes(rt)}
+        entry = {'routeTableId': rt.get('RouteTableId'), 'igwRoutes': _igwDefaultRoutes(rt),
+                 'defaultRoutes': _defaultRoutes(rt)}
         for assoc in rt.get('Associations', []) or []:
             state = (assoc.get('AssociationState') or {}).get('State', 'associated')
             if state not in ('associated', 'associating'):

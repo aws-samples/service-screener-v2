@@ -1723,5 +1723,112 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html"
+	},
+	"imagebuilderNoPipeline": {
+		"category": "S",
+		"^description": "No image build pipeline: in {$COUNT} Region(s) there is no enabled EC2 Image Builder pipeline and EC2 instances run stock Amazon / AWS Marketplace AMIs directly, so hardening, patch baselines and security tooling are applied (if at all) at boot instead of being baked into a tested, versioned image. Build hardened golden images with EC2 Image Builder (for example with the CIS / STIG hardening components) or another pipeline (Packer, a central image factory account) and launch instances from them. Instances on self-owned or cross-account AMIs are not flagged.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "No hardened image pipeline; instances use stock AMIs",
+		"ref": [
+			"[What is EC2 Image Builder?]<https://docs.aws.amazon.com/imagebuilder/latest/userguide/what-is-image-builder.html>",
+			"[Create an image pipeline]<https://docs.aws.amazon.com/imagebuilder/latest/userguide/start-build-image-pipeline.html>",
+			"[SEC06-BP02 Provision compute from hardened images]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_protect_compute_hardened_images.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/imagebuilder/latest/userguide/start-build-image-pipeline.html"
+	},
+	"naclAllowAllIngress": {
+		"category": "S",
+		"^description": "Custom Network ACL allows all inbound traffic: {$COUNT} custom (non-default) Network ACL(s) associated with subnets allow all protocols and ports from 0.0.0.0/0 or ::/0 with no lower-numbered deny rule, so they add no subnet-level filtering. Restrict the inbound rules to the ports and source ranges the subnet tier needs (e.g. only from the load balancer subnets for an application tier) to add a second layer of defence behind security groups. Default NACLs, which allow all traffic by design, are not flagged.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Custom NACL allows all inbound traffic",
+		"ref": [
+			"[Control subnet traffic with network access control lists]<https://docs.aws.amazon.com/vpc/latest/userguide/vpc-network-acls.html>",
+			"[Network ACL rules]<https://docs.aws.amazon.com/vpc/latest/userguide/nacl-rules.html>",
+			"[SEC05-BP02 Control traffic flow within your network layers]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_network_protection_layered.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/userguide/nacl-rules.html"
+	},
+	"selfManagedDataStoreOnEc2": {
+		"category": "S",
+		"^description": "Self-managed data store on EC2: {$COUNT} EC2 instance(s) appear to run a self-managed database, cache or search engine (a server package such as mysql-server, postgresql-server, redis or Microsoft SQL Server in SSM Inventory, or an attached security group that explicitly opens a default data-store port such as 3306, 5432, 1433, 1521, 27017, 6379, 11211, 9042 or 9200). You then own patching, encryption, backup and access control of the engine. Consider a managed service (Amazon RDS / Aurora, ElastiCache, DocumentDB, OpenSearch Service, Keyspaces) to shift that responsibility to AWS. This is a heuristic - port-only evidence on instances without SSM Inventory may be a proxy or a shared security group.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Self-managed database/cache on EC2",
+		"ref": [
+			"[SEC01-BP04 Stay up to date with security threats and recommendations]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_securely_operate_updated_threats.html>",
+			"[Shared Responsibility Model]<https://aws.amazon.com/compliance/shared-responsibility-model/>",
+			"[AWS Systems Manager Inventory]<https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-inventory.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://aws.amazon.com/products/databases/"
+	},
+	"sgIngressBroadCidr": {
+		"category": "S",
+		"^description": "Security group ingress from very broad public CIDRs: {$COUNT} security group(s) allow inbound traffic from public IPv4 ranges larger than /16 (or IPv6 ranges larger than /32) other than 0.0.0.0/0 / ::/0, for example 0.0.0.0/1, 52.0.0.0/8 or 2000::/3. Such ranges cover large parts of the internet and bypass checks that only look for 0.0.0.0/0. Restrict the source to the specific addresses, prefix lists or security groups that need access. Broad private ranges (RFC 1918, CGNAT, ULA) are not flagged.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "SG ingress from very broad public CIDR",
+		"ref": [
+			"[Security group rules]<https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html>",
+			"[Managed prefix lists]<https://docs.aws.amazon.com/vpc/latest/userguide/managed-prefix-lists.html>",
+			"[SEC05-BP02 Control traffic flow within your network layers]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_network_protection_layered.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html"
+	},
+	"sgUnrestrictedEgress": {
+		"category": "S",
+		"^description": "Data-tier security group with unrestricted egress: {$COUNT} security group(s) attached to managed data stores (RDS / Aurora / Neptune / DocumentDB, ElastiCache, Redshift or OpenSearch network interfaces) allow all outbound traffic (or all TCP/UDP ports) to 0.0.0.0/0 or ::/0. Data stores rarely need to initiate connections; open egress makes data exfiltration and command-and-control easier if the engine is compromised. Remove the default allow-all outbound rule and allow only the destinations the engine needs (e.g. a VPC endpoint or prefix list for S3 integration).",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Data-tier SG allows all outbound traffic",
+		"ref": [
+			"[Security group rules]<https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html>",
+			"[Controlling access with security groups (Amazon RDS)]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.RDSSecurityGroups.html>",
+			"[SEC05-BP02 Control traffic flow within your network layers]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_network_protection_layered.html>"
+		],
+		"remediation": "aws ec2 revoke-security-group-egress --group-id {ResourceId} --ip-permissions IpProtocol=-1,IpRanges=[{CidrIp=0.0.0.0/0}]",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/userguide/security-group-rules.html"
+	},
+	"ssmVpcEndpointsMissing": {
+		"category": "S",
+		"^description": "Isolated subnets without Systems Manager endpoints: {$COUNT} VPC(s) have EC2 instances in subnets with no default route (no internet gateway, NAT, transit gateway or other 0.0.0.0/0 / ::/0 path) and no ssm / ssmmessages interface VPC endpoint, so the SSM Agent cannot reach Systems Manager. These instances cannot be patched, inventoried or accessed through Session Manager, which pushes operators back to SSH keys and bastions. Create interface endpoints for com.amazonaws.<region>.ssm and ssmmessages (and ec2messages for SSM Agent < 3.3.40.0) with private DNS enabled.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Isolated subnets lack SSM interface endpoints",
+		"ref": [
+			"[Use VPC endpoints for Systems Manager]<https://docs.aws.amazon.com/systems-manager/latest/userguide/setup-create-vpc.html>",
+			"[SEC06-BP03 Reduce manual management and interactive access]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_protect_compute_reduce_manual_management.html>"
+		],
+		"remediation": "aws ec2 create-vpc-endpoint --vpc-id {ResourceId} --vpc-endpoint-type Interface --service-name com.amazonaws.<region>.ssm --subnet-ids <subnet-ids> --security-group-ids <sg-allowing-443> --private-dns-enabled",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/setup-create-vpc.html"
 	}
 }

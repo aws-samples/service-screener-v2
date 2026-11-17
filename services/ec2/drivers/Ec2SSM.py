@@ -1,9 +1,29 @@
+import re
+
 import botocore
 
 from services.Evaluator import Evaluator
 
 # Windows services that accept interactive remote logins (lower-cased service names)
 REMOTE_LOGIN_SERVICES = {'termservice': 'RDP (TermService)', 'sshd': 'OpenSSH (sshd)'}
+
+# Default listener ports of self-managed databases / caches / search engines
+DATASTORE_PORTS = {3306: 'MySQL/MariaDB', 5432: 'PostgreSQL', 1433: 'SQL Server', 1521: 'Oracle',
+                   27017: 'MongoDB', 6379: 'Redis/Valkey', 11211: 'Memcached', 9042: 'Cassandra',
+                   9200: 'Elasticsearch/OpenSearch'}
+# An ingress permission counts only when it targets a narrow, explicit port range
+# (all-traffic / wide ranges are not evidence of a data store).
+DATASTORE_MAX_RANGE = 10
+# Server packages / Windows programs in SSM Inventory AWS:Application (client
+# libraries and tools such as mysql-client / postgresql-libs do not match).
+DATASTORE_PACKAGES = [re.compile(p) for p in (
+    r'^(mysql|mysql-community|mariadb|percona-server)-server(-[\d.]+)?$',
+    r'^postgresql\d*-server$', r'^postgresql-\d+$',
+    r'^redis\d*$', r'^redis-server$', r'^valkey(-server)?$',
+    r'^mongodb(-org)?-server$', r'^memcached$', r'^cassandra$', r'^elasticsearch$', r'^opensearch$',
+    r'^oracle-database-(ee|se2|xe|free)',
+    r'^microsoft sql server 20\d\d \(64-bit\)$',
+)]
 
 
 class Ec2SSM(Evaluator):
@@ -13,7 +33,7 @@ class Ec2SSM(Evaluator):
     (ssmError holds the error code); pingStatus maps instance ID -> PingStatus."""
 
     def __init__(self, instanceId, ssmManagedSet, instanceData=None, ssmError=None, pingStatus=None,
-                 ssmClient=None, platformType=None):
+                 ssmClient=None, platformType=None, securityGroups=None):
         super().__init__()
         self.instanceId = instanceId
         self.ssmManagedSet = ssmManagedSet
@@ -22,6 +42,7 @@ class Ec2SSM(Evaluator):
         self.pingStatus = pingStatus or {}
         self.ssmClient = ssmClient
         self.platformType = platformType or {}
+        self.securityGroups = securityGroups
 
         self._resourceName = instanceId
 
@@ -110,3 +131,52 @@ class Ec2SSM(Evaluator):
             self.results[key] = [-1, f"{', '.join(running)} running while Session Manager is available{captured}"]
         else:
             self.results[key] = [1, f"No RDP/SSH service running{captured}"]
+
+    def _datastorePorts(self):
+        hits = set()
+        for sg in self.securityGroups or []:
+            for perm in sg.get('IpPermissions', []) or []:
+                if str(perm.get('IpProtocol')) != 'tcp':
+                    continue
+                lo, hi = perm.get('FromPort'), perm.get('ToPort')
+                if lo is None or hi is None or hi - lo > DATASTORE_MAX_RANGE:
+                    continue
+                for port, name in DATASTORE_PORTS.items():
+                    if lo <= port <= hi:
+                        hits.add(f"{name} {port} ({sg.get('GroupId')})")
+        return sorted(hits)
+
+    def _checkSelfManagedDataStoreOnEc2(self):
+        """Heuristic: the instance runs a self-managed database / cache. Evidence:
+        (a) SSM Inventory AWS:Application lists a database / cache server package
+        (SSM-managed instances only), or (b) an attached security group explicitly
+        opens a default data-store port (narrow TCP range). When inventory is
+        available and shows no server package, the port evidence alone is INFO
+        (e.g. a proxy, or a security group shared with a managed database)."""
+        key = 'selfManagedDataStoreOnEc2'
+        inst = self.instanceData
+        if not inst or self.securityGroups is None:
+            return
+        ports = self._datastorePorts()
+
+        packages, invNote = None, ''
+        if self.ssmClient is not None and self.ssmManagedSet and self.instanceId in self.ssmManagedSet:
+            try:
+                entries, meta = self._listInventory('AWS:Application')
+                if entries:
+                    packages = sorted({str(e.get('Name', '')) for e in entries
+                                       if any(p.search(str(e.get('Name', '')).lower()) for p in DATASTORE_PACKAGES)})
+                else:
+                    invNote = '; AWS:Application inventory not collected'
+            except botocore.exceptions.ClientError as e:
+                invNote = f"; inventory not readable ({e.response['Error']['Code']})"
+
+        if packages:
+            self.results[key] = [-1, f"Data store server package(s) installed: {', '.join(packages[:5])}" +
+                                 (f"; security group opens {', '.join(ports[:3])}" if ports else '')]
+        elif ports and packages is not None:
+            self.results[key] = [0, f"Security group opens {', '.join(ports[:5])} but SSM Inventory shows no data store server package"]
+        elif ports:
+            self.results[key] = [-1, f"Security group opens data store port(s) {', '.join(ports[:5])} (port heuristic{invNote or '; instance not SSM-managed, no inventory'})"]
+        else:
+            self.results[key] = [1, f"No data store ports or packages detected{invNote}"]
