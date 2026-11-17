@@ -2,7 +2,8 @@
 ################################################################################
 # Athena Service Screener - Test Resource Creation Script
 #
-# Creates an intentionally-misconfigured Athena workgroup.
+# Creates an intentionally-misconfigured Athena workgroup, plus one workgroup
+# that uses managed query results.
 #
 #   Workgroup #1:
 #     - no ResultConfiguration encryption      -> athenaWorkgroupNotEncrypted
@@ -13,6 +14,12 @@
 #     - no BytesScannedCutoffPerQuery          -> athenaBytesScannedNoLimit
 #     - output location at bucket ROOT         -> athenaWorkgroupS3OutputNoPrefix
 #     - no tags                                -> athenaNoTags
+#
+#   Workgroup #2 (managed query results, AWS owned key):
+#     - athenaWorkgroupNotEncrypted            -> PASS (always encrypted)
+#     - athenaMinimumEncryptionDisabled,
+#       athenaWorkgroupS3OutputNoPrefix,
+#       athenaS3OutputNotEncrypted             -> INFO (not applicable)
 #
 # Checks NOT simulated:
 #   athenaWorkgroupDisabled -- would require creating then disabling; the account's
@@ -36,6 +43,7 @@ export AWS_PAGER=""
 ACCOUNT_ID=$(aws sts get-caller-identity --query 'Account' --output text 2>/dev/null || true)
 [ -z "${ACCOUNT_ID:-}" ] && { echo -e "${RED}No AWS credentials${NC}"; exit 1; }
 WG="${PREFIX}-athena-wg-${TIMESTAMP}"
+WG_MANAGED="${PREFIX}-athena-wg-managed-${TIMESTAMP}"
 BUCKET="${PREFIX}-athena-${ACCOUNT_ID}-${TIMESTAMP}"
 OUTPUT_FILE="created_resources_${TIMESTAMP}.txt"; > "$OUTPUT_FILE"
 log() { echo "$1" >> "$OUTPUT_FILE"; }
@@ -61,6 +69,16 @@ aws athena create-work-group --name "$WG" \
          echo -e "  ${CYAN}   athenaBytesScannedNoLimit, athenaWorkgroupS3OutputNoPrefix,${NC}";
          echo -e "  ${CYAN}   athenaNoTags${NC}"; } \
     || echo -e "${YELLOW}⚠ create-work-group failed${NC}"
+
+# Managed query results: Athena stores and encrypts the results itself, so the
+# workgroup has no ResultConfiguration.
+aws athena create-work-group --name "$WG_MANAGED" \
+    --configuration "ManagedQueryResultsConfiguration={Enabled=true}" \
+    --region "$REGION" > /dev/null 2>&1 \
+    && { log "WORKGROUP:${WG_MANAGED}"; echo -e "${GREEN}✓ ${WG_MANAGED}${NC}";
+         echo -e "  ${CYAN}-> athenaWorkgroupNotEncrypted PASS; athenaMinimumEncryptionDisabled,${NC}";
+         echo -e "  ${CYAN}   athenaWorkgroupS3OutputNoPrefix, athenaS3OutputNotEncrypted INFO${NC}"; } \
+    || echo -e "${YELLOW}⚠ create-work-group (managed query results) failed${NC}"
 
 echo ""; echo -e "${GREEN}=== Creation Complete ===${NC}"
 echo "  cd ../../.. && python3 main.py --regions $REGION --services athena --beta 1 --sequential 1"

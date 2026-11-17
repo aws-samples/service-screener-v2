@@ -1,6 +1,7 @@
 # Athena Simulation Testing
 
-Creates one intentionally-misconfigured workgroup plus an S3 results bucket.
+Creates one intentionally-misconfigured workgroup plus an S3 results bucket,
+and one workgroup that uses managed query results.
 
 ## Resources Created
 
@@ -8,6 +9,7 @@ Creates one intentionally-misconfigured workgroup plus an S3 results bucket.
 |---|---|---|
 | S3 bucket `ss-test-athena-<acct>-*` | Results destination | *(supporting)* |
 | Workgroup `ss-test-athena-wg-*` | No result encryption, `EnforceWorkGroupConfiguration=false`, no minimum-encryption enforcement, metrics off, no bytes-scanned cutoff, output at bucket **root**, no tags | `athenaWorkgroupNotEncrypted`, `athenaWorkgroupNoEnforcement`, `athenaPublishMetricsDisabled`, `athenaBytesScannedNoLimit`, `athenaWorkgroupS3OutputNoPrefix`, `athenaNoTags` |
+| Workgroup `ss-test-athena-wg-managed-*` | Managed query results, AWS owned key (otherwise defaults: metrics off, no bytes-scanned cutoff, no tags) | `athenaWorkgroupNotEncrypted` PASS; `athenaMinimumEncryptionDisabled`, `athenaWorkgroupS3OutputNoPrefix`, `athenaS3OutputNotEncrypted` INFO (not applicable) |
 
 ## Coverage
 
@@ -27,6 +29,19 @@ branches.
 | `athenaS3OutputNotEncrypted` | ✗ PASS branch only — AWS enables SSE-S3 by default on new buckets, so a fixture bucket cannot be unencrypted |
 | `athenaWorkgroupDisabled` | ✗ the account's ENABLED workgroups cover PASS; disabling one to force FAIL is not worth the churn |
 | `athenaEngineVersionOutdated` | ✗ **unreachable** — AWS no longer permits selecting an engine older than version 3 |
+
+### Managed query results workgroup
+
+Verified in `eu-central-1`:
+
+| Check | Result |
+|---|---|
+| `athenaWorkgroupNotEncrypted` | ✓ PASS: managed query results are always encrypted |
+| `athenaMinimumEncryptionDisabled` | ✓ INFO: not applicable, the API rejects minimum encryption on such a workgroup |
+| `athenaWorkgroupS3OutputNoPrefix` | ✓ INFO: not applicable, no customer results location |
+| `athenaS3OutputNotEncrypted` | ✓ INFO: not applicable, no customer results location (no S3 call is made) |
+| `athenaWorkgroupNoEnforcement` | PASS (enforcement is on by default) |
+| `athenaPublishMetricsDisabled`, `athenaBytesScannedNoLimit`, `athenaNoTags` | FAIL, from the creation defaults, unrelated to managed query results |
 
 ## Usage
 

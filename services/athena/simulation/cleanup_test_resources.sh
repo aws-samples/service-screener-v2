@@ -1,7 +1,9 @@
 #!/bin/bash
 ################################################################################
 # Athena Service Screener - Test Resource Cleanup Script
-# Deletes only the workgroups/buckets recorded in a manifest.
+# Deletes only the workgroups/buckets recorded in a manifest (this includes
+# the managed-query-results workgroup, which create_test_resources.sh records
+# as a WORKGROUP: line like the other one).
 # Usage: ./cleanup_test_resources.sh [RESOURCE_FILE] [--region REGION] [--force]
 ################################################################################
 set -u
