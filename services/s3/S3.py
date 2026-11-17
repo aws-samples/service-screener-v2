@@ -12,6 +12,8 @@ from botocore.config import Config as bConfig
 from services.s3.drivers.S3Bucket import S3Bucket
 from services.s3.drivers.S3Control import S3Control
 from services.s3.drivers.S3Macie import S3Macie
+from services.s3.drivers.S3AccessPoint import S3AccessPoint
+from services.s3.drivers.S3GlacierVault import S3GlacierVault
 
 from utils.Tools import _pi
 
@@ -26,6 +28,7 @@ class S3(Service):
         self.s3Client = ssBoto.client('s3', config=self.bConfig)
         self.s3Control = ssBoto.client('s3control', config=self.bConfig)
         self.macieV2Client = ssBoto.client('macie2', config=self.bConfig)
+        self.glacierClient = ssBoto.client('glacier', config=self.bConfig)
         
         # buckets = Config.get('s3::buckets', [])
     
@@ -111,6 +114,57 @@ class S3(Service):
         
         return filteredBuckets    
     
+    def _accountId(self):
+        return (Config.get('stsInfo', {}) or {}).get('Account')
+
+    def getAccessPoints(self):
+        """[(name, listError)] for S3 access points (general purpose buckets) in
+        this Region. On a listing error returns a single placeholder entry so
+        the check records 'Unable to evaluate' instead of silently passing."""
+        if self.tags:
+            # Access point tags are not read; a tag-filtered scan covers buckets only.
+            return []
+        accountId = self._accountId()
+        if not accountId:
+            return [('AccessPoints-' + self.region, 'account id unavailable')]
+        names = []
+        try:
+            kwargs = {'AccountId': accountId}
+            while True:
+                resp = self.s3Control.list_access_points(**kwargs)
+                names += [ap['Name'] for ap in resp.get('AccessPointList', []) or [] if ap.get('Name')]
+                token = resp.get('NextToken')
+                if not token:
+                    break
+                kwargs['NextToken'] = token
+        except botocore.exceptions.ClientError as e:
+            code = e.response['Error']['Code']
+            _warn(f"S3 list_access_points failed in {self.region}: {code}", forcePrint=False)
+            return [('AccessPoints-' + self.region, code)]
+        except botocore.exceptions.BotoCoreError as e:
+            _warn(f"S3 list_access_points unavailable in {self.region}: {e}", forcePrint=False)
+            return [('AccessPoints-' + self.region, type(e).__name__)]
+        return [(n, None) for n in names]
+
+    def getGlacierVaults(self):
+        """[(vaultName, listError)] for S3 Glacier vaults in this Region."""
+        if self.tags:
+            # Vault tags are not read; a tag-filtered scan covers buckets only.
+            return []
+        names = []
+        try:
+            for page in self.glacierClient.get_paginator('list_vaults').paginate():
+                names += [v['VaultName'] for v in page.get('VaultList', []) or [] if v.get('VaultName')]
+        except botocore.exceptions.ClientError as e:
+            code = e.response['Error']['Code']
+            _warn(f"Glacier list_vaults failed in {self.region}: {code}", forcePrint=False)
+            return [('GlacierVaults-' + self.region, code)]
+        except botocore.exceptions.BotoCoreError as e:
+            # Glacier is not offered in every Region; environmental, not a finding.
+            _warn(f"Glacier list_vaults unavailable in {self.region}: {e}", forcePrint=False)
+            return []
+        return [(n, None) for n in names]
+
     def advise(self):
         objs = {}
         accountScanned = Config.get('S3_HasAccountScanned', False)
@@ -123,7 +177,9 @@ class S3(Service):
             Config.set('S3_HasAccountScanned', True)
             del obj
         
-        objs = {}
+        # NOTE: objs is intentionally NOT reset here. It previously was, which
+        # silently dropped the account-level (S3Control) results such as
+        # S3AccountPublicAccessBlock and StorageLens from every report.
         buckets = self.getResources()
         
         # Buckets are processed one at a time here on purpose. The outer
@@ -138,12 +194,26 @@ class S3(Service):
         # in getResources() instead.
         for bucket in buckets:
             _pi('S3Bucket', bucket['Name'])
-            obj = S3Bucket(bucket['Name'], self.s3Client)
+            obj = S3Bucket(bucket['Name'], self.s3Client, self.macieV2Client)
             obj.run(self.__class__)
             
             objs["Bucket::" + bucket['Name']] = obj.getInfo()
             del obj
         
+        for name, listError in self.getAccessPoints():
+            _pi('S3AccessPoint', name)
+            obj = S3AccessPoint(name, self.s3Control, self._accountId(), listError)
+            obj.run(self.__class__)
+            objs["AccessPoint::" + name] = obj.getInfo()
+            del obj
+
+        for name, listError in self.getGlacierVaults():
+            _pi('S3GlacierVault', name)
+            obj = S3GlacierVault(name, self.glacierClient, listError)
+            obj.run(self.__class__)
+            objs["GlacierVault::" + name] = obj.getInfo()
+            del obj
+
         _pi('S3Macie')
         obj = S3Macie(self.macieV2Client)
         obj.run(self.__class__)
