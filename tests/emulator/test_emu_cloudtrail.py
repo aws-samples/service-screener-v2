@@ -133,18 +133,3 @@ def test_trail_bucket_same_account(emu, uid):
         _dropTrail(emu, trail)
         _dropBucket(emu, bucket)
 
-
-def test_trail_bucket_no_object_lock(emu, uid):
-    bucket, locked, trail = f'ss-ct-{uid}', f'ss-ct-lock-{uid}', f'ss-ct-{uid}'
-    _trailBucket(emu, bucket)
-    _trailBucket(emu, locked, objectLock=True)
-    try:
-        ct = emu.client('cloudtrail')
-        assertFlagFixCycle(
-            emu, 'cloudtrail', 'trailBucketNoObjectLock', trail,
-            lambda: _newTrail(emu, trail, bucket),
-            lambda: ct.update_trail(Name=trail, S3BucketName=locked))
-    finally:
-        _dropTrail(emu, trail)
-        _dropBucket(emu, bucket)
-        _dropBucket(emu, locked)

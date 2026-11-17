@@ -153,7 +153,10 @@ def _runSame(c):
     d = c.driver()
     d._checkTrailBucketSameAccount()
     c.done()
-    Config.set('CloudTrail_ownedBuckets', None)  # bucket list is cached per scan
+    # bucket list and log-archive verdict are cached per account for the scan
+    acct = Config.get('stsInfo')['Account']
+    Config.set('CloudTrail_ownedBuckets::' + acct, None)
+    Config.set('CloudTrail_logArchive::' + acct, None)
     return d.results['trailBucketSameAccount']
 
 
@@ -185,6 +188,100 @@ def test_log_archive_account_not_flagged():
     _sameAcctStubs(c, [_trail('org', acct=OTHER, org=True, bucket='org-archive'),
                        _trail('local', bucket='org-archive')], ['org-archive'], cfg=False)
     assert _runSame(c)[0] == 1
+
+
+def test_log_archive_memo_survives_other_regions():
+    """A single-Region org trail is only visible in its home Region. Once the log
+    archive role is detected, the account's own Config channel delivering locally in
+    another Region must not be flagged."""
+    c = Clients()
+    _sameAcctStubs(c, [_trail('org', acct=OTHER, org=True, bucket='org-archive')],
+                   ['org-archive', 'cfg-local'], cfg=False)
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    c.done()
+    assert d.results['trailBucketSameAccount'][0] == 1
+
+    c = Clients()  # next Region: org trail not visible, local Config channel
+    _sameAcctStubs(c, [], ['org-archive', 'cfg-local'],
+                   channels=[{'name': 'default', 's3BucketName': 'cfg-local'}], cfg=False)
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    assert d.results['trailBucketSameAccount'][0] == 1
+
+
+def test_owned_buckets_cache_is_per_account():
+    """--sequential multi-account scans share one process: account B must not reuse
+    account A's bucket list (false PASS / false FAIL)."""
+    c = Clients()
+    _sameAcctStubs(c, [_trail('local', bucket='a-logs')], ['a-logs'])
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    c.done()
+    assert d.results['trailBucketSameAccount'][0] == -1
+
+    B = '444455556666'
+    Config.set('stsInfo', {'Account': B})
+    c = Clients()
+    _sameAcctStubs(c, [_trail('local', acct=B, bucket='b-logs')], ['b-logs'])
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    c.done()  # list_buckets was called again for B
+    assert d.results['trailBucketSameAccount'][0] == -1
+
+
+def test_account_flags_reset_between_accounts(monkeypatch):
+    """CloudTrail_has* flags are kept across Regions of one account but must be reset
+    when a --sequential multi-account scan moves to the next account."""
+    import services.cloudtrail.Cloudtrail as mod
+
+    seen = []
+
+    class FakeAccount:
+        def __init__(self, *a, **k):
+            pass
+
+        def run(self, cls):
+            seen.append(Config.get('CloudTrail_hasManagementEventsCaptured'))
+
+        def getInfo(self):
+            return {}
+
+    class FakeSession:
+        def client(self, *a, **k):
+            return None
+
+    monkeypatch.setattr(mod, 'CloudtrailAccount', FakeAccount)
+    class Quiet(mod.Cloudtrail):
+        def __del__(self):  # skip Service reporting side effects
+            pass
+
+    svc = Quiet.__new__(Quiet)
+    svc.ssBoto, svc.bConfig, svc.ctClient, svc.snsClient, svc.s3Client = FakeSession(), None, None, None, None
+    svc.getTrails = lambda: []
+
+    svc.advise()
+    Config.set('CloudTrail_hasManagementEventsCaptured', True)  # a trail in account A
+    svc.advise()                                               # next Region, same account
+    Config.set('stsInfo', {'Account': '444455556666'})
+    svc.advise()                                               # account B, no trails
+    assert seen == [False, True, False]
+    assert Config.get('CloudTrail_listGlobalServEnabled') == []
+
+
+def test_kms_ambiguous_selector_is_info():
+    c = selectorCoverage({'AdvancedEventSelectors': [{'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Management']},
+        {'Field': 'eventSource', 'Equals': ['s3.amazonaws.com'], 'StartsWith': ['kms']}]}]})
+    assert c['management'] and not c['kms'] and c['kmsAmbiguous']
+    c = Clients()
+    _kmsStubs(c, {'AdvancedEventSelectors': [{'Name': 'x', 'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Management']},
+        {'Field': 'eventSource', 'Equals': ['s3.amazonaws.com'], 'StartsWith': ['kms']}]}]})
+    d = c.driver()
+    d._checkCloudtrailExcludesKmsEvents()
+    assert d.results['cloudtrailExcludesKmsEvents'][0] == 0
+    c.done()
 
 
 def test_standalone_account_info():

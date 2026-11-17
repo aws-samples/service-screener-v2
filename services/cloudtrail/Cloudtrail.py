@@ -56,10 +56,17 @@ class Cloudtrail(Service):
         ## Will loop through all trail, and set to True if any has MultiRegion
         ## Trails already evaluated in an earlier region are skipped below (CloudTrail_ranList),
         ## so keep the account-wide flags from earlier regions instead of resetting them.
+        ## The flags live in the process-wide Config, so reset them whenever the scanned
+        ## account changes (--sequential multi-account scans run in one process).
+        accountId = (Config.get('stsInfo', {}) or {}).get('Account')
+        resetAll = Config.get('CloudTrail_scanAccount', None) != accountId
+        if resetAll:
+            Config.set('CloudTrail_scanAccount', accountId)
+            Config.set('CloudTrail_ranList', [])
         for k, v in [('CloudTrail_hasOneMultiRegion', False), ('CloudTrail_hasGlobalServEnabled', False),
                      ('CloudTrail_listGlobalServEnabled', []), ('CloudTrail_hasManagementEventsCaptured', False),
                      ('CloudTrail_hasDataEventsCaptured', False)]:
-            if Config.get(k, None) is None:
+            if resetAll or Config.get(k, None) is None:
                 Config.set(k, v)
         
         objs = {}

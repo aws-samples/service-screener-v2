@@ -26,9 +26,12 @@ def accountIdFromArn(arn):
 
 def ownedBucketNames(s3Client):
     """Return (set of bucket names owned by this account, None) or (None, errorCode).
-    Cached for the whole scan (bucket ownership is account-wide)."""
+    Cached per account for the whole scan (bucket ownership is account-wide; the
+    account id is part of the key so --sequential multi-account scans do not leak)."""
+    accountId = (Config.get('stsInfo', {}) or {}).get('Account') or 'unknown'
+    cacheKey = 'CloudTrail_ownedBuckets::' + accountId
     with _lock:
-        cached = Config.get('CloudTrail_ownedBuckets', None)
+        cached = Config.get(cacheKey, None)
         if cached is not None:
             return cached
         try:
@@ -40,8 +43,11 @@ def ownedBucketNames(s3Client):
             cached = (names, None)
         except Exception as e:
             cached = (None, errCode(e))
-        Config.set('CloudTrail_ownedBuckets', cached)
+        Config.set(cacheKey, cached)
         return cached
+
+
+_POSITIVE_OPS = ('Equals', 'StartsWith', 'EndsWith')
 
 
 def _matchesValue(fieldSel, value):
@@ -83,8 +89,12 @@ def selectorCoverage(selectors):
       management - trail captures management events
       kms        - trail captures management events from kms.amazonaws.com
       data       - trail captures data events
+      kmsAmbiguous - an advanced management selector combines several positive
+                     operators (Equals/StartsWith/EndsWith) on eventSource; CloudTrail
+                     does not document how those combine, so a "KMS excluded" verdict
+                     from such a selector is not trusted (callers report INFO).
     """
-    out = {'management': False, 'kms': False, 'data': False}
+    out = {'management': False, 'kms': False, 'data': False, 'kmsAmbiguous': False}
     selectors = selectors or {}
     for es in selectors.get('EventSelectors') or []:
         if es.get('IncludeManagementEvents') is True:
@@ -101,6 +111,8 @@ def selectorCoverage(selectors):
             for fs in sel.get('FieldSelectors', []) or []:
                 if fs.get('Field') == 'eventSource' and not _matchesValue(fs, KMS_SOURCE):
                     kmsOk = False
+                    if sum(1 for op in _POSITIVE_OPS if op in fs) > 1:
+                        out['kmsAmbiguous'] = True
             if kmsOk:
                 out['kms'] = True
         if _isDataAdvanced(sel):

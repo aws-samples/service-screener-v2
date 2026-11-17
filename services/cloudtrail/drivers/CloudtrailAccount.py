@@ -293,6 +293,9 @@ class CloudtrailAccount(Evaluator):
             if t['coverage']['kms']:
                 self.results[key] = [1, 'Trail {} logs KMS management events'.format(name)]
                 return
+            if t['coverage'].get('kmsAmbiguous'):
+                unknown.append('{} (selector with several positive operators on eventSource)'.format(name))
+                continue
             excluding.append(name)
 
         if unknown:
@@ -352,10 +355,17 @@ class CloudtrailAccount(Evaluator):
 
         # Organization trails owned by another account that deliver into a bucket of
         # this account: this account is the log archive, so local delivery is expected.
+        # The result is memoised per account for the scan, because a single-Region
+        # organization trail is only visible in its home Region.
+        memoKey = 'CloudTrail_logArchive::' + accountId
         for t in foreign:
             if t.get('S3BucketName') in owned:
-                self.results[key] = [1, 'This account appears to be the log archive account (receives trail {})'.format(t.get('Name'))]
-                return
+                Config.set(memoKey, t.get('Name'))
+                break
+        archiveOf = Config.get(memoKey, None)
+        if archiveOf:
+            self.results[key] = [1, 'This account appears to be the log archive account (receives trail {})'.format(archiveOf)]
+            return
 
         flagged = []
         for t in own:

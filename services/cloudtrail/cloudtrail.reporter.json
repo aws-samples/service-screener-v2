@@ -430,23 +430,6 @@
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/creating-trail-organization.html"
 	},
-	"trailBucketNoObjectLock": {
-		"category": "S",
-		"^description": "{$COUNT} CloudTrail trail(s) deliver logs to an S3 bucket in this account that does not have S3 Object Lock enabled. Object Lock (WORM) prevents log files from being overwritten or deleted, so an attacker cannot erase evidence. Object Lock can be enabled on existing buckets; configure a default retention (for example compliance mode) that matches your log retention requirement.",
-		"shortDesc": "Enable S3 Object Lock on the CloudTrail log bucket",
-		"criticality": "L",
-		"downtime": 0,
-		"slowness": 0,
-		"additionalCost": 0,
-		"needFullTest": 0,
-		"ref": [
-			"[Using S3 Object Lock]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock.html>",
-			"[Security best practices in CloudTrail]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/best-practices-security.html>"
-		],
-		"remediation": null,
-		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lock-configure.html"
-	},
 	"manualConsoleWritesDetected": {
 		"category": "S",
 		"^description": "In {$COUNT} Region(s), CloudTrail recorded write API calls made from AWS Management Console sessions in the last 30 days (heuristic, based on a sample of recent write events). Manual changes made outside your deployment pipelines bypass review and testing, cause configuration drift and are hard to audit. Make changes through infrastructure as code and pipelines, and reserve console write access for break-glass use.",

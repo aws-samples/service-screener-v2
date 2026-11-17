@@ -3,7 +3,7 @@ import boto3
 
 from utils.Config import Config
 from services.Evaluator import Evaluator
-from services.cloudtrail.drivers.CloudtrailHelper import selectorCoverage, ownedBucketNames, errCode
+from services.cloudtrail.drivers.CloudtrailHelper import selectorCoverage, errCode
 
 class CloudtrailCommon(Evaluator):
     def __init__(self, trail, ctClient, snsClient, s3Client):
@@ -256,40 +256,3 @@ class CloudtrailCommon(Evaluator):
             
         except botocore.exceptions.ClientError as e:
             print(f'-- Unable to check CloudWatch alarms: {e.response["Error"]["Code"]}')
-
-    def _checkTrailBucketNoObjectLock(self):
-        """
-        CloudTrail log files should be immutable. Flags a trail whose destination
-        bucket is in this account and does not have S3 Object Lock enabled.
-        Buckets in another account (e.g. a log archive account) are evaluated there.
-        """
-        key = 'trailBucketNoObjectLock'
-        bucket = self.trailInfo.get('S3BucketName')
-        if not bucket:
-            self.results[key] = [0, 'Trail has no S3 bucket configured']
-            return
-
-        owned, code = ownedBucketNames(self.s3Client)
-        if owned is None:
-            self.results[key] = [0, 'Unable to evaluate ({})'.format(code)]
-            return
-
-        if bucket not in owned:
-            self.results[key] = [0, 'Bucket {} is not in this account; evaluate Object Lock in the bucket owner account'.format(bucket)]
-            return
-
-        try:
-            resp = self.s3Client.get_object_lock_configuration(Bucket=bucket)
-        except botocore.exceptions.ClientError as e:
-            c = errCode(e)
-            if c == 'ObjectLockConfigurationNotFoundError':
-                self.results[key] = [-1, 'Bucket {}: Object Lock not enabled'.format(bucket)]
-            else:
-                self.results[key] = [0, 'Unable to evaluate ({})'.format(c)]
-            return
-
-        enabled = (resp.get('ObjectLockConfiguration') or {}).get('ObjectLockEnabled')
-        if enabled == 'Enabled':
-            self.results[key] = [1, 'Bucket {}: Object Lock enabled'.format(bucket)]
-        else:
-            self.results[key] = [-1, 'Bucket {}: Object Lock not enabled'.format(bucket)]
