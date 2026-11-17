@@ -1,9 +1,13 @@
+import datetime
+
+import botocore
+
 from services.Evaluator import Evaluator
 
 
 class AccessanalyzerCommon(Evaluator):
     """
-    Account/region-scoped IAM Access Analyzer checks (8).
+    Account/region-scoped IAM Access Analyzer checks (+ RAM org sharing).
 
     Input:
       detail -- from services/accessanalyzer/Accessanalyzer.py.getResources:
@@ -17,10 +21,18 @@ class AccessanalyzerCommon(Evaluator):
     ANALYZER_UNUSED = ('ACCOUNT_UNUSED_ACCESS', 'ORGANIZATION_UNUSED_ACCESS')
     ANALYZER_INTERNAL = ('ACCOUNT_INTERNAL_ACCESS', 'ORGANIZATION_INTERNAL_ACCESS')
 
-    def __init__(self, detail, aaClient):
+    UNUSED_FINDING_TYPES = ('UnusedIAMRole', 'UnusedIAMUserAccessKey',
+                            'UnusedIAMUserPassword', 'UnusedPermission')
+    ## An unused-access finding left ACTIVE longer than this is treated as
+    ## unresolved rather than "still being triaged".
+    UNUSED_FINDING_AGE_DAYS = 30
+    UNUSED_FINDINGS_PAGE_CAP = 20   # x100 findings per page
+
+    def __init__(self, detail, aaClient, orgClient=None):
         super().__init__()
         self.detail = detail
         self.aaClient = aaClient
+        self.orgClient = orgClient
         self._resourceName = 'Account'
 
         self.analyzers = detail.get('_analyzers') or []
@@ -191,4 +203,127 @@ class AccessanalyzerCommon(Evaluator):
                 "delegated administrator for an AWS Organization, an ORGANIZATION "
                 "analyzer gives a single cross-account view; a standalone account "
                 "does not need one"
+            ]
+
+    @staticmethod
+    def _errCode(e):
+        return e.response.get('Error', {}).get('Code', 'Unknown')
+
+    # 9. Unused-access analyzer has stale ACTIVE findings
+    def _checkAaUnusedAccessFindingsOpen(self):
+        key = 'aaUnusedAccessFindingsOpen'
+        analyzers = [a for a in self.active if a.get('type') in self.ANALYZER_UNUSED]
+        if not analyzers:
+            self.results[key] = [
+                0, "No active unused-access analyzer — see aaUnusedAccessAnalyzerMissing"
+            ]
+            return
+
+        cutoff = datetime.datetime.now(datetime.timezone.utc) - \
+            datetime.timedelta(days=self.UNUSED_FINDING_AGE_DAYS)
+        stale, total, capped = [], 0, False
+        for analyzer in analyzers:
+            pages = 0
+            try:
+                paginator = self.aaClient.get_paginator('list_findings_v2')
+                for page in paginator.paginate(
+                        analyzerArn=analyzer.get('arn'),
+                        filter={'status': {'eq': ['ACTIVE']}},
+                        PaginationConfig={'PageSize': 100}):
+                    for f in page.get('findings', []) or []:
+                        if f.get('findingType') not in self.UNUSED_FINDING_TYPES:
+                            continue
+                        if f.get('status', 'ACTIVE') != 'ACTIVE':
+                            continue
+                        total += 1
+                        created = f.get('createdAt')
+                        if isinstance(created, datetime.datetime):
+                            if created.tzinfo is None:
+                                created = created.replace(tzinfo=datetime.timezone.utc)
+                            if created <= cutoff:
+                                stale.append(f.get('resource', f.get('id', 'unknown')))
+                    pages += 1
+                    if pages >= self.UNUSED_FINDINGS_PAGE_CAP:
+                        capped = bool(page.get('nextToken'))
+                        break
+            except botocore.exceptions.ClientError as e:
+                self.results[key] = [0, f"Unable to evaluate ({self._errCode(e)})"]
+                return
+
+        if stale:
+            atLeast = "at least " if capped else ""
+            self.results[key] = [
+                -1,
+                "{}{} unused-access finding(s) (unused roles, access keys, passwords "
+                "or permissions) have been ACTIVE for more than {} days, e.g. {}".format(
+                    atLeast, len(stale), self.UNUSED_FINDING_AGE_DAYS,
+                    ', '.join(str(r) for r in stale[:3]))
+            ]
+        elif capped:
+            self.results[key] = [
+                0,
+                f"Unable to evaluate (more than {total} active unused-access findings; "
+                "only the first pages were read)"
+            ]
+        elif total:
+            self.results[key] = [
+                1,
+                f"{total} active unused-access finding(s), all raised within the last "
+                f"{self.UNUSED_FINDING_AGE_DAYS} days"
+            ]
+        else:
+            self.results[key] = [1, "No active unused-access findings"]
+
+    def _isPrimaryRegion(self):
+        """Org-wide settings are global: report them once, in the first
+        selected region, rather than once per region."""
+        from utils.Config import Config
+        regions = [r for r in (Config.get('REGIONS_SELECTED', []) or [])
+                   if r and r != 'GLOBAL']
+        return not regions or self.detail.get('_region') == regions[0]
+
+    # 10. RAM sharing with AWS Organizations not enabled
+    def _checkRamOrgSharingDisabled(self):
+        key = 'ramOrgSharingDisabled'
+        if self.orgClient is None or not self._isPrimaryRegion():
+            return
+        from utils.Config import Config
+        accountId = (Config.get('stsInfo', {}) or {}).get('Account')
+
+        try:
+            org = self.orgClient.describe_organization().get('Organization', {}) or {}
+        except botocore.exceptions.ClientError as e:
+            code = self._errCode(e)
+            if code == 'AWSOrganizationsNotInUseException':
+                self.results[key] = [0, "Account is not a member of an AWS Organization"]
+            else:
+                self.results[key] = [0, f"Unable to evaluate ({code})"]
+            return
+        isMgmt = bool(accountId) and org.get('MasterAccountId') == accountId
+
+        principals = set()
+        try:
+            paginator = self.orgClient.get_paginator(
+                'list_aws_service_access_for_organization')
+            for page in paginator.paginate():
+                principals |= {p.get('ServicePrincipal') for p in
+                               page.get('EnabledServicePrincipals', []) or []}
+        except botocore.exceptions.ClientError as e:
+            code = self._errCode(e)
+            if not isMgmt and code in ('AccessDeniedException', 'AccessDenied'):
+                self.results[key] = [0, "Not evaluable from member account"]
+            else:
+                self.results[key] = [0, f"Unable to evaluate ({code})"]
+            return
+
+        if 'ram.amazonaws.com' in principals:
+            self.results[key] = [
+                1, "AWS RAM trusted access with AWS Organizations is enabled"
+            ]
+        else:
+            self.results[key] = [
+                -1,
+                "AWS RAM trusted access with AWS Organizations is not enabled — "
+                "resources can only be shared with individual accounts by "
+                "invitation, not with the organization or its OUs"
             ]
