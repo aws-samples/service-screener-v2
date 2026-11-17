@@ -216,3 +216,123 @@ def test_fms_member_account_not_evaluable(session):
 
 def test_fms_admin_being_removed_is_info(session):
     assert _fms(session, {'AdminAccount': ACCT, 'RoleStatus': 'PENDING_DELETION'})[0] == 0
+
+
+# --------------------------------------------------------------------------- #
+# shieldAdvancedPublicResourcesUnprotected - CLB / EIP scope / CloudFront scope
+# --------------------------------------------------------------------------- #
+def _coverageMulti(session, protections, clbs=None, addresses=None, enis=None, cfItems=None):
+    """Drive the coverage check with only the clients given (others absent)."""
+    clients = {}
+    stubs = []
+    sh, ssh = _client(session, 'shield')
+    ssh.add_response('get_subscription_state', {'SubscriptionState': 'ACTIVE'})
+    ssh.add_response('list_protections', {'Protections': protections})
+    clients['shield'] = sh
+    stubs.append(ssh)
+    if clbs is not None:
+        elb, selb = _client(session, 'elb')
+        selb.add_response('describe_load_balancers', {'LoadBalancerDescriptions': clbs})
+        clients['elb'] = elb
+        stubs.append(selb)
+    if addresses is not None:
+        ec2, sec2 = _client(session, 'ec2')
+        sec2.add_response('describe_addresses', {'Addresses': addresses})
+        if enis is not None:
+            sec2.add_response('describe_network_interfaces', {'NetworkInterfaces': enis})
+        clients['ec2'] = ec2
+        stubs.append(sec2)
+    if cfItems is not None:
+        cf, scf = _client(session, 'cloudfront')
+        scf.add_response('list_distributions', {'DistributionList': {
+            'Marker': '', 'MaxItems': 100, 'IsTruncated': False,
+            'Quantity': len(cfItems), **({'Items': cfItems} if cfItems else {})}})
+        clients['cloudfront'] = cf
+        stubs.append(scf)
+    for s in stubs:
+        s.activate()
+    try:
+        r = _run(Wafv2Shield(clients, 'us-east-1', ACCT), '_checkShieldAdvancedPublicResourcesUnprotected')
+        for s in stubs:
+            s.assert_no_pending_responses()
+    finally:
+        for s in stubs:
+            s.deactivate()
+    return r['shieldAdvancedPublicResourcesUnprotected']
+
+
+CLB_ARN = f'arn:aws:elasticloadbalancing:us-east-1:{ACCT}:loadbalancer/classic-web'
+
+
+def test_coverage_internet_facing_clb_flag_fix(session):
+    clbs = [{'LoadBalancerName': 'classic-web', 'Scheme': 'internet-facing'}]
+    res = _coverageMulti(session, [], clbs=clbs)
+    assert res[0] == -1 and 'CLB classic-web' in res[1]
+    prot = [{'Id': PID, 'Name': 'clb', 'ResourceArn': CLB_ARN}]
+    assert _coverageMulti(session, prot, clbs=clbs)[0] == 1
+    # internal CLB is out of scope
+    assert _coverageMulti(session, [], clbs=[{'LoadBalancerName': 'x', 'Scheme': 'internal'}])[0] == 1
+
+
+def _addr(alloc, eni):
+    return {'AllocationId': alloc, 'AssociationId': f'eipassoc-{alloc[-8:]}', 'Domain': 'vpc',
+            'NetworkInterfaceId': eni, 'PublicIp': '198.51.100.10'}
+
+
+def _eni(eni, itype, requesterManaged):
+    return {'NetworkInterfaceId': eni, 'InterfaceType': itype, 'RequesterManaged': requesterManaged}
+
+
+def test_coverage_eip_on_nat_gateway_skipped(session):
+    alloc, eni = 'eipalloc-0123456789abcdef0', 'eni-0123456789abcdef0'
+    res = _coverageMulti(session, [], addresses=[_addr(alloc, eni)],
+                         enis=[_eni(eni, 'nat_gateway', True)])
+    assert res[0] == 1
+
+
+def test_coverage_eip_on_instance_eni_and_nlb_flag_fix(session):
+    a1, e1 = 'eipalloc-0123456789abcdef1', 'eni-0123456789abcdef1'
+    a2, e2 = 'eipalloc-0123456789abcdef2', 'eni-0123456789abcdef2'
+    addrs = [_addr(a1, e1), _addr(a2, e2)]
+    enis = [_eni(e1, 'interface', False), _eni(e2, 'network_load_balancer', True)]
+    res = _coverageMulti(session, [], addresses=addrs, enis=enis)
+    assert res[0] == -1 and res[1].startswith('2 of 2')
+    prot = [{'Id': PID, 'Name': 'a', 'ResourceArn': f'arn:aws:ec2:us-east-1:{ACCT}:eip-allocation/{a1}'},
+            {'Id': PID, 'Name': 'b', 'ResourceArn': f'arn:aws:ec2:us-east-1:{ACCT}:eip-allocation/{a2}'}]
+    assert _coverageMulti(session, prot, addresses=addrs, enis=enis)[0] == 1
+
+
+def _dist(enabled):
+    return {'Id': 'E1ABCDEFGHIJKL', 'ARN': CF, 'Status': 'Deployed', 'Enabled': enabled,
+            'LastModifiedTime': datetime(2026, 1, 1, tzinfo=timezone.utc),
+            'DomainName': 'd111111abcdef8.cloudfront.net', 'Aliases': {'Quantity': 0},
+            'Origins': {'Quantity': 1, 'Items': [{'Id': 'o', 'DomainName': 'example.com'}]},
+            'DefaultCacheBehavior': {'TargetOriginId': 'o', 'ViewerProtocolPolicy': 'allow-all'},
+            'CacheBehaviors': {'Quantity': 0}, 'CustomErrorResponses': {'Quantity': 0},
+            'Comment': '', 'PriceClass': 'PriceClass_All',
+            'ViewerCertificate': {}, 'Restrictions': {'GeoRestriction': {
+                'RestrictionType': 'none', 'Quantity': 0}},
+            'WebACLId': '', 'HttpVersion': 'http2', 'IsIPV6Enabled': True, 'Staging': False}
+
+
+def test_coverage_disabled_cloudfront_skipped(session):
+    assert _coverageMulti(session, [], cfItems=[_dist(True)])[0] == -1
+    assert _coverageMulti(session, [], cfItems=[_dist(False)])[0] == 1
+
+
+# --------------------------------------------------------------------------- #
+# shieldAutoL7MitigationDisabled - protection list unreadable
+# --------------------------------------------------------------------------- #
+def test_l7_protections_unreadable_is_unable():
+    from services.wafv2.drivers.Wafv2Shield import Wafv2ShieldProtectionsUnavailable
+    drv = Wafv2ShieldProtectionsUnavailable('AccessDeniedException')
+    r = _run(drv, '_checkShieldAutoL7MitigationDisabled')
+    assert r['shieldAutoL7MitigationDisabled'] == [0, 'Unable to evaluate (AccessDeniedException)']
+
+
+def test_shield_region_is_partition_aware():
+    from services.wafv2.Wafv2 import Wafv2
+    assert Wafv2.shieldRegion('eu-west-1') == 'us-east-1'
+    assert Wafv2.shieldRegion('us-east-1') == 'us-east-1'
+    assert Wafv2.shieldRegion('us-gov-west-1') == 'us-gov-west-1'
+    assert Wafv2.shieldRegion('cn-north-1') == 'cn-north-1'

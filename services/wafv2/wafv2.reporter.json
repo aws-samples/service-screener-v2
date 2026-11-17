@@ -674,7 +674,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Configuring proactive engagement]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-srt-proactive-engagement.html>",
-			"[Managing emergency contacts]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-edit-emergency-contacts.html>"
+			"[Contacting the SRT for help with a suspected DDoS event]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-srt-contacting.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -708,7 +708,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Automating application layer DDoS mitigation with Shield Advanced]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-automatic-app-layer-response.html>",
-			"[Enabling automatic application layer DDoS mitigation]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-automatic-app-layer-response-enable.html>"
+			"[Enabling automatic application layer DDoS mitigation]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-automatic-app-layer-response-config.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,

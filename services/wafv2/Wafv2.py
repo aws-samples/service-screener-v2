@@ -5,7 +5,8 @@ from services.Service import Service
 
 from services.wafv2.drivers.Wafv2Common import Wafv2Common
 from services.wafv2.drivers.Wafv2Shield import (
-    Wafv2Shield, Wafv2ShieldProtection, listShieldProtections,
+    Wafv2Shield, Wafv2ShieldProtection, Wafv2ShieldProtectionsUnavailable,
+    listShieldProtections,
     arnRegion, isAlbArn, isCloudFrontArn,
 )
 from services.wafv2.drivers.Wafv2Fms import Wafv2Fms
@@ -55,11 +56,14 @@ class Wafv2(Service):
         self.apigwClient = ssBoto.client('apigateway', config=self.bConfig)
         self.appsyncClient = ssBoto.client('appsync', config=self.bConfig)
         self.cognitoClient = ssBoto.client('cognito-idp', config=self.bConfig)
-        # Shield Advanced is global and served from us-east-1 only; Firewall
-        # Manager is regional. Used by the Shield/FMS drivers (read-only).
+        # Shield Advanced is global; in the commercial partition it is served
+        # from us-east-1 only. Other partitions (aws-cn, aws-us-gov) resolve
+        # their own endpoint from the scanned region. Firewall Manager is
+        # regional. Used by the Shield/FMS drivers (read-only).
         from botocore.config import Config as _BotoConfig
         self.shieldClient = ssBoto.client(
-            'shield', config=self.bConfig.merge(_BotoConfig(region_name='us-east-1')))
+            'shield', config=self.bConfig.merge(
+                _BotoConfig(region_name=self.shieldRegion(region))))
         self.fmsClient = ssBoto.client('fms', config=self.bConfig)
         self.ec2Client = ssBoto.client('ec2', config=self.bConfig)
         self.elbClassicClient = ssBoto.client('elb', config=self.bConfig)
@@ -734,6 +738,15 @@ class Wafv2(Service):
     # ------------------------------------------------------------------ #
     SHIELD_GLOBAL_CLAIM_KEY = 'wafv2::shieldGlobalScanRegion'
 
+    @staticmethod
+    def shieldRegion(region):
+        """Region used for the Shield API: us-east-1 in the aws partition,
+        the scanned region in aws-cn / aws-us-gov / other partitions."""
+        r = region or ''
+        if r.startswith(('cn-', 'us-gov-', 'us-iso', 'eu-isoe-')):
+            return r
+        return 'us-east-1'
+
     def _claimShieldGlobalRegion(self):
         """First region of the scan evaluates the global Shield items
         (proactive engagement, CloudFront, hosted zones) so a multi-region
@@ -782,14 +795,26 @@ class Wafv2(Service):
         # Per-protection L7 auto-mitigation: ALB protections of this region,
         # CloudFront protections in the global-claim region only.
         protections = []
+        shieldErr = None
         try:
             state = self.shieldClient.get_subscription_state().get('SubscriptionState')
             if state == 'ACTIVE':
                 protections = listShieldProtections(self.shieldClient)
         except botocore.exceptions.ClientError as e:
             self._logClientError('shield.list_protections', e)
+            shieldErr = e.response.get('Error', {}).get('Code', 'Unknown')
         except botocore.exceptions.EndpointConnectionError:
-            pass
+            shieldErr = 'EndpointConnectionError'
+        if shieldErr and isGlobal:
+            # No protection to attach the per-resource result to: report the
+            # gap once per scan instead of dropping it silently.
+            try:
+                obj = Wafv2ShieldProtectionsUnavailable(shieldErr)
+                obj.run(self.__class__)
+                objs['ShieldProtection::Unavailable'] = obj.getInfo()
+                del obj
+            except Exception as e:
+                print(f"Error recording Shield protection lookup failure: {e}")
         for p in protections:
             arn = p.get('ResourceArn', '')
             inScope = (isAlbArn(arn) and arnRegion(arn) == self.region) or \

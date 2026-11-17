@@ -57,7 +57,8 @@ class Wafv2Shield(Evaluator):
       shield.get_subscription_state / describe_subscription /
       describe_emergency_contact_settings / list_protections,
       elbv2.describe_load_balancers, elb.describe_load_balancers,
-      ec2.describe_addresses, cloudfront.list_distributions,
+      ec2.describe_addresses, ec2.describe_network_interfaces,
+      cloudfront.list_distributions,
       route53.list_hosted_zones.
     """
 
@@ -157,6 +158,28 @@ class Wafv2Shield(Evaluator):
     # ------------------------------------------------------------------ #
     # Internet-facing resources missing a Shield Advanced protection
     # ------------------------------------------------------------------ #
+    @staticmethod
+    def _unsupportedEipInterfaces(ec2, eniIds):
+        """Return the ENI ids (from `eniIds`) that Shield Advanced cannot
+        protect through an EIP: NAT gateways and other AWS-managed
+        (requester-managed) interfaces. Shield documents EIP protection for
+        EC2 instances and Network Load Balancers only. On lookup failure
+        nothing is skipped (EIP stays in scope)."""
+        skip = set()
+        ids = sorted({i for i in eniIds if i})
+        for i in range(0, len(ids), 200):
+            try:
+                resp = ec2.describe_network_interfaces(
+                    Filters=[{'Name': 'network-interface-id', 'Values': ids[i:i + 200]}])
+            except (botocore.exceptions.ClientError, botocore.exceptions.EndpointConnectionError):
+                continue
+            for eni in resp.get('NetworkInterfaces', []) or []:
+                itype = eni.get('InterfaceType') or 'interface'
+                if itype == 'nat_gateway' or \
+                        (eni.get('RequesterManaged') and itype != 'network_load_balancer'):
+                    skip.add(eni.get('NetworkInterfaceId'))
+        return skip
+
     def _collectPublicResources(self):
         """Return (resources, failedLookups). resources = [(label, arn)]."""
         res, failed = [], []
@@ -188,6 +211,7 @@ class Wafv2Shield(Evaluator):
         ec2 = self.clients.get('ec2')
         if ec2 is not None:
             try:
+                eips = []
                 for addr in ec2.describe_addresses().get('Addresses', []) or []:
                     alloc = addr.get('AllocationId')
                     # Only EIPs attached to something carry traffic; an idle
@@ -195,8 +219,16 @@ class Wafv2Shield(Evaluator):
                     if alloc and addr.get('Domain', 'vpc') == 'vpc' and \
                             (addr.get('AssociationId') or addr.get('NetworkInterfaceId')
                              or addr.get('InstanceId')):
-                        res.append((f"EIP {addr.get('PublicIp', alloc)}",
-                                    f'arn:{part}:ec2:{region}:{acct}:eip-allocation/{alloc}'))
+                        eips.append(addr)
+                skipEnis = self._unsupportedEipInterfaces(
+                    ec2, [a.get('NetworkInterfaceId') for a in eips
+                          if a.get('NetworkInterfaceId') and not a.get('InstanceId')])
+                for addr in eips:
+                    if addr.get('NetworkInterfaceId') in skipEnis and not addr.get('InstanceId'):
+                        continue
+                    alloc = addr['AllocationId']
+                    res.append((f"EIP {addr.get('PublicIp', alloc)}",
+                                f'arn:{part}:ec2:{region}:{acct}:eip-allocation/{alloc}'))
             except (botocore.exceptions.ClientError, botocore.exceptions.EndpointConnectionError) as e:
                 failed.append(f'ec2.describe_addresses:{_errCode(e)}')
 
@@ -206,7 +238,8 @@ class Wafv2Shield(Evaluator):
                 try:
                     for page in cf.get_paginator('list_distributions').paginate():
                         for d in (page.get('DistributionList') or {}).get('Items', []) or []:
-                            if d.get('ARN'):
+                            # A disabled distribution serves no traffic.
+                            if d.get('ARN') and d.get('Enabled', True) is not False:
                                 res.append((f"CloudFront {d.get('Id')}", d['ARN']))
                 except (botocore.exceptions.ClientError, botocore.exceptions.EndpointConnectionError) as e:
                     failed.append(f'cloudfront.list_distributions:{_errCode(e)}')
@@ -299,3 +332,20 @@ class Wafv2ShieldProtection(Evaluator):
                 -1, 'Shield Advanced protection has automatic application-layer DDoS mitigation '
                     f'{status} - L7 floods require manual WAF rule changes during an attack'
             ]
+
+
+class Wafv2ShieldProtectionsUnavailable(Evaluator):
+    """
+    Placeholder emitted when the Shield subscription state or protection list
+    cannot be read (AccessDenied, endpoint unavailable...). There is no
+    protection to attach shieldAutoL7MitigationDisabled to, so it is reported
+    once as 'Unable to evaluate' instead of silently disappearing.
+    """
+
+    def __init__(self, errCode):
+        super().__init__()
+        self.errCode = errCode or 'Unknown'
+        self._resourceName = 'ShieldProtections'
+
+    def _checkShieldAutoL7MitigationDisabled(self):
+        self.results['shieldAutoL7MitigationDisabled'] = [0, f'Unable to evaluate ({self.errCode})']

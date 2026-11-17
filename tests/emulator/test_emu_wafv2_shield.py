@@ -74,6 +74,41 @@ def test_shield_associated_eip_unprotected(emu, uid):
         ec2.delete_vpc(VpcId=vpc)
 
 
+def test_shield_internet_facing_clb_unprotected(emu, uid):
+    """Classic Load Balancer path: elb.describe_load_balancers plus the built
+    ARN arn:aws:elasticloadbalancing:<region>:<acct>:loadbalancer/<name>."""
+    sh = _ensureSubscription(emu)
+    ec2 = emu.client('ec2')
+    elb = emu.client('elb')
+    vpc = ec2.create_vpc(CidrBlock='10.79.0.0/16')['Vpc']['VpcId']
+    sn = ec2.create_subnet(VpcId=vpc, CidrBlock='10.79.1.0/24')['Subnet']['SubnetId']
+    name = f'ss-clb-{uid}'[:32]
+    acct = emu.client('sts').get_caller_identity()['Account']
+    state = {}
+    try:
+        def misconfigure():
+            elb.create_load_balancer(
+                LoadBalancerName=name, Subnets=[sn],
+                Listeners=[{'Protocol': 'HTTP', 'LoadBalancerPort': 80, 'InstancePort': 80}])
+            state['lb'] = True
+
+        def fix():
+            state['pid'] = sh.create_protection(
+                Name=f'ss-{uid}',
+                ResourceArn=f'arn:aws:elasticloadbalancing:us-east-1:{acct}:loadbalancer/{name}'
+            )['ProtectionId']
+
+        assertFlagFixCycle(emu, 'wafv2', 'shieldAdvancedPublicResourcesUnprotected',
+                           'Shield::Account', misconfigure, fix)
+    finally:
+        if state.get('pid'):
+            sh.delete_protection(ProtectionId=state['pid'])
+        if state.get('lb'):
+            elb.delete_load_balancer(LoadBalancerName=name)
+        ec2.delete_subnet(SubnetId=sn)
+        ec2.delete_vpc(VpcId=vpc)
+
+
 def test_shield_unassociated_eip_not_flagged(emu, uid):
     """An idle Elastic IP carries no traffic, so it must not be reported."""
     _ensureSubscription(emu)
