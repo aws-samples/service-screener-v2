@@ -54,11 +54,20 @@ class Cloudtrail(Service):
     
     def advise(self):
         ## Will loop through all trail, and set to True if any has MultiRegion
-        Config.set('CloudTrail_hasOneMultiRegion', False)
-        Config.set('CloudTrail_hasGlobalServEnabled', False)
-        Config.set('CloudTrail_listGlobalServEnabled', [])
-        Config.set('CloudTrail_hasManagementEventsCaptured', False)
-        Config.set('CloudTrail_hasDataEventsCaptured', False)
+        ## Trails already evaluated in an earlier region are skipped below (CloudTrail_ranList),
+        ## so keep the account-wide flags from earlier regions instead of resetting them.
+        ## The flags live in the process-wide Config, so reset them whenever the scanned
+        ## account changes (--sequential multi-account scans run in one process).
+        accountId = (Config.get('stsInfo', {}) or {}).get('Account')
+        resetAll = Config.get('CloudTrail_scanAccount', None) != accountId
+        if resetAll:
+            Config.set('CloudTrail_scanAccount', accountId)
+            Config.set('CloudTrail_ranList', [])
+        for k, v in [('CloudTrail_hasOneMultiRegion', False), ('CloudTrail_hasGlobalServEnabled', False),
+                     ('CloudTrail_listGlobalServEnabled', []), ('CloudTrail_hasManagementEventsCaptured', False),
+                     ('CloudTrail_hasDataEventsCaptured', False)]:
+            if resetAll or Config.get(k, None) is None:
+                Config.set(k, v)
         
         objs = {}
         trails = self.getTrails()
@@ -81,7 +90,9 @@ class Cloudtrail(Service):
         Config.set('CloudTrail_ranList', ctRanList)
         
         _pi('CloudTrail:Common')
-        obj = CloudtrailAccount(self.ctClient, len(trails))
+        obj = CloudtrailAccount(self.ctClient, len(trails), s3Client=self.s3Client,
+                                cfgClient=self.ssBoto.client('config', config=self.bConfig),
+                                orgClient=self.ssBoto.client('organizations', config=self.bConfig))
         obj.run(self.__class__)
         objs['Cloudtrail::General'] = obj.getInfo()
         del obj

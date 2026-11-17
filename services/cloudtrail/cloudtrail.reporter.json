@@ -394,5 +394,57 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudwatch-alarms-for-cloudtrail.html"
+	},
+	"cloudtrailExcludesKmsEvents": {
+		"category": "S",
+		"^description": "In {$COUNT} Region(s), every logging CloudTrail trail that captures management events excludes AWS KMS events (kms.amazonaws.com), either with ExcludeManagementEventSources or with an advanced event selector on eventSource. Without these events you have no audit record of who used, disabled or scheduled deletion of your KMS keys (Decrypt, GenerateDataKey, DisableKey, ScheduleKeyDeletion). Keep KMS events in at least one trail, or use advanced event selectors to filter only high-volume read events while keeping key management calls.",
+		"shortDesc": "Log AWS KMS management events in at least one trail",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Logging management events]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-management-events-with-cloudtrail.html>",
+			"[Logging AWS KMS API calls with CloudTrail]<https://docs.aws.amazon.com/kms/latest/developerguide/logging-using-cloudtrail.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-management-events-with-cloudtrail.html"
+	},
+	"trailBucketSameAccount": {
+		"category": "S",
+		"^description": "In {$COUNT} Region(s), CloudTrail trails or AWS Config delivery channels of this AWS Organizations account deliver logs to an S3 bucket in the same account. Anyone with administrative access to this account could alter or delete its own audit logs. Deliver logs to a bucket in a dedicated log archive account (for example with an organization trail and an organization-wide Config aggregator), and restrict access to that account.",
+		"shortDesc": "Deliver CloudTrail and Config logs to a separate log archive account",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Creating a trail for an organization]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/creating-trail-organization.html>",
+			"[Receiving CloudTrail log files from multiple accounts]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-receive-logs-from-multiple-accounts.html>",
+			"[Log archive account]<https://docs.aws.amazon.com/prescriptive-guidance/latest/security-reference-architecture/log-archive.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/creating-trail-organization.html"
+	},
+	"manualConsoleWritesDetected": {
+		"category": "S",
+		"^description": "In {$COUNT} Region(s), CloudTrail recorded write API calls made from AWS Management Console sessions in the last 30 days (heuristic, based on a sample of recent write events). Manual changes made outside your deployment pipelines bypass review and testing, cause configuration drift and are hard to audit. Make changes through infrastructure as code and pipelines, and reserve console write access for break-glass use.",
+		"shortDesc": "Avoid manual console changes outside pipelines",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[CloudTrail record contents]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-record-contents.html>",
+			"[Viewing events with CloudTrail Event history]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/view-cloudtrail-events.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/view-cloudtrail-events.html"
 	}
 }

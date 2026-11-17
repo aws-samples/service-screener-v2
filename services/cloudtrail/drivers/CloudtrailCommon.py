@@ -3,6 +3,7 @@ import boto3
 
 from utils.Config import Config
 from services.Evaluator import Evaluator
+from services.cloudtrail.drivers.CloudtrailHelper import selectorCoverage, errCode
 
 class CloudtrailCommon(Evaluator):
     def __init__(self, trail, ctClient, snsClient, s3Client):
@@ -57,14 +58,17 @@ class CloudtrailCommon(Evaluator):
             self.results['HasInsightSelectors'] = [-1, '']
             
     def _checkEvents(self):
-        e = self.trailSelector['Event']
-        if e == None:
-            return
-        
-        if 'IncludeManagementEvents' in e and e['IncludeManagementEvents'] == True:
+        # EventSelectors is a list (and AdvancedEventSelectors replaces it when used),
+        # so evaluate every selector of both kinds.
+        cov = selectorCoverage({
+            'EventSelectors': self.trailSelector['Event'],
+            'AdvancedEventSelectors': self.trailSelector['AdvancedEvent']
+        })
+
+        if cov['management']:
             Config.set('CloudTrail_hasManagementEventsCaptured', True)
-        
-        if 'DataResources' in e and len(e['DataResources']) > 0:
+
+        if cov['data']:
             Config.set('CloudTrail_hasDataEventsCaptured', True)
             
     def _checkSNSTopicValid(self):
