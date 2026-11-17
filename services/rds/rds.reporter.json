@@ -732,7 +732,7 @@
 	},
 	"MSSQLorPG__TransportEncrpytionDisabled": {
 		"category": "S",
-		"^description": "[MSSQL Transport Encryption] You have {$COUNT} instance(s) does not enable transport encryption. You can use Secure Sockets Layer (SSL) to encrypt connections between your client applications and your Amazon RDS DB instances running Microsoft SQL Server. SSL support is available in all AWS regions for all supported SQL Server editions.",
+		"^description": "[MSSQL/PostgreSQL Transport Encryption] You have {$COUNT} RDS for SQL Server / PostgreSQL instance(s) or Aurora PostgreSQL / Multi-AZ DB cluster(s) that do not enforce transport encryption (rds.force_ssl is 0, or is unset on RDS for PostgreSQL 14 and older / Aurora PostgreSQL 16 and older, where the engine default is 0). You can use Secure Sockets Layer (SSL/TLS) to encrypt connections between your client applications and your databases; set rds.force_ssl=1 in a custom DB parameter group (DB cluster parameter group for Aurora PostgreSQL and Multi-AZ DB clusters) after confirming clients support TLS. When rds.force_ssl is not returned for SQL Server, the result is reported as not evaluable rather than assumed.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
@@ -740,7 +740,9 @@
 		"criticality": "M",
 		"shortDesc": "Using SSL",
 		"ref": [
-			"[RDS SQLServer SSL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/SQLServer.Concepts.General.SSL.Using.html>"
+			"[RDS SQLServer SSL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/SQLServer.Concepts.General.SSL.Using.html>",
+			"[Requiring SSL/TLS for RDS for PostgreSQL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.SSL.html>",
+			"[Securing Aurora PostgreSQL data with SSL/TLS]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Security.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -1388,7 +1390,7 @@
 	},
 	"rdsLogExportsDisabled": {
 		"category": "S",
-		"^description": "[Logging] {$COUNT} RDS DB instance(s)/cluster(s) do not publish their security-relevant database logs to Amazon CloudWatch Logs (PostgreSQL/Aurora PostgreSQL: postgresql log; MySQL/MariaDB: error log, plus audit log when MARIADB_AUDIT_PLUGIN is configured; Aurora MySQL: audit log; SQL Server: error log). Without exported logs, authentication failures, privilege changes and errors are kept only on the instance for a short time, cannot be alerted on and are lost when the instance is deleted. Enable log exports on the instance (or on the cluster for Aurora and Multi-AZ DB clusters).",
+		"^description": "[Logging] {$COUNT} RDS DB instance(s)/cluster(s) do not publish their security-relevant database logs to Amazon CloudWatch Logs (PostgreSQL/Aurora PostgreSQL: postgresql log; MySQL/MariaDB: error log, plus audit log when MARIADB_AUDIT_PLUGIN is configured; Aurora MySQL: audit log; SQL Server: error log; RDS for Oracle is not evaluated because the rds service has no Oracle engine driver). Without exported logs, authentication failures, privilege changes and errors are kept only on the instance for a short time, cannot be alerted on and are lost when the instance is deleted. Enable log exports on the instance (or on the cluster for Aurora and Multi-AZ DB clusters).",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 1,
@@ -1424,7 +1426,7 @@
 	},
 	"rdsSnapshotSharedExternally": {
 		"category": "S",
-		"^description": "[RDS Snapshot] {$COUNT} manual RDS DB/cluster snapshot(s) can be restored by other AWS accounts (restore attribute is 'all' - public, restorable by any AWS account - or lists account IDs outside your AWS Organization, or - when organization membership cannot be read from this account - any other account). Anyone in those accounts can restore a full copy of the database. Remove public access and review the shared accounts, removing those that are not required. Unlike SnapshotRDSIsPublic, this is evaluated per snapshot, so public snapshots whose source DB has been deleted are also reported.",
+		"^description": "[RDS Snapshot] {$COUNT} manual RDS DB/cluster snapshot(s) can be restored by other AWS accounts: the restore attribute lists account IDs outside your AWS Organization (or, when organization membership cannot be read from this account, any other account), or is 'all' (public) for a snapshot whose source DB instance / Aurora cluster is not evaluated by SnapshotRDSIsPublic - for example because the source has been deleted, or it is a Multi-AZ DB cluster snapshot. Public snapshots of live sources are reported once, under SnapshotRDSIsPublic. Anyone in those accounts can restore a full copy of the database. Remove public access and review the shared accounts, removing those that are not required.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
@@ -1441,7 +1443,7 @@
 	},
 	"rdsSnapshotUnencrypted": {
 		"category": "S",
-		"^description": "[RDS Snapshot] {$COUNT} manual RDS DB/cluster snapshot(s) are not encrypted. Unencrypted snapshots keep a full copy of the data at rest without KMS protection and can be shared or copied without key-policy control. Copy the snapshot with a KMS key (copy-db-snapshot / copy-db-cluster-snapshot with --kms-key-id) and delete the unencrypted copy once it is no longer needed.",
+		"^description": "[RDS Snapshot] {$COUNT} manual RDS DB/cluster snapshot(s) or AWS Backup-managed DB snapshot(s) are not encrypted. Unencrypted snapshots keep a full copy of the data at rest without KMS protection and can be shared or copied without key-policy control. Copy the snapshot with a KMS key (copy-db-snapshot / copy-db-cluster-snapshot with --kms-key-id) and delete the unencrypted copy once it is no longer needed.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,

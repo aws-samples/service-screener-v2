@@ -207,8 +207,39 @@ class RdsCommon(Evaluator):
         if not self.engine in validEngine:
             return
         
-        if 'rds.force_ssl' in self.dbParams and self.dbParams['rds.force_ssl'] == '0':
-            self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [-1, 'rds.force_ssl==0']
+        val = self.dbParams.get('rds.force_ssl', None)
+        if val is not None:
+            if str(val).strip() == '0':
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [-1, 'rds.force_ssl==0']
+            elif str(val).strip() == '1':
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [1, 'rds.force_ssl==1']
+            return
+
+        # rds.force_ssl not returned by the parameter group: fall back to the
+        # engine default only where AWS documents it per major version. Aurora / Multi-AZ cluster member instances
+        # take the setting from the cluster parameter group (evaluated on the
+        # cluster object), so they are skipped here.
+        if self._isClusterMemberInstance():
+            return
+        # Documented engine defaults: RDS for PostgreSQL 15+ -> 1 (14 and
+        # older -> 0); Aurora PostgreSQL 17+ -> 1 (16 and older -> 0).
+        defaultOnFrom = {'postgres': 15, 'aurora-postgresql': 17}
+        if self.engine in defaultOnFrom:
+            try:
+                major = int(str(self.db.get('EngineVersion', '')).split('.')[0])
+            except ValueError:
+                major = None
+            minOn = defaultOnFrom[self.engine]
+            if major is None:
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [0, 'Unable to evaluate (rds.force_ssl not set; engine version unknown)']
+            elif major >= minOn:
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [1, 'rds.force_ssl not set (engine default 1 for {} {}+)'.format(self.engine, minOn)]
+            else:
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [-1, 'rds.force_ssl not set (engine default 0 before {} {})'.format(self.engine, minOn)]
+            return
+        # SQL Server: no version-specific default to rely on; never PASS (or
+        # FAIL) on an unknown value.
+        self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [0, 'Unable to evaluate (rds.force_ssl not returned by the parameter group)']
     
     def _checkMasterUsername(self):
         defaultMasterUser = {
@@ -908,7 +939,6 @@ class RdsCommon(Evaluator):
         if self._isClusterMemberInstance():
             return
 
-        rawEngine = self.db.get('Engine', '')
         auditUnknown = None
         if self.engine in ('postgres', 'aurora-postgresql'):
             required = ['postgresql']
@@ -922,9 +952,9 @@ class RdsCommon(Evaluator):
                     required.append('audit')
         elif self.engine == 'sqlserver':
             required = ['error']
-        elif rawEngine.startswith('oracle'):
-            required = ['audit']
         else:
+            # Oracle ('audit') is not evaluated: Rds.engineDriver has no Oracle
+            # driver, so Oracle instances never reach RdsCommon.
             return
 
         exported = self.db.get('EnabledCloudwatchLogsExports', []) or []

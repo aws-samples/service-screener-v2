@@ -5,10 +5,11 @@ Emulator gaps (covered by tests/test_stub_rds.py instead):
   so rdsLogExportsDisabled is tested here on Aurora clusters only.
 - describe_db_snapshot_attributes / modify_db_snapshot_attribute are NotImplemented, so
   rdsSnapshotSharedExternally is tested here on DB cluster snapshots only.
+- rds.force_ssl is always returned with a value, so its unset/engine-default path is stubbed.
 """
 import pytest
 
-from tests.emulator.conftest import assertFlagFixCycle
+from tests.emulator.conftest import assertFlagFixCycle, runCheck
 
 PWD = 'Passw0rd!123456'
 WAIT = {'Delay': 2, 'MaxAttempts': 90}
@@ -228,6 +229,65 @@ def test_rds_public_cluster_snapshot_after_source_deleted(emu, uid, sg):
     finally:
         _quiet(rds.delete_db_cluster_snapshot, DBClusterSnapshotIdentifier=snap)
         _deleteCluster(rds, cl)
+
+
+def test_rds_public_cluster_snapshot_of_live_cluster_reported_once(emu, uid, sg):
+    # No duplicate finding: while the source Aurora cluster exists, a public
+    # snapshot is reported by SnapshotRDSIsPublic (on the cluster) only, and
+    # rdsSnapshotSharedExternally points to it instead of failing again. A
+    # specific external account is still reported here. Full scan (no
+    # single-check filter) so both checks run as in a real scan.
+    rds = emu.client('rds')
+    cl = f'ss-rdspubl-{uid}'
+    snap = f'ss-rdspublsnap-{uid}'
+    other = '111122223333'
+    try:
+        _createCluster(rds, cl, sg)
+        rds.create_db_cluster_snapshot(DBClusterIdentifier=cl, DBClusterSnapshotIdentifier=snap)
+        rds.get_waiter('db_cluster_snapshot_available').wait(DBClusterSnapshotIdentifier=snap, WaiterConfig=WAIT)
+        rds.modify_db_cluster_snapshot_attribute(DBClusterSnapshotIdentifier=snap, AttributeName='restore',
+                                                 ValuesToAdd=['all'])
+
+        res = runCheck(emu, 'rds', None).results
+        clusterRes = [r for rid, r in res.items() if rid.endswith('Cluster=' + cl)]
+        snapRes = [r for rid, r in res.items() if rid == 'ClusterSnapshot::' + snap]
+        assert clusterRes and clusterRes[0].get('SnapshotRDSIsPublic', [None])[0] == -1, clusterRes
+        assert snapRes and snapRes[0]['rdsSnapshotSharedExternally'][0] == 0, snapRes
+        assert 'SnapshotRDSIsPublic' in snapRes[0]['rdsSnapshotSharedExternally'][1]
+
+        rds.modify_db_cluster_snapshot_attribute(DBClusterSnapshotIdentifier=snap, AttributeName='restore',
+                                                 ValuesToAdd=[other])
+        res = runCheck(emu, 'rds', None, snap).results
+        assert res['ClusterSnapshot::' + snap]['rdsSnapshotSharedExternally'][0] == -1
+        assert other in res['ClusterSnapshot::' + snap]['rdsSnapshotSharedExternally'][1]
+    finally:
+        _quiet(rds.delete_db_cluster_snapshot, DBClusterSnapshotIdentifier=snap)
+        _deleteCluster(rds, cl)
+
+
+# ---------------- MSSQLorPG__TransportEncrpytionDisabled (Aurora PostgreSQL cluster) ----------------
+def test_aurora_postgresql_cluster_force_ssl(emu, uid, sg):
+    # The emulator always returns rds.force_ssl with a value, so the
+    # unset/engine-default path is covered in tests/test_stub_rds.py.
+    rds = emu.client('rds')
+    name = f'ss-rdsapgssl-{uid}'
+    cpg = f'ss-rdsapgssl-cpg-{uid}'
+    rds.create_db_cluster_parameter_group(DBClusterParameterGroupName=cpg, DBParameterGroupFamily='aurora-postgresql17',
+                                          Description='ss test')
+    try:
+        def misconfigure():
+            rds.modify_db_cluster_parameter_group(DBClusterParameterGroupName=cpg, Parameters=[
+                {'ParameterName': 'rds.force_ssl', 'ParameterValue': '0', 'ApplyMethod': 'pending-reboot'}])
+            _createCluster(rds, name, sg, engine='aurora-postgresql', DBClusterParameterGroupName=cpg)
+
+        def fix():
+            rds.modify_db_cluster_parameter_group(DBClusterParameterGroupName=cpg, Parameters=[
+                {'ParameterName': 'rds.force_ssl', 'ParameterValue': '1', 'ApplyMethod': 'pending-reboot'}])
+
+        assertFlagFixCycle(emu, 'rds', 'MSSQLorPG__TransportEncrpytionDisabled', 'Cluster=' + name, misconfigure, fix)
+    finally:
+        _deleteCluster(rds, name)
+        _quiet(rds.delete_db_cluster_parameter_group, DBClusterParameterGroupName=cpg)
 
 
 # ---------------- auroraNoGlobalDatabase ----------------
