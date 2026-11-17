@@ -234,6 +234,17 @@ class IamUser(IamCommon):
         else:
             self.results['iamUserHumanAndMachineCreds'] = [1, 'Single credential type']
 
+    def _checkIamUserTwoActiveKeys(self):
+        """CIS 1.13: an IAM user should have at most one active access key.
+        Two active keys are expected only briefly during a rotation."""
+        if not self._isCredentialReportRow():
+            return
+        active = [n for n in ('1', '2') if self.user.get('access_key_{}_active'.format(n)) == 'true']
+        if len(active) == 2:
+            self.results['iamUserTwoActiveKeys'] = [-1, 'Access keys 1 and 2 are both active']
+        elif active:
+            self.results['iamUserTwoActiveKeys'] = [1, 'One active access key']
+
     def _checkBedrockLongTermApiKey(self):
         user = self.user['user']
         if user == '<root_account>':

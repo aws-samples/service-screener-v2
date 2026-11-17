@@ -947,5 +947,145 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/health/latest/ug/aws-health-planned-lifecycle-events.html"
+	},
+	"healthOrgViewDisabled": {
+		"category": "S",
+		"^description": "{$COUNT} AWS Organization(s) do not have the AWS Health organizational view enabled. Without it, Health events (security notifications, scheduled changes, service issues) of member accounts are not aggregated in the management or delegated administrator account, so issues affecting individual accounts can be missed. Enable organizational view from the management account and optionally register a delegated administrator. Only evaluable from the management account or a Health delegated administrator; requires a Business, Enterprise On-Ramp or Enterprise Support plan.",
+		"shortDesc": "Enable AWS Health organizational view",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Aggregating AWS Health events across accounts]<https://docs.aws.amazon.com/health/latest/ug/aggregate-events.html>",
+			"[DescribeHealthServiceStatusForOrganization]<https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeHealthServiceStatusForOrganization.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/health/latest/ug/enable-organizational-view-in-health-console.html"
+	},
+	"iamUserTwoActiveKeys": {
+		"category": "S",
+		"^description": "{$COUNT} IAM user(s) have two active access keys. Two active keys are only expected during a short rotation window; leaving both active doubles the number of long-term credentials that can leak and usually means the old key was never deactivated. Deactivate and delete the key that is no longer in use (CIS AWS Foundations 1.13).",
+		"shortDesc": "Keep at most one active access key per IAM user",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Manage access keys for IAM users]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html>",
+			"[Rotating access keys]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id-credentials-access-keys-update.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id-credentials-access-keys-update.html"
+	},
+	"rolesAnywhereTrustAnchorCertExpiring": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have enabled IAM Roles Anywhere trust anchors whose CA certificate (certificate bundle or AWS Private CA) has expired or expires within 30 days, or an imported certificate revocation list (CRL) that is disabled so revoked certificates are still accepted. Rotate the trust anchor CA before it expires (add the new CA certificate, reissue end-entity certificates, then remove the old one) and keep CRLs enabled and current.",
+		"shortDesc": "Rotate IAM Roles Anywhere trust anchor CAs and keep CRLs enabled",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[IAM Roles Anywhere trust model]<https://docs.aws.amazon.com/rolesanywhere/latest/userguide/trust-model.html>",
+			"[Revocation in IAM Roles Anywhere]<https://docs.aws.amazon.com/rolesanywhere/latest/userguide/trust-model.html#revocation>",
+			"[Getting started with IAM Roles Anywhere]<https://docs.aws.amazon.com/rolesanywhere/latest/userguide/getting-started.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/rolesanywhere/latest/userguide/trust-model.html"
+	},
+	"rootVirtualMfaOnly": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) protect the root user with a virtual (authenticator app) MFA device. Virtual TOTP codes can be phished and the device is often a personal phone. Register a FIDO2 security key or passkey (or a hardware TOTP token) for the root user, especially in the Organizations management account, and remove the virtual device. Note: AWS does not expose other root MFA device types through the IAM API, so if a security key is already registered alongside the virtual device, only the virtual device needs removing.",
+		"shortDesc": "Use a FIDO2 security key or passkey for root MFA",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Enable MFA for the root user]<https://docs.aws.amazon.com/IAM/latest/UserGuide/enable-mfa-for-root.html>",
+			"[Root user best practices]<https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html>",
+			"[Passkeys and security keys]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa_enable_fido.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa_enable_fido.html"
+	},
+	"workloadRoleCanEscalate": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have roles assumed by a workload service (AWS Lambda, Amazon ECS tasks, Amazon EC2, AWS CodeBuild, AWS Step Functions) that can change IAM permissions (iam:PutRolePolicy, iam:AttachRolePolicy, iam:CreatePolicyVersion, iam:SetDefaultPolicyVersion, iam:UpdateAssumeRolePolicy, user/group policy and credential actions) or pass any role (iam:PassRole on all roles) without a Condition. Code or a compromised dependency running in that workload can escalate to administrator. Remove these actions or scope them to specific resources and add conditions such as iam:PassedToService; use permissions boundaries for roles that must manage IAM. Full-administrator roles are reported separately; statements with conditions are treated as scoped.",
+		"shortDesc": "Prevent workload roles from escalating privileges",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Security best practices in IAM - least privilege]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>",
+			"[Grant a user permissions to pass a role]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_passrole.html>",
+			"[Permissions boundaries for IAM entities]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_passrole.html"
+	},
+	"accountMixesEnvironments": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) contain resources tagged as production and as non-production (for example Environment=prod and Environment=dev). Mixing environments in one account removes the account as a security and blast-radius boundary: non-production identities and changes can reach production data. Separate workloads and environments into dedicated accounts in AWS Organizations. Heuristic based on common environment tag keys (Environment, Env, Stage) and values.",
+		"shortDesc": "Separate production and non-production into different accounts",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Organizing your AWS environment using multiple accounts]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/organizing-your-aws-environment.html>",
+			"[Benefits of using multiple AWS accounts]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/benefits-of-using-multiple-aws-accounts.html>",
+			"[GetTagValues]<https://docs.aws.amazon.com/resourcegroupstagging/latest/APIReference/API_GetTagValues.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/organizing-your-aws-environment.html"
+	},
+	"auditManagerNoActiveAssessment": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have AWS Audit Manager enabled but no active assessment, so no compliance evidence is being collected. Create an assessment from a framework that matches your obligations, or disable Audit Manager if it is no longer used. Accounts that do not use Audit Manager are informational only.",
+		"shortDesc": "Keep an active Audit Manager assessment when Audit Manager is enabled",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[What is AWS Audit Manager?]<https://docs.aws.amazon.com/audit-manager/latest/userguide/what-is.html>",
+			"[Creating an assessment]<https://docs.aws.amazon.com/audit-manager/latest/userguide/create-assessments.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/audit-manager/latest/userguide/create-assessments.html"
+	},
+	"budgetNoActions": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have AWS Budgets configured but no budget actions. Budget actions can automatically apply a restrictive IAM policy or SCP, or stop EC2/RDS instances, when a threshold is crossed, limiting the impact of compromised credentials used for resource abuse (for example crypto mining). Consider adding a budget action (with approval if needed) to key budgets. Accounts without any budget are reported by enableCostBudget.",
+		"shortDesc": "Add budget actions to respond to unexpected spend",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Configuring a budget action]<https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-controls.html>",
+			"[DescribeBudgetActionsForAccount]<https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_budgets_DescribeBudgetActionsForAccount.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-controls.html"
 	}
 }

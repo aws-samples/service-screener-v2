@@ -244,3 +244,97 @@ def broadSecretReadActions(policyDoc):
             if broad:
                 found.add(action)
     return sorted(found)
+
+
+# --------------------------------------------------------------------------- #
+# Privilege escalation from service-trusted (workload) roles
+# --------------------------------------------------------------------------- #
+# Compute / orchestration services whose code runs with the role's credentials.
+WORKLOAD_SERVICE_PRINCIPALS = ('lambda', 'ecs-tasks', 'ec2', 'codebuild', 'states')
+
+# IAM actions that let a principal grant itself (or a role it can use) more
+# permissions. Value: the IAM resource type the action applies to, used to
+# decide whether the statement's Resource covers *any* such resource.
+ESCALATION_ACTIONS = {
+    'iam:PutRolePolicy': 'role',
+    'iam:AttachRolePolicy': 'role',
+    'iam:UpdateAssumeRolePolicy': 'role',
+    'iam:PassRole': 'role',
+    'iam:CreatePolicyVersion': 'policy',
+    'iam:SetDefaultPolicyVersion': 'policy',
+    'iam:PutUserPolicy': 'user',
+    'iam:AttachUserPolicy': 'user',
+    'iam:CreateAccessKey': 'user',
+    'iam:CreateLoginProfile': 'user',
+    'iam:UpdateLoginProfile': 'user',
+    'iam:AddUserToGroup': 'group',
+    'iam:PutGroupPolicy': 'group',
+    'iam:AttachGroupPolicy': 'group',
+}
+
+
+def workloadServicesTrusted(trustDoc):
+    """Workload service principals (e.g. 'lambda.amazonaws.com') an Allow
+    statement of the trust policy lets assume the role."""
+    found = set()
+    for stmt in PolicyPrincipal.iterStatements(trustDoc):
+        if str(stmt.get('Effect', '')).lower() != 'allow':
+            continue
+        if not PolicyPrincipal.statementAllowsAction(stmt, TRUST_ASSUME_ACTIONS):
+            continue
+        principal = stmt.get('Principal')
+        if not isinstance(principal, dict):
+            continue
+        for svc in _asList(principal.get('Service')):
+            if not isinstance(svc, str):
+                continue
+            name = svc.lower().split('.amazonaws.com', 1)[0]
+            if name in WORKLOAD_SERVICE_PRINCIPALS:
+                found.add(svc)
+    return sorted(found)
+
+
+def _resourcesCover(stmt, resourceType):
+    probe = '{}/ss-probe'.format(resourceType)
+    if 'NotResource' in stmt:
+        return not any(_resourcePatternMatchesAny(p, 'iam', probe) for p in _asList(stmt.get('NotResource')))
+    return any(_resourcePatternMatchesAny(p, 'iam', probe) for p in _asList(stmt.get('Resource')))
+
+
+def isFullAdmin(policyDoc):
+    """True if an Allow statement grants Action "*" on Resource "*" without
+    a Condition."""
+    for stmt in PolicyPrincipal.iterStatements(policyDoc):
+        if str(stmt.get('Effect', '')).lower() != 'allow' or stmt.get('Condition'):
+            continue
+        if '*' in _asList(stmt.get('Action')) and '*' in _asList(stmt.get('Resource')):
+            return True
+    return False
+
+
+def escalationActions(policyDocs, ignoreResource=False):
+    """IAM privilege-escalation actions granted by a set of identity policy
+    documents on all roles / users / groups / policies.
+
+    Conservative to avoid false positives:
+    - Allow statements with any Condition are treated as scoped (e.g.
+      iam:PassRole limited by iam:PassedToService, ResourceTag conditions).
+    - Resources scoped to specific names or name prefixes are not broad.
+    - An unconditional Deny on all resources removes the action.
+    ignoreResource=True is used for permissions boundaries, where any Allow
+    of the action keeps it available."""
+    allowed, denied = set(), set()
+    for doc in policyDocs:
+        for stmt in PolicyPrincipal.iterStatements(doc):
+            effect = str(stmt.get('Effect', '')).lower()
+            if stmt.get('Condition'):
+                continue
+            for action, rtype in ESCALATION_ACTIONS.items():
+                if not PolicyPrincipal.statementAllowsAction(stmt, [action]):
+                    continue
+                covers = _resourcesCover(stmt, rtype)
+                if effect == 'allow' and (ignoreResource or covers):
+                    allowed.add(action)
+                elif effect == 'deny' and covers:
+                    denied.add(action)
+    return sorted(allowed - denied)

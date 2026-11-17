@@ -10,6 +10,7 @@ from utils.Config import Config
 from utils.Tools import _warn, _pr
 from .IamCommon import IamCommon
 from . import IamPolicyHelpers
+from . import IamX509
  
 class IamAccount(IamCommon):
     PASSWORD_POLICY_MIN_SCORE = 4
@@ -257,7 +258,8 @@ class IamAccount(IamCommon):
         try:
             resp = budgetClient.describe_budgets(AccountId=stsInfo['Account'])
         
-            if 'Budgets' in resp:
+            # An empty 'Budgets' list means no budget is configured.
+            if resp.get('Budgets'):
                 return 
         
             self.results['enableCostBudget'] = [-1, ""]
@@ -1046,3 +1048,369 @@ class IamAccount(IamCommon):
             k = '{} ({})'.format(ev.get('eventTypeCode', '?'), ev.get('region', 'global'))
             summary[k] = summary.get(k, 0) + 1
         self.results['healthLifecycleEventsOpen'] = [-1, '<br>'.join('{} x{}'.format(k, v) for k, v in sorted(summary.items()))]
+
+    # ------------------------------------------------------------------ #
+    # WAFS2027 identity checks (chunk 2)
+    # ------------------------------------------------------------------ #
+    def _scanRegions(self):
+        return [r for r in (Config.get('REGIONS_SELECTED') or []) if r != 'GLOBAL'] or ['us-east-1']
+
+    def _regionalClient(self, service, region):
+        return self.ssBoto.client(service, config=bConfig(region_name=region))
+
+    def _checkHealthOrgViewDisabled(self):
+        """AWS Health organizational view aggregates Health events of every
+        member account. Only the management account (or a Health delegated
+        administrator, which can only exist once the view is enabled) can
+        read the status."""
+        if not self.organizationIsEnabled:
+            self.results['healthOrgViewDisabled'] = [0, 'No AWS Organization - organizational view not applicable']
+            return
+        isMgmt = self._isOrgManagementAccount()
+        try:
+            resp = self._healthClientForPartition().describe_health_service_status_for_organization()
+        except botocore.exceptions.ClientError as e:
+            code = e.response['Error']['Code']
+            if not isMgmt:
+                self.results['healthOrgViewDisabled'] = [0, 'Not evaluable from member account']
+            else:
+                self.results['healthOrgViewDisabled'] = [0, 'Unable to evaluate ({})'.format(code)]
+            return
+        status = resp.get('healthServiceAccessStatusForOrganization')
+        if status == 'ENABLED':
+            self.results['healthOrgViewDisabled'] = [1, 'AWS Health organizational view enabled']
+        elif not isMgmt:
+            # A member account (not a delegated admin) cannot see the real status.
+            self.results['healthOrgViewDisabled'] = [0, 'Not evaluable from member account']
+        elif status is None:
+            self.results['healthOrgViewDisabled'] = [0, 'Unable to evaluate (no status returned)']
+        else:
+            self.results['healthOrgViewDisabled'] = [-1, 'AWS Health organizational view is {}'.format(status)]
+
+    ROOT_MFA_SERIAL_SUFFIX = ':mfa/root-account-mfa-device'
+
+    def _checkRootVirtualMfaOnly(self):
+        """Root user MFA should be a FIDO2 security key / passkey or hardware
+        TOTP token rather than a virtual (authenticator app) device."""
+        try:
+            summary = self.iamClient.get_account_summary().get('SummaryMap', {})
+        except botocore.exceptions.ClientError as e:
+            self.results['rootVirtualMfaOnly'] = [0, 'Unable to evaluate ({})'.format(e.response['Error']['Code'])]
+            return
+        if summary.get('AccountMFAEnabled') != 1:
+            # No root MFA at all is reported by rootMfaActive.
+            self.results['rootVirtualMfaOnly'] = [0, 'Root user MFA not enabled (see rootMfaActive)']
+            return
+
+        rootDevices = []
+        try:
+            paginator = self.iamClient.get_paginator('list_virtual_mfa_devices')
+            for page in paginator.paginate(AssignmentStatus='Assigned'):
+                for dev in page.get('VirtualMFADevices', []):
+                    serial = dev.get('SerialNumber', '')
+                    userArn = (dev.get('User') or {}).get('Arn', '')
+                    if userArn.endswith(':root') or serial.endswith(self.ROOT_MFA_SERIAL_SUFFIX):
+                        rootDevices.append(serial)
+        except botocore.exceptions.ClientError as e:
+            self.results['rootVirtualMfaOnly'] = [0, 'Unable to evaluate ({})'.format(e.response['Error']['Code'])]
+            return
+
+        if rootDevices:
+            self.results['rootVirtualMfaOnly'] = [-1, 'Root user has virtual MFA device(s): {}'.format(', '.join(rootDevices))]
+        else:
+            self.results['rootVirtualMfaOnly'] = [1, 'Root user MFA is not a virtual device']
+
+    ROLES_ANYWHERE_EXPIRY_WARN_DAYS = 30
+
+    def _checkRolesAnywhereTrustAnchorCertExpiring(self):
+        """Enabled IAM Roles Anywhere trust anchors whose CA certificate has
+        expired or expires within ROLES_ANYWHERE_EXPIRY_WARN_DAYS, and
+        imported CRLs that are disabled (revoked certificates still accepted).
+        Disabled trust anchors cannot authenticate anyone and are only noted."""
+        now = datetime.now(tzlocal())
+        issues, notes, errors = [], [], []
+        anchorCount = 0
+        pcaClients = {}
+
+        for region in self._scanRegions():
+            client = self._regionalClient('rolesanywhere', region)
+            try:
+                anchors = []
+                for page in client.get_paginator('list_trust_anchors').paginate():
+                    anchors.extend(page.get('trustAnchors', []))
+                crls = []
+                for page in client.get_paginator('list_crls').paginate():
+                    crls.extend(page.get('crls', []))
+            except botocore.exceptions.ClientError as e:
+                errors.append('{}: {}'.format(region, e.response['Error']['Code']))
+                continue
+            except botocore.exceptions.EndpointConnectionError:
+                continue
+
+            enabledArns = set()
+            for ta in anchors:
+                anchorCount += 1
+                name = '{} ({})'.format(ta.get('name') or ta.get('trustAnchorId', '?'), region)
+                if ta.get('enabled') is False:
+                    notes.append('{}: trust anchor disabled'.format(name))
+                    continue
+                enabledArns.add(ta.get('trustAnchorArn'))
+                source = ta.get('source') or {}
+                stype = source.get('sourceType')
+                data = source.get('sourceData') or {}
+                if stype == 'CERTIFICATE_BUNDLE':
+                    certs = IamX509.pemCertificates(data.get('x509CertificateData'))
+                    if not certs:
+                        notes.append('{}: no certificate found in bundle'.format(name))
+                    for idx, (_nb, notAfter, err) in enumerate(certs):
+                        label = '{} certificate #{}'.format(name, idx + 1)
+                        if err:
+                            notes.append('{}: unable to evaluate ({})'.format(label, err))
+                            continue
+                        self._raExpiry(label, notAfter, now, issues)
+                elif stype == 'AWS_ACM_PCA':
+                    pcaArn = data.get('acmPcaArn', '')
+                    parts = pcaArn.split(':')
+                    pcaRegion = parts[3] if len(parts) > 3 and parts[3] else region
+                    if pcaRegion not in pcaClients:
+                        pcaClients[pcaRegion] = self._regionalClient('acm-pca', pcaRegion)
+                    try:
+                        ca = pcaClients[pcaRegion].describe_certificate_authority(
+                            CertificateAuthorityArn=pcaArn).get('CertificateAuthority', {})
+                    except botocore.exceptions.ClientError as e:
+                        notes.append('{}: unable to evaluate ACM PCA {} ({})'.format(name, pcaArn, e.response['Error']['Code']))
+                        continue
+                    caStatus = ca.get('Status')
+                    if caStatus in ('EXPIRED', 'DELETED'):
+                        issues.append('{}: ACM PCA {}'.format(name, caStatus))
+                    elif ca.get('NotAfter') is not None:
+                        self._raExpiry('{} ACM PCA'.format(name), ca['NotAfter'], now, issues)
+                    else:
+                        notes.append('{}: ACM PCA status {} (no validity date)'.format(name, caStatus))
+                else:
+                    notes.append('{}: source {} not evaluated'.format(name, stype))
+
+            for crl in crls:
+                if crl.get('enabled') is False and crl.get('trustAnchorArn') in enabledArns:
+                    issues.append('CRL {} ({}) is disabled - revoked certificates are still accepted'.format(
+                        crl.get('name') or crl.get('crlId', '?'), region))
+
+        key = 'rolesAnywhereTrustAnchorCertExpiring'
+        if issues:
+            self.results[key] = [-1, '<br>'.join(issues + notes)]
+        elif errors and anchorCount == 0:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(', '.join(errors))]
+        elif anchorCount == 0:
+            self.results[key] = [1, 'No IAM Roles Anywhere trust anchors in scanned region(s)']
+        elif any('unable to evaluate' in n for n in notes) or errors:
+            self.results[key] = [0, 'Unable to evaluate all trust anchors: ' + '<br>'.join(notes + errors)]
+        else:
+            self.results[key] = [1, '{} trust anchor(s) valid for more than {} days{}'.format(
+                anchorCount, self.ROLES_ANYWHERE_EXPIRY_WARN_DAYS, ('<br>' + '<br>'.join(notes)) if notes else '')]
+
+    def _raExpiry(self, label, notAfter, now, issues):
+        if notAfter.tzinfo is None:
+            notAfter = notAfter.replace(tzinfo=tzlocal())
+        if notAfter <= now:
+            issues.append('{}: expired {}'.format(label, notAfter.strftime('%Y-%m-%d')))
+        elif (notAfter - now).days < self.ROLES_ANYWHERE_EXPIRY_WARN_DAYS:
+            issues.append('{}: expires in {} days'.format(label, (notAfter - now).days))
+
+    def _roleIdentityPolicyDocs(self, role):
+        """(docs, unreadable) for a role from the authorization details."""
+        docs = [p.get('PolicyDocument') for p in role.get('RolePolicyList', []) or []]
+        unreadable = []
+        for p in role.get('AttachedManagedPolicies', []) or []:
+            doc = self._managedPolicyDoc(p.get('PolicyArn'))
+            if doc is None:
+                unreadable.append(p.get('PolicyName') or p.get('PolicyArn'))
+            else:
+                docs.append(doc)
+        return docs, unreadable
+
+    def _managedPolicyDoc(self, arn):
+        if not arn:
+            return None
+        if arn in self._policyDocumentMap:
+            return self._policyDocumentMap[arn]
+        try:
+            ver = self.iamClient.get_policy(PolicyArn=arn)['Policy']['DefaultVersionId']
+            doc = self._getPolicyDocument(arn, ver)
+        except (botocore.exceptions.ClientError, KeyError):
+            return None
+        self._policyDocumentMap[arn] = doc
+        return doc
+
+    def _checkWorkloadRoleCanEscalate(self):
+        """Roles assumable by a workload service (Lambda, ECS tasks, EC2,
+        CodeBuild, Step Functions) that can modify IAM policies / trust or
+        pass any role, i.e. code running in the workload can escalate to
+        administrator. Full-administrator roles are left to FullAdminAccess /
+        InlinePolicyFullAdminAccess."""
+        key = 'workloadRoleCanEscalate'
+        if not self._authDetails:
+            self.results[key] = [0, 'Unable to evaluate (authorization details not available)']
+            return
+
+        offenders, unknown = [], []
+        for role in self._authDetails.get('roles', []):
+            if str(role.get('Path', '')).startswith('/aws-service-role/'):
+                continue
+            services = IamPolicyHelpers.workloadServicesTrusted(role.get('AssumeRolePolicyDocument'))
+            if not services:
+                continue
+            name = role.get('RoleName', '?')
+            docs, unreadable = self._roleIdentityPolicyDocs(role)
+            if any(IamPolicyHelpers.isFullAdmin(d) for d in docs):
+                continue
+            actions = IamPolicyHelpers.escalationActions(docs)
+
+            boundaryArn = (role.get('PermissionsBoundary') or {}).get('PermissionsBoundaryArn')
+            if actions and boundaryArn:
+                bdoc = self._managedPolicyDoc(boundaryArn)
+                if bdoc is None:
+                    unknown.append('{} (permissions boundary not readable)'.format(name))
+                    continue
+                permitted = set(IamPolicyHelpers.escalationActions([bdoc], ignoreResource=True))
+                actions = [a for a in actions if a in permitted]
+
+            if actions:
+                offenders.append('{} [{}]: {}'.format(name, ', '.join(services), ', '.join(actions)))
+            elif unreadable:
+                unknown.append('{} (policy not readable: {})'.format(name, ', '.join(unreadable)))
+
+        if offenders:
+            self.results[key] = [-1, '<br>'.join(offenders)]
+        elif unknown:
+            self.results[key] = [0, 'Unable to evaluate: ' + '<br>'.join(unknown)]
+        else:
+            self.results[key] = [1, 'No workload role can modify IAM policies or pass any role']
+
+    # Tag keys commonly used to label the deployment environment (compared lower-case).
+    ENVIRONMENT_TAG_KEYS = frozenset((
+        'environment', 'env', 'stage', 'environment-type', 'environmenttype', 'environment_type',
+        'env-type', 'envtype', 'env_type', 'environment-name', 'environmentname', 'environment_name',
+        'aws:environment'))
+    _PROD_TOKENS = frozenset(('prod', 'production', 'prd', 'prdn', 'live'))
+    _NONPROD_TOKENS = frozenset((
+        'dev', 'develop', 'development', 'test', 'testing', 'tst', 'qa', 'uat', 'sit', 'staging', 'stage',
+        'stg', 'sandbox', 'sbx', 'nonprod', 'nonproduction', 'notprod', 'preprod', 'preproduction', 'demo', 'poc',
+        'lab', 'perf', 'int', 'integration', 'beta', 'alpha', 'gamma'))
+
+    @classmethod
+    def classifyEnvironmentValue(cls, value):
+        """'prod', 'nonprod' or None for an environment tag value."""
+        tokens = [t for t in re.split(r'[^a-z0-9]+', str(value).lower()) if t]
+        if any(t in cls._NONPROD_TOKENS for t in tokens):
+            return 'nonprod'
+        for i, t in enumerate(tokens):
+            if t in cls._PROD_TOKENS:
+                # "non-prod", "pre prod", "not_prod"
+                return 'nonprod' if i > 0 and tokens[i - 1] in ('non', 'pre', 'not') else 'prod'
+        return None
+
+    def _checkAccountMixesEnvironments(self):
+        """Resources tagged as production and as non-production in the same
+        account: environments should be separated by account."""
+        key = 'accountMixesEnvironments'
+        seen = {'prod': set(), 'nonprod': set()}
+        errors, evaluated = [], 0
+        for region in self._scanRegions():
+            client = self._regionalClient('resourcegroupstaggingapi', region)
+            try:
+                keys = []
+                for page in client.get_paginator('get_tag_keys').paginate():
+                    keys.extend(page.get('TagKeys', []))
+                for tagKey in keys:
+                    if str(tagKey).lower() not in self.ENVIRONMENT_TAG_KEYS:
+                        continue
+                    for page in client.get_paginator('get_tag_values').paginate(Key=tagKey):
+                        for value in page.get('TagValues', []):
+                            cls = self.classifyEnvironmentValue(value)
+                            if cls:
+                                seen[cls].add('{}={}'.format(tagKey, value))
+                evaluated += 1
+            except botocore.exceptions.ClientError as e:
+                errors.append('{}: {}'.format(region, e.response['Error']['Code']))
+            except botocore.exceptions.EndpointConnectionError:
+                continue
+
+        if seen['prod'] and seen['nonprod']:
+            self.results[key] = [-1, 'Production tags: {}<br>Non-production tags: {}'.format(
+                ', '.join(sorted(seen['prod'])[:10]), ', '.join(sorted(seen['nonprod'])[:10]))]
+        elif evaluated == 0 and errors:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(', '.join(errors))]
+        elif errors:
+            self.results[key] = [0, 'Unable to evaluate all regions ({})'.format(', '.join(errors))]
+        else:
+            found = sorted(seen['prod'] | seen['nonprod'])
+            self.results[key] = [1, 'Single environment tagged: {}'.format(', '.join(found[:10])) if found
+                                 else 'No environment tags found']
+
+    def _checkAuditManagerNoActiveAssessment(self):
+        """Audit Manager is enabled but no assessment is ACTIVE, so no evidence
+        is being collected. Not using Audit Manager at all is informational
+        (it is an optional, paid service)."""
+        key = 'auditManagerNoActiveAssessment'
+        enabled, withActive, errors = [], [], []
+        for region in self._scanRegions():
+            client = self._regionalClient('auditmanager', region)
+            try:
+                status = client.get_account_status().get('status')
+                if status != 'ACTIVE':
+                    continue
+                enabled.append(region)
+                token = None
+                count = 0
+                while True:
+                    params = {'status': 'ACTIVE'}
+                    if token:
+                        params['nextToken'] = token
+                    resp = client.list_assessments(**params)
+                    count += len(resp.get('assessmentMetadata', []))
+                    token = resp.get('nextToken')
+                    if count or not token:
+                        break
+                if count:
+                    withActive.append(region)
+            except botocore.exceptions.ClientError as e:
+                errors.append('{}: {}'.format(region, e.response['Error']['Code']))
+            except botocore.exceptions.EndpointConnectionError:
+                continue
+
+        idle = [r for r in enabled if r not in withActive]
+        if idle:
+            self.results[key] = [-1, 'Audit Manager enabled without an active assessment in: {}'.format(', '.join(idle))]
+        elif errors:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(', '.join(errors))]
+        elif not enabled:
+            self.results[key] = [0, 'Audit Manager not enabled in scanned region(s)']
+        else:
+            self.results[key] = [1, 'Active assessment(s) in: {}'.format(', '.join(withActive))]
+
+    def _checkBudgetNoActions(self):
+        """Budgets exist but none has a budget action (automatic IAM/SCP
+        policy or instance stop when a threshold is crossed). Accounts with
+        no budget at all are reported by enableCostBudget."""
+        key = 'budgetNoActions'
+        account = (Config.get('stsInfo', {}) or {}).get('Account')
+        if not account:
+            self.results[key] = [0, 'Unable to evaluate (account ID unknown)']
+            return
+        try:
+            budgets = []
+            for page in self.budgetClient.get_paginator('describe_budgets').paginate(AccountId=account):
+                budgets.extend(page.get('Budgets', []))
+            if not budgets:
+                self.results[key] = [0, 'No budgets configured (see enableCostBudget)']
+                return
+            actions = []
+            for page in self.budgetClient.get_paginator('describe_budget_actions_for_account').paginate(AccountId=account):
+                actions.extend(page.get('Actions', []))
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(e.response['Error']['Code'])]
+            return
+        if actions:
+            self.results[key] = [1, '{} budget action(s) configured'.format(len(actions))]
+        else:
+            self.results[key] = [-1, '{} budget(s), none with a budget action'.format(len(budgets))]
