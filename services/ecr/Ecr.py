@@ -139,7 +139,9 @@ class Ecr(Service):
             if code == 'RepositoryPolicyNotFoundException':
                 return None
             self._logClientError(f'get_repository_policy({repoName})', e)
-            return None
+            # Record that the policy could not be read so checks report
+            # "Unable to evaluate" instead of treating it as "no policy".
+            return {'_unreadable': code or 'Unknown'}
 
     def _describeImages(self, repoName):
         """Return a bounded list of image detail dicts for this repository.

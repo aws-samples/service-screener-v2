@@ -17,7 +17,8 @@ class EcrCommon(Evaluator):
         '_lifecyclePolicy'   -- parsed lifecycle policy dict, or
                                 {'_missing': True} when no policy set, or
                                 None on lookup error
-        '_repositoryPolicy'  -- parsed access policy dict or None
+        '_repositoryPolicy'  -- parsed access policy dict, None if no policy,
+                                or {'_unreadable': <error code>} if it could not be read
         '_images'            -- list of describe_images imageDetails (bounded)
         '_tagList'           -- list of {'Key','Value'} tags
         '_registryScanningConfig' -- registry scanning config (shared)
@@ -276,6 +277,11 @@ class EcrCommon(Evaluator):
     # ------------------------------------------------------------------ #
     def _checkEcrRepoPublicAccess(self):
         policy = self.repo.get('_repositoryPolicy')
+        if isinstance(policy, dict) and '_unreadable' in policy:
+            self.results['ecrRepoPublicAccess'] = [
+                0, f"Unable to evaluate ({policy['_unreadable']})"
+            ]
+            return
         if policy is None:
             self.results['ecrRepoPublicAccess'] = [
                 1, "No repository policy — no external Allow statements"
@@ -318,6 +324,11 @@ class EcrCommon(Evaluator):
     # ------------------------------------------------------------------ #
     def _checkEcrRepoCrossAccount(self):
         policy = self.repo.get('_repositoryPolicy')
+        if isinstance(policy, dict) and '_unreadable' in policy:
+            self.results['ecrRepoCrossAccount'] = [
+                0, f"Unable to evaluate ({policy['_unreadable']})"
+            ]
+            return
         if policy is None:
             self.results['ecrRepoCrossAccount'] = [
                 1, "No repository policy"

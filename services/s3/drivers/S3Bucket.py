@@ -29,6 +29,7 @@ class S3Bucket(Evaluator):
         # (used by _checkAccess, _checkTls and _checkWildcardPrincipalsActions).
         # The sentinel lets us cache a None result.
         self._bucketPolicy = S3Bucket._POLICY_NOT_FETCHED
+        self._bucketPolicyError = None
 
         # Cache for the bucket encryption config so we only call get_bucket_encryption
         # once per bucket (used by both _checkEncrypted and _checkSSECBlocking).
@@ -125,6 +126,7 @@ class S3Bucket(Evaluator):
             # Default to None so any error path caches/returns None, matching the
             # original implicit `return None` behaviour.
             policy_result = None
+            policy_error = None
             try:
                 policy = self.s3Client.get_bucket_policy(
                     Bucket=self.bucket
@@ -133,11 +135,17 @@ class S3Bucket(Evaluator):
             except botocore.exceptions.ClientError as e:
                 # Original behaviour: NoSuchBucketPolicy -> None; any other ClientError
                 # also fell through to None (the default above).
-                if e.response['Error']['Code'] == 'NoSuchBucketPolicy':
+                code = e.response['Error']['Code']
+                if code == 'NoSuchBucketPolicy':
                     policy_result = None
+                else:
+                    # e.g. AccessDenied: the policy exists or may exist but
+                    # could not be read. Checks must not treat this as "no policy".
+                    policy_error = code
 
             # Publish to the cache only once, after it's fully computed, so other
             # threads never observe a transient/partial value.
+            self._bucketPolicyError = policy_error
             self._bucketPolicy = policy_result
             return self._bucketPolicy
     
@@ -209,12 +217,18 @@ class S3Bucket(Evaluator):
                 # Don't return - continue with public access checks
 
         policy = self.getBucketPolicy()    
+        # Policy unreadable (e.g. AccessDenied) and not neutralised by
+        # RestrictPublicBuckets: we cannot claim public access is prohibited.
+        policy_unknown = bool(self._bucketPolicyError) and not public_policy_restricted
+        unknown_msg = f'Unable to evaluate (bucket policy: {self._bucketPolicyError})'
 
         # Check public read access (handle None bucket_acl)
         policy_blocks_read = not self.policyAllowsPublicRead(policy)
         acl_blocks_read = public_acl_restricted or (bucket_acl and not self.aclAllowsPublicRead(bucket_acl))
         
-        if (public_policy_restricted or policy_blocks_read) and acl_blocks_read:
+        if acl_blocks_read and policy_unknown:
+            self.results['PublicReadAccessBlock'] = [0, unknown_msg]
+        elif (public_policy_restricted or policy_blocks_read) and acl_blocks_read:
             self.results['PublicReadAccessBlock'] = [1, 'Prohibited'] 
         else:
             self.results['PublicReadAccessBlock'] = [-1, 'NotProhibited'] 
@@ -223,7 +237,9 @@ class S3Bucket(Evaluator):
         policy_blocks_write = not self.policyAllowsPublicWrite(policy)
         acl_blocks_write = public_acl_restricted or (bucket_acl and not self.aclAllowsPublicWrite(bucket_acl))
         
-        if (public_policy_restricted or policy_blocks_write) and acl_blocks_write:
+        if acl_blocks_write and policy_unknown:
+            self.results['PublicWriteAccessBlock'] = [0, unknown_msg]
+        elif (public_policy_restricted or policy_blocks_write) and acl_blocks_write:
             self.results['PublicWriteAccessBlock'] = [1, 'Prohibited'] 
         else:
             self.results['PublicWriteAccessBlock'] = [-1, 'NotProhibited'] 
@@ -480,6 +496,10 @@ class S3Bucket(Evaluator):
         
         policy_str = self.getBucketPolicy()
         if not policy_str:
+            if self._bucketPolicyError:
+                self.results['WildcardPrincipalsActions'] = [
+                    0, f'Unable to evaluate (bucket policy: {self._bucketPolicyError})'
+                ]
             # No policy means no wildcard risk
             return
             

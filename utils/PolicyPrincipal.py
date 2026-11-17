@@ -100,13 +100,19 @@ def _valueIsWildcardOnly(value):
     return isinstance(value, str) and value != '' and set(value) <= {'*', '?'}
 
 
-def conditionScopes(condition):
+def conditionScopes(condition, extraKeys=None):
     """
     True if the Condition block contains at least one positive-match operator
     on a scoping key with a concrete (non-wildcard) value.
+
+    extraKeys: optional iterable of additional service-specific scoping keys
+    (e.g. 'kms:CallerAccount'), compared case-insensitively.
     """
     if not isinstance(condition, dict):
         return False
+    scopingKeys = SCOPING_CONDITION_KEYS
+    if extraKeys:
+        scopingKeys = scopingKeys | {str(k).lower() for k in extraKeys}
     for operator, block in condition.items():
         if not isinstance(block, dict) or not isinstance(operator, str):
             continue
@@ -118,7 +124,7 @@ def conditionScopes(condition):
         if op not in SCOPING_OPERATORS:
             continue
         for key, value in block.items():
-            if str(key).lower() not in SCOPING_CONDITION_KEYS:
+            if str(key).lower() not in scopingKeys:
                 continue
             values = _asList(value)
             if values and not any(_valueIsWildcardOnly(v) for v in values):
