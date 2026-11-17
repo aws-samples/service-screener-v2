@@ -7,7 +7,8 @@ from services.Evaluator import Evaluator
 
 class AccessanalyzerCommon(Evaluator):
     """
-    Account/region-scoped IAM Access Analyzer checks (+ RAM org sharing).
+    Account/region-scoped IAM Access Analyzer checks. RAM account-level checks
+    live in AccessanalyzerRamAccount.
 
     Input:
       detail -- from services/accessanalyzer/Accessanalyzer.py.getResources:
@@ -28,11 +29,10 @@ class AccessanalyzerCommon(Evaluator):
     UNUSED_FINDING_AGE_DAYS = 30
     UNUSED_FINDINGS_PAGE_CAP = 20   # x100 findings per page
 
-    def __init__(self, detail, aaClient, orgClient=None):
+    def __init__(self, detail, aaClient):
         super().__init__()
         self.detail = detail
         self.aaClient = aaClient
-        self.orgClient = orgClient
         self._resourceName = 'Account'
 
         self.analyzers = detail.get('_analyzers') or []
@@ -244,7 +244,9 @@ class AccessanalyzerCommon(Evaluator):
                                 stale.append(f.get('resource', f.get('id', 'unknown')))
                     pages += 1
                     if pages >= self.UNUSED_FINDINGS_PAGE_CAP:
-                        capped = bool(page.get('nextToken'))
+                        ## Accumulate across analyzers: one truncated read must
+                        ## not be reset by a later analyzer that fits the cap.
+                        capped = capped or bool(page.get('nextToken'))
                         break
             except botocore.exceptions.ClientError as e:
                 self.results[key] = [0, f"Unable to evaluate ({self._errCode(e)})"]
@@ -273,57 +275,3 @@ class AccessanalyzerCommon(Evaluator):
             ]
         else:
             self.results[key] = [1, "No active unused-access findings"]
-
-    def _isPrimaryRegion(self):
-        """Org-wide settings are global: report them once, in the first
-        selected region, rather than once per region."""
-        from utils.Config import Config
-        regions = [r for r in (Config.get('REGIONS_SELECTED', []) or [])
-                   if r and r != 'GLOBAL']
-        return not regions or self.detail.get('_region') == regions[0]
-
-    # 10. RAM sharing with AWS Organizations not enabled
-    def _checkRamOrgSharingDisabled(self):
-        key = 'ramOrgSharingDisabled'
-        if self.orgClient is None or not self._isPrimaryRegion():
-            return
-        from utils.Config import Config
-        accountId = (Config.get('stsInfo', {}) or {}).get('Account')
-
-        try:
-            org = self.orgClient.describe_organization().get('Organization', {}) or {}
-        except botocore.exceptions.ClientError as e:
-            code = self._errCode(e)
-            if code == 'AWSOrganizationsNotInUseException':
-                self.results[key] = [0, "Account is not a member of an AWS Organization"]
-            else:
-                self.results[key] = [0, f"Unable to evaluate ({code})"]
-            return
-        isMgmt = bool(accountId) and org.get('MasterAccountId') == accountId
-
-        principals = set()
-        try:
-            paginator = self.orgClient.get_paginator(
-                'list_aws_service_access_for_organization')
-            for page in paginator.paginate():
-                principals |= {p.get('ServicePrincipal') for p in
-                               page.get('EnabledServicePrincipals', []) or []}
-        except botocore.exceptions.ClientError as e:
-            code = self._errCode(e)
-            if not isMgmt and code in ('AccessDeniedException', 'AccessDenied'):
-                self.results[key] = [0, "Not evaluable from member account"]
-            else:
-                self.results[key] = [0, f"Unable to evaluate ({code})"]
-            return
-
-        if 'ram.amazonaws.com' in principals:
-            self.results[key] = [
-                1, "AWS RAM trusted access with AWS Organizations is enabled"
-            ]
-        else:
-            self.results[key] = [
-                -1,
-                "AWS RAM trusted access with AWS Organizations is not enabled — "
-                "resources can only be shared with individual accounts by "
-                "invitation, not with the organization or its OUs"
-            ]

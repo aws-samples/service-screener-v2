@@ -9,12 +9,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[What is IAM Access Analyzer]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer.html>",
+            "[What is IAM Access Analyzer]<https://docs.aws.amazon.com/IAM/latest/UserGuide/what-is-access-analyzer.html>",
             "[Security Hub control IAM.28]<https://docs.aws.amazon.com/securityhub/latest/userguide/iam-controls.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer.html"
+        "remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/what-is-access-analyzer.html"
     },
     "aaNoAccountAnalyzer": {
         "category": "S",
@@ -43,12 +43,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Unused access analysis]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-unused-access.html>",
+            "[Create an unused access analyzer]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-create-unused.html>",
             "[Analyzer types]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-getting-started.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-unused-access.html"
+        "remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-create-unused.html"
     },
     "aaNoInternalAccessAnalyzer": {
         "category": "S",
@@ -60,12 +60,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Internal access analysis]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-internal-access.html>",
+            "[Create an internal access analyzer]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-create-internal.html>",
             "[Analyzer types]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-getting-started.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-internal-access.html"
+        "remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-create-internal.html"
     },
     "aaAnalyzerNotActive": {
         "category": "R",
@@ -95,7 +95,7 @@
         "needFullTest": 0,
         "ref": [
             "[Working with findings]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-findings.html>",
-            "[Resolving findings]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-resolving-findings.html>"
+            "[Resolving findings]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-findings-remediate.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -146,7 +146,7 @@
         "needFullTest": 0,
         "ref": [
             "[Unused access findings]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-findings-view.html>",
-            "[Unused access analysis]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-unused-access.html>",
+            "[Create an unused access analyzer]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-create-unused.html>",
             "[Remediate unused access findings]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-findings-remediate.html>"
         ],
         "remediation": null,
@@ -164,7 +164,7 @@
         "needFullTest": 0,
         "ref": [
             "[Sharing with principals outside your organization]<https://docs.aws.amazon.com/ram/latest/userguide/working-with-sharing-create.html>",
-            "[Security best practices for AWS RAM]<https://docs.aws.amazon.com/ram/latest/userguide/security-best-practices.html>",
+            "[Security in AWS RAM]<https://docs.aws.amazon.com/ram/latest/userguide/security.html>",
             "[Use condition keys to restrict sharing]<https://docs.aws.amazon.com/ram/latest/userguide/security-iam-policies.html>"
         ],
         "remediation": null,
@@ -198,11 +198,11 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Promoting a resource share created from a policy]<https://docs.aws.amazon.com/ram/latest/userguide/working-with-sharing-promote.html>",
+            "[Resource shares created from resource-based policies]<https://docs.aws.amazon.com/ram/latest/userguide/what-is.html#what-is-about-res-pol-sharing>",
             "[Promote resource share API]<https://docs.aws.amazon.com/ram/latest/APIReference/API_PromoteResourceShareCreatedFromPolicy.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/ram/latest/userguide/working-with-sharing-promote.html"
+        "remediation_doc": "https://docs.aws.amazon.com/ram/latest/APIReference/API_PromoteResourceShareCreatedFromPolicy.html"
     }
 }

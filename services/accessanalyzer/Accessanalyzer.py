@@ -6,6 +6,7 @@ from services.Service import Service
 
 from services.accessanalyzer.drivers.AccessanalyzerCommon import AccessanalyzerCommon
 from services.accessanalyzer.drivers.AccessanalyzerRamShare import AccessanalyzerRamShare
+from services.accessanalyzer.drivers.AccessanalyzerRamAccount import AccessanalyzerRamAccount
 
 
 class Accessanalyzer(Service):
@@ -183,19 +184,31 @@ class Accessanalyzer(Service):
     # ------------------------------------------------------------------ #
     def advise(self):
         objs = {}
+        ## Access Analyzer being unreachable in a region must not suppress the
+        ## RAM checks (or the once-per-scan org check) for that region.
         detail = self.getResources()
-        if detail is None:
-            return objs
+        if detail is not None:
+            try:
+                obj = AccessanalyzerCommon(detail, self.aaClient)
+                obj.run(self.__class__)
+                objs['AccessAnalyzer::Account'] = obj.getInfo()
+                del obj
+            except Exception as e:
+                print(f"Error processing Access Analyzer posture in "
+                      f"{self.region}: {e}")
+
+        shares, sharesErr = self._listResourceShares()
         try:
-            obj = AccessanalyzerCommon(detail, self.aaClient, self.orgClient)
+            obj = AccessanalyzerRamAccount(
+                {'_region': self.region, '_ramSharesError': sharesErr},
+                self.orgClient)
             obj.run(self.__class__)
-            objs['AccessAnalyzer::Account'] = obj.getInfo()
+            if obj.results:
+                objs['RAM::Account'] = obj.getInfo()
             del obj
         except Exception as e:
-            print(f"Error processing Access Analyzer posture in "
-                  f"{self.region}: {e}")
+            print(f"Error processing RAM account settings in {self.region}: {e}")
 
-        shares, _err = self._listResourceShares()
         accountId = (Config.get('stsInfo', {}) or {}).get('Account')
         for share in shares:
             try:
