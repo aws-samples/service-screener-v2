@@ -148,6 +148,19 @@ class Cloudwatch(Service):
         if resp.get('NextToken'):
             self.getAllAlarms(resp.get('NextToken'))
 
+    def getMetricFilterMetrics(self):
+        """(namespace, metricName) pairs produced by any CloudWatch Logs metric
+        filter in this region, or None when the filters cannot be read."""
+        out = set()
+        try:
+            for page in self.cwLogClient.get_paginator('describe_metric_filters').paginate():
+                for f in page.get('metricFilters', []) or []:
+                    for t in f.get('metricTransformations', []) or []:
+                        out.add((t.get('metricNamespace'), t.get('metricName')))
+        except Exception:
+            return None
+        return out
+
     def getAllDashboards(self, nextToken=None):
         """
         Collect all CloudWatch dashboards using pagination
@@ -573,9 +586,10 @@ class Cloudwatch(Service):
         
         # Check CloudWatch Alarms
         self.getAllAlarms()
+        metricFilterMetrics = self.getMetricFilterMetrics() if self.alarms else set()
         for alarm in self.alarms:
             _pi('CloudWatch Alarm', alarm['AlarmName'])
-            obj = CloudwatchAlarms(alarm, self.cwClient)
+            obj = CloudwatchAlarms(alarm, self.cwClient, metricFilterMetrics)
             obj.run(self.__class__)
             objs[f"Alarm::{alarm['AlarmName']}"] = obj.getInfo()
             del obj

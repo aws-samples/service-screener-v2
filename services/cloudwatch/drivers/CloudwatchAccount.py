@@ -129,6 +129,21 @@ class CloudwatchAccount(Evaluator):
         ('AWS/ElastiCache', 'GlobalDatastoreReplicationLag'),
     )
 
+    ## Dimensions that identify the replicating resource for each metric. Streams
+    ## without one of them are service aggregates (e.g. RDS publishes ReplicaLag
+    ## with no dimensions, by EngineName and by DatabaseClass); they are not
+    ## counted as streams needing their own alarm, and an alarm on them is an
+    ## aggregate alarm. An alarm carrying a resource dimension only covers the
+    ## stream with exactly that dimension set.
+    REPLICATION_LAG_RESOURCE_DIMS = {
+        ('AWS/RDS', 'ReplicaLag'): ('DBInstanceIdentifier',),
+        ('AWS/RDS', 'AuroraGlobalDBReplicationLag'): ('DBClusterIdentifier',),
+        ('AWS/RDS', 'AuroraBinlogReplicaLag'): ('DBClusterIdentifier', 'DBInstanceIdentifier'),
+        ('AWS/DynamoDB', 'ReplicationLatency'): ('TableName',),
+        ('AWS/S3', 'ReplicationLatency'): ('SourceBucket',),
+        ('AWS/ElastiCache', 'GlobalDatastoreReplicationLag'): ('CacheClusterId', 'ReplicationGroupId'),
+    }
+
     def __init__(self, region, clientFn, ctLogs, logGroups, alarms, compositeAlarms=None):
         super().__init__()
         self.init()
@@ -337,7 +352,13 @@ class CloudwatchAccount(Evaluator):
         """{service: True|False|None(unknown)}"""
         state = {}
         try:
-            state['GuardDuty'] = bool(self._paginate('guardduty', 'list_detectors', 'DetectorIds'))
+            ids = self._paginate('guardduty', 'list_detectors', 'DetectorIds')
+            if not ids:
+                state['GuardDuty'] = False
+            else:
+                ## A suspended detector (Status DISABLED) does not need a disablement alert.
+                statuses = [self._client('guardduty').get_detector(DetectorId=i).get('Status') for i in ids]
+                state['GuardDuty'] = any(st == 'ENABLED' for st in statuses)
         except Exception:
             state['GuardDuty'] = None
         try:
@@ -379,29 +400,100 @@ class CloudwatchAccount(Evaluator):
                 covered |= hits
         return covered
 
-    def _metricFilterCoverage(self):
+    def _filterCoverage(self, filters, alarmed):
+        """Detection services whose disablement events a set of metric filters
+        (feeding an alarmed metric) would count."""
         covered = set()
-        errors = []
-        alarmed = set()
-        for a in self.alarms:
+        for f in filters or []:
+            pattern = f.get('filterPattern', '') or ''
+            metrics = {(t.get('metricNamespace'), t.get('metricName')) for t in f.get('metricTransformations', [])}
+            if not metrics & alarmed:
+                continue
+            onlySource = not re.search(r'\$\.(?!eventSource\b)\w', pattern)
+            for svc, d in self.DETECTION_SERVICES.items():
+                if re.search(r'\$\.eventName\s*=\s*["\']?' + d['eventName'] + r'\b', pattern):
+                    covered.add(svc)
+                elif onlySource and re.search(r'\$\.eventSource\s*=\s*["\']?' + re.escape(d['eventSource']), pattern):
+                    covered.add(svc)
+        return covered
+
+    @staticmethod
+    def _alarmedMetrics(alarms, alarmMetricsFn):
+        out = set()
+        for a in alarms:
             if a.get('ActionsEnabled', True) and a.get('AlarmActions'):
-                alarmed |= self._alarmMetrics(a)
+                out |= alarmMetricsFn(a)
+        return out
+
+    def _remoteTrailLogGroups(self):
+        """Trails visible in this region (including shadow copies of multi-region
+        and organization trails) whose CloudWatch Logs group lives in another
+        region or another account. A multi-region trail delivers the events of
+        every region to its home-region log group, so a metric filter + alarm
+        there covers this region too.
+
+        Returns ([(region, account, logGroupName, trailArn)], error code or None)."""
+        def load():
+            out = []
+            ct = self._client('cloudtrail')
+            for t in ct.describe_trails(includeShadowTrails=True).get('trailList', []) or []:
+                lgArn = t.get('CloudWatchLogsLogGroupArn')
+                home = t.get('HomeRegion')
+                if not lgArn and home and home != self.region and t.get('TrailARN'):
+                    try:
+                        lgArn = self._client('cloudtrail', home).get_trail(Name=t['TrailARN']) \
+                            .get('Trail', {}).get('CloudWatchLogsLogGroupArn')
+                    except Exception:
+                        lgArn = None
+                parsed = _logGroupNameFromArn(lgArn)
+                if not parsed:
+                    continue
+                region, acct, name = parsed
+                if region == self.region and (not self.accountId or acct == self.accountId):
+                    continue  # already covered through ctLogs / _trailLogGroups()
+                out.append((region, acct, name, t.get('TrailARN', '?')))
+            return out
+        return self._cached('remoteTrailLogGroups', load)
+
+    def _remoteAlarms(self, region):
+        def load():
+            out = []
+            pager = self._client('cloudwatch', region).get_paginator('describe_alarms')
+            for page in pager.paginate(AlarmTypes=['MetricAlarm']):
+                out.extend(page.get('MetricAlarms', []) or [])
+            return out
+        return self._cached('alarms::' + region, load)
+
+    def _metricFilterCoverage(self):
+        errors = []
+        alarmed = self._alarmedMetrics(self.alarms, self._alarmMetrics)
+        covered = set()
         for name in self._trailLogGroups():
             filters, err = self._metricFilters(name)
             if err:
                 errors.append(err)
                 continue
-            for f in filters:
-                pattern = f.get('filterPattern', '') or ''
-                metrics = {(t.get('metricNamespace'), t.get('metricName')) for t in f.get('metricTransformations', [])}
-                if not metrics & alarmed:
-                    continue
-                onlySource = not re.search(r'\$\.(?!eventSource\b)\w', pattern)
-                for svc, d in self.DETECTION_SERVICES.items():
-                    if re.search(r'\$\.eventName\s*=\s*["\']?' + d['eventName'] + r'\b', pattern):
-                        covered.add(svc)
-                    elif onlySource and re.search(r'\$\.eventSource\s*=\s*["\']?' + re.escape(d['eventSource']), pattern):
-                        covered.add(svc)
+            covered |= self._filterCoverage(filters, alarmed)
+
+        remote, err = self._remoteTrailLogGroups()
+        if err:
+            errors.append(f'cloudtrail {err}')
+        for region, acct, name, trailArn in remote or []:
+            if self.accountId and acct != self.accountId:
+                errors.append(f'log group {name} of trail {trailArn} is in account {acct} (not readable here)')
+                continue
+            alarms, aerr = self._remoteAlarms(region)
+            if aerr:
+                errors.append(f'cloudwatch {region} {aerr}')
+                continue
+            fkey = f'mf::{region}::{name}'
+            filters, ferr = self._cached(fkey, lambda: [
+                f for page in self._client('logs', region).get_paginator('describe_metric_filters')
+                .paginate(logGroupName=name) for f in page.get('metricFilters', []) or []])
+            if ferr:
+                errors.append(f'{region} {ferr}')
+                continue
+            covered |= self._filterCoverage(filters, self._alarmedMetrics(alarms, self._alarmMetrics))
         return covered, errors
 
     def _checkDetectionDisableAlarm(self):
@@ -424,7 +516,9 @@ class CloudwatchAccount(Evaluator):
 
         missingActive = [s for s in relevant if active[s] is True and s not in covered]
         missingUnknown = [s for s in relevant if active[s] is None and s not in covered]
-        if missingActive and not errors:
+        if not missingActive and not missingUnknown:
+            self.results[key] = [1, 'Disablement alerts configured for: ' + ', '.join(sorted(covered & set(relevant)))]
+        elif missingActive and not errors:
             self.results[key] = [-1, 'No EventBridge rule or alarmed metric filter alerts when these are disabled: '
                                      + ', '.join(missingActive)]
         elif errors or missingUnknown:
@@ -449,7 +543,8 @@ class CloudwatchAccount(Evaluator):
             self.results[key] = [-1, 'Resource policy allows any AWS principal without a scoping condition: '
                                      + ', '.join(public)]
         else:
-            self.results[key] = [1, f'{len(policies)} account-level resource policy(ies); none allow any principal']
+            self.results[key] = [1, f'{len(policies)} account-level resource policy(ies); none allow any principal '
+                                    '(log-group-scoped resource policies are not evaluated)']
 
     def _checkCentralizationRule(self):
         key = 'cwLogsCentralizationRuleMissing'
@@ -503,11 +598,14 @@ class CloudwatchAccount(Evaluator):
         key = 'cwNoAnomalyDetection'
         lgMap = self._logGroupMap()
         securityGroups = set(self._trailLogGroups())
-        for names, err in (self._flowLogGroups(), self._resolverLogGroups()):
-            if not err:
+        errors = []
+        for label, (names, err) in (('VPC Flow Logs', self._flowLogGroups()),
+                                    ('Route 53 Resolver query logs', self._resolverLogGroups())):
+            if err:
+                errors.append(f'{label}: {err}')
+            else:
                 securityGroups |= {n for n in names if n in lgMap}
 
-        errors = []
         securityMetrics = set()
         for name in self._trailLogGroups():
             filters, err = self._metricFilters(name)
@@ -518,7 +616,8 @@ class CloudwatchAccount(Evaluator):
                     securityMetrics.add((t.get('metricNamespace'), t.get('metricName')))
 
         try:
-            for d in self._paginate('cloudwatch', 'describe_anomaly_detectors', 'AnomalyDetectors'):
+            for d in self._paginate('cloudwatch', 'describe_anomaly_detectors', 'AnomalyDetectors',
+                                     AnomalyDetectorTypes=['SINGLE_METRIC', 'METRIC_MATH']):
                 pairs = set()
                 single = d.get('SingleMetricAnomalyDetector') or {}
                 if single.get('MetricName'):
@@ -595,8 +694,11 @@ class CloudwatchAccount(Evaluator):
             try:
                 for page in cw.get_paginator('list_metrics').paginate(
                         Namespace=ns, MetricName=mn, RecentlyActive='PT3H'):
+                    resDims = self.REPLICATION_LAG_RESOURCE_DIMS.get((ns, mn), ())
                     for m in page.get('Metrics', []) or []:
                         d = frozenset((x.get('Name'), x.get('Value')) for x in m.get('Dimensions', []) or [])
+                        if not any(k in resDims for k, _ in d):
+                            continue  # service-level aggregate, not a replica
                         streams.setdefault((ns, mn), set()).add(d)
             except Exception as e:
                 errors.append(f'{ns}/{mn}: {_errCode(e)}')
@@ -620,11 +722,14 @@ class CloudwatchAccount(Evaluator):
         uncovered = []
         total = 0
         for (ns, mn), dimSets in sorted(streams.items()):
+            resDims = self.REPLICATION_LAG_RESOURCE_DIMS.get((ns, mn), ())
             onMetric = {e[2] for e in alarmEntries if e[0] == ns and e[1] == mn}
-            ## An alarm on an aggregate of this metric (dimension set that is not
-            ## one of the per-resource streams) or a SEARCH/metric-math expression
-            ## naming the metric covers every stream: do not FAIL those.
-            aggregate = any(d not in dimSets for d in onMetric) or \
+            ## An alarm on a service aggregate of this metric (no resource
+            ## dimension, e.g. no dimensions or EngineName only) or a
+            ## SEARCH/metric-math expression naming the metric covers every
+            ## stream. An alarm on another resource ID (for example a deleted
+            ## replica) covers nothing here.
+            aggregate = any(not any(k in resDims for k, _ in d) for d in onMetric) or \
                 any(re.search(r'\b' + re.escape(mn) + r'\b', x) and (ns in x or 'AWS/' not in x)
                     for x in expressions)
             for d in dimSets:
