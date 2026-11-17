@@ -9,12 +9,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[What is IAM Access Analyzer]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer.html>",
+            "[What is IAM Access Analyzer]<https://docs.aws.amazon.com/IAM/latest/UserGuide/what-is-access-analyzer.html>",
             "[Security Hub control IAM.28]<https://docs.aws.amazon.com/securityhub/latest/userguide/iam-controls.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer.html"
+        "remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/what-is-access-analyzer.html"
     },
     "aaNoAccountAnalyzer": {
         "category": "S",
@@ -43,12 +43,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Unused access analysis]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-unused-access.html>",
+            "[Create an unused access analyzer]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-create-unused.html>",
             "[Analyzer types]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-getting-started.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-unused-access.html"
+        "remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-create-unused.html"
     },
     "aaNoInternalAccessAnalyzer": {
         "category": "S",
@@ -60,12 +60,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Internal access analysis]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-internal-access.html>",
+            "[Create an internal access analyzer]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-create-internal.html>",
             "[Analyzer types]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-getting-started.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-internal-access.html"
+        "remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-create-internal.html"
     },
     "aaAnalyzerNotActive": {
         "category": "R",
@@ -95,7 +95,7 @@
         "needFullTest": 0,
         "ref": [
             "[Working with findings]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-findings.html>",
-            "[Resolving findings]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-resolving-findings.html>"
+            "[Resolving findings]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-findings-remediate.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -134,5 +134,75 @@
         "remediation": null,
         "remediation_risk": null,
         "remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-getting-started.html"
+    },
+    "aaUnusedAccessFindingsOpen": {
+        "category": "S",
+        "^description": "{$COUNT} region(s) have an unused-access analyzer with findings that have stayed ACTIVE for more than 30 days. Each finding is an IAM role, access key, console password or granted permission that has not been used during the tracking period. The analyzer only adds value if its findings are acted on: unresolved unused access is standing privilege that an attacker can use without anyone noticing. Remove the unused access (or archive the finding with a recorded justification).",
+        "shortDesc": "Resolve unused-access findings",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Unused access findings]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-findings-view.html>",
+            "[Create an unused access analyzer]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-create-unused.html>",
+            "[Remediate unused access findings]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-findings-remediate.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-findings-remediate.html"
+    },
+    "ramShareExternalPrincipals": {
+        "category": "S",
+        "^description": "{$COUNT} AWS RAM resource share(s) allow external principals and are associated with at least one principal outside the AWS Organization. Resources in these shares (subnets, Transit Gateways, Route 53 Resolver rules, License Manager configurations and more) are reachable from accounts that your organization's SCPs, RCPs and guardrails do not govern. Confirm each external principal is intended; otherwise remove it and set allowExternalPrincipals to false so the share can only be used inside the organization.",
+        "shortDesc": "Restrict RAM shares to the organization",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Sharing with principals outside your organization]<https://docs.aws.amazon.com/ram/latest/userguide/working-with-sharing-create.html>",
+            "[Security in AWS RAM]<https://docs.aws.amazon.com/ram/latest/userguide/security.html>",
+            "[Use condition keys to restrict sharing]<https://docs.aws.amazon.com/ram/latest/userguide/security-iam-policies.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/ram/latest/userguide/working-with-sharing-update.html"
+    },
+    "ramOrgSharingDisabled": {
+        "category": "S",
+        "^description": "AWS RAM trusted access with AWS Organizations is not enabled for {$COUNT} organization(s). Without it, resources can only be shared with individual accounts through invitations, which encourages sharing by account ID (including with accounts outside the organization) instead of with the organization or specific OUs. Enabling it lets you share within the organization without invitations and pair it with allowExternalPrincipals=false.",
+        "shortDesc": "Enable RAM sharing with AWS Organizations",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Enable resource sharing within AWS Organizations]<https://docs.aws.amazon.com/ram/latest/userguide/getting-started-sharing.html#getting-started-sharing-orgs>",
+            "[Using AWS RAM with AWS Organizations]<https://docs.aws.amazon.com/organizations/latest/userguide/services-that-can-integrate-ram.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/ram/latest/userguide/getting-started-sharing.html#getting-started-sharing-orgs"
+    },
+    "ramSharesNotPromoted": {
+        "category": "S",
+        "^description": "{$COUNT} AWS RAM resource share(s) were created from a resource-based policy (featureSet CREATED_FROM_POLICY) and have not been promoted to standard resource shares. Such shares are not fully visible or manageable in AWS RAM: they cannot be modified with RAM APIs or governed with RAM permissions, so access granted through them is easier to miss in reviews. Promote them to standard resource shares.",
+        "shortDesc": "Promote RAM shares created from policies",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Resource shares created from resource-based policies]<https://docs.aws.amazon.com/ram/latest/userguide/what-is.html#what-is-about-res-pol-sharing>",
+            "[Promote resource share API]<https://docs.aws.amazon.com/ram/latest/APIReference/API_PromoteResourceShareCreatedFromPolicy.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/ram/latest/APIReference/API_PromoteResourceShareCreatedFromPolicy.html"
     }
 }
