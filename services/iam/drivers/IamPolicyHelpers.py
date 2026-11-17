@@ -3,6 +3,7 @@ Pure helpers used by the IAM drivers to evaluate role trust policies and
 identity policies. Kept free of boto3 so they can be unit tested directly.
 """
 import fnmatch
+import json
 import re
 
 from utils import PolicyPrincipal
@@ -338,3 +339,161 @@ def escalationActions(policyDocs, ignoreResource=False):
                 elif effect == 'deny' and covers:
                     denied.add(action)
     return sorted(allowed - denied)
+
+
+# --------------------------------------------------------------------------- #
+# WAFS2027 identity checks (chunk 3)
+# --------------------------------------------------------------------------- #
+# Global condition keys that tie a request to a network location.
+NETWORK_CONDITION_KEYS = frozenset((
+    'aws:sourceip', 'aws:sourcevpc', 'aws:sourcevpce', 'aws:vpcsourceip', 'aws:sourcevpcarn'))
+
+
+def statementNetworkConditionKeys(stmt):
+    """Network condition keys used by a statement's Condition block."""
+    found = set()
+    condition = stmt.get('Condition')
+    if not isinstance(condition, dict):
+        return found
+    for block in condition.values():
+        if not isinstance(block, dict):
+            continue
+        for key in block:
+            if str(key).lower() in NETWORK_CONDITION_KEYS:
+                found.add(str(key))
+    return found
+
+
+def networkContainment(policyDocs):
+    """How a set of identity policies ties long-term credentials to a
+    network location. Returns (contained, reason):
+    - a Deny statement conditioned on a network key (the usual "deny unless
+      from my IP / VPC endpoint" guard), or
+    - every Allow statement carries a network condition.
+    No Allow statement at all returns (None, ...): the identity policies grant
+    nothing, so there is nothing to contain."""
+    allows, conditionedAllows = 0, 0
+    for doc in policyDocs:
+        for stmt in PolicyPrincipal.iterStatements(doc):
+            effect = str(stmt.get('Effect', '')).lower()
+            keys = statementNetworkConditionKeys(stmt)
+            if effect == 'deny' and keys:
+                return True, 'Deny statement conditioned on {}'.format(', '.join(sorted(keys)))
+            if effect == 'allow':
+                allows += 1
+                if keys:
+                    conditionedAllows += 1
+    if allows == 0:
+        return None, 'identity policies grant no permissions'
+    if allows == conditionedAllows:
+        return True, 'every Allow statement has a network condition'
+    return False, '{} of {} Allow statement(s) without a network condition and no network Deny guard'.format(
+        allows - conditionedAllows, allows)
+
+
+# Tag keys (normalised: lower-case, separators removed) that record a data
+# classification / sensitivity level.
+_CLASSIFICATION_KEY_RE = re.compile(r'classification|sensitivity|confidentiality')
+
+
+def isClassificationTagKey(key):
+    norm = re.sub(r'[\s_\-:./]+', '', str(key).lower())
+    return bool(_CLASSIFICATION_KEY_RE.search(norm))
+
+
+MFA_DEACTIVATION_EVENT = 'DeactivateMFADevice'
+IAM_EVENT_SOURCE = 'iam.amazonaws.com'
+CLOUDTRAIL_API_DETAIL_TYPE = 'AWS API Call via CloudTrail'
+
+
+def _eventValueMatches(patternValues, value):
+    """EventBridge pattern field (a list of values / matcher objects) matches value."""
+    if not isinstance(patternValues, list):
+        patternValues = [patternValues]
+    for pv in patternValues:
+        if isinstance(pv, str):
+            if pv == value:
+                return True
+        elif isinstance(pv, dict):
+            if 'prefix' in pv:
+                p = pv['prefix']
+                if isinstance(p, dict) and 'equals-ignore-case' in p:
+                    if value.lower().startswith(str(p['equals-ignore-case']).lower()):
+                        return True
+                elif isinstance(p, str) and value.startswith(p):
+                    return True
+            elif 'suffix' in pv:
+                s = pv['suffix']
+                if isinstance(s, dict) and 'equals-ignore-case' in s:
+                    if value.lower().endswith(str(s['equals-ignore-case']).lower()):
+                        return True
+                elif isinstance(s, str) and value.endswith(s):
+                    return True
+            elif 'equals-ignore-case' in pv:
+                if str(pv['equals-ignore-case']).lower() == value.lower():
+                    return True
+            elif 'wildcard' in pv:
+                if fnmatch.fnmatchcase(value, str(pv['wildcard'])):
+                    return True
+            elif 'anything-but' in pv:
+                ab = pv['anything-but']
+                if isinstance(ab, (str, int, float)):
+                    if str(ab) != value:
+                        return True
+                elif isinstance(ab, list):
+                    if value not in [str(x) for x in ab]:
+                        return True
+                elif isinstance(ab, dict) and 'prefix' in ab:
+                    if not value.startswith(str(ab['prefix'])):
+                        return True
+    return False
+
+
+def eventPatternMatchesMfaDeactivation(patternText):
+    """True if an EventBridge event pattern matches the CloudTrail
+    DeactivateMFADevice API call event. Other detail fields are ignored
+    (treated as not narrowing). A pattern must name the IAM source or the
+    event name to count."""
+    try:
+        pattern = json.loads(patternText) if isinstance(patternText, str) else patternText
+    except (TypeError, ValueError):
+        return False
+    if not isinstance(pattern, dict):
+        return False
+    detail = pattern.get('detail') if isinstance(pattern.get('detail'), dict) else {}
+    named = False
+    if 'source' in pattern:
+        if not _eventValueMatches(pattern['source'], 'aws.iam'):
+            return False
+        named = True
+    if 'detail-type' in pattern and not _eventValueMatches(pattern['detail-type'], CLOUDTRAIL_API_DETAIL_TYPE):
+        return False
+    if 'eventSource' in detail:
+        if not _eventValueMatches(detail['eventSource'], IAM_EVENT_SOURCE):
+            return False
+        named = True
+    if 'eventName' in detail:
+        if not _eventValueMatches(detail['eventName'], MFA_DEACTIVATION_EVENT):
+            return False
+        named = True
+    return named
+
+
+_MF_EVENTNAME_RE = re.compile(r'\$\.eventName\s*(!?=)\s*["\']?([A-Za-z0-9*]+)["\']?')
+_MF_EVENTSOURCE_IAM_RE = re.compile(r'\$\.eventSource\s*=\s*["\']?iam\.amazonaws\.com["\']?')
+
+
+def metricFilterMatchesMfaDeactivation(filterPattern):
+    """True if a CloudWatch Logs metric filter pattern on CloudTrail logs
+    selects DeactivateMFADevice events: an `$.eventName = DeactivateMFADevice`
+    term, or an `$.eventSource = iam.amazonaws.com` term with no eventName
+    term at all (all IAM API calls)."""
+    if not filterPattern:
+        return False
+    terms = _MF_EVENTNAME_RE.findall(filterPattern)
+    for op, val in terms:
+        if op == '=' and fnmatch.fnmatchcase(MFA_DEACTIVATION_EVENT, val):
+            return True
+    if not terms and _MF_EVENTSOURCE_IAM_RE.search(filterPattern):
+        return True
+    return False

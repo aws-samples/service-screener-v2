@@ -4,6 +4,7 @@ from dateutil.tz import tzlocal
 from dateutil.parser import parse
 
 from .IamCommon import IamCommon
+from . import IamPolicyHelpers
  
 class IamUser(IamCommon):
     ENUM_NO_INFO = ['not_supported', 'no_information']
@@ -285,3 +286,142 @@ class IamUser(IamCommon):
         self.results['bedrockLongTermApiKey'] = [-1, '; '.join(details)]
         if noExpiry > 0:
             self.results['bedrockApiKeyNoExpiry'] = [-1, '{} active key(s) without expiry'.format(noExpiry)]
+
+    # ------------------------------------------------------------------ #
+    # WAFS2027 identity checks (chunk 3)
+    # ------------------------------------------------------------------ #
+    # Tag an IAM user with this key (any value except "false") to record an
+    # approved exception for iamUserLongTermAccessKey.
+    LONG_TERM_KEY_EXCEPTION_TAG = 'ServiceScreener:LongTermKeyException'
+
+    def _activeAccessKeys(self):
+        return [n for n in ('1', '2') if self.user.get('access_key_{}_active'.format(n)) == 'true']
+
+    def _userTags(self):
+        """(tags, error) for the user: prefetched authorization details first,
+        list_user_tags otherwise."""
+        if self._prefetchedUserDetail is not None:
+            return self._prefetchedUserDetail.get('Tags', []) or [], None
+        tags = []
+        try:
+            for page in self.iamClient.get_paginator('list_user_tags').paginate(UserName=self.user['user']):
+                tags.extend(page.get('Tags', []))
+        except botocore.exceptions.ClientError as e:
+            return [], e.response['Error']['Code']
+        return tags, None
+
+    def _checkIamUserLongTermAccessKey(self):
+        """Non-root IAM user with an active long-term access key. Workloads
+        should use IAM roles (instance profiles, task roles, IAM Roles
+        Anywhere) and people should use federation / IAM Identity Center."""
+        if not self._isCredentialReportRow():
+            return
+        active = self._activeAccessKeys()
+        if not active:
+            return
+        key = 'iamUserLongTermAccessKey'
+        kind = ('console + programmatic user' if self.user.get('password_enabled') == 'true'
+                else 'programmatic-only user (machine identity)')
+        tags, err = self._userTags()
+        for t in tags:
+            if t.get('Key') == self.LONG_TERM_KEY_EXCEPTION_TAG and str(t.get('Value', '')).strip().lower() != 'false':
+                self.results[key] = [0, 'Exception recorded by tag {}={} ({}, active key(s) {})'.format(
+                    t.get('Key'), t.get('Value', ''), kind, ', '.join(active))]
+                return
+        note = ' (tags not readable: {})'.format(err) if err else ''
+        self.results[key] = [-1, '{} with active access key(s) {}{}'.format(kind, ', '.join(active), note)]
+
+    def _userPolicyDocs(self):
+        """(docs, unreadable) - identity policies that apply to the user
+        (inline, attached, and those of its groups)."""
+        detail = self._prefetchedUserDetail
+        docs, unreadable = [], []
+        attached = []
+        if detail is not None:
+            docs.extend(p.get('PolicyDocument') for p in detail.get('UserPolicyList', []) or [])
+            attached.extend(detail.get('AttachedManagedPolicies', []) or [])
+            groupsByName = {g.get('GroupName'): g for g in (self._authDetails or {}).get('groups', [])}
+            for gname in detail.get('GroupList', []) or []:
+                g = groupsByName.get(gname)
+                if g is None:
+                    unreadable.append('group {}'.format(gname))
+                    continue
+                docs.extend(p.get('PolicyDocument') for p in g.get('GroupPolicyList', []) or [])
+                attached.extend(g.get('AttachedManagedPolicies', []) or [])
+        else:
+            user = self.user['user']
+            try:
+                for page in self.iamClient.get_paginator('list_user_policies').paginate(UserName=user):
+                    for name in page.get('PolicyNames', []):
+                        docs.append(self.iamClient.get_user_policy(UserName=user, PolicyName=name)['PolicyDocument'])
+                for page in self.iamClient.get_paginator('list_attached_user_policies').paginate(UserName=user):
+                    attached.extend(page.get('AttachedPolicies', []))
+                for page in self.iamClient.get_paginator('list_groups_for_user').paginate(UserName=user):
+                    for g in page.get('Groups', []):
+                        gname = g['GroupName']
+                        for gp in self.iamClient.get_paginator('list_group_policies').paginate(GroupName=gname):
+                            for name in gp.get('PolicyNames', []):
+                                docs.append(self.iamClient.get_group_policy(GroupName=gname, PolicyName=name)['PolicyDocument'])
+                        for gp in self.iamClient.get_paginator('list_attached_group_policies').paginate(GroupName=gname):
+                            attached.extend(gp.get('AttachedPolicies', []))
+            except botocore.exceptions.ClientError as e:
+                return None, [e.response['Error']['Code']]
+
+        seen = set()
+        for p in attached:
+            arn = p.get('PolicyArn')
+            if not arn or arn in seen:
+                continue
+            seen.add(arn)
+            doc = self._policyDocumentMap.get(arn)
+            if doc is None:
+                try:
+                    ver = self.iamClient.get_policy(PolicyArn=arn)['Policy']['DefaultVersionId']
+                    doc = self.iamClient.get_policy_version(PolicyArn=arn, VersionId=ver)['PolicyVersion']['Document']
+                except (botocore.exceptions.ClientError, KeyError):
+                    unreadable.append(p.get('PolicyName') or arn)
+                    continue
+            docs.append(doc)
+        return docs, unreadable
+
+    def _permissionsBoundary(self):
+        if self._prefetchedUserDetail is not None:
+            return (self._prefetchedUserDetail.get('PermissionsBoundary') or {}).get('PermissionsBoundaryArn'), None
+        try:
+            user = self.iamClient.get_user(UserName=self.user['user'])['User']
+        except botocore.exceptions.ClientError as e:
+            return None, e.response['Error']['Code']
+        return (user.get('PermissionsBoundary') or {}).get('PermissionsBoundaryArn'), None
+
+    def _checkLongTermKeyNotContained(self):
+        """A user that keeps an active access key should limit where the key
+        can be used: a permissions boundary or identity policies that only
+        allow requests from known networks (aws:SourceIp / aws:SourceVpc /
+        aws:SourceVpce / aws:VpcSourceIp). SCP/RCP network perimeters are not
+        visible from here."""
+        if not self._isCredentialReportRow():
+            return
+        active = self._activeAccessKeys()
+        if not active:
+            return
+        key = 'longTermKeyNotContained'
+        boundary, err = self._permissionsBoundary()
+        if err:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(err)]
+            return
+        if boundary:
+            self.results[key] = [1, 'Permissions boundary {}'.format(boundary.split('/')[-1])]
+            return
+        docs, unreadable = self._userPolicyDocs()
+        if docs is None:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(', '.join(unreadable))]
+            return
+        contained, reason = IamPolicyHelpers.networkContainment(docs)
+        if contained:
+            self.results[key] = [1, reason]
+        elif unreadable:
+            self.results[key] = [0, 'Unable to evaluate (policy not readable: {})'.format(', '.join(unreadable))]
+        elif contained is None:
+            self.results[key] = [1, 'Active key(s) {}, but {}'.format(', '.join(active), reason)]
+        else:
+            self.results[key] = [-1, 'Active key(s) {}: no permissions boundary; {}'.format(', '.join(active), reason)]

@@ -1087,5 +1087,144 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-controls.html"
+	},
+	"costAllocationTagsNotActivated": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have no active user-defined cost allocation tags. Without activated cost allocation tags, cost and usage cannot be attributed to the owning team, workload or environment, which weakens ownership and accountability for resources (including unexpected or abusive usage). Activate the tag keys that record owner / workload / environment as cost allocation tags in the payer (management) account. Member accounts of an organization are reported as not evaluable.",
+		"shortDesc": "Activate user-defined cost allocation tags",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Activating user-defined cost allocation tags]<https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/activating-tags.html>",
+			"[ListCostAllocationTags]<https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_ListCostAllocationTags.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/activating-tags.html"
+	},
+	"dataStoreNoClassificationTag": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have data stores (S3 buckets, DynamoDB tables, RDS/Aurora/DocumentDB/Neptune databases, EFS file systems, Redshift clusters) without a data classification tag. A tag key containing 'classification', 'sensitivity' or 'confidentiality' (for example DataClassification=Confidential) lets you apply protection, access and monitoring controls according to data sensitivity. Tag each data store with its classification level. EBS volumes are reported by the EC2 check EBSVolumeDataClassification.",
+		"shortDesc": "Tag data stores with a data classification",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SEC07-BP01 Understand your data classification scheme]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_data_classification_identify_data.html>",
+			"[Best Practices for Tagging AWS Resources]<https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/tagging-best-practices.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_data_classification_identify_data.html"
+	},
+	"drRegionQuotaParity": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have service quotas in a disaster recovery Region that are lower than in the primary Region. The DR Region is inferred from AWS Backup cross-Region copy rules and Aurora global database secondaries; key quotas (EC2 On-Demand vCPUs, Elastic IPs, VPCs, Lambda concurrency, RDS DB instances) are compared. Lower quotas can prevent the recovery environment from scaling to production size during a failover. Request matching quota increases in the DR Region.",
+		"shortDesc": "Match DR Region service quotas to the primary Region",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[REL13-BP04 Manage configuration drift at the DR site or Region]<https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_planning_for_recovery_config_drift.html>",
+			"[Requesting a quota increase]<https://docs.aws.amazon.com/servicequotas/latest/userguide/request-quota-increase.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/servicequotas/latest/userguide/request-quota-increase.html"
+	},
+	"iamUserLongTermAccessKey": {
+		"category": "S",
+		"^description": "{$COUNT} IAM user(s) hold active long-term access keys. Long-term keys do not expire and are a common source of credential leaks. Workloads should use IAM roles (EC2 instance profiles, ECS task roles, Lambda execution roles, IAM Roles Anywhere for on-premises) and people should use federation / IAM Identity Center for temporary credentials. The detail separates programmatic-only users (machine identities) from users that also have a console password. To record an approved exception, tag the user with ServiceScreener:LongTermKeyException (any value except false). Key age is reported separately by hasAccessKeyNoRotate30days / hasAccessKeyNoRotate90days.",
+		"shortDesc": "Replace IAM user access keys with roles or federation",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SEC02-BP02 Use temporary credentials]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_identities_unique.html>",
+			"[Require workloads to use temporary credentials with IAM roles]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#bp-workloads-use-roles>",
+			"[Alternatives to long-term access keys]<https://docs.aws.amazon.com/IAM/latest/UserGuide/security-creds-programmatic-access.html#security-creds-alternatives-to-long-term-access-keys>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#bp-workloads-use-roles"
+	},
+	"longTermKeyNotContained": {
+		"category": "S",
+		"^description": "{$COUNT} IAM user(s) with an active access key have neither a permissions boundary nor identity policies that restrict where the key can be used. When a long-term key must remain, limit its blast radius with a permissions boundary and a network condition (aws:SourceIp, aws:SourceVpc, aws:SourceVpce or aws:VpcSourceIp) - for example a Deny statement for requests that do not come from your network - so a leaked key cannot be used from elsewhere. Network perimeters enforced by SCPs/RCPs are not visible from the account and are not considered.",
+		"shortDesc": "Restrict remaining access keys by network and boundary",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SEC02-BP02 Use temporary credentials]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_identities_unique.html>",
+			"[AWS: Denies access to AWS based on the source IP]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_examples_aws_deny-ip.html>",
+			"[Permissions boundaries for IAM entities]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_examples_aws_deny-ip.html"
+	},
+	"mfaDeactivationNotAlerted": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) do not alert when an MFA device is deactivated. Deactivating MFA (DeactivateMFADevice) is a common step when an attacker takes over an identity. Create an Amazon EventBridge rule on the default event bus in the IAM events Region (us-east-1 in the aws partition) matching the CloudTrail DeactivateMFADevice event with a notification target, or a CloudWatch Logs metric filter on the CloudTrail log group with an alarm that has an action.",
+		"shortDesc": "Alert on MFA device deactivation",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SEC02-BP05 Audit and rotate credentials periodically]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_identities_audit.html>",
+			"[AWS service events delivered via AWS CloudTrail]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-service-event-cloudtrail.html>",
+			"[Creating CloudWatch alarms for CloudTrail events]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudwatch-alarms-for-cloudtrail.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-service-event-cloudtrail.html"
+	},
+	"resourceExplorerNoAggregatorIndex": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have no active AWS Resource Explorer aggregator index. Without an aggregator index, resources cannot be searched across all Regions of the account from one place, which slows down inventory and incident investigation (for example finding every resource with a given tag or name). Turn on Resource Explorer in the Regions you use and promote one index to aggregator.",
+		"shortDesc": "Create a Resource Explorer aggregator index",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Turning on cross-Region search by creating an aggregator index]<https://docs.aws.amazon.com/resource-explorer/latest/userguide/manage-aggregator-region-turn-on.html>",
+			"[Setting up AWS Resource Explorer]<https://docs.aws.amazon.com/resource-explorer/latest/userguide/getting-started-setting-up.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/resource-explorer/latest/userguide/manage-aggregator-region-turn-on.html"
+	},
+	"roleSharedAcrossComponents": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have IAM roles used by more than one compute component (Lambda functions, ECS task roles, EC2 instance profiles, Step Functions state machines, CodeBuild projects), across services or within a non-Lambda service. Each component then holds the union of permissions the others need, breaking least privilege and widening the impact of a compromised component. Give each component its own role scoped to what it needs. Reuse among Lambda functions only is reported by the Lambda check lambdaRoleReused.",
+		"shortDesc": "Use a dedicated IAM role per component",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SEC03-BP01 Define access requirements]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_permissions_define.html>",
+			"[Apply least-privilege permissions]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege"
 	}
 }
