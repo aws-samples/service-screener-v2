@@ -466,3 +466,139 @@ def test_lookup_vault_cross_region_uses_describe():
     assert svc.ssBoto.calls == [('backup', 'us-west-2')]
     stub.assert_no_pending_responses()
     stub.deactivate()
+
+
+# --------------------------------------------------------------------------- #
+# backupVaultNoAccessPolicy (public policy) - unreadable-policy path and
+# policy shapes the emulator does not reject but are worth pinning down.
+# The AccessDenied branch of get_backup_vault_access_policy cannot be produced
+# on the emulator (it has no IAM enforcement), so it is driven here through
+# Backup._describeVault with a stubbed client.
+# --------------------------------------------------------------------------- #
+def _describeVaultWithPolicy(policyOrCode, mpaTeam=None, vaultType='BACKUP_VAULT'):
+    from services.backup.Backup import Backup
+    client = _client('backup')
+    stub = Stubber(client)
+    desc = {'BackupVaultName': 'v1', 'BackupVaultArn': _vaultArn('v1'), 'VaultType': vaultType,
+            'NumberOfRecoveryPoints': 0, 'Locked': False}
+    if mpaTeam:
+        desc['MpaApprovalTeamArn'] = mpaTeam
+    stub.add_response('describe_backup_vault', desc, {'BackupVaultName': 'v1'})
+    if isinstance(policyOrCode, str) and policyOrCode.startswith('ERR:'):
+        _err(stub, 'get_backup_vault_access_policy', policyOrCode[4:], {'BackupVaultName': 'v1'})
+    else:
+        stub.add_response('get_backup_vault_access_policy',
+                          {'BackupVaultName': 'v1', 'BackupVaultArn': _vaultArn('v1'),
+                           'Policy': policyOrCode}, {'BackupVaultName': 'v1'})
+    stub.add_response('list_recovery_points_by_backup_vault', {'RecoveryPoints': []},
+                      {'BackupVaultName': 'v1', 'MaxResults': ANY})
+    # Borrow the discovery methods without constructing a Service (whose
+    # __init__/__del__ touch global scan state).
+    svc = type('_BackupDiscovery', (), {
+        'RECOVERY_POINT_SAMPLE_LIMIT': Backup.RECOVERY_POINT_SAMPLE_LIMIT,
+        '_describeVault': Backup._describeVault,
+        '_listRecoveryPoints': Backup._listRecoveryPoints,
+        '_logClientError': Backup._logClientError,
+        'backupClient': client,
+    })()
+    with stub:
+        detail = svc._describeVault('v1', {'BackupVaultName': 'v1'})
+    stub.assert_no_pending_responses()
+    return detail
+
+
+def _vaultResult(detail, method, key):
+    d = BackupVault(detail, _client('backup'))
+    getattr(d, method)()
+    return d.results[key]
+
+
+def _pol(stmt):
+    import json
+    return json.dumps({'Version': '2012-10-17', 'Statement': stmt})
+
+
+def test_vault_policy_public_flag_fix_stub():
+    key, m = 'backupVaultNoAccessPolicy', '_checkBackupVaultNoAccessPolicy'
+    public = {'Effect': 'Allow', 'Principal': '*', 'Action': 'backup:*', 'Resource': '*'}
+    assert _vaultResult(_describeVaultWithPolicy(_pol([public])), m, key)[0] == -1
+    scoped = dict(public, Condition={'StringEquals': {'aws:PrincipalOrgID': 'o-abc123'}})
+    assert _vaultResult(_describeVaultWithPolicy(_pol([scoped])), m, key)[0] == 1
+
+
+def test_vault_policy_public_variants_flag():
+    key, m = 'backupVaultNoAccessPolicy', '_checkBackupVaultNoAccessPolicy'
+    base = {'Effect': 'Allow', 'Action': 'backup:CopyIntoBackupVault', 'Resource': '*'}
+    flagged = [
+        dict(base, NotPrincipal={'AWS': f'arn:aws:iam::{ACCT}:root'}),
+        dict(base, Principal={'AWS': ['*']},
+             Condition={'StringLike': {'aws:PrincipalOrgID': '*'}}),
+        dict(base, Principal={'AWS': '*'},
+             Condition={'StringNotEquals': {'aws:PrincipalAccount': OTHER}}),
+    ]
+    for stmt in flagged:
+        assert _vaultResult(_describeVaultWithPolicy(_pol([stmt])), m, key)[0] == -1, stmt
+    # Deny-only policy with wildcard principal is not public.
+    deny = {'Effect': 'Deny', 'Principal': '*', 'Action': 'backup:DeleteRecoveryPoint', 'Resource': '*'}
+    assert _vaultResult(_describeVaultWithPolicy(_pol([deny])), m, key)[0] == 1
+
+
+def test_vault_policy_unreadable_is_not_fail():
+    r = _vaultResult(_describeVaultWithPolicy('ERR:AccessDeniedException'),
+                     '_checkBackupVaultNoAccessPolicy', 'backupVaultNoAccessPolicy')
+    assert r[0] == 0 and 'Unable to evaluate (AccessDeniedException)' in r[1]
+    r = _vaultResult(_describeVaultWithPolicy('ERR:ResourceNotFoundException'),
+                     '_checkBackupVaultNoAccessPolicy', 'backupVaultNoAccessPolicy')
+    assert r[0] == -1
+
+
+# --------------------------------------------------------------------------- #
+# airGappedVaultNoMpa (also covered end to end on the emulator)
+# --------------------------------------------------------------------------- #
+def test_air_gapped_vault_no_mpa_stub():
+    lag = 'LOGICALLY_AIR_GAPPED_BACKUP_VAULT'
+    key, m = 'airGappedVaultNoMpa', '_checkAirGappedVaultNoMpa'
+    assert _vaultResult(_describeVaultWithPolicy('ERR:ResourceNotFoundException', vaultType=lag),
+                        m, key)[0] == -1
+    team = f'arn:aws:mpa:{REGION}:{ACCT}:approval-team/t1'
+    assert _vaultResult(_describeVaultWithPolicy('ERR:ResourceNotFoundException', mpaTeam=team,
+                                                 vaultType=lag), m, key)[0] == 1
+    assert _vaultResult(_describeVaultWithPolicy('ERR:ResourceNotFoundException'), m, key)[0] == 0
+
+
+# --------------------------------------------------------------------------- #
+# backupAuditFrameworkMissing - the emulator does not implement
+# list_report_plans, and cannot produce FAILED deployments or paginated
+# list_frameworks responses.
+# --------------------------------------------------------------------------- #
+def _fw(name, status):
+    return {'FrameworkName': name, 'FrameworkArn': f'arn:aws:backup:{REGION}:{ACCT}:framework:{name}-x',
+            'NumberOfControls': 1, 'CreationTime': NOW, 'DeploymentStatus': status}
+
+
+def test_audit_framework_missing_flag_fix(clients):
+    _, stubs = clients
+    key, m = 'backupAuditFrameworkMissing', '_checkBackupAuditFrameworkMissing'
+    stubs['backup'].add_response('list_frameworks', {'Frameworks': []}, {})
+    assert _run(_drv(clients), m, key)[0] == -1
+    # A framework whose deployment failed does not evaluate anything.
+    stubs['backup'].add_response('list_frameworks', {'Frameworks': [_fw('f1', 'FAILED')]}, {})
+    r = _run(_drv(clients), m, key)
+    assert r[0] == -1 and 'FAILED' in r[1]
+    # Fix: deployed framework on the second page.
+    stubs['backup'].add_response('list_frameworks',
+                                 {'Frameworks': [_fw('f1', 'FAILED')], 'NextToken': 't'}, {})
+    stubs['backup'].add_response('list_frameworks', {'Frameworks': [_fw('f2', 'COMPLETED')]},
+                                 {'NextToken': 't'})
+    stubs['backup'].add_response('list_report_plans', {'ReportPlans': []}, {})
+    r = _run(_drv(clients), m, key)
+    assert r[0] == 1 and 'f2' in r[1]
+
+
+def test_audit_framework_unreadable_and_no_plans(clients):
+    _, stubs = clients
+    key, m = 'backupAuditFrameworkMissing', '_checkBackupAuditFrameworkMissing'
+    _err(stubs['backup'], 'list_frameworks', 'AccessDeniedException', {})
+    r = _run(_drv(clients), m, key)
+    assert r[0] == 0 and 'Unable to evaluate' in r[1]
+    assert _run(_drv(clients, _account(plans=[])), m, key)[0] == 0

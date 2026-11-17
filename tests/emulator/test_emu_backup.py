@@ -44,10 +44,22 @@ def _deleteVault(b, name):
             b.delete_recovery_point(BackupVaultName=name, RecoveryPointArn=rp['RecoveryPointArn'])
     except Exception:
         pass
-    try:
-        b.delete_backup_vault(BackupVaultName=name)
-    except Exception:
-        pass
+    _retry(lambda: b.delete_backup_vault(BackupVaultName=name))
+
+
+def _retry(fn, attempts=20, delay=0.5):
+    """Run a cleanup call, retrying while the resource is still in a
+    transitional state (e.g. a vault in 'Creating' state, or a framework
+    with CREATE_IN_PROGRESS raising ConflictException)."""
+    for _ in range(attempts):
+        try:
+            fn()
+            return
+        except Exception as e:
+            code = getattr(e, 'response', {}).get('Error', {}).get('Code', '')
+            if code not in ('InvalidRequestException', 'ConflictException'):
+                return
+            time.sleep(delay)
 
 
 def _rule(vault, **extra):
@@ -322,5 +334,108 @@ def test_no_restore_testing_plan_unevaluable(emu, uid):
         assert st and all(s == 0 for s in st.values()), st
         assert 'Unable to evaluate' in json.dumps(res.results)
     finally:
+        _deletePlan(b, planId)
+        _deleteVault(b, vault)
+
+
+# --------------------------------------------------------------------------- #
+# backupVaultNoAccessPolicy - public (Principal "*") vault access policy
+# --------------------------------------------------------------------------- #
+def _publicPolicy(vault_arn, condition=None):
+    stmt = {'Sid': 'AnyoneCopyIn', 'Effect': 'Allow', 'Principal': {'AWS': ['*']},
+            'Action': 'backup:CopyIntoBackupVault', 'Resource': '*'}
+    if condition:
+        stmt['Condition'] = condition
+    return json.dumps({'Version': '2012-10-17', 'Statement': [stmt]})
+
+
+def test_vault_access_policy_public(emu, uid):
+    b = emu.client('backup')
+    vault = f'ss-v-{uid}'
+    arn = b.create_backup_vault(BackupVaultName=vault)['BackupVaultArn']
+    acct = _acct(emu)
+    try:
+        def misconfigure():
+            # An IfExists condition does not restrict callers that lack the key.
+            b.put_backup_vault_access_policy(BackupVaultName=vault, Policy=_publicPolicy(
+                arn, {'StringEqualsIfExists': {'aws:PrincipalAccount': acct}}))
+
+        def fix():
+            b.put_backup_vault_access_policy(BackupVaultName=vault, Policy=_publicPolicy(
+                arn, {'StringEquals': {'aws:PrincipalAccount': acct}}))
+
+        before, _ = assertFlagFixCycle(emu, 'backup', 'backupVaultNoAccessPolicy', f'Vault::{vault}',
+                                       misconfigure, fix)
+        res = runCheck(emu, 'backup', 'backupVaultNoAccessPolicy', f'Vault::{vault}')
+        assert all(s == 1 for s in res.statuses().values()), res.statuses()
+    finally:
+        try:
+            b.delete_backup_vault_access_policy(BackupVaultName=vault)
+        except Exception:
+            pass
+        _deleteVault(b, vault)
+
+
+# --------------------------------------------------------------------------- #
+# airGappedVaultNoMpa
+# --------------------------------------------------------------------------- #
+def test_air_gapped_vault_no_mpa(emu, uid):
+    b = emu.client('backup')
+    vault = f'ss-lag-{uid}'
+    team = f'arn:aws:mpa:us-east-1:{_acct(emu)}:approval-team/ss-{uid}'
+    b.create_logically_air_gapped_backup_vault(BackupVaultName=vault, MinRetentionDays=7,
+                                               MaxRetentionDays=35)
+    try:
+        def misconfigure():
+            pass  # a new air-gapped vault has no MPA team
+
+        def fix():
+            b.associate_backup_vault_mpa_approval_team(BackupVaultName=vault, MpaApprovalTeamArn=team)
+
+        assertFlagFixCycle(emu, 'backup', 'airGappedVaultNoMpa', f'Vault::{vault}', misconfigure, fix)
+        res = runCheck(emu, 'backup', 'airGappedVaultNoMpa', f'Vault::{vault}')
+        assert all(s == 1 for s in res.statuses().values()), res.statuses()
+    finally:
+        try:
+            b.disassociate_backup_vault_mpa_approval_team(BackupVaultName=vault)
+        except Exception:
+            pass
+        _deleteVault(b, vault)
+
+
+def test_air_gapped_mpa_not_applicable_to_standard_vault(emu, uid):
+    b = emu.client('backup')
+    vault = f'ss-v-{uid}'
+    b.create_backup_vault(BackupVaultName=vault)
+    try:
+        st = runCheck(emu, 'backup', 'airGappedVaultNoMpa', f'Vault::{vault}').statuses()
+        assert st and all(s == 0 for s in st.values()), st
+    finally:
+        _deleteVault(b, vault)
+
+
+# --------------------------------------------------------------------------- #
+# backupAuditFrameworkMissing (list_report_plans is NotImplemented in the
+# emulator; the check treats report plans as informational only)
+# --------------------------------------------------------------------------- #
+def test_audit_framework_missing(emu, uid):
+    b = emu.client('backup')
+    vault, plan, fw = f'ss-v-{uid}', f'ss-p-{uid}', f'ss_fw_{uid}'.replace('-', '_')
+    b.create_backup_vault(BackupVaultName=vault)
+    planId = b.create_backup_plan(BackupPlan={
+        'BackupPlanName': plan, 'Rules': [_rule(vault, Lifecycle={'DeleteAfterDays': 90})]})['BackupPlanId']
+    assert not b.list_frameworks().get('Frameworks'), 'private emulator expected to have no frameworks'
+    try:
+        def misconfigure():
+            pass  # no framework exists
+
+        def fix():
+            b.create_framework(FrameworkName=fw, FrameworkControls=[
+                {'ControlName': 'BACKUP_RECOVERY_POINT_ENCRYPTED'}])
+
+        assertFlagFixCycle(emu, 'backup', 'backupAuditFrameworkMissing', 'Account::us-east-1',
+                           misconfigure, fix)
+    finally:
+        _retry(lambda: b.delete_framework(FrameworkName=fw))
         _deletePlan(b, planId)
         _deleteVault(b, vault)

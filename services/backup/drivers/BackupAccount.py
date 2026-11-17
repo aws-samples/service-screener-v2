@@ -21,6 +21,7 @@ class BackupAccount(Evaluator):
       - backupPlanNoCrossAccountCopy      (S/M)  No rule copies to another account
       - backupNoFailureAlerting           (R/M)  No notification on job failures
       - backupNoRestoreTestingPlan        (R/M)  No restore testing plan / selections
+      - backupAuditFrameworkMissing       (R/L)  No Backup Audit Manager framework
 
     Input:
       account -- dict produced by Backup.py._discoverAccount.
@@ -518,8 +519,64 @@ class BackupAccount(Evaluator):
             ]
 
     # ------------------------------------------------------------------ #
+    # 12. No AWS Backup Audit Manager framework
+    # ------------------------------------------------------------------ #
+    # Frameworks in these deployment states do not evaluate any control.
+    INEFFECTIVE_FRAMEWORK_STATES = frozenset({'FAILED', 'DELETE_IN_PROGRESS'})
+
+    def _checkBackupAuditFrameworkMissing(self):
+        key = 'backupAuditFrameworkMissing'
+        if not (self.account.get('_plans') or []):
+            self.results[key] = [0, "No backup plans in this region - see backupNoPlanExists"]
+            return
+        try:
+            frameworks = self._listAllTokens('list_frameworks', 'Frameworks')
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({self._code(e)})"]
+            return
+
+        active = [f for f in frameworks
+                  if str(f.get('DeploymentStatus') or '').upper() not in self.INEFFECTIVE_FRAMEWORK_STATES]
+        if not active:
+            if frameworks:
+                states = ', '.join(sorted({str(f.get('DeploymentStatus')) for f in frameworks}))
+                msg = (f"{len(frameworks)} Backup Audit Manager framework(s) exist but none is "
+                       f"deployed (DeploymentStatus: {states})")
+            else:
+                msg = "No AWS Backup Audit Manager framework exists in this region"
+            self.results[key] = [-1, msg]
+            return
+
+        # Report plans deliver the audit evidence; informational only - a
+        # deployed framework already evaluates compliance through AWS Config.
+        reportNote = ''
+        try:
+            reportPlans = self._listAllTokens('list_report_plans', 'ReportPlans')
+            reportNote = f"; {len(reportPlans)} report plan(s)"
+        except botocore.exceptions.ClientError:
+            reportNote = '; report plans not readable'
+        names = ', '.join(str(f.get('FrameworkName')) for f in active[:5])
+        self.results[key] = [
+            1, f"{len(active)} Backup Audit Manager framework(s) deployed: {names}{reportNote}"
+        ]
+
+    # ------------------------------------------------------------------ #
     # Helpers
     # ------------------------------------------------------------------ #
+    def _listAllTokens(self, op, listKey, **kwargs):
+        """List every item of a NextToken-paginated backup API that has no
+        boto3 paginator (list_frameworks, list_report_plans)."""
+        items, token = [], None
+        while True:
+            args = dict(kwargs)
+            if token:
+                args['NextToken'] = token
+            resp = getattr(self.backupClient, op)(**args)
+            items.extend(resp.get(listKey) or [])
+            token = resp.get('NextToken')
+            if not token:
+                return items
+
     def _paginate(self, op, listKey, **kwargs):
         yield from self._paginateClient(self.backupClient, op, listKey, **kwargs)
 

@@ -490,5 +490,39 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/vault-lock.html"
+	},
+	"airGappedVaultNoMpa": {
+		"category": "S",
+		"^description": "{$COUNT} logically air-gapped backup vault(s) have no multi-party approval (MPA) team associated. Without an MPA approval team, access to the vault's recovery points cannot be restored to a different account through multi-party approval if the owning account is compromised, locked out, or closed - removing one of the main recovery paths an air-gapped vault is meant to provide.",
+		"shortDesc": "Associate an MPA approval team with logically air-gapped vaults",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Multi-party approval for logically air-gapped vaults]<https://docs.aws.amazon.com/aws-backup/latest/devguide/multipartyapproval.html>",
+			"[Logically air-gapped vault]<https://docs.aws.amazon.com/aws-backup/latest/devguide/logicallyairgappedvault.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/multipartyapproval.html"
+	},
+	"backupAuditFrameworkMissing": {
+		"category": "R",
+		"^description": "{$COUNT} region(s) use AWS Backup but have no deployed AWS Backup Audit Manager framework. Without a framework, there is no continuous, auditable evaluation of backup controls (backup plan frequency and retention, vault lock, encryption, cross-Region/cross-account copies), so drift from your backup policy can go unnoticed until a restore is needed. Audit Manager requires AWS Config resource recording and incurs AWS Config charges.",
+		"shortDesc": "Deploy an AWS Backup Audit Manager framework",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Backup Audit Manager]<https://docs.aws.amazon.com/aws-backup/latest/devguide/aws-backup-audit-manager.html>",
+			"[Working with audit frameworks]<https://docs.aws.amazon.com/aws-backup/latest/devguide/working-with-audit-frameworks.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/working-with-audit-frameworks.html"
 	}
 }

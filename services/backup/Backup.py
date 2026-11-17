@@ -136,6 +136,7 @@ class Backup(Service):
         # no policy is attached — treat that as an explicit None.
         access_policy = None
         access_policy_missing = False
+        access_policy_error = None
         try:
             pol_resp = self.backupClient.get_backup_vault_access_policy(
                 BackupVaultName=name
@@ -146,6 +147,10 @@ class Backup(Service):
             if code == 'ResourceNotFoundException':
                 access_policy_missing = True
             else:
+                # Unreadable (AccessDenied, throttling, ...) - recorded so the
+                # policy check reports "Unable to evaluate" instead of
+                # treating the vault as having no policy.
+                access_policy_error = code or 'ClientError'
                 self._logClientError(
                     f'get_backup_vault_access_policy({name})', e
                 )
@@ -168,6 +173,10 @@ class Backup(Service):
             '_vaultType': resp.get('VaultType') or summary.get('VaultType') or 'BACKUP_VAULT',
             '_accessPolicy': access_policy,
             '_accessPolicyMissing': access_policy_missing,
+            '_accessPolicyError': access_policy_error,
+            # Multi-party approval (logically air-gapped vaults only).
+            '_mpaApprovalTeamArn': resp.get('MpaApprovalTeamArn'),
+            '_vaultState': resp.get('VaultState'),
             '_recoveryPoints': recovery_points,
         }
         return detail

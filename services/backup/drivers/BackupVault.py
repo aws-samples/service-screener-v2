@@ -1,7 +1,7 @@
-import json
 from datetime import datetime, timedelta, timezone
 
 from services.Evaluator import Evaluator
+from utils import PolicyPrincipal
 
 
 class BackupVault(Evaluator):
@@ -11,6 +11,7 @@ class BackupVault(Evaluator):
       - backupVaultNoLock              (S/H)   Vault Lock disabled
       - backupVaultDefaultEncryption   (S/M)   AWS-owned KMS key
       - backupVaultNoAccessPolicy      (S/H)   No policy or open policy
+      - airGappedVaultNoMpa            (S/L)   LAG vault without MPA team
       - backupVaultEmpty               (R/L)   Zero recovery points > 7 days old
       - backupVaultLockNotFinalized    (S/M)   Governance mode / future LockDate
       - backupRecoveryPointNotEncrypted (S/M)  IsEncrypted=false on any point
@@ -32,6 +33,8 @@ class BackupVault(Evaluator):
         'aws/backup',    # standard service-managed alias
     )
     AWS_OWNED_KMS_TYPE = 'AWS_OWNED_KMS_KEY'
+
+    LOGICALLY_AIR_GAPPED = 'LOGICALLY_AIR_GAPPED_BACKUP_VAULT'
 
     # backupVaultEmpty grace period: newly-created vaults may legitimately be
     # empty for a few backup cycles.
@@ -117,48 +120,59 @@ class BackupVault(Evaluator):
     # 3. No / open access policy
     # ------------------------------------------------------------------ #
     def _checkBackupVaultNoAccessPolicy(self):
-        if self.vault.get('_accessPolicyMissing'):
-            self.results['backupVaultNoAccessPolicy'] = [
-                -1, "No vault access policy attached"
-            ]
+        key = 'backupVaultNoAccessPolicy'
+        err = self.vault.get('_accessPolicyError')
+        if err:
+            # get_backup_vault_access_policy failed with something other than
+            # ResourceNotFoundException (AccessDenied, throttling, ...): the
+            # policy may exist and may be public - never report "no policy".
+            self.results[key] = [0, f"Unable to evaluate ({err})"]
             return
 
         raw = self.vault.get('_accessPolicy')
-        if not raw:
-            self.results['backupVaultNoAccessPolicy'] = [
-                -1, "No vault access policy attached"
-            ]
+        if self.vault.get('_accessPolicyMissing') or not raw:
+            self.results[key] = [-1, "No vault access policy attached"]
             return
 
-        parsed = self._parsePolicy(raw)
-        if parsed is None:
-            self.results['backupVaultNoAccessPolicy'] = [
-                0, "Vault access policy present but not parseable"
-            ]
+        if PolicyPrincipal.parsePolicy(raw) is None:
+            self.results[key] = [0, "Vault access policy present but not parseable"]
             return
 
-        # Walk every statement; flag any Allow with Principal:* that has no
-        # scoping condition. That is the classic "world-writable" misconfig
-        # for Backup vaults.
+        # Flag any Allow statement that applies to any principal (Principal
+        # "*", {"AWS": "*"}, {"AWS": ["*"]}, or NotPrincipal) and is not bound
+        # to a known account / organisation by a positive-match Condition.
+        # IfExists / negated / ForAllValues operators and wildcard-only values
+        # do not count as scoping (utils.PolicyPrincipal).
         offending = []
-        for i, stmt in enumerate(self._policyStatements(parsed)):
-            if stmt.get('Effect') != 'Allow':
-                continue
-            if not self._principalIsWildcard(stmt.get('Principal')):
-                continue
-            if self._conditionScopes(stmt.get('Condition')):
-                continue
-            sid = stmt.get('Sid', f"stmt{i}")
-            offending.append(sid)
+        for i, stmt in enumerate(PolicyPrincipal.iterStatements(raw)):
+            if PolicyPrincipal.statementIsPublic(stmt):
+                offending.append(str(stmt.get('Sid') or f"stmt{i}"))
 
         if offending:
-            self.results['backupVaultNoAccessPolicy'] = [
+            self.results[key] = [
                 -1,
-                f"Access policy has wildcard-principal Allow without Condition: {', '.join(offending)}"
+                "Access policy grants access to any principal without a scoping Condition: "
+                + ', '.join(offending)
             ]
         else:
-            self.results['backupVaultNoAccessPolicy'] = [
-                1, "Vault access policy present and scoped"
+            self.results[key] = [1, "Vault access policy present and scoped"]
+
+    # ------------------------------------------------------------------ #
+    # 3b. Logically air-gapped vault without a multi-party approval team
+    # ------------------------------------------------------------------ #
+    def _checkAirGappedVaultNoMpa(self):
+        key = 'airGappedVaultNoMpa'
+        if (self.vault.get('_vaultType') or '').upper() != self.LOGICALLY_AIR_GAPPED:
+            self.results[key] = [0, "Not a logically air-gapped vault - MPA not applicable"]
+            return
+        teamArn = self.vault.get('_mpaApprovalTeamArn')
+        if teamArn:
+            self.results[key] = [1, f"Multi-party approval team associated: {teamArn}"]
+        else:
+            self.results[key] = [
+                -1,
+                "Logically air-gapped vault has no multi-party approval (MPA) team associated; "
+                "vault access cannot be recovered through MPA if the owning account is compromised or lost"
             ]
 
     # ------------------------------------------------------------------ #
@@ -386,58 +400,6 @@ class BackupVault(Evaluator):
             return False
         lower = keyArn.lower()
         return any(alias in lower for alias in cls.AWS_OWNED_KMS_ALIASES)
-
-    @staticmethod
-    def _parsePolicy(raw):
-        if not raw:
-            return None
-        if isinstance(raw, dict):
-            return raw
-        try:
-            return json.loads(raw)
-        except (ValueError, TypeError):
-            return None
-
-    @staticmethod
-    def _policyStatements(policy):
-        if not isinstance(policy, dict):
-            return []
-        stmts = policy.get('Statement', [])
-        if isinstance(stmts, dict):
-            return [stmts]
-        return stmts if isinstance(stmts, list) else []
-
-    @staticmethod
-    def _principalIsWildcard(principal):
-        if principal is None:
-            return False
-        if principal == '*':
-            return True
-        if isinstance(principal, dict):
-            for v in principal.values():
-                if v == '*':
-                    return True
-                if isinstance(v, list) and '*' in v:
-                    return True
-        return False
-
-    # Conditions that legitimately scope a Principal:* Allow statement.
-    SCOPING_CONDITION_KEYS = frozenset({
-        'aws:SourceAccount', 'aws:SourceArn', 'aws:SourceOwner',
-        'aws:PrincipalOrgID', 'aws:PrincipalOrgPaths',
-        'aws:PrincipalAccount', 'aws:PrincipalArn',
-    })
-
-    def _conditionScopes(self, condition):
-        if not condition or not isinstance(condition, dict):
-            return False
-        for op_block in condition.values():
-            if not isinstance(op_block, dict):
-                continue
-            for key in op_block.keys():
-                if key in self.SCOPING_CONDITION_KEYS:
-                    return True
-        return False
 
     @staticmethod
     def _asDatetime(value):
