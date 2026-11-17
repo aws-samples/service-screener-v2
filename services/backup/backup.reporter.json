@@ -268,11 +268,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Recovery point lifecycle]<https://docs.aws.amazon.com/aws-backup/latest/devguide/API_Lifecycle.html>"
+			"[Recovery point lifecycle]<https://docs.aws.amazon.com/aws-backup/latest/APIReference/API_Lifecycle.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/API_Lifecycle.html"
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/APIReference/API_Lifecycle.html"
 	},
 	"backupVaultLockNotFinalized": {
 		"category": "S",
@@ -316,7 +316,7 @@
 		"additionalCost": 1,
 		"needFullTest": 1,
 		"ref": [
-			"[list_protected_resources]<https://docs.aws.amazon.com/aws-backup/latest/devguide/API_ListProtectedResources.html>",
+			"[list_protected_resources]<https://docs.aws.amazon.com/aws-backup/latest/APIReference/API_ListProtectedResources.html>",
 			"[Assign resources to a backup plan]<https://docs.aws.amazon.com/aws-backup/latest/devguide/assigning-resources.html>"
 		],
 		"remediation": null,

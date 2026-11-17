@@ -141,12 +141,12 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Standard vs Express workflows]<https://docs.aws.amazon.com/step-functions/latest/dg/concepts-standard-vs-express.html>",
+			"[Standard vs Express workflows]<https://docs.aws.amazon.com/step-functions/latest/dg/choosing-workflow-type.html>",
 			"[Step Functions best practices]<https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/concepts-standard-vs-express.html"
+		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/choosing-workflow-type.html"
 	},
 	"sfnStatusNotActive": {
 		"category": "O",
@@ -190,12 +190,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>",
+			"[Tagging AWS resources]<https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html>",
 			"[Step Functions best practices]<https://docs.aws.amazon.com/step-functions/latest/dg/sfn-best-practices.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html"
+		"remediation_doc": "https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html"
 	},
 	"sfnNoHeartbeat": {
 		"category": "R",
@@ -240,11 +240,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Map state MaxConcurrency]<https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-map-state.html>"
+			"[Map state MaxConcurrency]<https://docs.aws.amazon.com/step-functions/latest/dg/state-map.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-map-state.html"
+		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/state-map.html"
 	},
 	"sfnTaskNoTimeout": {
 		"category": "R",
@@ -288,11 +288,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Choice state Default]<https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-choice-state.html>"
+			"[Choice state Default]<https://docs.aws.amazon.com/step-functions/latest/dg/state-choice.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-choice-state.html"
+		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/state-choice.html"
 	},
 	"sfnRoleDoesNotExist": {
 		"category": "O",
@@ -336,11 +336,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Parallel state error handling]<https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-parallel-state.html>"
+			"[Parallel state error handling]<https://docs.aws.amazon.com/step-functions/latest/dg/state-parallel.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-parallel-state.html"
+		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/state-parallel.html"
 	},
 	"sfnMapNoCatch": {
 		"category": "R",
@@ -352,11 +352,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Map state error handling]<https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-map-state.html>"
+			"[Map state error handling]<https://docs.aws.amazon.com/step-functions/latest/dg/state-map.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/amazon-states-language-map-state.html"
+		"remediation_doc": "https://docs.aws.amazon.com/step-functions/latest/dg/state-map.html"
 	},
 	"sfnRetryNoBackoff": {
 		"category": "R",

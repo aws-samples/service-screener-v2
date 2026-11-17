@@ -214,7 +214,7 @@
     "needFullTest": 1,
     "ref": [
       "[API destinations]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-api-destinations.html>",
-      "[Data protection in transit]<https://docs.aws.amazon.com/eventbridge/latest/userguide/data-protection.html>"
+      "[Data protection in transit]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-data-protection.html>"
     ],
     "remediation": null,
     "remediation_risk": null,

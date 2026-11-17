@@ -189,12 +189,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>",
+			"[Tagging AWS resources]<https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html>",
 			"[Tagging AWS WAF resources]<https://docs.aws.amazon.com/waf/latest/developerguide/tagging.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html"
+		"remediation_doc": "https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html"
 	},
 	"wafv2NoIpReputationList": {
 		"category": "S",

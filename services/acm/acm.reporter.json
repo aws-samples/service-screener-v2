@@ -26,7 +26,7 @@
 		"criticality": "H",
 		"shortDesc": "Certificate has expired",
 		"ref": [
-			"[ACM Certificate Lifecycle]<https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate.html>",
+			"[ACM Certificate Lifecycle]<https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate-characteristics.html>",
 			"[Troubleshoot certificate renewal]<https://docs.aws.amazon.com/acm/latest/userguide/troubleshooting-renewal.html>"
 		],
 		"remediation": null,
@@ -44,11 +44,11 @@
 		"shortDesc": "RSA key too short (< 2048 bits)",
 		"ref": [
 			"[ACM.2 Security Hub Control]<https://docs.aws.amazon.com/securityhub/latest/userguide/acm-controls.html>",
-			"[ACM Supported Key Algorithms]<https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate.html>"
+			"[ACM Supported Key Algorithms]<https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate-characteristics.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate.html"
+		"remediation_doc": "https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate-characteristics.html"
 	},
 	"acmCertRenewalFailed": {
 		"category": "R",

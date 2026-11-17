@@ -78,7 +78,7 @@
         "needFullTest": 0,
         "ref": [
             "[Protect a stack from being deleted]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-protect-stacks.html>",
-            "[Stack options]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-add-tags.html>"
+            "[Stack options]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-create-stack.html#configure-stack-options>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -95,7 +95,7 @@
         "needFullTest": 0,
         "ref": [
             "[Monitor and roll back stack operations]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-rollback-triggers.html>",
-            "[Rollback configuration]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-updating-stacks.html>"
+            "[Rollback configuration]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -111,7 +111,7 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Stack notifications]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-add-tags.html>",
+            "[Stack notifications]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-create-stack.html#configure-stack-options>",
             "[Monitoring stacks]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks-monitoring.html>"
         ],
         "remediation": null,
@@ -128,12 +128,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Stack updates]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-updating-stacks.html>",
+            "[Stack updates]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html>",
             "[Working with stacks]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-updating-stacks.html"
+        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html"
     },
     "cfnIAMCapabilityGranted": {
         "category": "S",
@@ -145,12 +145,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Acknowledging IAM resources]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-iam-template.html>",
+            "[Acknowledging IAM resources]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/control-access-with-iam.html>",
             "[Controlling access with IAM]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-iam-servicerole.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-iam-template.html"
+        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/control-access-with-iam.html"
     },
     "cfnNoTags": {
         "category": "O",
@@ -162,12 +162,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Setting stack tags]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-add-tags.html>",
+            "[Setting stack tags]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-create-stack.html#configure-stack-options>",
             "[Tagging AWS resources]<https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-add-tags.html"
+        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-create-stack.html#configure-stack-options"
     },
     "cfnNoProactiveHooks": {
         "category": "S",

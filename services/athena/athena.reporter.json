@@ -112,7 +112,7 @@
         "needFullTest": 1,
         "ref": [
             "[Athena engine versioning]<https://docs.aws.amazon.com/athena/latest/ug/engine-versions.html>",
-            "[Engine version reference]<https://docs.aws.amazon.com/athena/latest/ug/engine-versions-reference.html>"
+            "[Engine version reference]<https://docs.aws.amazon.com/athena/latest/ug/engine-versions.html>"
         ],
         "remediation": null,
         "remediation_risk": null,

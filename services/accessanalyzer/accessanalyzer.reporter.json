@@ -129,7 +129,7 @@
         "needFullTest": 0,
         "ref": [
             "[Organization analyzers]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-getting-started.html>",
-            "[Delegated administrator]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-settings.html>"
+            "[Delegated administrator]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-delegated-administrator.html>"
         ],
         "remediation": null,
         "remediation_risk": null,

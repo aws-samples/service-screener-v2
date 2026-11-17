@@ -26,11 +26,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Password policy]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-policies.html>"
+			"[Password policy]<https://docs.aws.amazon.com/cognito/latest/developerguide/managing-users-passwords.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-policies.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/managing-users-passwords.html"
 	},
 	"cognitoAdvancedSecurityNotEnforced": {
 		"category": "S",
@@ -42,11 +42,11 @@
 		"additionalCost": 1,
 		"needFullTest": 1,
 		"ref": [
-			"[Advanced security features]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-advanced-security.html>"
+			"[Advanced security features]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-threat-protection.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-advanced-security.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-threat-protection.html"
 	},
 	"cognitoDeletionProtectionDisabled": {
 		"category": "R",
@@ -90,11 +90,11 @@
 		"additionalCost": 1,
 		"needFullTest": 1,
 		"ref": [
-			"[Cognito Lambda triggers]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-identity-pools-working-with-aws-lambda-triggers.html>"
+			"[Cognito Lambda triggers]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-working-with-lambda-triggers.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-identity-pools-working-with-aws-lambda-triggers.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-working-with-lambda-triggers.html"
 	},
 	"cognitoAccountRecoveryNotConfigured": {
 		"category": "R",
@@ -106,11 +106,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Account recovery]<https://docs.aws.amazon.com/cognito/latest/developerguide/how-to-recover-a-user-account.html>"
+			"[Account recovery]<https://docs.aws.amazon.com/cognito/latest/developerguide/managing-users-passwords.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/how-to-recover-a-user-account.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/managing-users-passwords.html"
 	},
 	"cognitoSingleRecoveryOption": {
 		"category": "R",
@@ -122,11 +122,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Recovery mechanisms]<https://docs.aws.amazon.com/cognito/latest/developerguide/how-to-recover-a-user-account.html>"
+			"[Recovery mechanisms]<https://docs.aws.amazon.com/cognito/latest/developerguide/managing-users-passwords.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/how-to-recover-a-user-account.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/managing-users-passwords.html"
 	},
 	"cognitoUnusedUserPool": {
 		"category": "C",
@@ -186,11 +186,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>"
+			"[Tagging AWS resources]<https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html"
+		"remediation_doc": "https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html"
 	},
 	"cognitoCompromisedCredentialProtection": {
 		"category": "S",
@@ -266,12 +266,12 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Cognito OAuth flows]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-idp-settings.html>",
+			"[Cognito OAuth flows]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-client-apps.html>",
 			"[OAuth 2.1 draft]<https://oauth.net/2.1/>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-idp-settings.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-client-apps.html"
 	},
 	"cognitoClientTokenRevocationDisabled": {
 		"category": "S",
@@ -299,11 +299,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Cognito app client settings]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-idp-settings.html>"
+			"[Cognito app client settings]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-client-apps.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-idp-settings.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-client-apps.html"
 	},
 	"cognitoClientUserExistenceErrors": {
 		"category": "S",
@@ -331,11 +331,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Cognito authentication flows]<https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-authentication-flow.html>"
+			"[Cognito authentication flows]<https://docs.aws.amazon.com/cognito/latest/developerguide/authentication.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-authentication-flow.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/authentication.html"
 	},
 	"cognitoClientHttpLogoutUrl": {
 		"category": "S",
@@ -347,11 +347,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Cognito app client settings]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-idp-settings.html>"
+			"[Cognito app client settings]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-client-apps.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-idp-settings.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-client-apps.html"
 	},
 	"cognitoAccountTakeoverProtectionWeak": {
 		"category": "S",
@@ -395,11 +395,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Cognito advanced security]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-advanced-security.html>"
+			"[Cognito advanced security]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-threat-protection.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-advanced-security.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-settings-threat-protection.html"
 	},
 	"cognitoDefaultEmailSender": {
 		"category": "O",
@@ -475,11 +475,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Cognito password policy]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-policies.html>"
+			"[Cognito password policy]<https://docs.aws.amazon.com/cognito/latest/developerguide/managing-users-passwords.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-policies.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/managing-users-passwords.html"
 	},
 	"cognitoClientNoSecret": {
 		"category": "S",
@@ -491,11 +491,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Cognito app client types]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-idp-settings.html>"
+			"[Cognito app client types]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-client-apps.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-idp-settings.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-client-apps.html"
 	},
 	"cognitoClientExcessiveScopes": {
 		"category": "S",
@@ -507,11 +507,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Cognito OAuth scopes]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-idp-settings.html>"
+			"[Cognito OAuth scopes]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-client-apps.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-app-idp-settings.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-client-apps.html"
 	},
 	"cognitoNoMfaMethods": {
 		"category": "S",
@@ -640,7 +640,7 @@
 		"ref": [
 			"[Viewing Amazon Cognito user pool metrics]<https://docs.aws.amazon.com/cognito/latest/developerguide/metrics-for-cognito-user-pools.html>",
 			"[Viewing threat protection metrics]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-viewing-threat-protection-app.html>",
-			"[Using Amazon CloudWatch alarms]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html>"
+			"[Using Amazon CloudWatch alarms]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Alarms.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,

@@ -380,11 +380,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Cross-account cross-region dashboards]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_xaxr_dashboard.html>"
+			"[Cross-account cross-region dashboards]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/create_xaxr_dashboard.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_xaxr_dashboard.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/create_xaxr_dashboard.html"
 	},
 	"alarmsWithoutAutoScalingActions": {
 		"category": "O",
@@ -396,7 +396,7 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[CloudWatch alarms for Auto Scaling]<https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-instance-monitoring.html>",
+			"[CloudWatch alarms for Auto Scaling]<https://docs.aws.amazon.com/autoscaling/ec2/userguide/ec2-auto-scaling-cloudwatch-monitoring.html>",
 			"[Dynamic scaling for Amazon EC2 Auto Scaling]<https://docs.aws.amazon.com/autoscaling/ec2/userguide/as-scale-based-on-demand.html>"
 		],
 		"remediation": null,
@@ -626,12 +626,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Using Amazon CloudWatch alarms]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html>",
+			"[Using Amazon CloudWatch alarms]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Alarms.html>",
 			"[EnableAlarmActions]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/APIReference/API_EnableAlarmActions.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Alarms.html"
 	},
 	"cwLogsCentralizationRuleMissing": {
 		"category": "S",
@@ -680,7 +680,7 @@
 			"[Monitoring Amazon Aurora global databases]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-monitoring.html>",
 			"[DynamoDB global tables monitoring]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_monitoring.html>",
 			"[S3 Replication metrics]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/repl-metrics.html>",
-			"[Using Amazon CloudWatch alarms]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html>"
+			"[Using Amazon CloudWatch alarms]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Alarms.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,

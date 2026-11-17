@@ -389,7 +389,7 @@
 		"needFullTest": 0,
 		"ref": [
 			"[CloudWatch Alarms for CloudTrail]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudwatch-alarms-for-cloudtrail.html>",
-			"[CIS AWS Foundations Benchmark]<https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cis-controls.html>"
+			"[CIS AWS Foundations Benchmark]<https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-controls-reference.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,

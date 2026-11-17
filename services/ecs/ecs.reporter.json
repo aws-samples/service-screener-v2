@@ -75,11 +75,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[ECS capacity providers]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/cluster-capacity-providers.html>"
+			"[ECS capacity providers]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/clusters.html#capacity-providers>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/cluster-capacity-providers.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/clusters.html#capacity-providers"
 	},
 	"ecsClusterNoRunningTasks": {
 		"category": "O",
@@ -107,11 +107,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>"
+			"[Tagging AWS resources]<https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html"
+		"remediation_doc": "https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html"
 	},
 	"ecsServicePublicIpDisabled": {
 		"category": "S",
@@ -173,11 +173,11 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Security Hub ECS.10]<https://docs.aws.amazon.com/securityhub/latest/userguide/ecs-controls.html#ecs-10>",
-			"[Fargate platform versions]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/platform_versions.html>"
+			"[Fargate platform versions]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/platform-fargate.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/platform_versions.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/platform-fargate.html"
 	},
 	"ecsServiceAutoScalingConfigured": {
 		"category": "R",

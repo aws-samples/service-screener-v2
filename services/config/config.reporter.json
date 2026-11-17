@@ -112,11 +112,11 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Evaluating resources with AWS Config rules]<https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config.html>",
-			"[Managing AWS Config rules]<https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config-rules.html>"
+			"[Managing AWS Config rules]<https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config_components.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config-rules.html"
+		"remediation_doc": "https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config_components.html"
 	},
 	"configRulesNonCompliant": {
 		"category": "S",

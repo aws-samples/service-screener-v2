@@ -411,11 +411,11 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Global Tables Version Comparison]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V2.html>",
-			"[Upgrading Global Tables]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_upgrade.html>"
+			"[Upgrading Global Tables]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_versions.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_upgrade.html"
+		"remediation_doc": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_versions.html"
 	},
 	"tableClassOptimization": {
 		"category": "C",

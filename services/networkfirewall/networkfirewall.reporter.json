@@ -26,7 +26,7 @@
         "additionalCost": 0,
         "needFullTest": 1,
         "ref": [
-            "[Stateless default actions in your firewall policy]<https://docs.aws.amazon.com/network-firewall/latest/developerguide/stateless-default-actions.html>",
+            "[Stateless default actions in your firewall policy]<https://docs.aws.amazon.com/network-firewall/latest/developerguide/firewall-policy-settings.html>",
             "[AWS managed rule groups for Network Firewall]<https://docs.aws.amazon.com/network-firewall/latest/developerguide/nwfw-managed-rule-groups.html>",
             "[Security Hub controls NetworkFirewall.3, .4, .5]<https://docs.aws.amazon.com/securityhub/latest/userguide/networkfirewall-controls.html>"
         ],

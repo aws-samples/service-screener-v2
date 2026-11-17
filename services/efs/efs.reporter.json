@@ -235,10 +235,10 @@
 		"needFullTest": 0,
 		"shortDesc": "Review tags to ensure no sensitive data is present",
 		"ref": [
-			"[AWS Tagging Best Practices]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>"
+			"[AWS Tagging Best Practices]<https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html"
+		"remediation_doc": "https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html"
 	}
 }

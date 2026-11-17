@@ -139,11 +139,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Node group networking]<https://docs.aws.amazon.com/eks/latest/userguide/network_reqs.html>"
+			"[Node group networking]<https://docs.aws.amazon.com/eks/latest/userguide/network-reqs.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/eks/latest/userguide/network_reqs.html"
+		"remediation_doc": "https://docs.aws.amazon.com/eks/latest/userguide/network-reqs.html"
 	},
 	"eksClusterLoggingIncomplete": {
 		"category": "S",

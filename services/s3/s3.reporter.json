@@ -251,7 +251,7 @@
 		"additionalCost": 0,
 		"needFullTest": -1,
 		"ref": [
-			"[AWS Docs]<https://aws.amazon.com/premiumsupport/knowledge-center/s3-bucket-policy-for-config-rule/>"
+			"[AWS Docs]<https://repost.aws/knowledge-center/s3-bucket-policy-for-config-rule>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -406,7 +406,7 @@
 		"ref": [
 			"[Bucket Tagging]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-tagging.html>",
 			"[Public Access Best Practices]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/security-best-practices.html>",
-			"[Governance]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-overview.html>"
+			"[Governance]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-management.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,

@@ -26,12 +26,12 @@
     "additionalCost": 1,
     "needFullTest": 1,
     "ref": [
-      "[How AWS Systems Manager uses AWS KMS]<https://docs.aws.amazon.com/kms/latest/developerguide/services-parameter-store.html>",
+      "[How AWS Systems Manager uses AWS KMS]<https://docs.aws.amazon.com/systems-manager/latest/userguide/secure-string-parameter-kms-encryption.html>",
       "[SecureString parameters]<https://docs.aws.amazon.com/systems-manager/latest/userguide/parameter-store-about-examples.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
-    "remediation_doc": "https://docs.aws.amazon.com/kms/latest/developerguide/services-parameter-store.html"
+    "remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/secure-string-parameter-kms-encryption.html"
   },
   "ssmParameterOldVersion": {
     "category": "O",
@@ -196,12 +196,12 @@
     "additionalCost": 0,
     "needFullTest": 0,
     "ref": [
-      "[Troubleshooting managed node availability]<https://docs.aws.amazon.com/systems-manager/latest/userguide/troubleshooting-managed-instances.html>",
-      "[AWS Systems Manager Fleet Manager]<https://docs.aws.amazon.com/systems-manager/latest/userguide/fleet.html>"
+      "[Troubleshooting managed node availability]<https://docs.aws.amazon.com/systems-manager/latest/userguide/fleet-manager-troubleshooting-managed-nodes.html>",
+      "[AWS Systems Manager Fleet Manager]<https://docs.aws.amazon.com/systems-manager/latest/userguide/fleet-manager.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
-    "remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/troubleshooting-managed-instances.html"
+    "remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/fleet-manager-troubleshooting-managed-nodes.html"
   },
   "ssmDefaultHostManagementDisabled": {
     "category": "O",
@@ -213,12 +213,12 @@
     "additionalCost": 0,
     "needFullTest": 1,
     "ref": [
-      "[Default Host Management Configuration]<https://docs.aws.amazon.com/systems-manager/latest/userguide/managed-instances-default-host-management.html>",
+      "[Default Host Management Configuration]<https://docs.aws.amazon.com/systems-manager/latest/userguide/fleet-manager-default-host-management-configuration.html>",
       "[Setting up Systems Manager for EC2 instances]<https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-setting-up-ec2.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
-    "remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/managed-instances-default-host-management.html"
+    "remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/fleet-manager-default-host-management-configuration.html"
   },
   "ssmInventoryNotConfigured": {
     "category": "O",

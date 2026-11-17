@@ -835,13 +835,13 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[IAM role trust policies]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_terms-and-concepts.html#iam-term-trust-policy>",
+			"[IAM role trust policies]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html#id_roles_terms-and-concepts>",
 			"[AWS JSON policy elements: Principal]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html>",
 			"[Access to AWS accounts owned by third parties]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_common-scenarios_third-party.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/roles-managingrole-editing-console.html#roles-managingrole_edit-trust-policy"
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_manage.html#roles-managingrole_edit-trust-policy"
 	},
 	"iamServerCertificates": {
 		"category": "S",
@@ -912,7 +912,7 @@
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-access_examples.html"
+		"remediation_doc": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-access_iam-policies.html"
 	},
 	"controlTowerLandingZoneDrift": {
 		"category": "S",

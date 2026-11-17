@@ -128,12 +128,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Finding workflow status]<https://docs.aws.amazon.com/securityhub/latest/userguide/finding-workflow-status.html>",
+            "[Finding workflow status]<https://docs.aws.amazon.com/securityhub/latest/userguide/findings-workflow-status.html>",
             "[Managing findings]<https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-findings-viewing.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/securityhub/latest/userguide/finding-workflow-status.html"
+        "remediation_doc": "https://docs.aws.amazon.com/securityhub/latest/userguide/findings-workflow-status.html"
     },
     "shubFsbpStandardDisabled": {
         "category": "S",

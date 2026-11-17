@@ -41,11 +41,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Glue Data Catalog Resource Policies]<https://docs.aws.amazon.com/glue/latest/dg/glue-resource-policies.html>"
+			"[Glue Data Catalog Resource Policies]<https://docs.aws.amazon.com/glue/latest/dg/security_iam_service-with-iam.html#security_iam_service-with-iam-resource-based-policies>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/glue-resource-policies.html"
+		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/security_iam_service-with-iam.html#security_iam_service-with-iam-resource-based-policies"
 	},
 	"SslEnabled": {
 		"category": "S",
@@ -57,11 +57,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Connecting to a JDBC Data Store in a VPC]<https://docs.aws.amazon.com/glue/latest/dg/connection-using.html>"
+			"[Connecting to a JDBC Data Store in a VPC]<https://docs.aws.amazon.com/glue/latest/dg/glue-connections.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/connection-using.html"
+		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/glue-connections.html"
 	},
 	"DevEndpointCloudWatchLogsEncryption": {
 		"category": "S",

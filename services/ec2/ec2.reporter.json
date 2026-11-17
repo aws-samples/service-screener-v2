@@ -399,7 +399,7 @@
 		"needFullTest": 0,
 		"shortDesc": "New EBS Generation Available",
 		"ref": [
-			"[Amazon EBS volume types]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-volume-types.html>"
+			"[Amazon EBS volume types]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volume-types.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -543,7 +543,7 @@
 		"needFullTest": 0,
 		"shortDesc": "EBS Fast Snapshot Enabled",
 		"ref": [
-			"[EBS FastSnapshot Pricing]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ebs-fast-snapshot-restore.html#fsr-pricing>"
+			"[EBS FastSnapshot Pricing]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-fast-snapshot-restore.html#fsr-pricing>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -719,11 +719,11 @@
 		"needFullTest": 0,
 		"shortDesc": "Reserved Instance Recommendation",
 		"ref": [
-			"[Reserved Instance]<https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/ri-recommendations.html>"
+			"[Reserved Instance]<https://docs.aws.amazon.com/cost-management/latest/userguide/ri-recommendations.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/ri-recommendations.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cost-management/latest/userguide/ri-recommendations.html"
 	},
 	"CESavingsPlans": {
 		"category": "C",
@@ -1041,12 +1041,12 @@
 		"needFullTest": 1,
 		"shortDesc": "Use non-EOL Windows",
 		"ref": [
-			"[Windows Upgrade Guide]<https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/serverupgrade.html/>",
+			"[Windows Upgrade Guide]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/serverupgrade.html>",
 			"[endoflife]<https://endoflife.date/windows-server>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/serverupgrade.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/serverupgrade.html"
 	},
 	"WindowsOSNotLatest": {
 		"category": "S",
@@ -1058,12 +1058,12 @@
 		"needFullTest": 1,
 		"shortDesc": "Use non-EOL Windows",
 		"ref": [
-			"[Windows Upgrade Guide]<https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/serverupgrade.html/>",
+			"[Windows Upgrade Guide]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/serverupgrade.html>",
 			"[endoflife]<https://endoflife.date/windows-server>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/WindowsGuide/serverupgrade.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/serverupgrade.html"
 	},
 	"EBSEncryptionByDefault": {
 		"category": "S",

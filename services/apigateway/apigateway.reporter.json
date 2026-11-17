@@ -154,11 +154,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Setting up a stage using the API Gateway console]<https://docs.aws.amazon.com/apigateway/latest/developerguide/stages.html>"
+			"[Setting up a stage using the API Gateway console]<https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-stages.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/apigateway/latest/developerguide/stages.html"
+		"remediation_doc": "https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-stages.html"
 	},
 	"ResourcePolicy": {
 		"category": "S",
@@ -358,11 +358,11 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Monitor REST APIs with CloudWatch metrics]<https://docs.aws.amazon.com/apigateway/latest/developerguide/monitoring-cloudwatch.html>",
-			"[Using Amazon CloudWatch alarms]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html>"
+			"[Using Amazon CloudWatch alarms]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Alarms.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch_Alarms.html"
 	},
 	"APIKeyAntiPattern": {
 		"category": "S",
@@ -459,12 +459,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Setting up a stage]<https://docs.aws.amazon.com/apigateway/latest/developerguide/stages.html>",
+			"[Setting up a stage]<https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-stages.html>",
 			"[Deploy REST APIs]<https://docs.aws.amazon.com/apigateway/latest/developerguide/how-to-deploy-api.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/apigateway/latest/developerguide/stages.html"
+		"remediation_doc": "https://docs.aws.amazon.com/apigateway/latest/developerguide/set-up-stages.html"
 	},
 	"CORSConfiguration": {
 		"category": "S",

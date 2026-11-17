@@ -203,12 +203,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[SageMaker Model Data]<https://docs.aws.amazon.com/sagemaker/latest/dg/API_ContainerDefinition.html>",
+			"[SageMaker Model Data]<https://docs.aws.amazon.com/sagemaker/latest/APIReference/API_ContainerDefinition.html>",
 			"[Security Best Practices]<https://docs.aws.amazon.com/sagemaker/latest/dg/security-best-practices.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/sagemaker/latest/dg/API_ContainerDefinition.html"
+		"remediation_doc": "https://docs.aws.amazon.com/sagemaker/latest/APIReference/API_ContainerDefinition.html"
 	},
 	"TrainingSpotInstancesEnabled": {
 		"category": "C",

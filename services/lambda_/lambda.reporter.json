@@ -9,11 +9,11 @@
 		"needFullTest": 1,
 		"shortDesc": "Function URLs In Used",
 		"ref": [
-			"[Lambda function URLs]<https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html>"
+			"[Lambda function URLs]<https://docs.aws.amazon.com/lambda/latest/dg/urls-configuration.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-urls.html"
+		"remediation_doc": "https://docs.aws.amazon.com/lambda/latest/dg/urls-configuration.html"
 	},
 	"lambdaMissingRole": {
 		"category": "S",
@@ -185,11 +185,11 @@
 		"needFullTest": 0,
 		"shortDesc": "Function not in used for 7 days",
 		"ref": [
-			"[API to delete Lambda]<https://docs.aws.amazon.com/lambda/latest/dg/API_DeleteFunction.html>"
+			"[API to delete Lambda]<https://docs.aws.amazon.com/lambda/latest/api/API_DeleteFunction.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/lambda/latest/dg/API_DeleteFunction.html"
+		"remediation_doc": "https://docs.aws.amazon.com/lambda/latest/api/API_DeleteFunction.html"
 	},
 	"lambdaNotInUsed30Days": {
 		"category": "O",
@@ -201,11 +201,11 @@
 		"needFullTest": 0,
 		"shortDesc": "Function not in used for 30 days",
 		"ref": [
-			"[API to delete Lambda]<https://docs.aws.amazon.com/lambda/latest/dg/API_DeleteFunction.html>"
+			"[API to delete Lambda]<https://docs.aws.amazon.com/lambda/latest/api/API_DeleteFunction.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/lambda/latest/dg/API_DeleteFunction.html"
+		"remediation_doc": "https://docs.aws.amazon.com/lambda/latest/api/API_DeleteFunction.html"
 	},
 	"lambdaPublicAccess": {
 		"category": "S",
@@ -377,11 +377,11 @@
 		"needFullTest": 1,
 		"shortDesc": "Memory Not Optimized",
 		"ref": [
-			"[Lambda Power Tuning]<https://docs.aws.amazon.com/lambda/latest/operatorguide/profile-functions.html>"
+			"[Lambda Power Tuning]<https://docs.aws.amazon.com/lambda/latest/dg/configuration-memory.html#configuration-memory-use-cases>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/lambda/latest/operatorguide/profile-functions.html"
+		"remediation_doc": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-memory.html#configuration-memory-use-cases"
 	},
 	"lambdaTimeoutNotOptimized": {
 		"category": "R",
@@ -393,11 +393,11 @@
 		"needFullTest": 1,
 		"shortDesc": "Timeout Not Optimized",
 		"ref": [
-			"[Lambda function configuration]<https://docs.aws.amazon.com/lambda/latest/dg/configuration-function-common.html>"
+			"[Lambda function configuration]<https://docs.aws.amazon.com/lambda/latest/dg/lambda-functions.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/lambda/latest/dg/configuration-function-common.html"
+		"remediation_doc": "https://docs.aws.amazon.com/lambda/latest/dg/lambda-functions.html"
 	},
 	"lambdaRoleTooPermissive": {
 		"category": "S",

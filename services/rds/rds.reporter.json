@@ -319,11 +319,11 @@
 		"criticality": "L",
 		"shortDesc": "Set value to ON",
 		"ref": [
-			"[RDS MySQL Autocommit]<https://docs.aws.amazon.com/whitepapers/latest/amazon-aurora-mysql-db-admin-handbook/transaction-management-and-autocommit.html>"
+			"[RDS MySQL Autocommit]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.AuroraMySQL.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/amazon-aurora-mysql-db-admin-handbook/transaction-management-and-autocommit.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.AuroraMySQL.html"
 	},
 	"MYSQL__parammInnodbStatsPersistent": {
 		"category": "P",
@@ -842,11 +842,11 @@
 		"criticality": "L",
 		"shortDesc": "Setup with sub-optimal setting for Enhanced Monitoring",
 		"ref": [
-			"[RDS Enhanced Monitoring]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Monitoring.OS.overview.html>"
+			"[RDS Enhanced Monitoring]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Monitoring.OS.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Monitoring.OS.overview.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Monitoring.OS.html"
 	},
 	"CACertExpiringIn365days": {
 		"category": "O",
@@ -986,11 +986,11 @@
 		"criticality": "M",
 		"shortDesc": "Freeable Memory Less than 10%",
 		"ref": [
-			"[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+			"[Rightsizing Guide]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html"
+		"remediation_doc": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html"
 	},
 	"FreeMemoryDropMT50pctIn24hours": {
 		"category": "CP",
@@ -1002,11 +1002,11 @@
 		"criticality": "H",
 		"shortDesc": "Freeable Memory Drop > 50%",
 		"ref": [
-			"[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+			"[Rightsizing Guide]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html"
+		"remediation_doc": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html"
 	},
 	"RightSizingMemoryMonthMinMT60pct": {
 		"category": "CP",
@@ -1018,11 +1018,11 @@
 		"criticality": "M",
 		"shortDesc": "Freeable Memory > 60% (months)",
 		"ref": [
-			"[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+			"[Rightsizing Guide]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html"
+		"remediation_doc": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html"
 	},
 	"RightSizingCpuMonthMaxLT50pct": {
 		"category": "CP",
@@ -1034,11 +1034,11 @@
 		"criticality": "H",
 		"shortDesc": "Max CPU < 50% (months)",
 		"ref": [
-			"[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+			"[Rightsizing Guide]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html"
+		"remediation_doc": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html"
 	},
 	"RightSizingCpuLowUsageDetected": {
 		"category": "CP",
@@ -1050,11 +1050,11 @@
 		"criticality": "M",
 		"shortDesc": "Low Minumum & Average CPUUtilization",
 		"ref": [
-			"[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+			"[Rightsizing Guide]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html"
+		"remediation_doc": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html"
 	},
 	"RightSizingCpuLowUsageDetectedWithWeeklySpike": {
 		"category": "CP",
@@ -1066,11 +1066,11 @@
 		"criticality": "L",
 		"shortDesc": "Weekly CPU Usage Spike detected",
 		"ref": [
-			"[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+			"[Rightsizing Guide]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html"
+		"remediation_doc": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html"
 	},
 	"AuroraStorageTypeToUseIOOpt": {
 		"category": "C",
