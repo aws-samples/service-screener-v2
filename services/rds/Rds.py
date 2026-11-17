@@ -14,6 +14,7 @@ from services.rds.drivers.RdsMssql import RdsMssql
 from services.rds.drivers.RdsSecretsManager import RdsSecretsManager
 from services.rds.drivers.RdsSecretsVsDB import RdsSecretsVsDB
 from services.rds.drivers.RdsSecurityGroup import RdsSecurityGroup
+from services.rds.drivers.RdsSnapshot import RdsSnapshot
 
 from datetime import datetime, timedelta, time, timezone
 
@@ -34,6 +35,7 @@ class Rds(Service):
         self.smClient = ssBoto.client('secretsmanager', config=self.bConfig)
         self.cwClient = ssBoto.client('cloudwatch', config=self.bConfig)
         self.ceClient = ssBoto.client('ce', config=self.bConfig)
+        self.orgClient = ssBoto.client('organizations', config=self.bConfig)
         self.setChartsType(self.CHARTSTYPE)
         
         self.secrets = []
@@ -93,6 +95,30 @@ class Rds(Service):
             
         return finalArr
             
+    def getManualSnapshots(self):
+        # Manual DB snapshots and DB cluster snapshots owned by this account
+        # (automated snapshots mirror the source DB and cannot be shared).
+        snaps = []
+        for page in self.rdsClient.get_paginator('describe_db_snapshots').paginate(SnapshotType='manual'):
+            snaps += [(s, False) for s in page.get('DBSnapshots', [])]
+        for page in self.rdsClient.get_paginator('describe_db_cluster_snapshots').paginate(SnapshotType='manual'):
+            snaps += [(s, True) for s in page.get('DBClusterSnapshots', [])]
+
+        if not self.tags:
+            return snaps
+        return [(s, c) for (s, c) in snaps if self.resourceHasTags(s.get('TagList', []))]
+
+    def getOrgAccounts(self):
+        # Only readable from the Organizations management / delegated admin
+        # account; None means org membership cannot be verified.
+        try:
+            accounts = set()
+            for page in self.orgClient.get_paginator('list_accounts').paginate():
+                accounts |= {a['Id'] for a in page.get('Accounts', [])}
+            return accounts
+        except botocore.exceptions.ClientError:
+            return None
+
     def getSecrets(self):
         p = {"IncludePlannedDeletion": False, "MaxResults": 10}
         
@@ -260,6 +286,17 @@ class Rds(Service):
             obj.run(self.__class__)
             objs['RDS_SG::' + sg] = obj.getInfo()
             del obj
+
+        snapshots = self.getManualSnapshots()
+        if snapshots:
+            accountId = (Config.get('stsInfo', {}) or {}).get('Account')
+            orgAccounts = self.getOrgAccounts()
+            for snap, isClusterSnap in snapshots:
+                obj = RdsSnapshot(snap, isClusterSnap, self.rdsClient, accountId, orgAccounts)
+                _pi('RDS-Snapshot', obj._resourceName)
+                obj.run(self.__class__)
+                objs[('ClusterSnapshot::' if isClusterSnap else 'Snapshot::') + obj._resourceName] = obj.getInfo()
+                del obj
 
         self.getSecrets()
         for secret in self.secrets:

@@ -1385,5 +1385,92 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Events.html"
+	},
+	"rdsLogExportsDisabled": {
+		"category": "S",
+		"^description": "[Logging] {$COUNT} RDS DB instance(s)/cluster(s) do not publish their security-relevant database logs to Amazon CloudWatch Logs (PostgreSQL/Aurora PostgreSQL: postgresql log; MySQL/MariaDB: error log, plus audit log when MARIADB_AUDIT_PLUGIN is configured; Aurora MySQL: audit log; SQL Server: error log). Without exported logs, authentication failures, privilege changes and errors are kept only on the instance for a short time, cannot be alerted on and are lost when the instance is deleted. Enable log exports on the instance (or on the cluster for Aurora and Multi-AZ DB clusters).",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"criticality": "M",
+		"shortDesc": "Publish database logs to CloudWatch Logs",
+		"ref": [
+			"[Publishing database logs to CloudWatch Logs]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Procedural.UploadtoCloudWatch.html>",
+			"[Publishing Aurora logs to CloudWatch Logs]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_LogAccess.Procedural.UploadtoCloudWatch.html>",
+			"[Security Hub RDS.9]<https://docs.aws.amazon.com/securityhub/latest/userguide/rds-controls.html#rds-9>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Procedural.UploadtoCloudWatch.html"
+	},
+	"rdsSecureTransportNotRequired": {
+		"category": "S",
+		"^description": "[Transport Encryption] {$COUNT} RDS for MySQL / MariaDB DB instance(s) or Aurora MySQL / Multi-AZ DB cluster(s) do not set require_secure_transport to ON in their (cluster) parameter group, so clients may connect without TLS and credentials and data can travel in plaintext. The engine default is OFF. Set require_secure_transport=1 (ON) in a custom DB parameter group (DB cluster parameter group for Aurora MySQL) after confirming clients support TLS. PostgreSQL and SQL Server rds.force_ssl is reported separately.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": -1,
+		"criticality": "M",
+		"shortDesc": "Require TLS for MySQL/MariaDB/Aurora MySQL",
+		"ref": [
+			"[Requiring SSL/TLS for RDS for MySQL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/mysql-ssl-connections.require-ssl.html>",
+			"[Requiring SSL/TLS for RDS for MariaDB]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/mariadb-ssl-connections.require-ssl.html>",
+			"[TLS connections to Aurora MySQL]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Security.html#AuroraMySQL.Security.SSL>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/mysql-ssl-connections.require-ssl.html"
+	},
+	"rdsSnapshotSharedExternally": {
+		"category": "S",
+		"^description": "[RDS Snapshot] {$COUNT} manual RDS DB/cluster snapshot(s) can be restored by other AWS accounts (restore attribute lists account IDs outside your AWS Organization, or - when organization membership cannot be read from this account - any other account). Anyone in those accounts can restore a full copy of the database. Review the shared accounts and remove those that are not required (public sharing is reported separately as SnapshotRDSIsPublic).",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"criticality": "M",
+		"shortDesc": "Review snapshots shared with other accounts",
+		"ref": [
+			"[Sharing a DB snapshot]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/share-snapshot.html>",
+			"[Sharing a DB cluster snapshot]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-share-snapshot.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/share-snapshot.html"
+	},
+	"rdsSnapshotUnencrypted": {
+		"category": "S",
+		"^description": "[RDS Snapshot] {$COUNT} manual RDS DB/cluster snapshot(s) are not encrypted. Unencrypted snapshots keep a full copy of the data at rest without KMS protection and can be shared or copied without key-policy control. Copy the snapshot with a KMS key (copy-db-snapshot / copy-db-cluster-snapshot with --kms-key-id) and delete the unencrypted copy once it is no longer needed.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"criticality": "M",
+		"shortDesc": "Encrypt RDS snapshots",
+		"ref": [
+			"[Encrypting Amazon RDS resources]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html>",
+			"[Copying a DB snapshot]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_CopySnapshot.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_CopySnapshot.html"
+	},
+	"auroraNoGlobalDatabase": {
+		"category": "R",
+		"^description": "[Disaster Recovery] {$COUNT} Aurora cluster(s) are not part of an Aurora global database. For business-critical workloads with low RPO/RTO requirements, an Aurora global database replicates to secondary Regions with typically sub-second lag and supports managed cross-Region failover. This is a DR strategy and cost decision - ignore it for clusters whose recovery objectives are met by backups.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"criticality": "L",
+		"shortDesc": "Consider Aurora Global Database for critical clusters",
+		"ref": [
+			"[Using Amazon Aurora global databases]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database.html>",
+			"[Disaster recovery options in the cloud]<https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-getting-started.html"
 	}
 }
