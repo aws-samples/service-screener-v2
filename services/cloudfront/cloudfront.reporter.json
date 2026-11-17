@@ -80,6 +80,24 @@
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/secure-connections-supported-viewer-protocols-ciphers.html"
 	},
+	"cloudfrontViewerMinTlsOld": {
+		"category": "S",
+		"^description": "{$COUNT} CloudFront distribution(s) allow TLS versions older than TLS 1.2: either the viewer security policy (MinimumProtocolVersion) on a custom certificate is below TLSv1.2_2021, or an HTTPS custom origin permits TLSv1/TLSv1.1. These protocol versions and their cipher suites are deprecated and weaken encryption in transit.",
+		"shortDesc": "Set the viewer security policy to TLSv1.2_2021 or later and remove TLSv1/TLSv1.1 from origin SSL protocols.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Supported protocols and ciphers between viewers and CloudFront]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/secure-connections-supported-viewer-protocols-ciphers.html>",
+			"[Supported protocols and ciphers between CloudFront and the origin]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/secure-connections-supported-ciphers-cloudfront-to-origin.html>",
+			"[Distribution settings - Security policy]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesGeneral.html#DownloadDistValues-security-policy>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/secure-connections-supported-viewer-protocols-ciphers.html"
+	},
 	"originFailover": {
 		"category": "R",
 		"^description": "Your CloudFront distributions is not setup for origin failover. To set up origin failover, you must have a distribution with at least two origins.",
