@@ -14,6 +14,9 @@ class BackupPlan(Evaluator):
       - backupPlanInfrequentSchedule  (R/L)  Any rule fires < once per 24h
       - backupPlanNoCompletionWindow  (O/L)  Any rule missing CompletionWindowMinutes
       - backupPlanNoContinuousBackup  (R/L)  No rule sets EnableContinuousBackup=true
+      - backupMalwareScanDisabled     (S/L)  EC2/EBS/S3 plan without malware scanning
+      - backupPlanNotTargetingProtectedVault (S/M) No rule lands in a locked / air-gapped vault
+      - backupRetentionBelowDetectionWindow  (S/M) Longest retention < RETENTION_FLOOR_DAYS
 
     Input:
       plan -- dict produced by Backup.py._describePlan.
@@ -31,10 +34,26 @@ class BackupPlan(Evaluator):
         'RDS', 'Aurora', 'S3', 'DynamoDB',
     })
 
-    def __init__(self, plan, backupClient):
+    # Resource types GuardDuty Malware Protection for AWS Backup can scan.
+    MALWARE_SCANNABLE_ARN_RE = re.compile(
+        r'^arn:aws[a-z-]*:(ec2:[^:]*:[^:]*:(instance|volume)/|s3:::)'
+    )
+    LOGICALLY_AIR_GAPPED = 'LOGICALLY_AIR_GAPPED_BACKUP_VAULT'
+
+    # Minimum retention (days) that still covers a typical ransomware /
+    # compromise detection window. Policy-dependent; 35 days matches the
+    # maximum continuous-backup (PITR) window and common guidance.
+    RETENTION_FLOOR_DAYS = 35
+
+    def __init__(self, plan, backupClient, vaultLookup=None, accountId=None, region=None):
         super().__init__()
         self.plan = plan
         self.backupClient = backupClient
+        # vaultLookup(nameOrArn) -> (summary|None, reason|None); supplied by
+        # Backup.py so plan checks can see whether target vaults are locked.
+        self.vaultLookup = vaultLookup
+        self.accountId = accountId
+        self.region = region
 
         self._resourceName = plan.get('_name') or plan.get('_id', 'unknown')
         self.rules = plan.get('_rules') or []
@@ -232,8 +251,204 @@ class BackupPlan(Evaluator):
             ]
 
     # ------------------------------------------------------------------ #
+    # 8. EC2/EBS/S3 plan without GuardDuty malware scanning
+    # ------------------------------------------------------------------ #
+    def _checkBackupMalwareScanDisabled(self):
+        key = 'backupMalwareScanDisabled'
+        if not self.rules:
+            self.results[key] = [0, "No rules to evaluate"]
+            return
+        if not self.selections:
+            self.results[key] = [0, "Plan has no resource selections - see backupPlanNotAssigned"]
+            return
+
+        covers = self._selectionsCoverScannableTypes()
+        if covers is None:
+            self.results[key] = [
+                0, "Selections are tag/condition based only - cannot tell whether EC2/EBS/S3 are protected"
+            ]
+            return
+        if not covers:
+            self.results[key] = [0, "Plan does not protect EC2/EBS/S3 resources (malware scanning not applicable)"]
+            return
+
+        ruleScan = [r.get('RuleName', '(unnamed)') for r in self.rules if r.get('ScanActions')]
+        planScan = self.plan.get('_scanSettings') or []
+        if ruleScan and planScan:
+            self.results[key] = [
+                1, f"Malware scanning configured (ScanSettings present; rule(s) with ScanActions: {', '.join(ruleScan[:5])})"
+            ]
+        elif ruleScan or planScan:
+            self.results[key] = [
+                0,
+                "Malware scanning partially configured ("
+                + ("rule ScanActions present but no plan ScanSettings" if ruleScan
+                   else "plan ScanSettings present but no rule has ScanActions") + ")"
+            ]
+        else:
+            self.results[key] = [
+                -1, "Plan protects EC2/EBS/S3 resources but no rule has ScanActions and the plan has no ScanSettings"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 9. Rule data never lands in a locked / logically air-gapped vault
+    # ------------------------------------------------------------------ #
+    def _checkBackupPlanNotTargetingProtectedVault(self):
+        key = 'backupPlanNotTargetingProtectedVault'
+        if not self.rules:
+            self.results[key] = [0, "No rules to evaluate"]
+            return
+        if self.vaultLookup is None:
+            self.results[key] = [0, "Unable to evaluate (vault index unavailable)"]
+            return
+
+        unprotected, indeterminate = [], []
+        for rule in self.rules:
+            name = rule.get('RuleName', '(unnamed)')
+            state, notes = self._ruleProtection(rule)
+            if state == 'unprotected':
+                unprotected.append(name)
+            elif state != 'protected':
+                indeterminate.append(f"{name}({'; '.join(notes)})")
+
+        if unprotected:
+            self.results[key] = [
+                -1,
+                "Rule(s) whose target and copy vaults are neither Vault-Locked nor logically air-gapped: "
+                + ', '.join(unprotected[:5]) + (f" (+{len(unprotected) - 5} more)" if len(unprotected) > 5 else "")
+            ]
+        elif indeterminate:
+            self.results[key] = [
+                0,
+                "Protection relies on vaults that cannot be inspected from this account: "
+                + ', '.join(indeterminate[:3])
+            ]
+        else:
+            self.results[key] = [1, "Every rule stores or copies backups into a locked or air-gapped vault"]
+
+    # ------------------------------------------------------------------ #
+    # 10. Longest retention shorter than the detection window
+    # ------------------------------------------------------------------ #
+    def _checkBackupRetentionBelowDetectionWindow(self):
+        key = 'backupRetentionBelowDetectionWindow'
+        floor = self.RETENTION_FLOOR_DAYS
+        if not self.rules:
+            self.results[key] = [0, "No rules to evaluate"]
+            return
+
+        # The plan keeps a pre-compromise recovery point as long as its
+        # longest-lived recovery point (rule or any copy) outlives the floor,
+        # so a short daily rule next to a long monthly rule is fine.
+        best = 0          # None == some recovery point is kept indefinitely
+        details = []
+        copiesWithoutLifecycle = []
+        for rule in self.rules:
+            name = rule.get('RuleName', '(unnamed)')
+            rets = [self._retentionDays(rule.get('Lifecycle'), isRule=True)]
+            for a in (rule.get('CopyActions') or []):
+                if not (a.get('Lifecycle') or {}).get('DeleteAfterDays'):
+                    # Copy retention not stated explicitly - do not guess.
+                    copiesWithoutLifecycle.append(name)
+                    continue
+                rets.append(self._retentionDays(a.get('Lifecycle'), isRule=False))
+            if any(r is None for r in rets):
+                best = None
+                break
+            ruleMax = max(rets)
+            best = max(best, ruleMax)
+            details.append(f"{name}={ruleMax}d")
+
+        if best is None:
+            self.results[key] = [1, "At least one rule (or copy) retains recovery points indefinitely"]
+        elif best < floor and copiesWithoutLifecycle:
+            self.results[key] = [
+                0,
+                f"Rule retention is at most {best} days (< {floor}) but CopyActions in "
+                f"{', '.join(sorted(set(copiesWithoutLifecycle))[:5])} have no explicit DeleteAfterDays - "
+                "verify the retention of the copies"
+            ]
+        elif best >= floor:
+            self.results[key] = [1, f"Longest retention is {best} days (>= {floor})"]
+        else:
+            self.results[key] = [
+                -1,
+                f"Longest retention across all rules and copies is {best} days (< {floor}): "
+                + ', '.join(details[:5])
+            ]
+
+    # ------------------------------------------------------------------ #
     # Helpers
     # ------------------------------------------------------------------ #
+    @staticmethod
+    def _retentionDays(lifecycle, isRule):
+        """Return retention in days, or None for indefinite retention.
+
+        - No Lifecycle / no DeleteAfterDays / DeleteAfterDays <= 0 (-1 means
+          'keep forever') -> indefinite.
+        - DeleteAfterEvent=DELETE_AFTER_COPY on the rule without
+          DeleteAfterDays -> the source point is short-lived (0); only the
+          copies count."""
+        lifecycle = lifecycle or {}
+        days = lifecycle.get('DeleteAfterDays')
+        if days is None:
+            if isRule and lifecycle.get('DeleteAfterEvent'):
+                return 0
+            return None
+        try:
+            days = int(days)
+        except (TypeError, ValueError):
+            return None
+        if days <= 0:
+            return None
+        return days
+
+    def _selectionsCoverScannableTypes(self):
+        """True if any selection explicitly (or via '*') includes EC2/EBS/S3;
+        False if all selections list only other resource ARNs; None if the
+        resource types depend on tags/conditions only."""
+        opaque = False
+        for sel in self.selections:
+            resources = [r for r in (sel.get('Resources') or []) if isinstance(r, str)]
+            if not resources:
+                opaque = True
+                continue
+            for arn in resources:
+                if arn == '*' or self.MALWARE_SCANNABLE_ARN_RE.match(arn):
+                    return True
+        return None if opaque else False
+
+    def _ruleProtection(self, rule):
+        """Classify one rule: 'protected' if its target or any copy vault is
+        locked / logically air-gapped; 'unprotected' if every destination was
+        inspected and none is; otherwise 'indeterminate'."""
+        if rule.get('TargetLogicallyAirGappedBackupVaultArn'):
+            return 'protected', []
+        dests = []
+        if rule.get('TargetBackupVaultName'):
+            dests.append(rule['TargetBackupVaultName'])
+        for action in rule.get('CopyActions') or []:
+            if action.get('DestinationBackupVaultArn'):
+                dests.append(action['DestinationBackupVaultArn'])
+        if not dests:
+            return 'indeterminate', ['no destination vault']
+
+        notes = []
+        for dest in dests:
+            if dest.startswith('arn:'):
+                parts = dest.split(':')
+                acct = parts[4] if len(parts) > 4 else ''
+                if self.accountId and acct and acct != self.accountId:
+                    notes.append(f"copy to account {acct} assumed protected")
+                    continue
+            summary, reason = self.vaultLookup(dest)
+            if summary is None:
+                notes.append(f"{dest.split(':')[-1]}: {reason}")
+                continue
+            if bool(summary.get('Locked')) or \
+                    (summary.get('VaultType') or '').upper() == self.LOGICALLY_AIR_GAPPED:
+                return 'protected', []
+        return ('indeterminate', notes) if notes else ('unprotected', [])
+
     def _planHomeRegion(self):
         for rule in self.rules:
             arn = rule.get('TargetBackupVaultArn') or ''
