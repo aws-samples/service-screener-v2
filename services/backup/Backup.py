@@ -61,6 +61,17 @@ class Backup(Service):
         self.dynamodbClient = ssBoto.client('dynamodb', config=self.bConfig)
         self.efsClient = ssBoto.client('efs', config=self.bConfig)
         self.ec2Client = ssBoto.client('ec2', config=self.bConfig)
+        # Alerting evidence for backupNoFailureAlerting (read-only calls).
+        self.eventsClient = ssBoto.client('events', config=self.bConfig)
+        self.cloudwatchClient = ssBoto.client('cloudwatch', config=self.bConfig)
+        # Vault summaries from list_backup_vaults keyed by name (all vaults,
+        # including checkpointed ones) - used by plan-level checks that need
+        # to know whether a rule's target vault is locked / air-gapped.
+        self._vaultIndex = {}
+        # Cache for describe_backup_vault lookups of copy destinations in
+        # other Regions of this account: {vaultArn: summary|None}.
+        self._remoteVaultCache = {}
+        self._remoteBackupClients = {}
 
     # ------------------------------------------------------------------ #
     # Discovery
@@ -82,6 +93,8 @@ class Backup(Service):
             paginator = self.backupClient.get_paginator('list_backup_vaults')
             for page in paginator.paginate():
                 summaries = [s for s in (page.get('BackupVaultList', []) or []) if s.get('BackupVaultName')]
+                for vs in summaries:
+                    self._vaultIndex[vs['BackupVaultName']] = vs
                 pendingNames = {s['BackupVaultName'] for s in self.registerItems(
                     'BackupVault', summaries, idFn=lambda s: s.get('BackupVaultName', 'unknown')
                 )}
@@ -237,6 +250,7 @@ class Backup(Service):
             '_arn': resp.get('BackupPlanArn') or summary.get('BackupPlanArn'),
             '_rules': plan_body.get('Rules') or [],
             '_selections': selections,
+            '_scanSettings': plan_body.get('ScanSettings') or [],
             '_creationDate': resp.get('CreationDate') or summary.get('CreationDate'),
         }
         return detail
@@ -292,6 +306,7 @@ class Backup(Service):
         return {
             '_name': self.region,
             '_region': self.region,
+            '_accountId': self._callerAccountId(),
             '_vaults': vaults,
             '_plans': plans,
             '_globalSettings': global_settings,
@@ -478,7 +493,10 @@ class Backup(Service):
             try:
                 name = plan.get('_name') or plan.get('_id') or 'unknown'
                 _pi('Backup', f"Analyzing plan: {name}")
-                obj = BackupPlan(plan, self.backupClient)
+                obj = BackupPlan(plan, self.backupClient,
+                                 vaultLookup=self._lookupVault,
+                                 accountId=self._callerAccountId(),
+                                 region=self.region)
                 obj.run(self.__class__)
                 objs[f"Backup::Plan::{name}"] = obj.getInfo()
                 del obj
@@ -489,7 +507,9 @@ class Backup(Service):
         try:
             account = resources.get('account') or {}
             _pi('Backup', f"Analyzing account/region: {self.region}")
-            obj = BackupAccount(account, self.backupClient)
+            obj = BackupAccount(account, self.backupClient,
+                                eventsClient=self.eventsClient,
+                                cloudwatchClient=self.cloudwatchClient)
             obj.run(self.__class__)
             objs[f"Backup::Account::{self.region}"] = obj.getInfo()
             del obj
@@ -501,6 +521,50 @@ class Backup(Service):
     # ------------------------------------------------------------------ #
     # Helpers
     # ------------------------------------------------------------------ #
+    def _callerAccountId(self):
+        from utils.Config import Config
+        return (Config.get('stsInfo', {}) or {}).get('Account')
+
+    def _lookupVault(self, vaultArn):
+        """Resolve a backup vault ARN (in this account) to a vault summary
+        dict with at least Locked / VaultType / MinRetentionDays.
+
+        Returns (summary, None) on success, (None, reason) when the vault
+        cannot be read. Vaults in this Region come from the list_backup_vaults
+        index; vaults in another Region of this account are read with a
+        read-only describe_backup_vault call against that Region. A bare
+        vault name is resolved against this Region's index."""
+        if vaultArn and not vaultArn.startswith('arn:'):
+            if vaultArn in self._vaultIndex:
+                return self._vaultIndex[vaultArn], None
+            return None, 'vault not found'
+        parts = (vaultArn or '').split(':')
+        if len(parts) < 7 or parts[2] != 'backup' or parts[5] != 'backup-vault':
+            return None, 'unparseable ARN'
+        region, name = parts[3], ':'.join(parts[6:])
+        if region == self.region:
+            if name in self._vaultIndex:
+                return self._vaultIndex[name], None
+            return None, 'vault not found'
+        if vaultArn in self._remoteVaultCache:
+            return self._remoteVaultCache[vaultArn]
+        result = (None, 'unknown')
+        try:
+            client = self._remoteBackupClients.get(region)
+            if client is None:
+                from botocore.config import Config as _BConfig
+                client = self.ssBoto.client('backup', region_name=region,
+                                            config=self.bConfig.merge(_BConfig(region_name=region)))
+                self._remoteBackupClients[region] = client
+            resp = client.describe_backup_vault(BackupVaultName=name)
+            result = (resp, None)
+        except botocore.exceptions.ClientError as e:
+            result = (None, e.response.get('Error', {}).get('Code', 'ClientError'))
+        except botocore.exceptions.BotoCoreError as e:
+            result = (None, type(e).__name__)
+        self._remoteVaultCache[vaultArn] = result
+        return result
+
     def _logClientError(self, where, error):
         code = error.response.get('Error', {}).get('Code', 'Unknown')
         if code in ('AccessDenied', 'AccessDeniedException', 'AuthorizationError',

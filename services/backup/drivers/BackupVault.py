@@ -17,6 +17,7 @@ class BackupVault(Evaluator):
       - backupRecoveryPointNeverRestored (R/M) LastRestoreTime null for all
       - backupRecoveryPointExpiredLifecycle (C/L) Status=EXPIRED on any point
       - backupRecoveryPointNoCMK       (S/L)   AWS_OWNED_KMS_KEY on any point
+      - backupRetentionBelowDetectionWindow (S/M) Vault Lock MinRetentionDays < 35
 
     Input:
       vault -- dict produced by Backup.py._describeVault.
@@ -35,6 +36,9 @@ class BackupVault(Evaluator):
     # backupVaultEmpty grace period: newly-created vaults may legitimately be
     # empty for a few backup cycles.
     EMPTY_VAULT_GRACE_DAYS = 7
+
+    # Shared with BackupPlan.RETENTION_FLOOR_DAYS (backupRetentionBelowDetectionWindow).
+    RETENTION_FLOOR_DAYS = 35
 
     # Default AWS-managed vaults for service integrations that are permitted
     # to lack CMK / vault-lock (AWS Backup's own defaults).
@@ -231,6 +235,37 @@ class BackupVault(Evaluator):
             self.results['backupVaultLockNotFinalized'] = [
                 1, "Vault Lock finalised (COMPLIANCE mode, LockDate in the past)"
             ]
+
+    # ------------------------------------------------------------------ #
+    # 5b. Vault Lock minimum retention shorter than the detection window
+    # ------------------------------------------------------------------ #
+    def _checkBackupRetentionBelowDetectionWindow(self):
+        key = 'backupRetentionBelowDetectionWindow'
+        floor = self.RETENTION_FLOOR_DAYS
+        isLag = (self.vault.get('_vaultType') or '').upper() == 'LOGICALLY_AIR_GAPPED_BACKUP_VAULT'
+        if not self.vault.get('_locked') and not isLag:
+            self.results[key] = [0, "Vault Lock not enabled - see backupVaultNoLock"]
+            return
+
+        minDays = self.vault.get('_minRetentionDays')
+        if minDays is None:
+            self.results[key] = [
+                -1, f"Vault Lock does not enforce MinRetentionDays (recommended >= {floor} days)"
+            ]
+            return
+        try:
+            minDays = int(minDays)
+        except (TypeError, ValueError):
+            self.results[key] = [0, f"MinRetentionDays unparseable: {minDays}"]
+            return
+        if minDays < floor:
+            self.results[key] = [
+                -1,
+                f"Vault Lock MinRetentionDays={minDays} (< {floor}); recovery points can be deleted "
+                "before a compromise is likely to be detected"
+            ]
+        else:
+            self.results[key] = [1, f"Vault Lock MinRetentionDays={minDays} (>= {floor})"]
 
     # ------------------------------------------------------------------ #
     # 6. Recovery point encryption
