@@ -1,3 +1,4 @@
+import json
 import re
 import botocore
 
@@ -36,6 +37,7 @@ class EcsTaskDefinition(Evaluator):
     # 40 ecsTaskDefinitionSensitiveHostPaths (T2)
     # 41 ecsTaskDefinitionUlimitsConfigured (T2)
     # 42 ecsTaskDefinitionEphemeralStorageEncryption (T2)
+    # 43 ecsTaskRoleOverprivileged (WAFS2027 SEC03-BP01)
 
     ROOT_USER_VALUES = {'', 'root', '0', '0:0'}
 
@@ -83,12 +85,17 @@ class EcsTaskDefinition(Evaluator):
     ULIMIT_NOFILE_MAX = 65536
     ULIMIT_NPROC_MAX = 4096
 
-    def __init__(self, task_def, secrets_client, ssm_client, cluster_has_fargate_cmk):
+    def __init__(self, task_def, secrets_client, ssm_client, cluster_has_fargate_cmk,
+                 iam_client=None, role_cache=None):
         super().__init__()
         self.td = task_def or {}
         self.secretsClient = secrets_client
         self.ssmClient = ssm_client
         self.cluster_has_fargate_cmk = bool(cluster_has_fargate_cmk)
+        self.iamClient = iam_client
+        # roleName -> (findings, errorCode); shared across task definitions so
+        # a task role used by many families is only inspected once per region.
+        self.roleCache = role_cache if role_cache is not None else {}
 
         family = self.td.get('family', 'unknown')
         rev = self.td.get('revision', '?')
@@ -585,3 +592,127 @@ class EcsTaskDefinition(Evaluator):
                 f"Ephemeral storage {eph} GiB (> 20 default) but no cluster in region sets "
                 "fargateEphemeralStorageKmsKeyId"
             ]
+
+    # ------------------------------------------------------------------ #
+    # #43 ecsTaskRoleOverprivileged (WAFS2027 SEC03-BP01)
+    # ------------------------------------------------------------------ #
+    def _checkEcsTaskRoleOverprivileged(self):
+        key = 'ecsTaskRoleOverprivileged'
+        roleArn = self.td.get('taskRoleArn')
+        if not roleArn:
+            self.results[key] = [0, "No task role (taskRoleArn) configured"]
+            return
+        if self.iamClient is None:
+            self.results[key] = [0, "Unable to evaluate (IAM client unavailable)"]
+            return
+        roleName = _roleNameFromArn(roleArn)
+        if roleName not in self.roleCache:
+            self.roleCache[roleName] = _inspectTaskRole(self.iamClient, roleName)
+        findings, errCode = self.roleCache[roleName]
+
+        if findings:
+            msg = f"Task role {roleName} is overprivileged: " + "; ".join(findings[:5])
+            if errCode:
+                msg += f" (some policies unreadable: {errCode})"
+            self.results[key] = [-1, msg]
+        elif errCode:
+            self.results[key] = [0, f"Unable to evaluate ({errCode})"]
+        else:
+            self.results[key] = [1, f"Task role {roleName} has no admin, service-wide wildcard or *FullAccess policies"]
+
+
+# ---------------------------------------------------------------------- #
+# Task-role inspection helpers (read-only IAM calls)
+# ---------------------------------------------------------------------- #
+_AWS_MANAGED_PREFIX = ':iam::aws:policy/'
+
+
+def _roleNameFromArn(arn):
+    """taskRoleArn may be a full ARN (optionally with a path) or a bare role name."""
+    if ':role/' in arn:
+        return arn.split(':role/', 1)[1].rsplit('/', 1)[-1]
+    return arn.rsplit('/', 1)[-1]
+
+
+def _broadStatements(doc):
+    """Return a sorted list of broad grants in a policy document:
+    '*' / '*:*' (full admin), '<svc>:*' (service-wide wildcard), or Allow+NotAction."""
+    if isinstance(doc, str):
+        try:
+            doc = json.loads(doc)
+        except (ValueError, TypeError):
+            return []
+    if not isinstance(doc, dict):
+        return []
+    stmts = doc.get('Statement', [])
+    if isinstance(stmts, dict):
+        stmts = [stmts]
+    found = set()
+    for st in stmts or []:
+        if not isinstance(st, dict) or st.get('Effect') != 'Allow':
+            continue
+        if 'NotAction' in st:
+            found.add('Allow+NotAction')
+            continue
+        actions = st.get('Action', [])
+        if isinstance(actions, str):
+            actions = [actions]
+        for a in actions or []:
+            if not isinstance(a, str):
+                continue
+            a = a.strip()
+            if a in ('*', '*:*'):
+                found.add('*')
+            elif a.endswith(':*'):
+                found.add(a.lower())
+    return sorted(found)
+
+
+def _inspectTaskRole(iamClient, roleName):
+    """Return (findings, errorCode). errorCode is set when any part of the role
+    could not be read, so the caller never reports PASS on partial data."""
+    findings = []
+    errCode = None
+    try:
+        attached = []
+        for page in iamClient.get_paginator('list_attached_role_policies').paginate(RoleName=roleName):
+            attached.extend(page.get('AttachedPolicies', []) or [])
+        inline = []
+        for page in iamClient.get_paginator('list_role_policies').paginate(RoleName=roleName):
+            inline.extend(page.get('PolicyNames', []) or [])
+    except botocore.exceptions.ClientError as e:
+        return [], e.response.get('Error', {}).get('Code', 'Unknown')
+
+    for p in attached:
+        arn = p.get('PolicyArn', '') or ''
+        name = p.get('PolicyName') or arn.rsplit('/', 1)[-1]
+        awsManaged = _AWS_MANAGED_PREFIX in arn
+        if awsManaged and name == 'AdministratorAccess':
+            findings.append("managed:AdministratorAccess")
+            continue
+        if awsManaged and name.endswith('FullAccess'):
+            findings.append(f"managed:{name}")
+            continue
+        try:
+            pol = iamClient.get_policy(PolicyArn=arn).get('Policy', {}) or {}
+            ver = pol.get('DefaultVersionId')
+            if not ver:
+                errCode = errCode or 'NoDefaultVersion'
+                continue
+            doc = iamClient.get_policy_version(PolicyArn=arn, VersionId=ver).get('PolicyVersion', {}).get('Document')
+            broad = _broadStatements(doc)
+            if broad:
+                findings.append(f"managed:{name} ({', '.join(broad)})")
+        except botocore.exceptions.ClientError as e:
+            errCode = errCode or e.response.get('Error', {}).get('Code', 'Unknown')
+
+    for pname in inline:
+        try:
+            doc = iamClient.get_role_policy(RoleName=roleName, PolicyName=pname).get('PolicyDocument')
+            broad = _broadStatements(doc)
+            if broad:
+                findings.append(f"inline:{pname} ({', '.join(broad)})")
+        except botocore.exceptions.ClientError as e:
+            errCode = errCode or e.response.get('Error', {}).get('Code', 'Unknown')
+
+    return findings, errCode

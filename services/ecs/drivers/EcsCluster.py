@@ -1,3 +1,7 @@
+import re
+
+import botocore
+
 from services.Evaluator import Evaluator
 
 
@@ -23,11 +27,22 @@ class EcsCluster(Evaluator):
     #  6  ecsClusterNoRunningTasks
     #  7  ecsClusterTagging
     # 36  ecsClusterServiceConnectDefaults
+    # 43  ecsContainerAgentOutdated (WAFS2027 SEC06-BP01)
 
-    def __init__(self, cluster, cluster_services):
+    # An instance is "outdated" when its agent is more than this many minor
+    # releases behind the version shipped in the latest recommended
+    # ECS-optimized AMI. The agent releases every 1-3 weeks; a small lag is a
+    # normal patch cadence, so it is tolerated to avoid noisy findings.
+    AGENT_MINOR_LAG_TOLERANCE = 2
+    EVALUATED_INSTANCE_STATUSES = {'ACTIVE', 'DRAINING'}
+
+    def __init__(self, cluster, cluster_services, ecs_client=None, latest_agent=None):
         super().__init__()
         self.cluster = cluster or {}
         self.services = cluster_services or []
+        self.ecsClient = ecs_client
+        # (versionString or None, errorCode or None) from the SSM public parameter
+        self.latestAgent = latest_agent or (None, 'NotFetched')
 
         name = self.cluster.get('clusterName') or self.cluster.get('clusterArn', 'unknown')
         self._resourceName = f"Cluster::{name}"
@@ -195,3 +210,66 @@ class EcsCluster(Evaluator):
                 -1,
                 f"{len(self.services)} services but no serviceConnectDefaults.namespace"
             ]
+
+    # ------------------------------------------------------------------ #
+    # #43 ecsContainerAgentOutdated (WAFS2027 SEC06-BP01)
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _parseVersion(v):
+        m = re.match(r'^v?(\d+)\.(\d+)\.(\d+)', str(v or '').strip())
+        return tuple(int(x) for x in m.groups()) if m else None
+
+    def _checkEcsContainerAgentOutdated(self):
+        key = 'ecsContainerAgentOutdated'
+        arn = self.cluster.get('clusterArn')
+        if not arn or self.ecsClient is None:
+            self.results[key] = [0, "Unable to evaluate (no cluster ARN / ECS client)"]
+            return
+        try:
+            ciArns = []
+            for page in self.ecsClient.get_paginator('list_container_instances').paginate(cluster=arn):
+                ciArns.extend(page.get('containerInstanceArns', []) or [])
+            instances = []
+            for i in range(0, len(ciArns), 100):
+                resp = self.ecsClient.describe_container_instances(cluster=arn, containerInstances=ciArns[i:i+100])
+                instances.extend(resp.get('containerInstances', []) or [])
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({e.response.get('Error', {}).get('Code', 'Unknown')})"]
+            return
+
+        instances = [c for c in instances if c.get('status') in self.EVALUATED_INSTANCE_STATUSES]
+        if not instances:
+            self.results[key] = [0, "No EC2/external container instances registered (Fargate-only or empty)"]
+            return
+
+        latestStr, latestErr = self.latestAgent
+        latest = self._parseVersion(latestStr)
+        failed, outdated, unknown = [], [], 0
+        for c in instances:
+            ident = c.get('ec2InstanceId') or c.get('containerInstanceArn', '?').rsplit('/', 1)[-1]
+            if c.get('agentUpdateStatus') == 'FAILED':
+                failed.append(ident)
+            ver = (c.get('versionInfo') or {}).get('agentVersion')
+            cur = self._parseVersion(ver)
+            if cur is None:
+                unknown += 1
+                continue
+            if latest and (cur[0] < latest[0] or
+                           (cur[0] == latest[0] and latest[1] - cur[1] > self.AGENT_MINOR_LAG_TOLERANCE)):
+                outdated.append(f"{ident} ({ver})")
+
+        if failed or outdated:
+            parts = []
+            if outdated:
+                parts.append(f"{len(outdated)} instance(s) run agent more than {self.AGENT_MINOR_LAG_TOLERANCE} "
+                             f"minor releases behind {latestStr}: " + ", ".join(outdated[:5]))
+            if failed:
+                parts.append("agentUpdateStatus=FAILED on: " + ", ".join(failed[:5]))
+            self.results[key] = [-1, "; ".join(parts)]
+        elif latest is None:
+            self.results[key] = [0, f"Unable to evaluate ({latestErr or 'latest agent version unavailable'})"]
+        elif unknown:
+            self.results[key] = [0, f"Unable to evaluate (agentVersion missing on {unknown} instance(s))"]
+        else:
+            self.results[key] = [1, f"All {len(instances)} container instance(s) within "
+                                    f"{self.AGENT_MINOR_LAG_TOLERANCE} minor releases of agent {latestStr}"]

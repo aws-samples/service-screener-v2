@@ -679,5 +679,58 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-storage.html"
+	},
+	"ecsTaskRoleOverprivileged": {
+		"category": "S",
+		"^description": "{$COUNT} ECS task definition(s) use a task role (taskRoleArn) that grants administrator access, full wildcard ('*' / '*:*') actions, service-wide wildcard actions ('<service>:*'), Allow+NotAction statements, or AWS managed '*FullAccess' policies. Every container in the task receives these credentials, so a compromised container or dependency can act far beyond what the application needs.",
+		"shortDesc": "Scope ECS task roles to the least privilege the application needs",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Task IAM role]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html>",
+			"[Grant least privilege]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>",
+			"[SEC03-BP01 Define access requirements]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_permissions_define.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-iam-roles.html"
+	},
+	"ecsContainerAgentOutdated": {
+		"category": "S",
+		"^description": "{$COUNT} ECS cluster(s) have EC2 or external container instances whose ECS container agent is more than 2 minor releases behind the agent shipped in the latest recommended ECS-optimized AMI (SSM public parameter /aws/service/ecs/optimized-ami/amazon-linux-2023/recommended), or whose last agent update FAILED. Outdated agents miss security fixes and new features.",
+		"shortDesc": "Update the ECS container agent (or roll instances to the latest ECS-optimized AMI)",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Updating the Amazon ECS container agent]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-agent-update.html>",
+			"[Retrieving Amazon ECS-optimized AMI metadata]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/retrieve-ecs-optimized_AMI.html>",
+			"[SEC06-BP01 Perform vulnerability management]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_protect_compute_vulnerability_management.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-agent-update.html"
+	},
+	"ecsExecEnabledServices": {
+		"category": "S",
+		"^description": "{$COUNT} ECS service(s) have ECS Exec enabled (enableExecuteCommand = true), allowing interactive shell access into running containers. This is legitimate for debugging, but on production workloads it should be disabled by default, enabled only temporarily, and restricted with IAM (ecs:ExecuteCommand) and session logging. Services tagged as production are marked [production-tagged] in the detail.",
+		"shortDesc": "Disable ECS Exec on services that do not need interactive access",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Monitor Amazon ECS containers with ECS Exec]<https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-exec.html>",
+			"[SEC06-BP03 Reduce manual management and interactive access]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_protect_compute_reduce_manual_management.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonECS/latest/developerguide/ecs-exec.html"
 	}
 }
