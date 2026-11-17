@@ -1,0 +1,22 @@
+{
+	"fsxAutomaticBackupDisabled": {
+		"category": "R",
+		"^description": "{$COUNT} Amazon FSx file system(s) have automatic daily backups disabled (AutomaticBackupRetentionDays is 0). Without backups, accidental deletion, corruption or ransomware can cause unrecoverable data loss. You can ignore this if the file system is protected by an AWS Backup plan.",
+		"shortDesc": "Enable automatic backups for FSx file systems.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[FSx for Windows File Server backups]<https://docs.aws.amazon.com/fsx/latest/WindowsGuide/using-backups.html>",
+			"[FSx for Lustre backups]<https://docs.aws.amazon.com/fsx/latest/LustreGuide/using-backups-fsx.html>",
+			"[FSx for NetApp ONTAP backups]<https://docs.aws.amazon.com/fsx/latest/ONTAPGuide/using-backups.html>",
+			"[FSx for OpenZFS backups]<https://docs.aws.amazon.com/fsx/latest/OpenZFSGuide/using-backups.html>",
+			"[REL09-BP01 Identify and back up all data that needs to be backed up]<https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_backing_up_data_identified_backups_data.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/fsx/latest/WindowsGuide/using-backups.html"
+	}
+}
