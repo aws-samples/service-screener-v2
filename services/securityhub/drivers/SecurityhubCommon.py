@@ -1,9 +1,11 @@
+import botocore
+
 from services.Evaluator import Evaluator
 
 
 class SecurityhubCommon(Evaluator):
     """
-    Account/region-scoped Security Hub checks (8).
+    Account/region-scoped Security Hub checks.
 
     Input:
       detail -- from services/securityhub/Securityhub.py.getResources.
@@ -19,11 +21,23 @@ class SecurityhubCommon(Evaluator):
     ## Below this many third-party integrations we flag shubIntegrationsMissing.
     MIN_INTEGRATIONS = 3
 
-    def __init__(self, detail, shClient, cisArnFragment):
+    ## A FSBP standard ARN contains this fragment regardless of version.
+    FSBP_ARN_FRAGMENT = 'aws-foundational-security-best-practices'
+
+    ## Subscription states in which a standard is (or is becoming) active.
+    ## FAILED / DELETING are not "on"; INCOMPLETE still evaluates most
+    ## controls and PENDING is mid-enable, so both count as enabled.
+    ACTIVE_STANDARD_STATES = ('READY', 'INCOMPLETE', 'PENDING')
+
+    def __init__(self, detail, shClient, cisArnFragment, ssmClient=None,
+                 eventsClient=None):
         super().__init__()
         self.detail = detail
         self.shClient = shClient
+        self.ssmClient = ssmClient
+        self.eventsClient = eventsClient
         self.cisArnFragment = cisArnFragment
+        self.standardsError = detail.get('_standardsError')
         self._resourceName = 'Account'
 
         self.enabled = bool(detail.get('_enabled'))
@@ -67,6 +81,10 @@ class SecurityhubCommon(Evaluator):
     def _checkShubNoStandardsEnabled(self):
         if not self.enabled:
             return self._na('shubNoStandardsEnabled')
+        if self.standardsError:
+            self.results['shubNoStandardsEnabled'] = [
+                0, f"Unable to evaluate ({self.standardsError})"]
+            return
         if self.standards:
             self.results['shubNoStandardsEnabled'] = [
                 1, f"{len(self.standards)} security standard(s) enabled"
@@ -82,6 +100,10 @@ class SecurityhubCommon(Evaluator):
     def _checkShubCISStandardDisabled(self):
         if not self.enabled:
             return self._na('shubCISStandardDisabled')
+        if self.standardsError:
+            self.results['shubCISStandardDisabled'] = [
+                0, f"Unable to evaluate ({self.standardsError})"]
+            return
         hasCis = any(self.cisArnFragment in (s.get('StandardsArn') or '')
                      for s in self.standards)
         if hasCis:
@@ -184,4 +206,212 @@ class SecurityhubCommon(Evaluator):
                 f"{atLeast}{self.unprocessed} finding(s) are still in the NEW "
                 "workflow state — a backlog this size means findings are not "
                 "being triaged, so a real one is unlikely to be noticed among them"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # WAFS2027 additions
+    # ------------------------------------------------------------------ #
+    @staticmethod
+    def _errCode(e):
+        return e.response.get('Error', {}).get('Code', 'Unknown')
+
+    def _activeStandards(self):
+        return [s for s in self.standards
+                if (s.get('StandardsStatus') or '') in self.ACTIVE_STANDARD_STATES]
+
+    # 9. AWS Foundational Security Best Practices not enabled
+    def _checkShubFsbpStandardDisabled(self):
+        key = 'shubFsbpStandardDisabled'
+        if not self.enabled:
+            return self._na(key)
+        if self.standardsError:
+            self.results[key] = [0, f"Unable to evaluate ({self.standardsError})"]
+            return
+        fsbp = [s for s in self.standards
+                if self.FSBP_ARN_FRAGMENT in (s.get('StandardsArn') or '')]
+        active = [s for s in fsbp
+                  if (s.get('StandardsStatus') or '') in self.ACTIVE_STANDARD_STATES]
+        if active:
+            self.results[key] = [
+                1, "AWS Foundational Security Best Practices is enabled "
+                   f"({active[0].get('StandardsStatus')})"
+            ]
+        elif fsbp:
+            self.results[key] = [
+                -1,
+                "The AWS Foundational Security Best Practices subscription is "
+                f"{fsbp[0].get('StandardsStatus')} — its controls are not being "
+                "evaluated"
+            ]
+        else:
+            self.results[key] = [
+                -1,
+                "AWS Foundational Security Best Practices is not enabled — the "
+                "AWS-curated baseline of controls across services is not being "
+                "evaluated in this region"
+            ]
+
+    # 10. New Security Hub (v2) not enabled
+    def _checkSecurityHubV2NotEnabled(self):
+        key = 'securityHubV2NotEnabled'
+        try:
+            resp = self.shClient.describe_security_hub_v2()
+        except botocore.exceptions.ClientError as e:
+            code = self._errCode(e)
+            if code == 'ResourceNotFoundException':
+                self.results[key] = [
+                    -1,
+                    "The new AWS Security Hub is not enabled in this region — "
+                    "findings from GuardDuty, Inspector, Macie and Security Hub "
+                    "CSPM are not correlated into exposures and prioritised "
+                    "risks"
+                ]
+            else:
+                self.results[key] = [0, f"Unable to evaluate ({code})"]
+            return
+        except botocore.exceptions.BotoCoreError as e:
+            self.results[key] = [0, f"Unable to evaluate ({type(e).__name__})"]
+            return
+        if resp.get('HubV2Arn'):
+            self.results[key] = [1, "The new AWS Security Hub is enabled"]
+        else:
+            self.results[key] = [0, "Unable to evaluate (no HubV2Arn returned)"]
+
+    # 11. Controls disabled without a recorded reason
+    def _checkShubControlsDisabledNoReason(self):
+        key = 'shubControlsDisabledNoReason'
+        if not self.enabled:
+            return self._na(key)
+        if self.standardsError:
+            self.results[key] = [0, f"Unable to evaluate ({self.standardsError})"]
+            return
+        ## Only READY/INCOMPLETE subscriptions have a control list to read;
+        ## PENDING ones are still being provisioned.
+        subs = [s for s in self.standards
+                if (s.get('StandardsStatus') or '') in ('READY', 'INCOMPLETE')
+                and s.get('StandardsSubscriptionArn')]
+        if not subs:
+            self.results[key] = [0, "No ready standard subscription to evaluate"]
+            return
+
+        noReason, disabled, errors = [], 0, []
+        for sub in subs:
+            arn = sub['StandardsSubscriptionArn']
+            try:
+                pag = self.shClient.get_paginator('describe_standards_controls')
+                for page in pag.paginate(StandardsSubscriptionArn=arn):
+                    for c in page.get('Controls', []) or []:
+                        if (c.get('ControlStatus') or '') != 'DISABLED':
+                            continue
+                        disabled += 1
+                        if not (c.get('DisabledReason') or '').strip():
+                            noReason.append(c.get('ControlId')
+                                            or c.get('StandardsControlArn', '?'))
+            except botocore.exceptions.ClientError as e:
+                errors.append(self._errCode(e))
+
+        if noReason:
+            shown = ', '.join(sorted(set(noReason))[:10])
+            more = '' if len(set(noReason)) <= 10 else ', ...'
+            self.results[key] = [
+                -1,
+                f"{len(noReason)} disabled control(s) have no recorded reason "
+                f"({shown}{more}) — the exception cannot be traced or reviewed"
+            ]
+        elif errors and len(errors) == len(subs):
+            self.results[key] = [0, f"Unable to evaluate ({errors[0]})"]
+        elif errors:
+            self.results[key] = [
+                0, f"Unable to evaluate every standard ({errors[0]}); "
+                   f"{disabled} disabled control(s) read all have a reason"
+            ]
+        else:
+            msg = (f"{disabled} disabled control(s), all with a recorded reason"
+                   if disabled else "No controls are disabled")
+            self.results[key] = [1, msg]
+
+    # 12. No automated response wired to Security Hub findings
+    def _automationEvidence(self):
+        """Returns (evidence list, error codes). Stops at the first evidence."""
+        errors = []
+
+        def _first(fn):
+            try:
+                return fn()
+            except botocore.exceptions.ClientError as e:
+                errors.append(self._errCode(e))
+            except botocore.exceptions.BotoCoreError as e:
+                errors.append(type(e).__name__)
+            return None
+
+        def rules():
+            ## list_automation_rules has no paginator: walk NextToken so a page
+            ## of DISABLED rules cannot hide an ENABLED one.
+            token = None
+            while True:
+                kw = {'MaxResults': 100}
+                if token:
+                    kw['NextToken'] = token
+                r = self.shClient.list_automation_rules(**kw)
+                for m in r.get('AutomationRulesMetadata', []) or []:
+                    if (m.get('RuleStatus') or 'ENABLED') == 'ENABLED':
+                        return f"automation rule {m.get('RuleName', '')}".strip()
+                token = r.get('NextToken')
+                if not token:
+                    return None
+
+        def actions():
+            pag = self.shClient.get_paginator('describe_action_targets')
+            for page in pag.paginate():
+                for t in page.get('ActionTargets', []) or []:
+                    return f"custom action {t.get('Name', '')}".strip()
+            return None
+
+        def eventRules():
+            if self.eventsClient is None:
+                return None
+            pag = self.eventsClient.get_paginator('list_rules')
+            for page in pag.paginate():
+                for r in page.get('Rules', []) or []:
+                    if (r.get('State') or '') == 'DISABLED':
+                        continue
+                    if 'aws.securityhub' in (r.get('EventPattern') or ''):
+                        return f"EventBridge rule {r.get('Name', '')}".strip()
+            return None
+
+        def runbooks():
+            if self.ssmClient is None:
+                return None
+            pag = self.ssmClient.get_paginator('list_documents')
+            for page in pag.paginate(Filters=[
+                    {'Key': 'Owner', 'Values': ['Self']},
+                    {'Key': 'DocumentType', 'Values': ['Automation']}]):
+                for d in page.get('DocumentIdentifiers', []) or []:
+                    return f"SSM Automation runbook {d.get('Name', '')}".strip()
+            return None
+
+        for fn in (rules, actions, eventRules, runbooks):
+            ev = _first(fn)
+            if ev:
+                return ev, errors
+        return None, errors
+
+    def _checkSecurityHubNoAutomationRules(self):
+        key = 'securityHubNoAutomationRules'
+        if not self.enabled:
+            return self._na(key)
+        evidence, errors = self._automationEvidence()
+        if evidence:
+            self.results[key] = [
+                1, f"Response automation found ({evidence})"
+            ]
+        elif errors:
+            self.results[key] = [0, f"Unable to evaluate ({errors[0]})"]
+        else:
+            self.results[key] = [
+                -1,
+                "No Security Hub automation rule, custom action, EventBridge "
+                "rule matching aws.securityhub, or self-owned SSM Automation "
+                "runbook was found — findings appear to be handled entirely by "
+                "hand"
             ]
