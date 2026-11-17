@@ -87,8 +87,8 @@
 	},
 	"EncInTransitAndRest": {
 		"category": "S",
-		"^description": "Encryption in Transit: {$COUNT} of ElastiCache are not enable encryption in transit",
-		"shortDesc": "Encryption in Transit",
+		"^description": "Encryption at rest and in transit: {$COUNT} ElastiCache cluster(s) do not have encryption at rest and/or in transit enabled. The finding message names which one is missing. Node-based Memcached clusters do not support encryption at rest; use ElastiCache Serverless or Valkey/Redis OSS for data that must be encrypted at rest.",
+		"shortDesc": "Encryption at rest and in transit",
 		"criticality": "L",
 		"downtime": 0,
 		"slowness": 0,
@@ -98,7 +98,9 @@
 			"[New Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/GettingStarted.CreateCluster.html>",
 			"[New Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/GettingStarted.CreateCluster.html>",
 			"[Modify Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/Clusters.Modify.html>",
-			"[Modify Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Clusters.Modify.html>"
+			"[Modify Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Clusters.Modify.html>",
+			"[At-rest encryption]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/at-rest-encryption.html>",
+			"[In-transit encryption]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/in-transit-encryption.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
