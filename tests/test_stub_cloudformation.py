@@ -174,7 +174,7 @@ def test_plaintext_secret_metadata_names_not_flagged():
     secrets = {'Pwd': 'hunter2!', 'DbPass': 'hunter2!', 'AdminPass': 'hunter2!',
                'db_password': 'hunter2!', 'dbpassword': 'hunter2!',
                'Password1': 'hunter2!', 'SecretAccessKey': 'wJalrXUtnFEMI/K7MDENG',
-               'ClientSecret': 'Zx9-abc_def', 'SlackApiKey': 'xoxb-123-abc',
+               'ClientSecret': 'Zx9-abc_def', 'SlackApiKey': 'fake-api-key-value',
                'DatabaseSecret': 'S3cr3tValue!', 'DBPasswordValue': 'hunter2!'}
     stack = {'Parameters': [{'ParameterKey': k, 'ParameterValue': v}
                             for k, v in secrets.items()]}
