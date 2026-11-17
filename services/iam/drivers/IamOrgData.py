@@ -230,3 +230,75 @@ def scpGuardrails(doc):
         if any(_actionMatches(p, a) for p in iamPatterns for a in PRIV_ESC_ACTIONS):
             found.add('preventPrivEscalation')
     return found
+
+
+# ---------------------------------------------------------------------- #
+# SCP guardrail coverage (shared by the scpNo* action-guard checks)
+# ---------------------------------------------------------------------- #
+# A Deny only works as an org-wide guardrail when its Condition (if any) is
+# an *exception* (e.g. "everyone except the BreakGlass role"). A Deny scoped
+# by a positive condition - e.g. only for the root user, only outside the
+# approved regions - leaves the action allowed for everyone else and must not
+# count as coverage (that would be a false PASS).
+_EXCEPTION_BOOL_KEYS = {'aws:principalisawsservice', 'aws:viaawsservice'}
+
+
+def _baseOperator(op):
+    op = str(op).lower()
+    for prefix in ('forallvalues:', 'foranyvalue:'):
+        if op.startswith(prefix):
+            op = op[len(prefix):]
+    if op.endswith('ifexists'):
+        op = op[:-len('ifexists')]
+    return op
+
+
+def denyIsUnconditionalGuardrail(stmt):
+    """True when the Deny applies to everyone except explicit exceptions."""
+    cond = stmt.get('Condition')
+    if not cond:
+        return True
+    if not isinstance(cond, dict):
+        return False
+    for (op, key), vals in conditionKeys(stmt).items():
+        base = _baseOperator(op)
+        if key == 'aws:requestedregion':
+            return False
+        if base.startswith('stringnot') or base.startswith('arnnot'):
+            continue
+        if base == 'bool' and key in _EXCEPTION_BOOL_KEYS and all(v.lower() == 'false' for v in vals):
+            continue
+        return False
+    return True
+
+
+def guardrailCoverage(policies, requirements):
+    """Evaluate attached customer SCPs against guardrail requirements.
+
+    policies:     [{'Name', 'Content'}] (customer SCPs that are attached)
+    requirements: [(label, [[alt, alt...], [alt...]])] - a guardrail is met
+                  when every inner list has at least one action denied.
+    Returns {'met': {label: set(policyNames)}, 'missing': [label],
+             'conditional': {label: set(policyNames)}, 'unparsed': [names]}
+    """
+    deniedBy, condBy, unparsed = {}, {}, []
+    allActions = {a for _, reqs in requirements for alts in reqs for a in alts}
+    for p in policies:
+        if p.get('Content') is None:
+            unparsed.append(p.get('Name'))
+            continue
+        for s in statements(p['Content']):
+            for a in allActions:
+                if denyCoversAction(s, a):
+                    target = deniedBy if denyIsUnconditionalGuardrail(s) else condBy
+                    target.setdefault(a, set()).add(p.get('Name'))
+    met, missing, conditional = {}, [], {}
+    for label, reqs in requirements:
+        if all(any(a in deniedBy for a in alts) for alts in reqs):
+            met[label] = set().union(*[deniedBy[a] for alts in reqs for a in alts if a in deniedBy])
+        else:
+            missing.append(label)
+            names = set().union(*([condBy[a] for alts in reqs for a in alts if a in condBy] or [set()]))
+            if names:
+                conditional[label] = names
+    return {'met': met, 'missing': missing, 'conditional': conditional, 'unparsed': unparsed}

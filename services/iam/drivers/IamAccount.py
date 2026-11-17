@@ -8,7 +8,9 @@ from dateutil.tz import tzlocal
 from utils.Config import Config
 from utils.Tools import _warn, _pr
 from .IamCommon import IamCommon
-from .IamOrgData import OrgData, SCP, RCP, TAG, FULL_AWS_ACCESS_ID, statements, denyCoversAction, conditionKeys, scpGuardrails, SCP_GUARDRAILS
+from .IamOrgData import OrgData, SCP, RCP, TAG, FULL_AWS_ACCESS_ID, statements, denyCoversAction, conditionKeys, scpGuardrails, SCP_GUARDRAILS, \
+    denyIsUnconditionalGuardrail, guardrailCoverage
+from .IamSsoData import SsoData, parseIsoDuration
  
 class IamAccount(IamCommon):
     PASSWORD_POLICY_MIN_SCORE = 4
@@ -61,6 +63,7 @@ class IamAccount(IamCommon):
 
         callerAccountId = (Config.get('stsInfo', {}) or {}).get('Account')
         self.orgData = OrgData(self.orgClient, callerAccountId, orgResp, orgErr)
+        self.ssoData = SsoData(ssBoto, Config.get('REGIONS_SELECTED', []) or [])
 
         self.init()
     
@@ -1089,7 +1092,9 @@ class IamAccount(IamCommon):
                 continue
             for s in statements(p['Content']):
                 for a in self.BACKUP_TAMPER_ACTIONS:
-                    if denyCoversAction(s, a):
+                    # A Deny scoped to e.g. the root user or non-approved regions
+                    # leaves backups deletable by everyone else: not coverage.
+                    if denyCoversAction(s, a) and denyIsUnconditionalGuardrail(s):
                         covered.add(a)
                         protecting.add(p['Name'])
         uncovered = [a for a in self.BACKUP_TAMPER_ACTIONS if a not in covered]
@@ -1099,3 +1104,265 @@ class IamAccount(IamCommon):
             self.results[key] = [0, 'Unable to evaluate (unparseable SCP content: {})'.format(', '.join(unparsed))]
         else:
             self.results[key] = [-1, 'No attached SCP denies: {}'.format(', '.join(uncovered))]
+
+    # ------------------------------------------------------------------ #
+    # SCP action guardrails. Coverage is the union of every customer SCP
+    # attached anywhere in the organization; a Deny only counts when it is
+    # unconditional or carries exception-style conditions (see
+    # IamOrgData.denyIsUnconditionalGuardrail).
+    # ------------------------------------------------------------------ #
+    DATA_PROTECTION_GUARDRAILS = [
+        ('S3 Block Public Access (s3:PutAccountPublicAccessBlock / s3:PutBucketPublicAccessBlock)',
+         [['s3:PutAccountPublicAccessBlock', 's3:PutBucketPublicAccessBlock']]),
+        ('EBS default encryption (ec2:DisableEbsEncryptionByDefault)', [['ec2:DisableEbsEncryptionByDefault']]),
+        ('KMS key deletion (kms:ScheduleKeyDeletion)', [['kms:ScheduleKeyDeletion']]),
+    ]
+    IAM_USER_GUARDRAILS = [
+        ('IAM user / access key creation (iam:CreateUser or iam:CreateAccessKey)',
+         [['iam:CreateUser', 'iam:CreateAccessKey']]),
+    ]
+    SECURITY_SERVICE_GUARDRAILS = [
+        ('CloudTrail (cloudtrail:StopLogging, cloudtrail:DeleteTrail)',
+         [['cloudtrail:StopLogging'], ['cloudtrail:DeleteTrail']]),
+        ('GuardDuty (guardduty:DeleteDetector, guardduty:DisassociateFrom*Account)',
+         [['guardduty:DeleteDetector'],
+          ['guardduty:DisassociateFromMasterAccount', 'guardduty:DisassociateFromAdministratorAccount']]),
+        ('AWS Config (config:StopConfigurationRecorder, config:DeleteConfigurationRecorder)',
+         [['config:StopConfigurationRecorder'], ['config:DeleteConfigurationRecorder']]),
+        ('Organizations (organizations:LeaveOrganization)', [['organizations:LeaveOrganization']]),
+    ]
+
+    def _scpActionGuard(self, key, requirements, what):
+        if not self._orgPrecondition(key, True, 'Not applicable: SCPs require All Features (see orgNotAllFeatures)'):
+            return
+        pols = self._policyGate(key, SCP, [0, 'Not applicable: SCPs are not enabled (see SCPEnabled)'])
+        if pols is None:
+            return
+        attached = self._customerAttached(pols)
+        cov = guardrailCoverage(attached, requirements)
+        targets = {p['Name']: p['Targets'] for p in attached}
+
+        def where(names):
+            return '; '.join('{} -> {}'.format(n, ', '.join(self._targetLabel(t) for t in targets.get(n, [])[:5]))
+                             for n in sorted(names))
+
+        if not cov['missing']:
+            self.results[key] = [1, 'Attached SCP(s) deny {}:<br>{}'.format(what, self._detail(
+                ['{}: {}'.format(label, where(names)) for label, names in cov['met'].items()]))]
+            return
+        if cov['unparsed']:
+            self.results[key] = [0, 'Unable to evaluate (unparseable SCP content: {})'.format(', '.join(cov['unparsed']))]
+            return
+        lines = []
+        for label in cov['missing']:
+            note = ''
+            if label in cov['conditional']:
+                note = ' (only denied under a narrowing condition, e.g. root user or region, by: {})'.format(
+                    ', '.join(sorted(cov['conditional'][label])))
+            lines.append('Not denied: {}{}'.format(label, note))
+        for label, names in cov['met'].items():
+            lines.append('Denied: {} by {}'.format(label, ', '.join(sorted(names))))
+        self.results[key] = [-1, self._detail(lines)]
+
+    def _checkScpNoDataProtectionGuardrail(self):
+        self._scpActionGuard('scpNoDataProtectionGuardrail', self.DATA_PROTECTION_GUARDRAILS,
+                             'disabling data-protection settings')
+
+    def _checkScpNoIamUserCreationDeny(self):
+        self._scpActionGuard('scpNoIamUserCreationDeny', self.IAM_USER_GUARDRAILS,
+                             'IAM user / access key creation')
+
+    def _checkScpNoSecurityServiceProtection(self):
+        self._scpActionGuard('scpNoSecurityServiceProtection', self.SECURITY_SERVICE_GUARDRAILS,
+                             'disabling security services')
+
+    # ------------------------------------------------------------------ #
+    SECURITY_DELEGATION_SERVICES = {
+        'guardduty.amazonaws.com': 'Amazon GuardDuty',
+        'securityhub.amazonaws.com': 'AWS Security Hub',
+        'inspector2.amazonaws.com': 'Amazon Inspector',
+        'macie.amazonaws.com': 'Amazon Macie',
+        'access-analyzer.amazonaws.com': 'IAM Access Analyzer',
+        'config.amazonaws.com': 'AWS Config',
+        'config-multiaccountsetup.amazonaws.com': 'AWS Config',
+    }
+
+    def _checkSecurityServicesNoDelegatedAdmin(self):
+        """Management account only. FAIL when no security service has a
+        delegated administrator, or when a security service has trusted
+        access enabled (in use org-wide) but is still administered from the
+        management account."""
+        key = 'securityServicesNoDelegatedAdmin'
+        if not self._orgPrecondition(key, True):
+            return
+        if not self.orgData.isManagementAccount():
+            self.results[key] = [0, 'Not evaluable from member account']
+            return
+        delegated = {}
+        try:
+            admins = []
+            for page in self.orgClient.get_paginator('list_delegated_administrators').paginate():
+                admins.extend(page.get('DelegatedAdministrators', []))
+            for adm in admins:
+                for page in self.orgClient.get_paginator('list_delegated_services_for_account').paginate(AccountId=adm['Id']):
+                    for svc in page.get('DelegatedServices', []):
+                        sp = svc.get('ServicePrincipal')
+                        if sp in self.SECURITY_DELEGATION_SERVICES:
+                            delegated.setdefault(self.SECURITY_DELEGATION_SERVICES[sp], set()).add(
+                                '{} ({})'.format(adm.get('Name', ''), adm['Id']))
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = self.orgData.notEvaluable(e.response['Error']['Code'])
+            return
+
+        trusted, trustedErr = set(), None
+        try:
+            for page in self.orgClient.get_paginator('list_aws_service_access_for_organization').paginate():
+                for svc in page.get('EnabledServicePrincipals', []):
+                    sp = svc.get('ServicePrincipal')
+                    if sp in self.SECURITY_DELEGATION_SERVICES:
+                        trusted.add(self.SECURITY_DELEGATION_SERVICES[sp])
+        except botocore.exceptions.ClientError as e:
+            trustedErr = e.response['Error']['Code']
+
+        allServices = sorted(set(self.SECURITY_DELEGATION_SERVICES.values()))
+        if not delegated:
+            self.results[key] = [-1, 'No delegated administrator is registered for any of: {}. Security services are administered from the management account.'.format(
+                ', '.join(allServices))]
+            return
+        inUseNotDelegated = sorted(trusted - set(delegated))
+        if inUseNotDelegated:
+            self.results[key] = [-1, 'Trusted access enabled but no delegated administrator for: {}<br>Delegated: {}'.format(
+                ', '.join(inUseNotDelegated),
+                '; '.join('{} -> {}'.format(s, ', '.join(sorted(a))) for s, a in sorted(delegated.items())))]
+            return
+        msg = 'Delegated: {}'.format('; '.join('{} -> {}'.format(s, ', '.join(sorted(a))) for s, a in sorted(delegated.items())))
+        if trustedErr:
+            msg += '<br>(Trusted-access list unreadable: {}; services without delegation were not checked for org-wide use)'.format(trustedErr)
+        self.results[key] = [1, msg]
+
+    # ------------------------------------------------------------------ #
+    # IAM Identity Center (sso-admin). Requires the organization instance,
+    # i.e. the management or Identity Center delegated administrator account.
+    # ------------------------------------------------------------------ #
+    MAX_SSO_SESSION_SECONDS = 8 * 3600
+    ADMIN_MANAGED_POLICY_ARN = 'arn:aws:iam::aws:policy/AdministratorAccess'
+
+    def _ssoOrgInstances(self, key):
+        """Organization instances, or None after recording a [0, ...] result."""
+        insts, errors = self.ssoData.instances()
+        orgInsts = [i for i in insts if i['Kind'] == 'ORG']
+        if orgInsts:
+            return orgInsts
+        if errors:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(errors[0].split(': ')[-1])]
+        elif not self.ssoData.regions:
+            self.results[key] = [0, 'Unable to evaluate (no regions selected)']
+        elif insts:
+            self.results[key] = [0, 'Not applicable: only an account instance of IAM Identity Center exists (permission sets require the organization instance)']
+        elif self.orgData.inOrganization() and not self.orgData.isManagementAccount():
+            self.results[key] = [0, 'Not evaluable from member account']
+        else:
+            self.results[key] = [0, 'Not applicable: no IAM Identity Center instance found in scanned regions ({})'.format(
+                ', '.join(self.ssoData.regions))]
+        return None
+
+    def _psName(self, inst, psArn):
+        ps, err = self.ssoData.permissionSet(inst, psArn)
+        return (ps or {}).get('Name') or psArn.split('/')[-1]
+
+    def _checkSsoAssignmentsToIndividualUsers(self):
+        key = 'ssoAssignmentsToIndividualUsers'
+        insts = self._ssoOrgInstances(key)
+        if insts is None:
+            return
+        userAssign, total, errors = [], 0, []
+        for inst in insts:
+            for psArn in inst['PermissionSets']:
+                accounts, err = self.ssoData.provisionedAccounts(inst, psArn)
+                if err:
+                    errors.append(err)
+                    continue
+                for acc in accounts:
+                    assigns, err = self.ssoData.assignments(inst, psArn, acc)
+                    if err:
+                        errors.append(err)
+                        continue
+                    total += len(assigns)
+                    users = [a for a in assigns if a.get('PrincipalType') == 'USER']
+                    if users:
+                        userAssign.append('{} -> account {}: {} user assignment(s)'.format(
+                            self._psName(inst, psArn), acc, len(users)))
+        if userAssign:
+            msg = '{} permission set/account pair(s) assigned directly to users (assign groups instead; keep documented break-glass exceptions only):<br>{}'.format(
+                len(userAssign), self._detail(userAssign))
+            if errors:
+                msg += '<br>Unable to read {} assignment list(s) ({})'.format(len(errors), errors[0])
+            self.results[key] = [-1, msg]
+        elif errors:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(errors[0])]
+        else:
+            self.results[key] = [1, 'No account assignments to individual users ({} assignment(s) checked)'.format(total)]
+
+    @staticmethod
+    def _inlineIsAdmin(doc):
+        for s in statements(doc):
+            if s.get('Effect') != 'Allow':
+                continue
+            res = s.get('Resource', [])
+            res = res if isinstance(res, list) else [res]
+            if '*' not in [str(r) for r in res]:
+                continue
+            acts = s.get('Action', [])
+            acts = acts if isinstance(acts, list) else [acts]
+            if any(str(a) in ('*', '*:*') for a in acts):
+                return True
+        return False
+
+    def _checkSsoPermissionSetOverprivileged(self):
+        """FAIL on SessionDuration > PT8H. Admin-level permission sets
+        (AdministratorAccess or inline Allow *:* on *) are reported as INFO:
+        nearly every organization legitimately has one."""
+        key = 'ssoPermissionSetOverprivileged'
+        insts = self._ssoOrgInstances(key)
+        if insts is None:
+            return
+        longSessions, admins, errors, count = [], [], [], 0
+        for inst in insts:
+            for psArn in inst['PermissionSets']:
+                count += 1
+                ps, err = self.ssoData.permissionSet(inst, psArn)
+                if err:
+                    errors.append(err)
+                    continue
+                name = ps.get('Name') or psArn.split('/')[-1]
+                dur = ps.get('SessionDuration') or 'PT1H'
+                secs = parseIsoDuration(dur)
+                if secs is not None and secs > self.MAX_SSO_SESSION_SECONDS:
+                    longSessions.append('{}: SessionDuration {}'.format(name, dur))
+                mps, err = self.ssoData.managedPolicies(inst, psArn)
+                if err:
+                    errors.append(err)
+                elif any(m.get('Arn') == self.ADMIN_MANAGED_POLICY_ARN for m in mps):
+                    admins.append('{} (AdministratorAccess)'.format(name))
+                    continue
+                raw, err = self.ssoData.inlinePolicy(inst, psArn)
+                if err:
+                    errors.append(err)
+                    continue
+                if raw:
+                    try:
+                        doc = json.loads(raw) if isinstance(raw, str) else raw
+                    except ValueError:
+                        doc = None
+                    if self._inlineIsAdmin(doc):
+                        admins.append('{} (inline Allow *:*)'.format(name))
+        adminNote = 'Admin-level permission set(s) ({}): {}'.format(len(admins), ', '.join(admins)) if admins else ''
+        if longSessions:
+            lines = ['Session longer than 8 hours: ' + l for l in longSessions] + ([adminNote] if adminNote else [])
+            self.results[key] = [-1, self._detail(lines)]
+        elif errors:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(errors[0])]
+        elif admins:
+            self.results[key] = [0, 'INFO: {}. Ensure these are limited to a small, group-based audience.'.format(adminNote)]
+        else:
+            self.results[key] = [1, '{} permission set(s): none grant full admin or a session longer than 8 hours'.format(count)]

@@ -940,5 +940,143 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html"
+	},
+	"scpNoDataProtectionGuardrail": {
+		"category": "S",
+		"^description": "No attached service control policy (SCP) denies the actions that weaken account-wide data-protection settings: changing S3 Block Public Access (s3:PutAccountPublicAccessBlock / s3:PutBucketPublicAccessBlock), disabling EBS encryption by default (ec2:DisableEbsEncryptionByDefault) and scheduling KMS key deletion (kms:ScheduleKeyDeletion). Without these preventive guardrails any administrator in a member account can expose data publicly, create unencrypted volumes or destroy keys protecting encrypted data. Attach an SCP that denies these actions (with an exception for a designated platform role if needed). A Deny that only applies to the root user or outside approved Regions does not count. Region restriction is reported by scpBestPractices.",
+		"shortDesc": "Protect data-protection settings with an SCP",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SCP examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html>",
+			"[Blocking public access to S3 storage]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html>",
+			"[EBS encryption by default]<https://docs.aws.amazon.com/ebs/latest/userguide/encryption-by-default.html>",
+			"[Deleting AWS KMS keys]<https://docs.aws.amazon.com/kms/latest/developerguide/deleting-keys.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html"
+	},
+	"scpNoIamUserCreationDeny": {
+		"category": "S",
+		"^description": "No attached service control policy (SCP) denies iam:CreateUser or iam:CreateAccessKey. IAM users with long-term access keys are a common source of credential leaks; organizations that federate human access through IAM Identity Center should prevent new IAM users and access keys in workload accounts with an SCP (optionally with an exception for an approved automation role or only on selected OUs).",
+		"shortDesc": "Restrict IAM user and access key creation with an SCP",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SCP examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html>",
+			"[Require human users to use federation]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#bp-users-federation-idp>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html"
+	},
+	"scpNoSecurityServiceProtection": {
+		"category": "S",
+		"^description": "No attached service control policy (SCP) fully prevents security services from being disabled. The detail lists which of these are not denied: CloudTrail (cloudtrail:StopLogging, cloudtrail:DeleteTrail), GuardDuty (guardduty:DeleteDetector, guardduty:DisassociateFromMasterAccount / DisassociateFromAdministratorAccount), AWS Config (config:StopConfigurationRecorder, config:DeleteConfigurationRecorder) and leaving the organization (organizations:LeaveOrganization). An attacker or careless administrator in a member account can otherwise switch off logging and detection. A Deny that only applies to the root user or outside approved Regions does not count.",
+		"shortDesc": "Prevent disabling security services with an SCP",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SCP examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html>",
+			"[SCP examples for CloudTrail, GuardDuty and Config]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples_general.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html"
+	},
+	"securityServicesNoDelegatedAdmin": {
+		"category": "S",
+		"^description": "Security services are administered from the organization management account: either no delegated administrator is registered for any of GuardDuty, Security Hub, Inspector, Macie, IAM Access Analyzer or AWS Config, or a service has organization trusted access enabled but no delegated administrator. Delegate security services to a dedicated security tooling account so the management account is used as little as possible.",
+		"shortDesc": "Delegate security services to a security tooling account",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS services that you can use with AWS Organizations]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_integrate_services_list.html>",
+			"[Security OU and Security Tooling account]<https://docs.aws.amazon.com/prescriptive-guidance/latest/security-reference-architecture/security-tooling.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_integrate_delegated_admin.html"
+	},
+	"ssoAssignmentsToIndividualUsers": {
+		"category": "S",
+		"^description": "IAM Identity Center permission sets are assigned to individual users instead of groups. Direct user assignments are hard to review and are often left behind when people change roles. Assign permission sets to groups (ideally synchronized from your identity provider) and keep individual assignments only for documented break-glass access.",
+		"shortDesc": "Assign Identity Center permission sets to groups",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Assign user or group access to AWS accounts]<https://docs.aws.amazon.com/singlesignon/latest/userguide/assignusers.html>",
+			"[Manage access with groups]<https://docs.aws.amazon.com/singlesignon/latest/userguide/users-groups-provisioning.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/singlesignon/latest/userguide/assignusers.html"
+	},
+	"ssoPermissionSetOverprivileged": {
+		"category": "S",
+		"^description": "IAM Identity Center permission sets allow sessions longer than 8 hours. Long sessions keep credentials valid long after work is done and increase the impact of a stolen session. The detail also lists admin-level permission sets (AdministratorAccess or an inline Allow *:*) so their audience can be reviewed.",
+		"shortDesc": "Shorten Identity Center session durations",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Set session duration]<https://docs.aws.amazon.com/singlesignon/latest/userguide/howtosessionduration.html>",
+			"[Permission sets]<https://docs.aws.amazon.com/singlesignon/latest/userguide/permissionsetsconcept.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/singlesignon/latest/userguide/howtosessionduration.html"
+	},
+	"thirdPartyRoleNoExternalId": {
+		"category": "S",
+		"^description": "{$COUNT} IAM roles trust an AWS account outside your organization without requiring a strong sts:ExternalId (missing, IfExists, wildcard, shorter than 8 characters, numeric-only or equal to an account ID) or an aws:PrincipalOrgID condition. Third parties that assume roles in many customer accounts must be given a unique external ID to prevent the confused deputy problem.",
+		"shortDesc": "Require a unique sts:ExternalId for third-party roles",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[The confused deputy problem]<https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html>",
+			"[Access to AWS accounts owned by third parties]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_common-scenarios_third-party.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_common-scenarios_third-party.html"
+	},
+	"thirdPartyRoleOverprivileged": {
+		"category": "S",
+		"^description": "{$COUNT} IAM roles trusted by an AWS account outside your organization have admin-level permissions (AdministratorAccess, IAMFullAccess, or a policy allowing *, *:* or iam:* on all resources). A compromise at the third party then becomes full control of your account. Grant third-party roles only the permissions the vendor documents as required.",
+		"shortDesc": "Least privilege for third-party roles",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Access to AWS accounts owned by third parties]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_common-scenarios_third-party.html>",
+			"[Grant least privilege]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege"
 	}
 }

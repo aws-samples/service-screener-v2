@@ -6,6 +6,8 @@ Checks whose APIs the emulator does not implement (list_policies,
 list_accounts, list_accounts_for_parent, enable_policy_type, IAM
 list_organizations_features) are covered in tests/test_stub_iam_org.py.
 """
+import json
+
 from tests.emulator.conftest import assertFlagFixCycle, runCheck
 
 RES = 'Account::Config'
@@ -73,3 +75,56 @@ def test_unimplemented_org_reads_are_not_silent_pass(emu):
         res = runCheck(emu, 'iam', check, RES)
         st = res.statuses()
         assert st == {RES: 0}, (check, res.results)
+
+
+def test_new_org_guardrail_checks_not_silent_pass(emu):
+    """SCP guardrail and delegated-admin checks: the emulator does not implement
+    list_policies / list_delegated_administrators, so they must report 0.
+    Flag/fix cycles are in tests/test_stub_iam_org_guardrails.py."""
+    for check in ('scpNoDataProtectionGuardrail', 'scpNoIamUserCreationDeny', 'scpNoSecurityServiceProtection',
+                  'securityServicesNoDelegatedAdmin'):
+        res = runCheck(emu, 'iam', check, RES)
+        assert res.statuses() == {RES: 0}, (check, res.results)
+
+
+def test_sso_checks_account_instance_not_applicable(emu):
+    """The emulator only provides an account instance of IAM Identity Center
+    (permission-set APIs return ValidationException): checks must say so
+    instead of passing. Flag/fix cycles are in the Stubber test."""
+    for check in ('ssoAssignmentsToIndividualUsers', 'ssoPermissionSetOverprivileged'):
+        res = runCheck(emu, 'iam', check, RES)
+        assert res.statuses() == {RES: 0}, (check, res.results)
+        assert 'account instance' in res.results[RES][check][1]
+
+
+def test_third_party_role_unclassifiable_in_emulator(emu, uid):
+    """A role trusting another account without ExternalId and with
+    AdministratorAccess. organizations.list_accounts is NotImplemented in the
+    emulator, so the trusted account cannot be proven external: both checks
+    must return 0 (never a silent PASS, never an unproven FAIL). Removing the
+    cross-account trust removes the result. Classified flag/fix cycles are in
+    tests/test_stub_iam_org_guardrails.py."""
+    iam = emu.client('iam')
+    name = f'ss-test-vendor-{uid}'
+    trust = {'Version': '2012-10-17', 'Statement': [{'Effect': 'Allow', 'Action': 'sts:AssumeRole',
+                                                     'Principal': {'AWS': 'arn:aws:iam::111122223333:root'}}]}
+    selfTrust = {'Version': '2012-10-17', 'Statement': [{'Effect': 'Allow', 'Action': 'sts:AssumeRole',
+                                                         'Principal': {'AWS': 'arn:aws:iam::000000000000:root'}}]}
+    iam.create_role(RoleName=name, AssumeRolePolicyDocument=json.dumps(trust))
+    try:
+        iam.attach_role_policy(RoleName=name, PolicyArn='arn:aws:iam::aws:policy/AdministratorAccess')
+        for check in ('thirdPartyRoleNoExternalId', 'thirdPartyRoleOverprivileged'):
+            res = runCheck(emu, 'iam', check, name)
+            assert res.statuses() == {f'Role::{name}': 0}, (check, res.results)
+            assert '111122223333' in res.results[f'Role::{name}'][check][1]
+
+        iam.update_assume_role_policy(RoleName=name, PolicyDocument=json.dumps(selfTrust))
+        for check in ('thirdPartyRoleNoExternalId', 'thirdPartyRoleOverprivileged'):
+            res = runCheck(emu, 'iam', check, name)
+            assert res.statuses() == {}, (check, res.results)
+    finally:
+        try:
+            iam.detach_role_policy(RoleName=name, PolicyArn='arn:aws:iam::aws:policy/AdministratorAccess')
+        except Exception:
+            pass
+        iam.delete_role(RoleName=name)
