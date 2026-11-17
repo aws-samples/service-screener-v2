@@ -1,3 +1,6 @@
+import fnmatch
+import json
+
 from services.Evaluator import Evaluator
 
 
@@ -10,6 +13,8 @@ class EventbridgeRegional(Evaluator):
       ebConnectionNoAuth
       ebApiDestinationHttpEndpoint
       ebGlobalEndpointNoReplication
+      securityFindingsNotRouted
+      healthEventsNotRouted
 
     These subjects are per-region collections rather than per-bus or per-rule:
     archives, schema discoverers, connections, API destinations and global
@@ -19,7 +24,8 @@ class EventbridgeRegional(Evaluator):
     Input:
       detail -- dict from Eventbridge._getRegionalDetail. Keys: '_region',
         '_accountId', '_archives', '_connections', '_apiDestinations',
-        '_endpoints', '_discoverers', '_discovererLookupFailed'.
+        '_endpoints', '_discoverers', '_discovererLookupFailed', '_routing'
+        (see Eventbridge._getRoutingDetail).
 
     Status contract (services/Evaluator.py): -1 = FAIL, 1 = PASS, 0 = INFO /
     not applicable. Only -1 surfaces as a finding.
@@ -31,6 +37,13 @@ class EventbridgeRegional(Evaluator):
     ## The EventBridge API has no 'NONE' value — a connection always carries one
     ## of these — so an unrecognised or absent value is the anomaly.
     AUTHENTICATED_TYPES = frozenset(['BASIC', 'OAUTH_CLIENT_CREDENTIALS', 'API_KEY'])
+
+    SECURITY_SOURCES = ('aws.guardduty', 'aws.securityhub', 'aws.inspector2', 'aws.access-analyzer')
+    HEALTH_SOURCE = 'aws.health'
+    ENABLED_STATES = frozenset(['ENABLED', 'ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS'])
+    ## Pattern fields that do not narrow which service emitted the event. A
+    ## pattern that filters only on these (no 'source') matches every source.
+    SOURCE_NEUTRAL_FIELDS = frozenset(['account', 'region'])
 
     def __init__(self, detail, ebClient):
         super().__init__()
@@ -46,6 +59,7 @@ class EventbridgeRegional(Evaluator):
         self.endpoints = detail.get('_endpoints') or []
         self.discoverers = detail.get('_discoverers') or []
         self.discovererLookupFailed = bool(detail.get('_discovererLookupFailed'))
+        self.routing = detail.get('_routing')
 
         self.addII('region', detail.get('_region', 'N/A'))
         self.addII('archiveCount', str(len(self.archives)))
@@ -219,6 +233,222 @@ class EventbridgeRegional(Evaluator):
                 f"All {len(self.endpoints)} global endpoint(s) have replication "
                 "ENABLED"
             ]
+
+    # ------------------------------------------------------------------ #
+    # 6. Security findings not routed to any responder
+    # ------------------------------------------------------------------ #
+    def _checkSecurityFindingsNotRouted(self):
+        """
+        GuardDuty, Security Hub, Inspector and IAM Access Analyzer publish their
+        findings to the default event bus of the Region. Without an enabled rule
+        that matches at least one of these sources and has a target, no
+        responder (ticketing, chat, SOAR, Lambda) is notified automatically.
+
+        Suppressed to INFO when findings are centralised elsewhere: the account
+        is an active GuardDuty or Security Hub member (the administrator account
+        owns the response), or Security Hub cross-Region aggregation links this
+        Region into another aggregation Region.
+        """
+        key = 'securityFindingsNotRouted'
+        routing = self.routing
+        if not isinstance(routing, dict):
+            self.results[key] = [0, 'Unable to evaluate (routing data not collected)']
+            return
+        if routing.get('regionError'):
+            self.results[key] = [0, f"Unable to evaluate ({routing['regionError']})"]
+            return
+
+        routes = self._routesBySource(routing.get('regionRules'), self.SECURITY_SOURCES)
+        routed = [s for s in self.SECURITY_SOURCES if routes[s]]
+        perSource = '; '.join(
+            f"{s}: " + (self._joinNames(routes[s]) if routes[s] else 'not routed')
+            for s in self.SECURITY_SOURCES)
+
+        if routed:
+            self.results[key] = [1, f"Security findings are routed on the default bus — {perSource}"]
+            return
+
+        gdAdmin = routing.get('guardDutyAdmin')
+        shAdmin = routing.get('securityHubAdmin')
+        if gdAdmin or shAdmin:
+            admins = []
+            if gdAdmin:
+                admins.append(f"GuardDuty administrator {gdAdmin}")
+            if shAdmin:
+                admins.append(f"Security Hub administrator {shAdmin}")
+            self.results[key] = [
+                0,
+                "No local rule routes security findings, but this account is a member of "
+                + ' and '.join(admins) + " — evaluate finding routing in the administrator account"
+            ]
+            return
+
+        aggRegion = routing.get('securityHubAggregation')
+        if aggRegion:
+            self.results[key] = [
+                0,
+                "No local rule routes security findings, but Security Hub aggregates this "
+                f"Region's findings into {aggRegion} — evaluate finding routing there"
+            ]
+            return
+
+        self.results[key] = [
+            -1,
+            "No ENABLED rule with a target on the default event bus matches findings from "
+            "GuardDuty, Security Hub, Inspector or IAM Access Analyzer — " + perSource
+        ]
+
+    # ------------------------------------------------------------------ #
+    # 7. AWS Health events not routed
+    # ------------------------------------------------------------------ #
+    def _checkHealthEventsNotRouted(self):
+        """
+        AWS Health delivers Region-specific events to the default bus of the
+        affected Region and global events to us-east-1. FAIL only when neither
+        the scanned Region nor us-east-1 has an ENABLED aws.health rule with a
+        target. When only us-east-1 routes Health events, global events are
+        covered but this Region's events are not; that is reported as INFO.
+        """
+        key = 'healthEventsNotRouted'
+        routing = self.routing
+        if not isinstance(routing, dict):
+            self.results[key] = [0, 'Unable to evaluate (routing data not collected)']
+            return
+        if routing.get('regionError'):
+            self.results[key] = [0, f"Unable to evaluate ({routing['regionError']})"]
+            return
+
+        region = routing.get('_region', 'this Region')
+        local = self._routesBySource(routing.get('regionRules'), [self.HEALTH_SOURCE])[self.HEALTH_SOURCE]
+        if local:
+            self.results[key] = [1, f"AWS Health events in {region} are routed by: " + self._joinNames(local)]
+            return
+
+        if region != 'us-east-1':
+            if routing.get('globalError'):
+                self.results[key] = [
+                    0, f"Unable to evaluate ({routing['globalError']}) — no aws.health rule in {region}, "
+                    "and us-east-1 (global events) could not be read"]
+                return
+            globalRoutes = self._routesBySource(
+                routing.get('globalRules'), [self.HEALTH_SOURCE])[self.HEALTH_SOURCE]
+            if globalRoutes:
+                self.results[key] = [
+                    0,
+                    "Global AWS Health events are routed in us-east-1 by " + self._joinNames(globalRoutes)
+                    + f", but no rule routes Region-specific Health events in {region}"
+                ]
+                return
+
+        self.results[key] = [
+            -1,
+            f"No ENABLED rule with a target matches source aws.health on the default bus in {region}"
+            + ("" if region == 'us-east-1' else " or us-east-1")
+            + " — service events and scheduled changes affecting this account reach no responder"
+        ]
+
+    # ------------------------------------------------------------------ #
+    # Event pattern matching
+    # ------------------------------------------------------------------ #
+    def _routesBySource(self, rules, sources):
+        """{source: [ruleName, ...]} counting only ENABLED rules with >= 1 target."""
+        out = {s: [] for s in sources}
+        for rule in rules or []:
+            if rule.get('State') not in self.ENABLED_STATES:
+                continue
+            if (rule.get('targetCount') or 0) < 1:
+                continue
+            for s in rule.get('sources') or []:
+                if s in out:
+                    out[s].append(rule.get('Name', '?'))
+        return out
+
+    @classmethod
+    def patternMatchesSource(cls, pattern, source):
+        """
+        True when an EventBridge EventPattern (JSON string or dict) can match an
+        event whose 'source' is `source`. Understands top-level $or, exact
+        values and the prefix / suffix / wildcard / equals-ignore-case /
+        anything-but / exists content filters. Unparseable patterns never match.
+        """
+        if isinstance(pattern, str):
+            try:
+                pattern = json.loads(pattern)
+            except (ValueError, TypeError):
+                return False
+        if not isinstance(pattern, dict):
+            return False
+        return any(cls._alternativeMatches(alt, source) for alt in cls._expandOr(pattern))
+
+    @classmethod
+    def _expandOr(cls, pattern, depth=0):
+        if depth > 5 or '$or' not in pattern:
+            return [pattern]
+        base = {k: v for k, v in pattern.items() if k != '$or'}
+        alts = []
+        for sub in pattern.get('$or') or []:
+            if isinstance(sub, dict):
+                merged = dict(base)
+                merged.update(sub)
+                alts += cls._expandOr(merged, depth + 1)
+        return alts
+
+    @classmethod
+    def _alternativeMatches(cls, pattern, source):
+        if 'source' not in pattern:
+            ## No source filter: matches every source only when nothing else in
+            ## the pattern narrows the event type.
+            return set(pattern.keys()) <= cls.SOURCE_NEUTRAL_FIELDS
+        values = pattern.get('source')
+        if not isinstance(values, list):
+            values = [values]
+        return any(cls._valueMatches(v, source) for v in values)
+
+    @classmethod
+    def _valueMatches(cls, matcher, source):
+        if isinstance(matcher, str):
+            return matcher == source
+        if not isinstance(matcher, dict):
+            return False
+        if 'prefix' in matcher:
+            p = matcher['prefix']
+            if isinstance(p, dict):
+                p = p.get('equals-ignore-case')
+                return isinstance(p, str) and source.lower().startswith(p.lower())
+            return isinstance(p, str) and source.startswith(p)
+        if 'suffix' in matcher:
+            p = matcher['suffix']
+            if isinstance(p, dict):
+                p = p.get('equals-ignore-case')
+                return isinstance(p, str) and source.lower().endswith(p.lower())
+            return isinstance(p, str) and source.endswith(p)
+        if 'equals-ignore-case' in matcher:
+            p = matcher['equals-ignore-case']
+            return isinstance(p, str) and p.lower() == source.lower()
+        if 'wildcard' in matcher:
+            p = matcher['wildcard']
+            return isinstance(p, str) and fnmatch.fnmatchcase(source, p.replace('[', '[[]'))
+        if 'exists' in matcher:
+            return matcher['exists'] is True
+        if 'anything-but' in matcher:
+            excluded = matcher['anything-but']
+            if isinstance(excluded, str):
+                return excluded != source
+            if isinstance(excluded, list):
+                return source not in excluded
+            if isinstance(excluded, dict):
+                if 'prefix' in excluded and isinstance(excluded['prefix'], str):
+                    return not source.startswith(excluded['prefix'])
+                if 'suffix' in excluded and isinstance(excluded['suffix'], str):
+                    return not source.endswith(excluded['suffix'])
+                if 'wildcard' in excluded and isinstance(excluded['wildcard'], str):
+                    return not fnmatch.fnmatchcase(source, excluded['wildcard'].replace('[', '[[]'))
+                if 'equals-ignore-case' in excluded:
+                    ex = excluded['equals-ignore-case']
+                    ex = [ex] if isinstance(ex, str) else (ex or [])
+                    return source.lower() not in [str(e).lower() for e in ex]
+            return False
+        return False
 
     # ------------------------------------------------------------------ #
     # Helpers
