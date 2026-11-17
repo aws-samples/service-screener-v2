@@ -1,0 +1,71 @@
+{
+    "pipelineRoleOverprivileged": {
+        "category": "S",
+        "^description": "{$COUNT} pipeline(s) use a pipeline service role or action role with administrator access (the AdministratorAccess managed policy, or a policy allowing Action \"*\" on Resource \"*\"). The pipeline role is assumed by every execution and action roles run with whatever source content the pipeline receives, so anyone who can change the source or pipeline definition effectively gains full control of the account. Scope pipeline and action roles to the specific resources each stage deploys.",
+        "shortDesc": "Scope pipeline and action roles to least privilege",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[CodePipeline service role]<https://docs.aws.amazon.com/codepipeline/latest/userguide/how-to-custom-role.html>",
+            "[Security best practices for CodePipeline]<https://docs.aws.amazon.com/codepipeline/latest/userguide/security-best-practices.html>",
+            "[Apply least-privilege permissions]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/codepipeline/latest/userguide/how-to-custom-role.html"
+    },
+    "codepipelineNoStageRollback": {
+        "category": "S",
+        "^description": "{$COUNT} pipeline(s) have deploy stages that do not automatically roll back on failure (stage onFailure result is not ROLLBACK, or the pipeline is type V1 which does not support automatic stage rollback). Without rollback, a failed deployment can leave a partially deployed, untested or vulnerable release in place until someone intervenes manually.",
+        "shortDesc": "Configure automatic rollback on deploy stages",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Configure automatic stage rollback]<https://docs.aws.amazon.com/codepipeline/latest/userguide/stage-rollback-auto.html>",
+            "[Pipeline types]<https://docs.aws.amazon.com/codepipeline/latest/userguide/pipeline-types.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/codepipeline/latest/userguide/stage-rollback-auto.html"
+    },
+    "pipelineNoEventNotification": {
+        "category": "S",
+        "^description": "{$COUNT} pipeline(s) have no enabled AWS CodeStar notification rule for failed executions and no enabled EventBridge rule (with a target) matching failed CodePipeline executions. Failed or tampered pipeline runs, such as a security test stage that blocks a release, then go unnoticed.",
+        "shortDesc": "Notify on pipeline execution failures",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Create a notification rule]<https://docs.aws.amazon.com/codepipeline/latest/userguide/notification-rule-create.html>",
+            "[Monitoring CodePipeline events]<https://docs.aws.amazon.com/codepipeline/latest/userguide/detect-state-changes-cloudwatch-events.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/codepipeline/latest/userguide/notification-rule-create.html"
+    },
+    "pipelineNoSecurityTestAction": {
+        "category": "S",
+        "^description": "{$COUNT} pipeline(s) have no Test-category action, no Amazon Inspector scan action, and no step whose name suggests testing or security scanning. This is a heuristic: tests may run inside a build action, but a dedicated, visible security testing stage makes it explicit that every release is scanned before deployment.",
+        "shortDesc": "Add security testing actions to pipelines",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Amazon Inspector scan invoke action]<https://docs.aws.amazon.com/codepipeline/latest/userguide/action-reference-InspectorScan.html>",
+            "[Test action integrations]<https://docs.aws.amazon.com/codepipeline/latest/userguide/integrations-action-type.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/codepipeline/latest/userguide/action-reference-InspectorScan.html"
+    }
+}
