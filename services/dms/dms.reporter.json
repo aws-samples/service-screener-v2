@@ -1,0 +1,19 @@
+{
+	"dmsEndpointSslNone": {
+		"category": "S",
+		"^description": "{$COUNT} DMS endpoints connect to their database without TLS (SslMode=none, or Kafka/Redis plaintext security protocol). Migrated data and database credentials travel unencrypted between the replication instance and the database. This is Security Hub control DMS.9.",
+		"shortDesc": "Enable SSL/TLS on DMS endpoints",
+		"criticality": "M",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Using SSL with AWS DMS]<https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Security.SSL.html>",
+			"[Security Hub DMS.9]<https://docs.aws.amazon.com/securityhub/latest/userguide/dms-controls.html#dms-9>"
+		],
+		"remediation": "aws dms modify-endpoint --endpoint-arn {ResourceArn} --ssl-mode require",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/dms/latest/userguide/CHAP_Security.SSL.html"
+	}
+}
