@@ -11,6 +11,8 @@ from services.iam.drivers.IamRole import IamRole
 from services.iam.drivers.IamGroup import IamGroup
 from services.iam.drivers.IamUser import IamUser
 from services.iam.drivers.IamAccount import IamAccount
+from services.iam.drivers.IamOrgData import OrgData
+from services.iam.drivers.IamTrust import buildTrustContext
 
 from utils.Tools import _pi
 
@@ -271,6 +273,12 @@ class Iam(Service):
         roleLastUsedCache = IamRoleLastUsedCache.load(accountId)
         cacheSizeBefore = len(roleLastUsedCache)
 
+        ## Org membership for third-party trust classification (read-only,
+        ## describe_organization + list_accounts, each called once).
+        trustContext = buildTrustContext(
+            OrgData(self.awsClients['orgClient'], accountId if accountId != 'default' else None),
+            accountId if accountId != 'default' else None)
+
         for role in roles:
             _pi('IAM::Role', role['RoleName'])
 
@@ -285,7 +293,7 @@ class Iam(Service):
                 role = dict(role)
                 role['RoleLastUsed'] = {}
 
-            obj = IamRole(role, self.iamClient, self._authDetails, self._policyDocumentMap, roleLastUsedCache)
+            obj = IamRole(role, self.iamClient, self._authDetails, self._policyDocumentMap, roleLastUsedCache, trustContext)
             obj.run(self.__class__)
 
             objs['Role::' + role['RoleName']] = obj.getInfo()

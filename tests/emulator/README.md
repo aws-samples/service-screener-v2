@@ -30,6 +30,13 @@ client points at `https://127.0.0.1:<port>`.
 See `test_emu_s3_template.py`. Use `assertFlagFixCycle(emu, service, checkKey, resourceName,
 misconfigure, fix)` and a unique resource name from the `uid` fixture; clean up in `finally`.
 
+## Account-wide checks
+
+Checks whose result covers every resource in the account (for example "every data store is
+tagged") must use the `emu_fresh` fixture instead of `emu`. It starts an empty emulator on a free
+loopback port for that test, so resources left by other tests cannot change the outcome. It needs
+`docker` or `finch` and the `aws-emulator` image (override with `SS_EMULATOR_IMAGE`).
+
 ## Known emulator limits
 
 - One account and one Region; IAM policies are not evaluated (checks only read configuration).

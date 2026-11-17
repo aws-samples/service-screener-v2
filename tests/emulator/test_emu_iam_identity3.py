@@ -213,7 +213,8 @@ def test_role_shared_by_lambdas_only_not_flagged(emu, uid):
 # --------------------------------------------------------------------------- #
 # dataStoreNoClassificationTag
 # --------------------------------------------------------------------------- #
-def test_data_store_classification_s3(emu, uid):
+def test_data_store_classification_s3(emu_fresh, uid):
+    emu = emu_fresh  # account-wide check: needs an empty account
     s3 = emu.client('s3')
     bucket = f'ss-test-class-{uid}'
     try:
@@ -231,7 +232,8 @@ def test_data_store_classification_s3(emu, uid):
         _quiet(s3.delete_bucket, Bucket=bucket)
 
 
-def test_data_store_classification_efs(emu, uid):
+def test_data_store_classification_efs(emu_fresh, uid):
+    emu = emu_fresh  # account-wide check: needs an empty account
     """EFS tags come from DescribeFileSystems. (DynamoDB tags are not
     persisted by the emulator; the DynamoDB never-tagged path is covered in
     tests/test_stub_iam_identity3.py.)"""

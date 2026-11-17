@@ -453,7 +453,7 @@
 	},
 	"hasExternalIdentityProvider": {
 		"category": "O",
-		"^description": "This enables your users to sign in to the AWS access portal with their corporate credentials. They can then navigate to their assigned accounts, roles, and applications hosted in external IdPs. For example, you can connect an external IdP such as Okta or Azure Active Directory (AD), to IAM Identity Center. Your users can then sign in to the AWS access portal with their existing Okta or Azure credentials. In addition, you can assign access permissions centrally for your users across all the accounts and applications in your AWS organization. In addition, developers can simply sign in to the AWS Command Line Interface (AWS CLI) using their existing credentials, and benefit from automatic short-term credential generation and rotation.",
+		"^description": "This enables your users to sign in to the AWS access portal with their corporate credentials. They can then navigate to their assigned accounts, roles, and applications hosted in external IdPs. For example, you can connect an external IdP such as Okta or Azure Active Directory (AD), to IAM Identity Center. Your users can then sign in to the AWS access portal with their existing Okta or Azure credentials. In addition, you can assign access permissions centrally for your users across all the accounts and applications in your AWS organization. In addition, developers can simply sign in to the AWS Command Line Interface (AWS CLI) using their existing credentials, and benefit from automatic short-term credential generation and rotation. When IAM Identity Center is in use but no IAM SAML provider exists, the finding also notes that there is no direct IAM federation to fall back on during an Identity Center outage; this matters for your designated emergency-access account.",
 		"shortDesc": "Use External Identity Provider",
 		"criticality": "M",
 		"downtime": 0,
@@ -494,11 +494,11 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Notify on Root Activity]<https://aws.amazon.com/blogs/mt/monitor-and-notify-on-aws-account-root-user-activity/>",
-			"[Root ID responsible]<https://docs.aws.amazon.com/accounts/latest/reference/root-user-tasks.html>"
+			"[Root ID responsible]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html#root-user-tasks>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/accounts/latest/reference/root-user-tasks.html"
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-user.html#root-user-tasks"
 	},
 	"rootConsoleLoginFail3x": {
 		"category": "S",
@@ -601,15 +601,16 @@
 	},
 	"SCPEnabled": {
 		"category": "S",
-		"^description": "Enabling service control policies (SCPs) in AWS Organizations provides central control over the maximum available permissions for the IAM users and IAM roles in your organization, helping to ensure your accounts stay within your organization's access control guidelines. SCPs are a type of organization policy that are available only when you have enabled all AWS Organizations features, not just consolidated billing, offering the ability to centrally define and enforce the maximum permissions that can be granted to IAM users and roles across your organization's accounts, which helps maintain security and compliance by making it possible to centrally manage and enforce access control policies across your entire organization.",
-		"shortDesc": "Enable Service Control Policy (SCP)",
-		"criticality": "L",
+		"^description": "No service control policy (SCP) other than the default FullAWSAccess is attached anywhere in your AWS Organization (root, organizational units or accounts), or the SCP policy type is not enabled on the root. FullAWSAccess allows everything, so without at least one customer SCP there are no organization-wide guardrails on the maximum permissions of IAM users and roles in member accounts. SCPs are available only when the organization uses All Features. This check reads the organization from the management account or a delegated administrator; from a member account it is reported as not evaluable.",
+		"shortDesc": "Attach Service Control Policies (SCPs)",
+		"criticality": "M",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Enable Service Control Policy (SCP)]<https://docs.aws.amazon.com/organizations/latest/userguide/enable-policy-type.html>"
+			"[Enable Service Control Policy (SCP)]<https://docs.aws.amazon.com/organizations/latest/userguide/enable-policy-type.html>",
+			"[Service control policies (SCPs)]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -738,7 +739,7 @@
 	},
 	"scpBestPractices": {
 		"category": "S",
-		"^description": "{$COUNT} Service Control Policies (SCPs) in your AWS Organization are missing recommended security guardrails. SCPs are a type of organization policy that you can use to manage permissions across your organization, providing central control over the maximum available permissions for all accounts. Best practice SCPs should include: (1) Denying root user actions to prevent use of root credentials across member accounts, (2) Restricting access to specific AWS regions to limit where resources can be created, and (3) Preventing privilege escalation by denying sensitive IAM actions like creating policy versions or setting default policy versions. These guardrails provide defense-in-depth by ensuring that even if individual account policies are misconfigured, organizational controls prevent high-risk actions. Review the identified SCPs and enhance them with appropriate Deny statements to implement these security patterns.",
+		"^description": "One or more organizational units or member accounts in your AWS Organization are missing recommended guardrails in their EFFECTIVE set of service control policies (SCPs attached directly plus those inherited from every parent OU and the root). Best-practice SCP guardrails are: (1) denying root user actions in member accounts, (2) restricting access to approved AWS Regions (aws:RequestedRegion), and (3) preventing privilege escalation by denying sensitive IAM actions such as iam:CreatePolicyVersion, iam:SetDefaultPolicyVersion or iam:PassRole. A guardrail provided by any SCP in the inheritance path counts, so splitting guardrails across several SCPs is fine. The management account is not evaluated because SCPs never apply to it. OUs without active member accounts are skipped, and an unconditional Deny \"*\" (for example a Suspended or Quarantine OU SCP) meets every guardrail. Review the listed OUs/accounts and attach SCPs with the missing Deny statements at the root or a parent OU.",
 		"shortDesc": "Improve SCP security guardrails",
 		"criticality": "M",
 		"downtime": 0,
@@ -1262,5 +1263,434 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/security-ir/latest/userguide/membership.html"
+	},
+	"orgMgmtAccountHostsWorkloads": {
+		"category": "S",
+		"^description": "The AWS Organizations management account hosts workload resources (EC2 instances, Lambda functions, RDS DB instances or EKS clusters) in the scanned Regions. The management account cannot be restricted by service control policies and holds organization-wide privileges, so workloads running there are outside your guardrails and widen the blast radius of a compromise. Use the management account only for organization, billing and identity administration and move workloads into member accounts. Functions deployed by AWS Control Tower, Landing Zone Accelerator and Quick Setup are excluded.",
+		"shortDesc": "Move workloads out of the management account",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Best practices for the management account]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_best-practices_mgmt-acct.html>",
+			"[Design principles - avoid workloads in the management account]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/design-principles-for-your-multi-account-strategy.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_best-practices_mgmt-acct.html"
+	},
+	"orgNotAllFeatures": {
+		"category": "S",
+		"^description": "Your AWS Organization uses only the consolidated billing feature set. Without All Features you cannot use service control policies, resource control policies, tag, backup or declarative policies, or centralized root access, so no organization-wide guardrails can be enforced. Enable all features in AWS Organizations (every member account must approve, or accounts created by the organization are switched automatically).",
+		"shortDesc": "Enable all features in AWS Organizations",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Enabling all features in your organization]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_org_support-all-features.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_org_support-all-features.html"
+	},
+	"orgMemberAlternateContactsMissing": {
+		"category": "S",
+		"^description": "One or more member accounts in your AWS Organization are missing SECURITY, BILLING or OPERATIONS alternate contacts. AWS sends security notifications, abuse reports and billing or operational notices to these contacts; when they are missing, only the root user email of each account is notified. Set alternate contacts (ideally distribution lists) for every member account centrally from the management account or the AWS Account Management delegated administrator. Requires trusted access for AWS Account Management; from a member account this check is not evaluable.",
+		"shortDesc": "Set alternate contacts for all member accounts",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Update alternate contacts for any account in your organization]<https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-update-contact-alternate.html>",
+			"[Enable trusted access for AWS Account Management]<https://docs.aws.amazon.com/accounts/latest/reference/using-orgs-trusted-access.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-update-contact-alternate.html"
+	},
+	"orgNoResourceControlPolicies": {
+		"category": "S",
+		"^description": "No resource control policy (RCP) enforces an organization data perimeter. Either the RCP policy type is not enabled on the organization root, only the default RCPFullAWSAccess is attached, or no attached RCP has a Deny statement conditioned on aws:PrincipalOrgID / aws:ResourceOrgID / aws:SourceOrgID (or the OrgPaths variants). RCPs centrally restrict which principals can access resources such as S3 buckets, KMS keys, SQS queues and Secrets Manager secrets in member accounts, preventing access from identities outside your organization even when a resource policy is misconfigured.",
+		"shortDesc": "Enforce a data perimeter with RCPs",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Resource control policies (RCPs)]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_rcps.html>",
+			"[RCP examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_rcps_examples.html>",
+			"[Building a data perimeter on AWS]<https://docs.aws.amazon.com/whitepapers/latest/building-a-data-perimeter-on-aws/building-a-data-perimeter-on-aws.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_rcps.html"
+	},
+	"orgNoTagPolicy": {
+		"category": "S",
+		"^description": "No AWS Organizations tag policy is attached to the root, an OU or an account (or the tag policy type is not enabled). Tag policies standardize tag keys and values, such as a data-classification key, across accounts so resources can be identified, governed and protected according to their sensitivity. The detail shows whether any attached tag policy defines a classification-like tag key (name-based, informational only).",
+		"shortDesc": "Attach a tag policy (e.g. data classification)",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Tag policies]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_tag-policies.html>",
+			"[Tagging best practices - tags for data security and access control]<https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/tags-for-data-security-risk-management-and-access-control.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_tag-policies.html"
+	},
+	"orgOuStructureFlat": {
+		"category": "S",
+		"^description": "Your AWS Organization has no organizational units, or member accounts are attached directly to the organization root. Without an OU structure (for example Security, Infrastructure, Workloads, Sandbox) you cannot apply different guardrails to different environments, and every policy must be attached at the root or per account. Group accounts into OUs by function and compliance requirements rather than by reporting structure.",
+		"shortDesc": "Organize accounts into OUs",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Recommended OUs and accounts]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/recommended-ous-and-accounts.html>",
+			"[Managing organizational units]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_ous.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_ous.html"
+	},
+	"rootCentralizedAccessNotEnabled": {
+		"category": "S",
+		"^description": "Centralized root access for member accounts is not enabled (IAM ListOrganizationsFeatures does not report RootCredentialsManagement and RootSessions). With centralized root access you can remove root user credentials from member accounts, prevent their recovery, and perform the few root-only tasks through short-lived privileged sessions from the management account or a delegated administrator. Enable trusted access for IAM and both features in the IAM console.",
+		"shortDesc": "Enable centralized root access",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Centrally manage root access for member accounts]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-enable-root-access.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-enable-root-access.html"
+	},
+	"scpNoBackupTamperProtection": {
+		"category": "S",
+		"^description": "The effective service control policies of one or more member accounts do not deny the AWS Backup actions used to tamper with backups (backup:DeleteBackupVault, DeleteBackupVaultAccessPolicy, DeleteBackupVaultLockConfiguration, DeleteRecoveryPoint, PutBackupVaultAccessPolicy, UpdateRecoveryPointLifecycle). The check evaluates the EFFECTIVE SCP set of every active member account (SCPs attached to the account, its parent OUs and the root) and lists the accounts that are not covered, so a Deny attached only to one OU, one account or the management account (where SCPs never apply) does not make the whole organization compliant. Ransomware actors with administrator access in a member account commonly delete recovery points or shorten retention before encrypting data. Attach an SCP that denies these actions except for a designated backup administration role, and consider AWS Backup Vault Lock in compliance mode for immutable backups.",
+		"shortDesc": "Protect backups from tampering with an SCP",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SCP examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html>",
+			"[AWS Backup vault access policies]<https://docs.aws.amazon.com/aws-backup/latest/devguide/create-a-vault-access-policy.html>",
+			"[AWS Backup Vault Lock]<https://docs.aws.amazon.com/aws-backup/latest/devguide/vault-lock.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html"
+	},
+	"scpNoDataProtectionGuardrail": {
+		"category": "S",
+		"^description": "The effective service control policies (SCPs) of one or more member accounts do not deny the actions that weaken account-wide data-protection settings: changing S3 Block Public Access (s3:PutAccountPublicAccessBlock / s3:PutBucketPublicAccessBlock), disabling EBS encryption by default (ec2:DisableEbsEncryptionByDefault) and scheduling KMS key deletion (kms:ScheduleKeyDeletion). The check evaluates the EFFECTIVE SCP set of every active member account (SCPs attached to the account, its parent OUs and the root) and lists the accounts that are not covered, so a Deny attached only to one OU, one account or the management account (where SCPs never apply) does not make the whole organization compliant. Without these preventive guardrails any administrator in a member account can expose data publicly, create unencrypted volumes or destroy keys protecting encrypted data. Attach an SCP that denies these actions (with an exception for a designated platform role if needed). A Deny that only applies to the root user or outside approved Regions does not count. Region restriction is reported by scpBestPractices.",
+		"shortDesc": "Protect data-protection settings with an SCP",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SCP examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html>",
+			"[Blocking public access to S3 storage]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html>",
+			"[EBS encryption by default]<https://docs.aws.amazon.com/ebs/latest/userguide/encryption-by-default.html>",
+			"[Deleting AWS KMS keys]<https://docs.aws.amazon.com/kms/latest/developerguide/deleting-keys.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html"
+	},
+	"scpNoIamUserCreationDeny": {
+		"category": "S",
+		"^description": "The effective service control policies (SCPs) of one or more member accounts do not deny iam:CreateUser or iam:CreateAccessKey. The check evaluates the EFFECTIVE SCP set of every active member account (SCPs attached to the account, its parent OUs and the root) and lists the accounts that are not covered, so a Deny attached only to one OU, one account or the management account (where SCPs never apply) does not make the whole organization compliant. IAM users with long-term access keys are a common source of credential leaks; organizations that federate human access through IAM Identity Center should prevent new IAM users and access keys in workload accounts with an SCP (optionally with an exception for an approved automation role). Accounts that intentionally keep IAM users (for example outside the workload OUs) are listed in the detail and can be suppressed.",
+		"shortDesc": "Restrict IAM user and access key creation with an SCP",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SCP examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html>",
+			"[Require human users to use federation]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#bp-users-federation-idp>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html"
+	},
+	"scpNoSecurityServiceProtection": {
+		"category": "S",
+		"^description": "The effective service control policies (SCPs) of one or more member accounts do not fully prevent security services from being disabled. The check evaluates the EFFECTIVE SCP set of every active member account (SCPs attached to the account, its parent OUs and the root) and lists the accounts that are not covered, so a Deny attached only to one OU, one account or the management account (where SCPs never apply) does not make the whole organization compliant. The detail lists which of these are not denied: CloudTrail (cloudtrail:StopLogging, cloudtrail:DeleteTrail), GuardDuty (guardduty:DeleteDetector, guardduty:DisassociateFromMasterAccount / DisassociateFromAdministratorAccount), AWS Config (config:StopConfigurationRecorder, config:DeleteConfigurationRecorder) and leaving the organization (organizations:LeaveOrganization). An attacker or careless administrator in a member account can otherwise switch off logging and detection. A Deny that only applies to the root user or outside approved Regions does not count.",
+		"shortDesc": "Prevent disabling security services with an SCP",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SCP examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html>",
+			"[CloudTrail security best practices]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/best-practices-security.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html"
+	},
+	"securityServicesNoDelegatedAdmin": {
+		"category": "S",
+		"^description": "Security services are administered from the organization management account: either no delegated administrator is registered for any of GuardDuty, Security Hub, Inspector, Macie, IAM Access Analyzer or AWS Config, or a service has organization trusted access enabled but no delegated administrator. Delegate security services to a dedicated security tooling account so the management account is used as little as possible.",
+		"shortDesc": "Delegate security services to a security tooling account",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS services that you can use with AWS Organizations]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_integrate_services_list.html>",
+			"[Security OU and Security Tooling account]<https://docs.aws.amazon.com/prescriptive-guidance/latest/security-reference-architecture/security-tooling.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_integrate_delegated_admin.html"
+	},
+	"ssoAssignmentsToIndividualUsers": {
+		"category": "S",
+		"^description": "IAM Identity Center permission sets are assigned to individual users instead of groups. Direct user assignments are hard to review and are often left behind when people change roles. Assign permission sets to groups (ideally synchronized from your identity provider) and keep individual assignments only for documented break-glass access.",
+		"shortDesc": "Assign Identity Center permission sets to groups",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Assign user or group access to AWS accounts]<https://docs.aws.amazon.com/singlesignon/latest/userguide/assignusers.html>",
+			"[Manage access with groups]<https://docs.aws.amazon.com/singlesignon/latest/userguide/users-groups-provisioning.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/singlesignon/latest/userguide/assignusers.html"
+	},
+	"ssoPermissionSetOverprivileged": {
+		"category": "S",
+		"^description": "IAM Identity Center permission sets allow sessions longer than 8 hours. Long sessions keep credentials valid long after work is done and increase the impact of a stolen session. The detail also lists admin-level permission sets (AdministratorAccess, or an inline policy allowing *:*, NotAction or iam:* on all resources; customer-managed policy references are not inspected) so their audience can be reviewed.",
+		"shortDesc": "Shorten Identity Center session durations",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Set session duration]<https://docs.aws.amazon.com/singlesignon/latest/userguide/howtosessionduration.html>",
+			"[Permission sets]<https://docs.aws.amazon.com/singlesignon/latest/userguide/permissionsetsconcept.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/singlesignon/latest/userguide/howtosessionduration.html"
+	},
+	"thirdPartyRoleNoExternalId": {
+		"category": "S",
+		"^description": "{$COUNT} IAM roles trust an AWS account outside your organization without requiring a strong sts:ExternalId (missing, IfExists, wildcard, shorter than 8 characters, numeric-only or equal to an account ID) or an aws:PrincipalOrgID condition. Third parties that assume roles in many customer accounts must be given a unique external ID to prevent the confused deputy problem.",
+		"shortDesc": "Require a unique sts:ExternalId for third-party roles",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[The confused deputy problem]<https://docs.aws.amazon.com/IAM/latest/UserGuide/confused-deputy.html>",
+			"[Access to AWS accounts owned by third parties]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_common-scenarios_third-party.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_common-scenarios_third-party.html"
+	},
+	"thirdPartyRoleOverprivileged": {
+		"category": "S",
+		"^description": "{$COUNT} IAM roles trusted by an AWS account outside your organization have admin-level permissions (AdministratorAccess, IAMFullAccess, or a policy allowing *, *:* or iam:* on all resources). A compromise at the third party then becomes full control of your account. Grant third-party roles only the permissions the vendor documents as required.",
+		"shortDesc": "Least privilege for third-party roles",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Access to AWS accounts owned by third parties]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_common-scenarios_third-party.html>",
+			"[Grant least privilege]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege"
+	},
+	"accountNotVended": {
+		"category": "S",
+		"^description": "One or more active member accounts joined your AWS Organization by invitation (JoinedMethod INVITED) instead of being created through an account-vending process such as Control Tower Account Factory, Account Factory for Terraform (AFT) or a CreateAccount pipeline. Invited accounts do not automatically receive your account baseline (guardrails, logging, security tooling, network setup). Invited accounts that are enrolled in AWS Control Tower are not reported. Accounts created with a raw CreateAccount call cannot be distinguished from Account Factory ones and are not reported. Run from the management or a delegated administrator account.",
+		"shortDesc": "Vend accounts through Account Factory (or enroll invited accounts)",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Provision accounts with AWS Control Tower Account Factory]<https://docs.aws.amazon.com/controltower/latest/userguide/account-factory.html>",
+			"[Enroll an existing AWS account in Control Tower]<https://docs.aws.amazon.com/controltower/latest/userguide/enroll-account.html>",
+			"[Organizing Your AWS Environment Using Multiple Accounts]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/organizing-your-aws-environment.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/controltower/latest/userguide/enroll-account.html"
+	},
+	"orgAccountsMissingOwnershipTags": {
+		"category": "S",
+		"^description": "{$COUNT} or more active accounts in your AWS Organization have no ownership-like tag on the account itself (tag key containing owner, team, contact, cost center, business unit, department, steward or custodian). Account tags identify who is accountable for the account, who to contact during an incident and how costs are allocated. Tag key conventions are organization-specific, so this name-based check is informational. Run from the management or a delegated administrator account.",
+		"shortDesc": "Tag member accounts with owner information",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Tagging AWS Organizations resources]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_tagging.html>",
+			"[Best Practices for Tagging AWS Resources]<https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/tagging-best-practices.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_tagging.html"
+	},
+	"orgBackupPolicyMissing": {
+		"category": "S",
+		"^description": "No AWS Organizations backup policy is attached to the root, an OU or an account (or the backup policy type is not enabled). Backup policies centrally deploy and enforce AWS Backup plans across member accounts so new accounts and resources are protected without per-account setup. Per-account backup plans and coverage are evaluated separately by the AWS Backup checks; this check only reports the absence of organization-level enforcement. Run from the management or a delegated administrator account.",
+		"shortDesc": "Enforce backups with an Organizations backup policy",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Backup policies]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_backup.html>",
+			"[Managing AWS Backup resources across multiple AWS accounts]<https://docs.aws.amazon.com/aws-backup/latest/devguide/manage-cross-account.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_backup.html"
+	},
+	"orgNoDeclarativePolicy": {
+		"category": "S",
+		"^description": "No AWS Organizations declarative policy for EC2 is attached to the root, an OU or an account (or the declarative policy type is not enabled). Declarative policies enforce baseline service configurations, such as blocking public access to EBS snapshots and AMIs, enforcing IMDSv2 defaults, VPC Block Public Access and allowed images, and stay in effect when new features or APIs are added. The effective per-account settings are also evaluated directly by the EC2 account-level checks. Run from the management or a delegated administrator account.",
+		"shortDesc": "Enforce EC2 baselines with a declarative policy",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Declarative policies]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_declarative_policies.html>",
+			"[Declarative policy syntax and examples]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_ec2_syntax.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_declarative_policies.html"
+	},
+	"orgNoForensicsOu": {
+		"category": "S",
+		"^description": "No organizational unit or active account in your AWS Organization is named like a forensics or incident-investigation environment (name containing forensic, investigation or incident response). A dedicated forensics account (commonly in a Security or Forensics OU) lets responders copy snapshots and evidence into an isolated, access-controlled environment. This is a name-based heuristic: if your forensics environment uses a different name, suppress this finding. Run from the management or a delegated administrator account.",
+		"shortDesc": "Prepare a dedicated forensics account/OU",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SEC10-BP03 Prepare forensic capabilities]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_prepare_forensic.html>",
+			"[Foundational OUs - Security OU]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/foundational-ous.html#security-ou>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_prepare_forensic.html"
+	},
+	"orgNoSandboxOrStagingOu": {
+		"category": "S",
+		"^description": "No organizational unit in your AWS Organization is named like a Sandbox OU (sandbox, playground, experiment) or a Policy Staging OU (policy staging / SCP test). A Sandbox OU gives builders a place to experiment away from production guardrails and data, and a Policy Staging OU lets you test SCP and other policy changes before applying them broadly. This is a name-based heuristic; the PASS detail shows which of the two OUs were found. Run from the management or a delegated administrator account.",
+		"shortDesc": "Create Sandbox / Policy Staging OUs",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Recommended OUs and accounts]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/recommended-ous-and-accounts.html>",
+			"[Experimental OUs - Sandbox OU]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/experimental-ous.html#sandbox-ou>",
+			"[Procedural OUs - Policy Staging OU]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/procedural-ous.html#policy-staging-ou>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/recommended-ous-and-accounts.html"
+	},
+	"principalInventorySummary": {
+		"category": "S",
+		"^description": "Informational inventory of principal sources in this account: IAM users and roles (service-linked, Identity Center and other), IAM SAML and OIDC identity providers, IAM Identity Center instances, Amazon Cognito user pools and IAM Roles Anywhere trust anchors in the scanned Regions. This check never reports a finding; use it to confirm every identity source is known and centrally managed.",
+		"shortDesc": "Review the inventory of principal sources",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Identity providers and federation]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers.html>",
+			"[SEC02-BP04 Rely on a centralized identity provider]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_identities_identity_provider.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers.html"
+	},
+	"ssoUsersNotScimProvisioned": {
+		"category": "S",
+		"^description": "IAM Identity Center identity store contains enabled users without ExternalIds alongside users provisioned from an external identity provider (SCIM). Manually created users are not updated or deprovisioned when people leave or change roles in your identity provider. Provision users automatically from the IdP and remove manually created users (keep only documented break-glass users). Stores where no user has ExternalIds are reported for information only, because that is expected when the Identity Center directory is the identity source.",
+		"shortDesc": "Provision Identity Center users from your identity provider (SCIM)",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Automatic provisioning (SCIM)]<https://docs.aws.amazon.com/singlesignon/latest/userguide/provision-automatically.html>",
+			"[Manage your identity source]<https://docs.aws.amazon.com/singlesignon/latest/userguide/manage-your-identity-source.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/singlesignon/latest/userguide/provision-automatically.html"
+	},
+	"trustedIdentityPropagationUnused": {
+		"category": "S",
+		"^description": "Informational: whether trusted identity propagation is used, so that access to data services (Amazon Athena, Amazon Redshift, AWS Lake Formation, Amazon S3 Access Grants, Amazon Q and others) is authorized and logged per workforce user instead of per shared IAM role. Evidence: OAuth Identity Center applications, trusted token issuers, the Lake Formation Identity Center integration and S3 Access Grants instances associated with Identity Center in the scanned Regions. This check never reports a finding.",
+		"shortDesc": "Consider trusted identity propagation for data access",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Trusted identity propagation overview]<https://docs.aws.amazon.com/singlesignon/latest/userguide/trustedidentitypropagation-overview.html>",
+			"[SEC02-BP04 Rely on a centralized identity provider]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_identities_identity_provider.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/singlesignon/latest/userguide/trustedidentitypropagation-overview.html"
 	}
 }
