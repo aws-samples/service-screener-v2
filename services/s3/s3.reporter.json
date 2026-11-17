@@ -34,7 +34,7 @@
 	"AccessControlList": {
 		"category": "S",
 		"^description": "You are using {$COUNT} S3 buckets with ACLs. ACLs are legacy access control mechanisms that predate IAM. Instead of ACLs, we recommend using S3 bucket policies or AWS Identity and Access Management (IAM) policies to manage access to your S3 buckets.",
-		"shortDesc": "Enable SSE",
+		"shortDesc": "Disable S3 bucket ACLs (enforce BucketOwnerEnforced)",
 		"criticality": "L",
 		"downtime": 0,
 		"slowness": 0,
@@ -428,5 +428,143 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/bucketnamingrules.html"
+	},
+	"macieAutomatedDiscoveryDisabled": {
+		"category": "S",
+		"^description": "Amazon Macie is enabled but automated sensitive data discovery is turned off. Without it, Macie does not continuously sample your S3 buckets to find and score sensitive data such as PII or credentials, so you rely on manually scoped classification jobs and can miss newly created or changed buckets.",
+		"shortDesc": "Enable Macie automated sensitive data discovery",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Performing automated sensitive data discovery]<https://docs.aws.amazon.com/macie/latest/user/discovery-asdd.html>",
+			"[Configuring automated sensitive data discovery]<https://docs.aws.amazon.com/macie/latest/user/discovery-asdd-account-enable.html>"
+		],
+		"remediation": "aws macie2 update-automated-discovery-configuration --status ENABLED",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/macie/latest/user/discovery-asdd-account-enable.html"
+	},
+	"macieOrgAutoEnableOff": {
+		"category": "S",
+		"^description": "This account is the Amazon Macie delegated administrator, but Macie is not automatically enabled for new accounts that join the organization. New member accounts will not be monitored for sensitive data until someone enables Macie for them manually.",
+		"shortDesc": "Auto-enable Macie for new organization accounts",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Managing Macie accounts with AWS Organizations]<https://docs.aws.amazon.com/macie/latest/user/accounts-mgmt-ao.html>",
+			"[Configuring Macie for new organization accounts]<https://docs.aws.amazon.com/macie/latest/user/accounts-mgmt-ao-auto-enable.html>"
+		],
+		"remediation": "aws macie2 update-organization-configuration --auto-enable",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/macie/latest/user/accounts-mgmt-ao-auto-enable.html"
+	},
+	"macieSensitiveDataFindingsOpen": {
+		"category": "S",
+		"^description": "Amazon Macie has unarchived sensitive data findings in this Region. Each finding reports S3 objects that contain sensitive data such as PII, financial or credential data. Review the affected objects, remove or protect the data (encryption, access restriction, deletion), and archive findings that are expected.",
+		"shortDesc": "Review open Macie sensitive data findings",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Analyzing Macie findings]<https://docs.aws.amazon.com/macie/latest/user/findings.html>",
+			"[Types of sensitive data findings]<https://docs.aws.amazon.com/macie/latest/user/findings-types.html#findings-types-classification>",
+			"[Suppressing Macie findings]<https://docs.aws.amazon.com/macie/latest/user/findings-suppression.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/macie/latest/user/findings.html"
+	},
+	"s3AccessPointPublic": {
+		"category": "S",
+		"^description": "You have {$COUNT} S3 access points that have a public access point policy or Block Public Access settings off, where neither the underlying bucket nor the account-level Block Public Access blocks the same settings. S3 blocks a request if the access point, the bucket or the account blocks it, so only settings that are off at all three levels are reported. Data in the underlying bucket may be reachable by anyone through the access point. Access point Block Public Access settings cannot be changed after creation, so replace the access point with one that blocks public access, or enable Block Public Access on the bucket or the account.",
+		"shortDesc": "Block public access on S3 access points",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": -1,
+		"ref": [
+			"[Managing public access to access points]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-points-bpa-settings.html>",
+			"[Blocking public access to your Amazon S3 storage]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html>",
+			"[The meaning of public]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html#access-control-block-public-access-policy-status>"
+		],
+		"remediation": "aws s3control put-public-access-block --account-id {AccountId} --public-access-block-configuration '{\"BlockPublicAcls\":true,\"IgnorePublicAcls\":true,\"BlockPublicPolicy\":true,\"RestrictPublicBuckets\":true}'",
+		"remediation_risk": "high",
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-points-bpa-settings.html"
+	},
+	"glacierVaultPolicyPublic": {
+		"category": "S",
+		"^description": "You have {$COUNT} S3 Glacier vaults whose vault access policy grants access to a wildcard principal without a condition that restricts the caller to known accounts, organizations or networks. Anyone could read, delete or upload archives depending on the allowed actions. Restrict the policy to specific principals.",
+		"shortDesc": "Restrict public Glacier vault access policies",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Vault access policies]<https://docs.aws.amazon.com/amazonglacier/latest/dev/vault-access-policy.html>",
+			"[Identity and access management for S3 Glacier]<https://docs.aws.amazon.com/amazonglacier/latest/dev/security-iam.html>"
+		],
+		"remediation": "aws glacier set-vault-access-policy --account-id - --vault-name {ResourceName} --policy file://restricted-policy.json",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/amazonglacier/latest/dev/vault-access-policy.html"
+	},
+	"macieBucketsNotMonitored": {
+		"category": "S",
+		"^description": "{$COUNT} S3 buckets are not monitored by Amazon Macie: they are excluded from automated sensitive data discovery and are not included in any recurring sensitive data discovery job. Sensitive data stored in them would go undetected.",
+		"shortDesc": "Monitor buckets with Macie sensitive data discovery",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Automated sensitive data discovery scope]<https://docs.aws.amazon.com/macie/latest/user/discovery-asdd-account-manage-s3.html>",
+			"[Running sensitive data discovery jobs]<https://docs.aws.amazon.com/macie/latest/user/discovery-jobs.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/macie/latest/user/discovery-asdd-account-manage-s3.html"
+	},
+	"s3ReplicationNoMetrics": {
+		"category": "RS",
+		"^description": "{$COUNT} S3 buckets replicate objects without S3 Replication metrics enabled. Without metrics (and S3 Replication Time Control, which requires them) you cannot see pending bytes, replication latency or failed operations, so a broken replication path that your recovery plan depends on can go unnoticed.",
+		"shortDesc": "Enable S3 Replication metrics",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Monitoring progress with replication metrics]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/repl-metrics.html>",
+			"[Meeting compliance requirements with S3 Replication Time Control]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/replication-time-control.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/repl-metrics.html"
+	},
+	"s3VersionedNoNoncurrentExpiry": {
+		"category": "CS",
+		"^description": "{$COUNT} versioned S3 buckets have no lifecycle rule that expires noncurrent object versions. Every overwritten or deleted object is retained indefinitely, which increases cost and keeps data (including data you intended to delete) beyond its required retention period. Add a NoncurrentVersionExpiration rule that matches your retention requirements. A bucket with no lifecycle configuration at all is also reported under BucketLifecycle; this check additionally flags versioned buckets whose lifecycle rules only handle current objects.",
+		"shortDesc": "Expire noncurrent object versions",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": -1,
+		"needFullTest": 0,
+		"ref": [
+			"[Managing the lifecycle of objects]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/object-lifecycle-mgmt.html>",
+			"[Lifecycle configuration elements - NoncurrentVersionExpiration]<https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-rules.html#intro-lifecycle-rules-actions>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonS3/latest/userguide/intro-lifecycle-rules.html"
 	}
 }

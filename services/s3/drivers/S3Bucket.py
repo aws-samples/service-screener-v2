@@ -11,6 +11,9 @@ from utils.Policy import Policy
 from utils import PolicyPrincipal
 from services.Evaluator import Evaluator
 
+# Guards the once-per-Region fetch of Macie's bucket inventory (macie2.describe_buckets).
+_macieInventoryLock = threading.Lock()
+
 class S3Bucket(Evaluator):
     # Sentinel to distinguish "policy not yet fetched" from "fetched, no policy (None)"
     _POLICY_NOT_FETCHED = object()
@@ -18,10 +21,11 @@ class S3Bucket(Evaluator):
     _ENCRYPTION_NOT_FETCHED = object()
     _ENCRYPTION_NOT_CONFIGURED = object()
 
-    def __init__(self, bucket, s3Client):
+    def __init__(self, bucket, s3Client, macieClient=None):
         super().__init__()
         self.bucket = bucket
         self.s3Client = s3Client
+        self.macieClient = macieClient
 
         self._resourceName = bucket
 
@@ -43,6 +47,9 @@ class S3Bucket(Evaluator):
         # API call happens exactly once per bucket instead of racing.
         self._policyLock = threading.Lock()
         self._encryptionLock = threading.Lock()
+        # Shared get_bucket_replication / get_bucket_versioning responses.
+        self._cache = {}
+        self._cacheLock = threading.Lock()
 
         self.init()
 
@@ -78,6 +85,26 @@ class S3Bucket(Evaluator):
                     return None
                 # Any other error: cache nothing and re-raise, matching original behaviour.
                 raise
+
+    def _cachedCall(self, name, fn):
+        """Run fn() once per bucket and cache the response or the ClientError
+        (re-raised to every caller), so checks sharing an API do not refetch."""
+        with self._cacheLock:
+            if name not in self._cache:
+                try:
+                    self._cache[name] = ('ok', fn())
+                except botocore.exceptions.ClientError as e:
+                    self._cache[name] = ('err', e)
+            kind, val = self._cache[name]
+        if kind == 'err':
+            raise val
+        return val
+
+    def getBucketReplication(self):
+        return self._cachedCall('replication', lambda: self.s3Client.get_bucket_replication(Bucket=self.bucket))
+
+    def getBucketVersioning(self):
+        return self._cachedCall('versioning', lambda: self.s3Client.get_bucket_versioning(Bucket=self.bucket))
 
     def policyAllowsPublicRead(self, policy_document):
         """
@@ -249,9 +276,7 @@ class S3Bucket(Evaluator):
         self.results['BucketVersioning'] = [-1, 'Off']
         
         try:
-            resp = self.s3Client.get_bucket_versioning(
-                Bucket=self.bucket
-            )
+            resp = self.getBucketVersioning()
             if resp.get('Status') == "MFADelete":
                 self.results['MFADelete'] = [1, 'On']
             
@@ -277,9 +302,7 @@ class S3Bucket(Evaluator):
 
     def _checkBucketReplication(self):
         try:
-            resp = self.s3Client.get_bucket_replication(
-                Bucket=self.bucket
-            )
+            resp = self.getBucketReplication()
             self.results['BucketReplication'] = [1, 'On']
             
             # Check if cross-region replication
@@ -736,3 +759,140 @@ class S3Bucket(Evaluator):
         if predictability_issues:
             issues_str = ', '.join(predictability_issues[:3])  # Limit to first 3
             self.results['UnpredictableBucketNames'] = [-1, f'Predictable: {issues_str}']
+
+    # ------------------------------------------------------------------
+    # WAFS2027 checks
+    # ------------------------------------------------------------------
+    def _checkReplicationMetrics(self):
+        """Replication rules without S3 Replication metrics (and so without RTC,
+        which requires metrics) give no visibility into replication lag or
+        failures. Not applicable (no result) when replication is not configured."""
+        key = 's3ReplicationNoMetrics'
+        try:
+            resp = self.getBucketReplication()
+        except botocore.exceptions.ClientError as e:
+            code = e.response['Error']['Code']
+            if code != 'ReplicationConfigurationNotFoundError':
+                self.results[key] = [0, f'Unable to evaluate ({code})']
+            return
+
+        rules = [r for r in resp.get('ReplicationConfiguration', {}).get('Rules', []) or []
+                 if r.get('Status') == 'Enabled']
+        if not rules:
+            return
+
+        noMetrics, noRtc = [], []
+        for idx, rule in enumerate(rules):
+            dest = rule.get('Destination', {}) or {}
+            rid = rule.get('ID') or f'rule#{idx}'
+            if (dest.get('Metrics', {}) or {}).get('Status') != 'Enabled':
+                noMetrics.append(rid)
+            if (dest.get('ReplicationTime', {}) or {}).get('Status') != 'Enabled':
+                noRtc.append(rid)
+
+        if noMetrics:
+            self.results[key] = [-1, f"Replication metrics disabled for rule(s): {', '.join(noMetrics[:5])}"]
+        elif noRtc:
+            self.results[key] = [1, f"Metrics enabled; RTC off for rule(s): {', '.join(noRtc[:5])}"]
+        else:
+            self.results[key] = [1, 'Replication metrics and RTC enabled']
+
+    @staticmethod
+    def _lifecycleRuleIsBucketWide(rule):
+        """True when the lifecycle rule applies to every object in the bucket."""
+        if rule.get('Prefix'):
+            return False
+        flt = rule.get('Filter')
+        if flt is None:
+            return True
+        if not isinstance(flt, dict):
+            return False
+        # Filter {} or Filter {'Prefix': ''} cover the whole bucket; Tag/And/size
+        # filters only cover a subset.
+        return all(k == 'Prefix' and not v for k, v in flt.items())
+
+    def _checkVersionedNoncurrentExpiry(self):
+        """Versioned buckets without a NoncurrentVersionExpiration lifecycle
+        action keep every overwritten/deleted object version forever. Not
+        applicable (no result) when versioning has never been enabled."""
+        key = 's3VersionedNoNoncurrentExpiry'
+        try:
+            status = self.getBucketVersioning().get('Status')
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({e.response['Error']['Code']})"]
+            return
+        if status not in ('Enabled', 'Suspended'):
+            return
+
+        try:
+            rules = self.s3Client.get_bucket_lifecycle_configuration(Bucket=self.bucket).get('Rules', []) or []
+        except botocore.exceptions.ClientError as e:
+            code = e.response['Error']['Code']
+            if code == 'NoSuchLifecycleConfiguration':
+                self.results[key] = [-1, f'Versioning {status}; no lifecycle configuration']
+            else:
+                self.results[key] = [0, f'Unable to evaluate ({code})']
+            return
+
+        expiring = [r for r in rules if r.get('Status') == 'Enabled' and r.get('NoncurrentVersionExpiration')]
+        if any(S3Bucket._lifecycleRuleIsBucketWide(r) for r in expiring):
+            self.results[key] = [1, 'Noncurrent version expiration configured']
+        elif expiring:
+            # Scoped rules only: some prefixes/tags are covered, others may not be.
+            self.results[key] = [0, 'Noncurrent version expiration configured only for filtered subsets']
+        else:
+            self.results[key] = [-1, f'Versioning {status}; no enabled noncurrent version expiration rule']
+
+    def getMacieInventory(self):
+        """Macie bucket inventory for this Region, fetched once per scan via
+        describe_buckets. Returns ('ok', {bucketName: metadata}) or ('err', msg)."""
+        if self.macieClient is None:
+            return ('err', 'Unable to evaluate (no Macie client)')
+        region = self.macieClient.meta.region_name
+        cfgKey = f's3::macieBucketInventory::{region}'
+        with _macieInventoryLock:
+            cached = Config.get(cfgKey, None)
+            if cached is not None:
+                return cached
+            try:
+                inv = {}
+                for page in self.macieClient.get_paginator('describe_buckets').paginate():
+                    for b in page.get('buckets', []) or []:
+                        if b.get('bucketName'):
+                            inv[b['bucketName']] = b
+                out = ('ok', inv)
+            except botocore.exceptions.ClientError as e:
+                err = e.response.get('Error', {})
+                if err.get('Code') == 'AccessDeniedException' and 'not enabled' in (err.get('Message') or '').lower():
+                    out = ('err', 'Macie not enabled in this Region')
+                else:
+                    out = ('err', f"Unable to evaluate ({err.get('Code', 'Unknown')})")
+            except botocore.exceptions.EndpointConnectionError:
+                out = ('err', 'Unable to evaluate (Macie endpoint not available in this Region)')
+            Config.set(cfgKey, out)
+            return out
+
+    def _checkMacieBucketMonitored(self):
+        """Bucket is neither monitored by Macie automated sensitive data
+        discovery nor included in a recurring Macie classification job."""
+        key = 'macieBucketsNotMonitored'
+        kind, data = self.getMacieInventory()
+        if kind != 'ok':
+            self.results[key] = [0, data]
+            return
+        meta = data.get(self.bucket)
+        if meta is None:
+            self.results[key] = [0, 'Bucket not yet in Macie inventory']
+            return
+        jobs = meta.get('jobDetails', {}) or {}
+        if meta.get('automatedDiscoveryMonitoringStatus') == 'MONITORED':
+            self.results[key] = [1, 'Monitored by automated sensitive data discovery']
+        elif jobs.get('isMonitoredByJob') == 'TRUE':
+            self.results[key] = [1, 'Monitored by a recurring classification job']
+        elif 'UNKNOWN' in (jobs.get('isMonitoredByJob'), jobs.get('isDefinedInJob')):
+            # Macie could not retrieve job data for this bucket.
+            self.results[key] = [0, 'Unable to evaluate (job data unavailable)']
+        elif jobs.get('isDefinedInJob') == 'TRUE':
+            self.results[key] = [-1, 'Only covered by one-time classification job(s); not continuously monitored']
+        else:
+            self.results[key] = [-1, 'Not monitored by automated discovery or any classification job']
