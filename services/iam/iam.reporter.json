@@ -805,5 +805,462 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_remove.html"
+	},
+	"iamActiveKeyUnused": {
+		"category": "S",
+		"^description": "{$COUNT} IAM user(s) have an active access key that has not been used in the last 90 days, or that was never used and is older than 7 days. Unused active keys are standing credentials that can be leaked and abused without anyone noticing. This is evaluated per key, independent of console activity. Deactivate the key, confirm nothing breaks, then delete it; prefer temporary credentials (IAM roles, IAM Identity Center) over long-term access keys.",
+		"shortDesc": "Deactivate unused active access keys",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Find unused AWS credentials]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_finding-unused.html>",
+			"[Manage access keys for IAM users]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html>",
+			"[IAM Credential Reports]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_getting-report.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html#rotating_access_keys_console"
+	},
+	"iamRoleTrustPublicPrincipal": {
+		"category": "S",
+		"^description": "{$COUNT} IAM role(s) have a trust policy that allows <b>any AWS principal</b> (\"*\" or {\"AWS\": \"*\"}) to call sts:AssumeRole without a condition that restricts the caller to your organization or accounts (aws:PrincipalOrgID, aws:PrincipalAccount, aws:PrincipalArn, aws:SourceAccount ...). Any identity in any AWS account can then assume the role and use its permissions. An sts:ExternalId condition alone is not treated as a restriction because the external ID is not a secret. Replace the wildcard principal with specific account or role ARNs, or add an aws:PrincipalOrgID condition.",
+		"shortDesc": "Restrict role trust policies that allow any principal",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[IAM role trust policies]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_terms-and-concepts.html#iam-term-trust-policy>",
+			"[AWS JSON policy elements: Principal]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html>",
+			"[Access to AWS accounts owned by third parties]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_common-scenarios_third-party.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/roles-managingrole-editing-console.html#roles-managingrole_edit-trust-policy"
+	},
+	"iamServerCertificates": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) store expired TLS server certificates in IAM, or IAM server certificates that expire within 30 days. IAM server certificates are never renewed automatically; an expired certificate attached to a load balancer or CloudFront distribution breaks TLS for clients, and leaving expired certificates in IAM risks them being deployed by mistake. Delete expired certificates and move to AWS Certificate Manager (ACM), which renews certificates automatically. Accounts with only valid IAM server certificates are reported as informational.",
+		"shortDesc": "Remove expired IAM server certificates; prefer ACM",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Manage server certificates in IAM]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_server-certs.html>",
+			"[AWS Certificate Manager]<https://docs.aws.amazon.com/acm/latest/userguide/acm-overview.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_server-certs.html#delete-server-certificate"
+	},
+	"iamUserHumanAndMachineCreds": {
+		"category": "S",
+		"^description": "{$COUNT} IAM user(s) have both a console password and an active access key. Mixing human (console) and programmatic (access key) credentials on one identity makes it hard to apply the right controls to each, widens the impact of a leaked credential, and usually means a person is using long-term keys. Give people federated access through IAM Identity Center, and give workloads IAM roles; if an IAM user must remain, keep only one credential type.",
+		"shortDesc": "Separate human and programmatic credentials",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Security best practices in IAM]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html>",
+			"[Manage access keys for IAM users]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html>",
+			"[IAM Credential Reports]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_getting-report.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html"
+	},
+	"oidcRoleTrustNoSubjectCondition": {
+		"category": "S",
+		"^description": "{$COUNT} IAM role(s) trust a multi-tenant OIDC provider (GitHub Actions, GitLab.com, HCP Terraform, Buildkite) or an Amazon EKS cluster OIDC provider without a <b>sub</b> condition that pins the caller's own organization, repository, project or namespace (for example no token.actions.githubusercontent.com:sub condition, or a value such as \"repo:*\"). Any repository or pipeline on that platform - including ones owned by other customers - or any service account in the cluster can then assume the role. Add a StringEquals/StringLike condition on &lt;provider&gt;:sub that names your org/repo (e.g. repo:my-org/my-repo:ref:refs/heads/main). Roles trusting other (single-tenant) OIDC providers without a sub condition are reported as informational.",
+		"shortDesc": "Pin the sub claim in OIDC role trust policies",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Create a role for OIDC federation]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html>",
+			"[Configuring a role for GitHub OIDC identity provider]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html#idp_oidc_Create_GitHub>",
+			"[IAM roles for service accounts (EKS)]<https://docs.aws.amazon.com/eks/latest/userguide/associate-service-account-role.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-idp_oidc.html"
+	},
+	"broadSecretReadAccess": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have customer managed (attached) or inline identity policies that allow reading every secret or parameter - secretsmanager:GetSecretValue or ssm:GetParameter* on Resource \"*\" (or an ARN wildcard covering all secrets/parameters) without a resource-tag or secret-ID condition. Any principal with such a policy can read all application credentials in the account. Scope the Resource to the specific secret/parameter ARNs (or a path prefix) the workload needs, or use attribute-based access control with resource tags. Full administrator policies are reported by the administrator-access checks instead.",
+		"shortDesc": "Scope secret and parameter read permissions",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Authentication and access control for AWS Secrets Manager]<https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-access.html>",
+			"[Restricting access to Parameter Store parameters using IAM policies]<https://docs.aws.amazon.com/systems-manager/latest/userguide/sysman-paramstore-access.html>",
+			"[Apply least-privilege permissions]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-access_examples.html"
+	},
+	"controlTowerLandingZoneDrift": {
+		"category": "S",
+		"^description": "{$COUNT} AWS Control Tower landing zone(s) are drifted or failed, or have enabled controls in FAILED or DRIFTED state. Drift means the governance baseline (OUs, accounts, SCPs, Config rules) no longer matches what Control Tower deployed, so controls you rely on may not be enforced. Review the drift in the Control Tower console and repair the landing zone or re-enable the affected controls. This is only evaluated from the Organizations management account; accounts without a landing zone are reported as informational.",
+		"shortDesc": "Resolve Control Tower landing zone / control drift",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Detect and resolve drift in AWS Control Tower]<https://docs.aws.amazon.com/controltower/latest/userguide/drift.html>",
+			"[Repair your landing zone]<https://docs.aws.amazon.com/controltower/latest/userguide/resolve-drift.html>",
+			"[Control drift]<https://docs.aws.amazon.com/controltower/latest/controlreference/governance-drift.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/controltower/latest/userguide/resolve-drift.html"
+	},
+	"healthLifecycleEventsOpen": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have open or upcoming AWS Health scheduled-change events announcing end of life, end of standard support or deprecation of engines, runtimes or platform versions you use. After that date the versions stop receiving security patches (or are force-upgraded). Review the affected resources in AWS Health and plan the upgrade before the deadline. Requires a Business, Enterprise On-Ramp or Enterprise Support plan; otherwise reported as not evaluable.",
+		"shortDesc": "Act on AWS Health end-of-life / lifecycle events",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[AWS Health planned lifecycle events]<https://docs.aws.amazon.com/health/latest/ug/aws-health-planned-lifecycle-events.html>",
+			"[DescribeEvents]<https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeEvents.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/health/latest/ug/aws-health-planned-lifecycle-events.html"
+	},
+	"healthOrgViewDisabled": {
+		"category": "S",
+		"^description": "{$COUNT} AWS Organization(s) do not have the AWS Health organizational view enabled. Without it, Health events (security notifications, scheduled changes, service issues) of member accounts are not aggregated in the management or delegated administrator account, so issues affecting individual accounts can be missed. Enable organizational view from the management account and optionally register a delegated administrator. Only evaluable from the management account or a Health delegated administrator; requires a Business, Enterprise On-Ramp or Enterprise Support plan.",
+		"shortDesc": "Enable AWS Health organizational view",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Aggregating AWS Health events across accounts]<https://docs.aws.amazon.com/health/latest/ug/aggregate-events.html>",
+			"[DescribeHealthServiceStatusForOrganization]<https://docs.aws.amazon.com/health/latest/APIReference/API_DescribeHealthServiceStatusForOrganization.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/health/latest/ug/enable-organizational-view-in-health-console.html"
+	},
+	"iamUserTwoActiveKeys": {
+		"category": "S",
+		"^description": "{$COUNT} IAM user(s) have two active access keys. Two active keys are only expected during a short rotation window; leaving both active doubles the number of long-term credentials that can leak and usually means the old key was never deactivated. Deactivate and delete the key that is no longer in use (CIS AWS Foundations 1.13).",
+		"shortDesc": "Keep at most one active access key per IAM user",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Manage access keys for IAM users]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html>",
+			"[Rotating access keys]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id-credentials-access-keys-update.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id-credentials-access-keys-update.html"
+	},
+	"rolesAnywhereTrustAnchorCertExpiring": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have enabled IAM Roles Anywhere trust anchors whose CA certificate (certificate bundle or AWS Private CA) has expired or expires within 30 days, or an imported certificate revocation list (CRL) that is disabled so revoked certificates are still accepted. Rotate the trust anchor CA before it expires (add the new CA certificate, reissue end-entity certificates, then remove the old one) and keep CRLs enabled and current.",
+		"shortDesc": "Rotate IAM Roles Anywhere trust anchor CAs and keep CRLs enabled",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[IAM Roles Anywhere trust model]<https://docs.aws.amazon.com/rolesanywhere/latest/userguide/trust-model.html>",
+			"[Revocation in IAM Roles Anywhere]<https://docs.aws.amazon.com/rolesanywhere/latest/userguide/trust-model.html#revocation>",
+			"[Getting started with IAM Roles Anywhere]<https://docs.aws.amazon.com/rolesanywhere/latest/userguide/getting-started.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/rolesanywhere/latest/userguide/trust-model.html"
+	},
+	"rootVirtualMfaOnly": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) protect the root user with a virtual (authenticator app) MFA device. Virtual TOTP codes can be phished and the device is often a personal phone. Register a FIDO2 security key or passkey (or a hardware TOTP token) for the root user, especially in the Organizations management account, and remove the virtual device. Note: AWS does not expose other root MFA device types through the IAM API, so if a security key is already registered alongside the virtual device, only the virtual device needs removing.",
+		"shortDesc": "Use a FIDO2 security key or passkey for root MFA",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Enable MFA for the root user]<https://docs.aws.amazon.com/IAM/latest/UserGuide/enable-mfa-for-root.html>",
+			"[Root user best practices]<https://docs.aws.amazon.com/IAM/latest/UserGuide/root-user-best-practices.html>",
+			"[Passkeys and security keys]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa_enable_fido.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_mfa_enable_fido.html"
+	},
+	"workloadRoleCanEscalate": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have roles assumed by a workload service (AWS Lambda, Amazon ECS tasks, Amazon EC2, AWS CodeBuild, AWS Step Functions) that can change IAM permissions (iam:PutRolePolicy, iam:AttachRolePolicy, iam:CreatePolicyVersion, iam:SetDefaultPolicyVersion, iam:UpdateAssumeRolePolicy, user/group policy and credential actions) or pass any role (iam:PassRole on all roles) without a Condition. Code or a compromised dependency running in that workload can escalate to administrator. Remove these actions or scope them to specific resources and add conditions such as iam:PassedToService; use permissions boundaries for roles that must manage IAM. Full-administrator roles are reported separately; statements with conditions are treated as scoped.",
+		"shortDesc": "Prevent workload roles from escalating privileges",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Security best practices in IAM - least privilege]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>",
+			"[Grant a user permissions to pass a role]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_passrole.html>",
+			"[Permissions boundaries for IAM entities]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_use_passrole.html"
+	},
+	"accountMixesEnvironments": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) contain resources tagged as production and as non-production (for example Environment=prod and Environment=dev). Mixing environments in one account removes the account as a security and blast-radius boundary: non-production identities and changes can reach production data. Separate workloads and environments into dedicated accounts in AWS Organizations. Heuristic based on common environment tag keys (Environment, Env, Stage) and values.",
+		"shortDesc": "Separate production and non-production into different accounts",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Organizing your AWS environment using multiple accounts]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/organizing-your-aws-environment.html>",
+			"[Benefits of using multiple AWS accounts]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/benefits-of-using-multiple-aws-accounts.html>",
+			"[GetTagValues]<https://docs.aws.amazon.com/resourcegroupstagging/latest/APIReference/API_GetTagValues.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/organizing-your-aws-environment.html"
+	},
+	"auditManagerNoActiveAssessment": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have AWS Audit Manager enabled but no active assessment, so no compliance evidence is being collected. Create an assessment from a framework that matches your obligations, or disable Audit Manager if it is no longer used. Accounts that do not use Audit Manager are informational only.",
+		"shortDesc": "Keep an active Audit Manager assessment when Audit Manager is enabled",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[What is AWS Audit Manager?]<https://docs.aws.amazon.com/audit-manager/latest/userguide/what-is.html>",
+			"[Creating an assessment]<https://docs.aws.amazon.com/audit-manager/latest/userguide/create-assessments.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/audit-manager/latest/userguide/create-assessments.html"
+	},
+	"budgetNoActions": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have AWS Budgets configured but no budget actions. Budget actions can automatically apply a restrictive IAM policy or SCP, or stop EC2/RDS instances, when a threshold is crossed, limiting the impact of compromised credentials used for resource abuse (for example crypto mining). Consider adding a budget action (with approval if needed) to key budgets. Accounts without any budget are reported by enableCostBudget.",
+		"shortDesc": "Add budget actions to respond to unexpected spend",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Configuring a budget action]<https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-controls.html>",
+			"[DescribeBudgetActionsForAccount]<https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_budgets_DescribeBudgetActionsForAccount.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-controls.html"
+	},
+	"costAllocationTagsNotActivated": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have no active user-defined cost allocation tags. Without activated cost allocation tags, cost and usage cannot be attributed to the owning team, workload or environment, which weakens ownership and accountability for resources (including unexpected or abusive usage). Activate the tag keys that record owner / workload / environment as cost allocation tags in the payer (management) account. Member accounts of an organization are reported as not evaluable.",
+		"shortDesc": "Activate user-defined cost allocation tags",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Activating user-defined cost allocation tags]<https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/activating-tags.html>",
+			"[ListCostAllocationTags]<https://docs.aws.amazon.com/aws-cost-management/latest/APIReference/API_ListCostAllocationTags.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/activating-tags.html"
+	},
+	"dataStoreNoClassificationTag": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have data stores (S3 buckets, DynamoDB tables, RDS/Aurora/DocumentDB/Neptune databases, EFS file systems, Redshift clusters) without a data classification tag. A tag key containing 'classification', 'sensitivity' or 'confidentiality' (for example DataClassification=Confidential) lets you apply protection, access and monitoring controls according to data sensitivity. Tag each data store with its classification level. EBS volumes are reported by the EC2 check EBSVolumeDataClassification.",
+		"shortDesc": "Tag data stores with a data classification",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SEC07-BP01 Understand your data classification scheme]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_data_classification_identify_data.html>",
+			"[Best Practices for Tagging AWS Resources]<https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/tagging-best-practices.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_data_classification_identify_data.html"
+	},
+	"drRegionQuotaParity": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have service quotas in a disaster recovery Region that are lower than in the primary Region. The DR Region is inferred from AWS Backup cross-Region copy rules and Aurora global database secondaries; key quotas (EC2 On-Demand vCPUs, Elastic IPs, VPCs, Lambda concurrency, RDS DB instances) are compared. Lower quotas can prevent the recovery environment from scaling to production size during a failover. Request matching quota increases in the DR Region.",
+		"shortDesc": "Match DR Region service quotas to the primary Region",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[REL13-BP04 Manage configuration drift at the DR site or Region]<https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_planning_for_recovery_config_drift.html>",
+			"[Requesting a quota increase]<https://docs.aws.amazon.com/servicequotas/latest/userguide/request-quota-increase.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/servicequotas/latest/userguide/request-quota-increase.html"
+	},
+	"iamUserLongTermAccessKey": {
+		"category": "S",
+		"^description": "{$COUNT} IAM user(s) hold active long-term access keys. Long-term keys do not expire and are a common source of credential leaks. Workloads should use IAM roles (EC2 instance profiles, ECS task roles, Lambda execution roles, IAM Roles Anywhere for on-premises) and people should use federation / IAM Identity Center for temporary credentials. The detail separates programmatic-only users (machine identities) from users that also have a console password. To record an approved exception, tag the user with ServiceScreener:LongTermKeyException (any value except false). Key age is reported separately by hasAccessKeyNoRotate30days / hasAccessKeyNoRotate90days.",
+		"shortDesc": "Replace IAM user access keys with roles or federation",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SEC02-BP02 Use temporary credentials]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_identities_unique.html>",
+			"[Require workloads to use temporary credentials with IAM roles]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#bp-workloads-use-roles>",
+			"[Alternatives to long-term access keys]<https://docs.aws.amazon.com/IAM/latest/UserGuide/security-creds-programmatic-access.html#security-creds-alternatives-to-long-term-access-keys>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#bp-workloads-use-roles"
+	},
+	"longTermKeyNotContained": {
+		"category": "S",
+		"^description": "{$COUNT} IAM user(s) with an active access key have neither a permissions boundary nor identity policies that restrict where the key can be used. When a long-term key must remain, limit its blast radius with a permissions boundary and a network condition (aws:SourceIp, aws:SourceVpc, aws:SourceVpce or aws:VpcSourceIp) - for example a Deny statement for requests that do not come from your network - so a leaked key cannot be used from elsewhere. Network perimeters enforced by SCPs/RCPs are not visible from the account and are not considered.",
+		"shortDesc": "Restrict remaining access keys by network and boundary",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SEC02-BP02 Use temporary credentials]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_identities_unique.html>",
+			"[AWS: Denies access to AWS based on the source IP]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_examples_aws_deny-ip.html>",
+			"[Permissions boundaries for IAM entities]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_examples_aws_deny-ip.html"
+	},
+	"mfaDeactivationNotAlerted": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) do not alert when an MFA device is deactivated. Deactivating MFA (DeactivateMFADevice) is a common step when an attacker takes over an identity. Create an Amazon EventBridge rule on the default event bus in the IAM events Region (us-east-1 in the aws partition) matching the CloudTrail DeactivateMFADevice event with a notification target, or a CloudWatch Logs metric filter on the CloudTrail log group with an alarm that has an action.",
+		"shortDesc": "Alert on MFA device deactivation",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SEC02-BP05 Audit and rotate credentials periodically]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_identities_audit.html>",
+			"[AWS service events delivered via AWS CloudTrail]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-service-event-cloudtrail.html>",
+			"[Creating CloudWatch alarms for CloudTrail events]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudwatch-alarms-for-cloudtrail.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-service-event-cloudtrail.html"
+	},
+	"resourceExplorerNoAggregatorIndex": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have no active AWS Resource Explorer aggregator index. Without an aggregator index, resources cannot be searched across all Regions of the account from one place, which slows down inventory and incident investigation (for example finding every resource with a given tag or name). Turn on Resource Explorer in the Regions you use and promote one index to aggregator.",
+		"shortDesc": "Create a Resource Explorer aggregator index",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Turning on cross-Region search by creating an aggregator index]<https://docs.aws.amazon.com/resource-explorer/latest/userguide/manage-aggregator-region-turn-on.html>",
+			"[Setting up AWS Resource Explorer]<https://docs.aws.amazon.com/resource-explorer/latest/userguide/getting-started-setting-up.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/resource-explorer/latest/userguide/manage-aggregator-region-turn-on.html"
+	},
+	"roleSharedAcrossComponents": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have IAM roles used by more than one compute component (Lambda functions, ECS task roles, EC2 instance profiles, Step Functions state machines, CodeBuild projects), across services or within a non-Lambda service. Each component then holds the union of permissions the others need, breaking least privilege and widening the impact of a compromised component. Give each component its own role scoped to what it needs. Reuse among Lambda functions only is reported by the Lambda check lambdaRoleReused.",
+		"shortDesc": "Use a dedicated IAM role per component",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[SEC03-BP01 Define access requirements]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_permissions_define.html>",
+			"[Apply least-privilege permissions]<https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/best-practices.html#grant-least-privilege"
+	},
+	"sirMembershipMissing": {
+		"category": "S",
+		"^description": "{$COUNT} account(s) have no active AWS Security Incident Response membership in the scanned Regions. AWS Security Incident Response triages GuardDuty and Security Hub findings, provides a case-management workflow and gives 24/7 access to the AWS Customer Incident Response Team (CIRT), shortening the time to contain and recover from a security event. Consider subscribing from the AWS Organizations management account or a Security Incident Response delegated administrator account (it is an optional, paid service). Plain member accounts of an organization are reported as not evaluable.",
+		"shortDesc": "Consider an AWS Security Incident Response membership",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[What is AWS Security Incident Response?]<https://docs.aws.amazon.com/security-ir/latest/userguide/what-is.html>",
+			"[SEC10-BP02 Develop incident management plans]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_develop_management_plans.html>",
+			"[ListMemberships]<https://docs.aws.amazon.com/security-ir/latest/APIReference/API_ListMemberships.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/security-ir/latest/userguide/what-is.html"
+	},
+	"sirTeamTooSmall": {
+		"category": "S",
+		"^description": "{$COUNT} AWS Security Incident Response membership(s) have fewer than 2 distinct incident response team contacts (counted by email address). The incident response team receives case notifications and is engaged by the AWS Customer Incident Response Team; relying on a single person (or several entries sharing one mailbox) stalls the response when that person is unavailable. Add at least two distinct, monitored contacts to the membership's incident response team.",
+		"shortDesc": "Add at least 2 distinct SIR incident response team contacts",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Security Incident Response - Membership]<https://docs.aws.amazon.com/security-ir/latest/userguide/membership.html>",
+			"[SEC10-BP01 Identify key personnel and external resources]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_incident_response_identify_personnel.html>",
+			"[GetMembership]<https://docs.aws.amazon.com/security-ir/latest/APIReference/API_GetMembership.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/security-ir/latest/userguide/membership.html"
 	}
 }
