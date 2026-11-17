@@ -13,8 +13,10 @@ class EksCommon(Evaluator):
         'udp': [53]
     }
     
-    def __init__(self, eksCluster, clusterInfo, eksClient, ec2Client, iamClient):
+    def __init__(self, eksCluster, clusterInfo, eksClient, ec2Client, iamClient, ssmClient=None):
         super().__init__()
+        self.ssmClient = ssmClient
+        self._ssmCache = {}
         self.cluster = eksCluster
         self.clusterInfo = clusterInfo
         self.eksClient = eksClient
@@ -534,37 +536,197 @@ class EksCommon(Evaluator):
             
         return
     
+    def _errCode(self, e):
+        try:
+            return e.response.get('Error', {}).get('Code') or 'ClientError'
+        except Exception:
+            return 'Error'
+
     def _checkNoIRSAConfigured(self):
         """
-        Check if OIDC provider is configured for IAM Roles for Service Accounts (IRSA).
-        IRSA provides pod-level IAM permissions, which is more secure than node-level roles.
+        Pod-level workload identity (FND02-BP10).
+        PASS when the cluster has at least one working workload identity mechanism:
+          - IRSA: the cluster OIDC issuer is registered as an IAM OIDC identity provider
+            (an issuer URL alone exists on every cluster and does not enable IRSA), or
+          - EKS Pod Identity: pod identity associations exist, or the
+            eks-pod-identity-agent add-on is installed / EKS Auto Mode (agent built in).
+        FAIL only when none of these are present. If a source cannot be read and no
+        mechanism was found, the result is 0 (Unable to evaluate).
+        """
+        evidence = []
+        unable = []
+
+        identity = self.clusterInfo.get('identity') or {}
+        issuer = (identity.get('oidc') or {}).get('issuer') or ''
+
+        if issuer:
+            host = issuer.split('://', 1)[-1].rstrip('/').lower()
+            try:
+                providers = self.iamClient.list_open_id_connect_providers().get('OpenIDConnectProviderList', []) or []
+                for p in providers:
+                    arn = (p.get('Arn') or '').lower()
+                    if arn.endswith(':oidc-provider/' + host):
+                        evidence.append('IRSA (IAM OIDC provider registered)')
+                        break
+            except botocore.exceptions.ClientError as e:
+                unable.append('iam:' + self._errCode(e))
+
+        try:
+            paginator = self.eksClient.get_paginator('list_pod_identity_associations')
+            assocCnt = 0
+            for page in paginator.paginate(clusterName=self.cluster):
+                assocCnt += len(page.get('associations', []) or [])
+                if assocCnt > 0:
+                    break
+            if assocCnt > 0:
+                evidence.append('EKS Pod Identity associations')
+        except botocore.exceptions.ClientError as e:
+            unable.append('eks:' + self._errCode(e))
+
+        if (self.clusterInfo.get('computeConfig') or {}).get('enabled') is True:
+            evidence.append('EKS Auto Mode (Pod Identity agent built in)')
+        else:
+            try:
+                paginator = self.eksClient.get_paginator('list_addons')
+                for page in paginator.paginate(clusterName=self.cluster):
+                    if 'eks-pod-identity-agent' in (page.get('addons', []) or []):
+                        evidence.append('eks-pod-identity-agent add-on')
+                        break
+            except botocore.exceptions.ClientError as e:
+                unable.append('eks:' + self._errCode(e))
+
+        if evidence:
+            self.results['eksNoIRSAConfigured'] = [1, 'Workload identity: ' + ', '.join(evidence)]
+        elif unable:
+            self.results['eksNoIRSAConfigured'] = [0, 'Unable to evaluate (' + ', '.join(sorted(set(unable))) + ')']
+        elif not issuer:
+            self.results['eksNoIRSAConfigured'] = [-1, 'No OIDC issuer and no EKS Pod Identity configured']
+        else:
+            self.results['eksNoIRSAConfigured'] = [-1, 'OIDC issuer not registered as IAM OIDC provider and no EKS Pod Identity configured']
+
+        return
+
+    ## SSM public parameters holding the latest EKS-optimized AMI release per amiType.
+    ## {v} is the node group Kubernetes version. Bottlerocket parameters hold the
+    ## Bottlerocket image version, which is what EKS reports as releaseVersion.
+    AMI_RELEASE_SSM_PATHS = {
+        'AL2_x86_64': '/aws/service/eks/optimized-ami/{v}/amazon-linux-2/recommended/release_version',
+        'AL2_x86_64_GPU': '/aws/service/eks/optimized-ami/{v}/amazon-linux-2-gpu/recommended/release_version',
+        'AL2_ARM_64': '/aws/service/eks/optimized-ami/{v}/amazon-linux-2-arm64/recommended/release_version',
+        'AL2023_x86_64_STANDARD': '/aws/service/eks/optimized-ami/{v}/amazon-linux-2023/x86_64/standard/recommended/release_version',
+        'AL2023_ARM_64_STANDARD': '/aws/service/eks/optimized-ami/{v}/amazon-linux-2023/arm64/standard/recommended/release_version',
+        'AL2023_x86_64_NEURON': '/aws/service/eks/optimized-ami/{v}/amazon-linux-2023/x86_64/neuron/recommended/release_version',
+        'AL2023_x86_64_NVIDIA': '/aws/service/eks/optimized-ami/{v}/amazon-linux-2023/x86_64/nvidia/recommended/release_version',
+        'AL2023_ARM_64_NVIDIA': '/aws/service/eks/optimized-ami/{v}/amazon-linux-2023/arm64/nvidia/recommended/release_version',
+        'BOTTLEROCKET_x86_64': '/aws/service/bottlerocket/aws-k8s-{v}/x86_64/latest/image_version',
+        'BOTTLEROCKET_ARM_64': '/aws/service/bottlerocket/aws-k8s-{v}/arm64/latest/image_version',
+        'BOTTLEROCKET_x86_64_FIPS': '/aws/service/bottlerocket/aws-k8s-{v}-fips/x86_64/latest/image_version',
+        'BOTTLEROCKET_ARM_64_FIPS': '/aws/service/bottlerocket/aws-k8s-{v}-fips/arm64/latest/image_version',
+        'BOTTLEROCKET_x86_64_NVIDIA': '/aws/service/bottlerocket/aws-k8s-{v}-nvidia/x86_64/latest/image_version',
+        'BOTTLEROCKET_ARM_64_NVIDIA': '/aws/service/bottlerocket/aws-k8s-{v}-nvidia/arm64/latest/image_version',
+        'BOTTLEROCKET_x86_64_NVIDIA_FIPS': '/aws/service/bottlerocket/aws-k8s-{v}-nvidia-fips/x86_64/latest/image_version',
+        'BOTTLEROCKET_ARM_64_NVIDIA_FIPS': '/aws/service/bottlerocket/aws-k8s-{v}-nvidia-fips/arm64/latest/image_version',
+    }
+
+    @staticmethod
+    def parseReleaseVersion(release, bottlerocket=False):
+        """'1.31.2-20241121' -> ((1, 31, 2), 20241121); Bottlerocket '1.20.3-5d9ac849' -> ((1, 20, 3), 0).
+        Returns None when the string cannot be parsed."""
+        if not release or not isinstance(release, str):
+            return None
+        parts = release.strip().split('-', 1)
+        try:
+            ver = tuple(int(x) for x in parts[0].lstrip('v').split('.'))
+        except ValueError:
+            return None
+        if bottlerocket:
+            return (ver, 0)
+        if len(parts) < 2 or not parts[1].isdigit():
+            return None
+        return (ver, int(parts[1]))
+
+    def _latestAmiRelease(self, path):
+        if path in self._ssmCache:
+            return self._ssmCache[path]
+        try:
+            val = self.ssmClient.get_parameter(Name=path)['Parameter']['Value']
+            out = (val, None)
+        except botocore.exceptions.ClientError as e:
+            out = (None, self._errCode(e))
+        self._ssmCache[path] = out
+        return out
+
+    def _checkNodeGroupAmiOutdated(self):
+        """
+        Managed node groups should run the latest EKS-optimized AMI release for their
+        Kubernetes version and amiType (SEC06-BP01). The latest release is read from
+        the public SSM parameters published by AWS. CUSTOM (launch template AMI) and
+        Windows node groups are not evaluable and are skipped.
         """
         try:
-            # Check if OIDC issuer is configured
-            identity = self.clusterInfo.get('identity')
-            
-            if identity is None:
-                self.results['eksNoIRSAConfigured'] = [-1, 'No identity configuration found']
-                return
-            
-            oidc = identity.get('oidc')
-            
-            if oidc is None:
-                self.results['eksNoIRSAConfigured'] = [-1, 'OIDC provider not configured']
-                return
-            
-            issuer = oidc.get('issuer')
-            
-            if issuer is None or issuer == '':
-                self.results['eksNoIRSAConfigured'] = [-1, 'OIDC issuer not configured']
-                return
-            
-            # OIDC provider is configured - IRSA is available
-            # Note: We cannot check if service accounts are actually using IRSA without Kubernetes API
-            
-        except Exception as e:
-            print(f"Error checking IRSA configuration for cluster {self.cluster}: {e}")
-            
+            nodeGroups = []
+            for page in self.eksClient.get_paginator('list_nodegroups').paginate(clusterName=self.cluster):
+                nodeGroups += page.get('nodegroups', []) or []
+        except botocore.exceptions.ClientError as e:
+            self.results['eksNodeGroupAmiOutdated'] = [0, 'Unable to evaluate (' + self._errCode(e) + ')']
+            return
+
+        if not nodeGroups:
+            return
+
+        if self.ssmClient is None:
+            self.results['eksNodeGroupAmiOutdated'] = [0, 'Unable to evaluate (no SSM client)']
+            return
+
+        outdated, current, skipped, unable = [], [], [], []
+        for ngName in nodeGroups:
+            try:
+                ng = self.eksClient.describe_nodegroup(clusterName=self.cluster, nodegroupName=ngName).get('nodegroup', {}) or {}
+            except botocore.exceptions.ClientError as e:
+                unable.append(ngName + ' (' + self._errCode(e) + ')')
+                continue
+
+            amiType = ng.get('amiType')
+            pathTpl = self.AMI_RELEASE_SSM_PATHS.get(amiType)
+            if pathTpl is None:
+                skipped.append(ngName + ' (' + str(amiType) + ')')
+                continue
+
+            k8sVersion = ng.get('version') or (self.clusterInfo or {}).get('version')
+            release = ng.get('releaseVersion')
+            if not k8sVersion or not release:
+                unable.append(ngName + ' (missing version/releaseVersion)')
+                continue
+
+            latest, err = self._latestAmiRelease(pathTpl.format(v=k8sVersion))
+            if latest is None:
+                unable.append(ngName + ' (' + str(err) + ')')
+                continue
+
+            isBr = amiType.startswith('BOTTLEROCKET')
+            cur = self.parseReleaseVersion(release, isBr)
+            lat = self.parseReleaseVersion(latest, isBr)
+            if cur is None or lat is None:
+                unable.append(ngName + ' (unparseable release ' + str(release) + ' / ' + str(latest) + ')')
+                continue
+
+            if cur < lat:
+                outdated.append(ngName + ': ' + release + ' < ' + latest)
+            else:
+                current.append(ngName)
+
+        if outdated:
+            self.results['eksNodeGroupAmiOutdated'] = [-1, '; '.join(outdated)]
+        elif unable:
+            self.results['eksNodeGroupAmiOutdated'] = [0, 'Unable to evaluate (' + '; '.join(unable) + ')']
+        elif current:
+            msg = 'Latest AMI release: ' + ', '.join(current)
+            if skipped:
+                msg += '. Not evaluated: ' + ', '.join(skipped)
+            self.results['eksNodeGroupAmiOutdated'] = [1, msg]
+        else:
+            self.results['eksNodeGroupAmiOutdated'] = [0, 'Not evaluable (CUSTOM/Windows AMI): ' + ', '.join(skipped)]
+
         return
     
     def _checkNoAutoscaling(self):
