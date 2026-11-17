@@ -592,5 +592,76 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-lambda-challenge.html"
+	},
+	"cognitoIdentityPoolGuestRoleBroad": {
+		"category": "S",
+		"^description": "{$COUNT} Cognito identity pool(s) allow unauthenticated (guest) identities and map them to an IAM role with broad permissions (Action '*' or 'service:*' or NotAction on all resources or on resources shared by every guest, or an AWS managed AdministratorAccess / PowerUserAccess / ReadOnlyAccess / ViewOnlyAccess / SecurityAudit / *FullAccess policy). Wildcards confined to the caller's own identity with ${cognito-identity.amazonaws.com:sub} in the resource, or in a required dynamodb:LeadingKeys / s3:prefix condition, are not reported. Anyone on the internet can obtain temporary AWS credentials for this role without signing in.",
+		"shortDesc": "Scope the identity pool guest role to least privilege or disable guest access",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Identity pools authentication flow - guest access]<https://docs.aws.amazon.com/cognito/latest/developerguide/identity-pools.html>",
+			"[IAM roles for identity pools]<https://docs.aws.amazon.com/cognito/latest/developerguide/iam-roles.html>",
+			"[Security best practices for identity pools]<https://docs.aws.amazon.com/cognito/latest/developerguide/identity-pools-security-best-practices.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/iam-roles.html"
+	},
+	"cognitoIdentityPoolNoRoleMapping": {
+		"category": "S",
+		"^description": "{$COUNT} Cognito identity pool(s) accept two or more sign-in sources (distinct user pools or federated identity providers) but give every authenticated user the same default IAM role, with no role-based access control (role mapping) and no attribute-based access control (principal tags). Users from all sources receive identical permissions.",
+		"shortDesc": "Use role mapping or principal tags to scope identity pool permissions per user",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Role-based access control for identity pools]<https://docs.aws.amazon.com/cognito/latest/developerguide/role-based-access-control.html>",
+			"[Attributes for access control in identity pools]<https://docs.aws.amazon.com/cognito/latest/developerguide/attributes-for-access-control.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/role-based-access-control.html"
+	},
+	"cognitoNoAuthMetricAlarm": {
+		"category": "S",
+		"^description": "{$COUNT} Cognito user pool(s) with users have no CloudWatch alarm with an enabled action on their AWS/Cognito metrics (for example sign-in successes, throttles, or the threat protection metrics CompromisedCredentialsRisk / AccountTakeoverRisk). Abnormal sign-in activity or a spike in risky sign-ins does not alert operators.",
+		"shortDesc": "Alarm on Cognito sign-in and threat protection metrics",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Viewing Amazon Cognito user pool metrics]<https://docs.aws.amazon.com/cognito/latest/developerguide/metrics-for-cognito-user-pools.html>",
+			"[Viewing threat protection metrics]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-viewing-threat-protection-app.html>",
+			"[Using Amazon CloudWatch alarms]<https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/AlarmThatSendsEmail.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/metrics-for-cognito-user-pools.html"
+	},
+	"cognitoPerAppIdentitySilos": {
+		"category": "S",
+		"^description": "{$COUNT} region(s) contain three or more Cognito user pools that each serve exactly one app client and federate with no external identity provider. Separate per-application identity stores duplicate user lifecycle, MFA and password policy management; consider a shared user pool with multiple app clients or federation with a central identity provider.",
+		"shortDesc": "Consolidate per-application user pools or federate with a central identity provider",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[User pool app clients]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-settings-client-apps.html>",
+			"[Adding third-party identity providers to a user pool]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-identity-federation.html>",
+			"[Multi-tenant application best practices]<https://docs.aws.amazon.com/cognito/latest/developerguide/multi-tenant-application-best-practices.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pools-identity-federation.html"
 	}
 }

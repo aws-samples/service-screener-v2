@@ -1066,3 +1066,37 @@ class CognitoCommon(Evaluator):
                 f"Custom-auth triggers ({', '.join(configured)}) with "
                 f"AdvancedSecurityMode={mode}"
             ]
+
+    # ------------------------------------------------------------------ #
+    # 38. No CloudWatch alarm on the pool's sign-in / risk metrics
+    # ------------------------------------------------------------------ #
+    def _checkCognitoNoAuthMetricAlarm(self):
+        key = 'cognitoNoAuthMetricAlarm'
+        poolId = self.pool.get('Id')
+        try:
+            users = int(self.pool.get('EstimatedNumberOfUsers', 0) or 0)
+        except (TypeError, ValueError):
+            users = 0
+        if users == 0:
+            self.results[key] = [0, "No users in this pool - see cognitoUnusedUserPool"]
+            return
+        idx = self.pool.get('_alarmIndex')
+        if not idx:
+            self.results[key] = [0, "Unable to evaluate (alarms not read)"]
+            return
+        if idx.get('error'):
+            self.results[key] = [0, f"Unable to evaluate ({idx['error']})"]
+            return
+        if poolId in (idx.get('actioned') or set()):
+            self.results[key] = [
+                1, "A CloudWatch alarm with actions monitors this pool's AWS/Cognito metrics"
+            ]
+            return
+        if poolId in (idx.get('unactioned') or set()):
+            self.results[key] = [
+                -1, "AWS/Cognito alarm(s) for this pool exist but have no enabled alarm action"
+            ]
+            return
+        self.results[key] = [
+            -1, "No CloudWatch alarm on AWS/Cognito sign-in or risk metrics for this pool"
+        ]
