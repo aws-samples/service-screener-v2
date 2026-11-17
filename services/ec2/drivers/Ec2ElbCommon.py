@@ -1,8 +1,11 @@
+import threading
+
 import boto3
 import botocore
 
 import constants as _C
 
+from utils.Config import Config
 from services.Evaluator import Evaluator
 from services.ec2.drivers.Ec2SecGroup import Ec2SecGroup
 
@@ -18,17 +21,57 @@ class Ec2ElbCommon(Evaluator):
 
         self.init()
 
+        self._lock = threading.RLock()
         self._listenersCache = None
+        self._attributesCache = None
 
     def _getListeners(self):
-        """Memoized describe_listeners - _checkListenerPortEncrypt and
-        _checkALBSGPortMatch both need this for the same LB, no need to fetch twice."""
-        if self._listenersCache is None:
-            result = self.elbClient.describe_listeners(
-                LoadBalancerArn = self.elb['LoadBalancerArn']
-            )
-            self._listenersCache = result.get('Listeners', [])
-        return self._listenersCache
+        """Memoized, paginated describe_listeners - several checks need the
+        listeners of the same LB, no need to fetch more than once."""
+        with self._lock:
+            if self._listenersCache is None:
+                listeners = []
+                paginator = self.elbClient.get_paginator('describe_listeners')
+                for page in paginator.paginate(LoadBalancerArn = self.elb['LoadBalancerArn']):
+                    listeners.extend(page.get('Listeners', []))
+                self._listenersCache = listeners
+            return self._listenersCache
+
+    def _getAttributes(self):
+        """Memoized describe_load_balancer_attributes as {key: value}."""
+        with self._lock:
+            if self._attributesCache is None:
+                results = self.elbClient.describe_load_balancer_attributes(
+                    LoadBalancerArn = self.elb['LoadBalancerArn']
+                )
+                self._attributesCache = {a['Key']: a.get('Value') for a in results.get('Attributes', [])}
+            return self._attributesCache
+
+    def _getSslPolicyProtocols(self, policyName):
+        """SslProtocols of an elbv2 security policy. The full policy table is
+        fetched once per region and cached; unknown names are looked up directly.
+        Returns None if the policy cannot be resolved."""
+        cacheKey = 'ec2::elbv2SslPolicies::' + self.elbClient.meta.region_name
+        table = Config.get(cacheKey, None)
+        if table is None:
+            table = {}
+            paginator = self.elbClient.get_paginator('describe_ssl_policies')
+            for page in paginator.paginate():
+                for pol in page.get('SslPolicies', []):
+                    table[pol.get('Name')] = pol.get('SslProtocols', [])
+            Config.set(cacheKey, table)
+
+        if policyName in table:
+            return table[policyName]
+        try:
+            resp = self.elbClient.describe_ssl_policies(Names = [policyName])
+            for pol in resp.get('SslPolicies', []):
+                if pol.get('Name') == policyName:
+                    table[policyName] = pol.get('SslProtocols', [])
+                    return table[policyName]
+        except botocore.exceptions.ClientError:
+            pass
+        return None
 
     # checks
     def _checkListenerPortEncrypt(self):
@@ -48,17 +91,9 @@ class Ec2ElbCommon(Evaluator):
         return
     
     def _checkCrossZoneLB(self):
-        elb = self.elb
-        arn = elb['LoadBalancerArn']
-        
-        results = self.elbClient.describe_load_balancer_attributes(
-            LoadBalancerArn = arn
-        )
-        
-        
-        for attr in results['Attributes']:
-            if attr['Key'] == 'load_balancing.cross_zone.enabled' and attr['Value'] == 'false':
-                self.results['ELBCrossZone'] = [-1, 'Disabled']
+        attrs = self._getAttributes()
+        if attrs.get('load_balancing.cross_zone.enabled') == 'false':
+            self.results['ELBCrossZone'] = [-1, 'Disabled']
         
         return
     
@@ -126,3 +161,71 @@ class Ec2ElbCommon(Evaluator):
             self.results['ELBMultiAZ'] = [-1, f"{len(uniqueAZs)} AZ"]
         
         return
+
+    WEAK_TLS_PROTOCOLS = ('SSLv3', 'TLSv1', 'TLSv1.1')
+
+    def _checkElbAccessLogsDisabled(self):
+        """Access logs (access_logs.s3.enabled). ALB: always applicable.
+        NLB: access logs only record TLS listener traffic, so only evaluated when
+        the NLB has a TLS listener. GWLB: access logs not supported (no result)."""
+        key = 'elbAccessLogsDisabled'
+        lbType = self.elb.get('Type')
+        try:
+            if lbType == 'network':
+                if not any(l.get('Protocol') == 'TLS' for l in self._getListeners()):
+                    return
+            elif lbType != 'application':
+                return
+            attrs = self._getAttributes()
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({e.response['Error']['Code']})"]
+            return
+
+        enabled = attrs.get('access_logs.s3.enabled')
+        if enabled == 'true':
+            bucket = attrs.get('access_logs.s3.bucket') or ''
+            self.results[key] = [1, f"Enabled{' (s3://' + bucket + ')' if bucket else ''}"]
+        elif enabled == 'false':
+            self.results[key] = [-1, 'Disabled']
+        else:
+            self.results[key] = [0, 'Unable to evaluate (access_logs.s3.enabled attribute not returned)']
+
+    def _checkElbTlsPolicyOutdated(self):
+        """HTTPS (ALB) / TLS (NLB) listeners whose security policy still allows
+        TLS 1.0/1.1 (or SSLv3), resolved from describe_ssl_policies SslProtocols."""
+        key = 'elbTlsPolicyOutdated'
+        try:
+            listeners = [l for l in self._getListeners() if l.get('Protocol') in ('HTTPS', 'TLS')]
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({e.response['Error']['Code']})"]
+            return
+        if not listeners:
+            return
+
+        weak, unknown, good = [], [], []
+        try:
+            for l in listeners:
+                label = f"{l.get('Protocol')}:{l.get('Port')}"
+                policy = l.get('SslPolicy')
+                if not policy:
+                    unknown.append(f"{label} (no SslPolicy returned)")
+                    continue
+                protocols = self._getSslPolicyProtocols(policy)
+                if protocols is None:
+                    unknown.append(f"{label} ({policy} not resolvable)")
+                    continue
+                bad = [p for p in protocols if p in self.WEAK_TLS_PROTOCOLS]
+                if bad:
+                    weak.append(f"{label} {policy} allows {'/'.join(bad)}")
+                else:
+                    good.append(f"{label} {policy}")
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({e.response['Error']['Code']})"]
+            return
+
+        if weak:
+            self.results[key] = [-1, '; '.join(weak)]
+        elif unknown:
+            self.results[key] = [0, 'Unable to evaluate (' + '; '.join(unknown) + ')']
+        else:
+            self.results[key] = [1, '; '.join(good)]

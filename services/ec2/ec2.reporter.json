@@ -1352,5 +1352,140 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/exporting-recommendations.html"
+	},
+	"ec2AmiPublic": {
+		"category": "S",
+		"^description": "Public AMI: {$COUNT} AMI(s) owned by this account are shared publicly (launch permission group 'all'). Anyone can launch them and read their snapshots, which can expose data, credentials and software. Make the AMIs private or share only with specific accounts/organizations.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "H",
+		"needFullTest": 0,
+		"shortDesc": "Self-owned AMI is public",
+		"ref": [
+			"[Make an AMI public or private]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-intro.html>",
+			"[Best practices for shared AMIs]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/building-shared-amis.html>"
+		],
+		"remediation": "aws ec2 modify-image-attribute --image-id {ResourceId} --launch-permission \"Remove=[{Group=all}]\"",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/sharingamis-intro.html"
+	},
+	"ec2ImageBlockPublicAccessOff": {
+		"category": "S",
+		"^description": "AMI Block Public Access disabled: block public access for AMIs is 'unblocked' in {$COUNT} region(s). Enable it (block-new-sharing) to prevent AMIs from being made public. Existing public AMIs are reported separately.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "Enable AMI Block Public Access",
+		"ref": [
+			"[Block public access to your AMIs]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/block-public-access-to-amis.html>"
+		],
+		"remediation": "aws ec2 enable-image-block-public-access --image-block-public-access-state block-new-sharing",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/manage-block-public-access-for-amis.html"
+	},
+	"ec2ImdsDefaultNotRequired": {
+		"category": "S",
+		"^description": "IMDSv2 not required by default: in {$COUNT} region(s) the account-level instance metadata defaults do not set HttpTokens=required (or set a hop limit above 2), so new instances can be launched with IMDSv1. Set the account default to require IMDSv2 so new launches are protected; existing instances are covered by EC2IMDSv2.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "M",
+		"needFullTest": 1,
+		"shortDesc": "Require IMDSv2 by default for new instances",
+		"ref": [
+			"[Set IMDSv2 as the default for the account]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-IMDS-new-instances.html#set-imdsv2-account-defaults>",
+			"[Use IMDSv2]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html>"
+		],
+		"remediation": "aws ec2 modify-instance-metadata-defaults --http-tokens required --http-put-response-hop-limit 2",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-IMDS-new-instances.html"
+	},
+	"ec2SnapshotBlockPublicAccessOff": {
+		"category": "S",
+		"^description": "EBS snapshot Block Public Access disabled: block public access for EBS snapshots is 'unblocked' in {$COUNT} region(s), so snapshots can be shared publicly. Enable block-all-sharing (or at least block-new-sharing). Existing public snapshots are reported by EBSSnapshotIsPublic.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "Enable EBS snapshot Block Public Access",
+		"ref": [
+			"[Block public access for EBS snapshots]<https://docs.aws.amazon.com/ebs/latest/userguide/block-public-access-snapshots.html>"
+		],
+		"remediation": "aws ec2 enable-snapshot-block-public-access --state block-all-sharing",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/ebs/latest/userguide/block-public-access-snapshots-work.html"
+	},
+	"elbAccessLogsDisabled": {
+		"category": "S",
+		"^description": "Load balancer access logs disabled: {$COUNT} load balancer(s) do not deliver access logs to Amazon S3. Access logs are needed to investigate security events and troubleshoot traffic.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "Enable load balancer access logs",
+		"ref": [
+			"[ALB access logs]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-access-logs.html>",
+			"[NLB access logs]<https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-access-logs.html>",
+			"[Classic Load Balancer access logs]<https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/access-log-collection.html>"
+		],
+		"remediation": "aws elbv2 modify-load-balancer-attributes --load-balancer-arn {ResourceId} --attributes Key=access_logs.s3.enabled,Value=true Key=access_logs.s3.bucket,Value=<bucket>",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/enable-access-logging.html"
+	},
+	"elbTlsPolicyOutdated": {
+		"category": "S",
+		"^description": "Outdated TLS policy: {$COUNT} load balancer(s) have HTTPS/TLS/SSL listeners whose security policy still allows TLS 1.0, TLS 1.1 or SSLv3. Use a policy that supports only TLS 1.2 and later (e.g. ELBSecurityPolicy-TLS13-1-2-2021-06).",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "H",
+		"needFullTest": 1,
+		"shortDesc": "Load balancer TLS policy allows TLS 1.0/1.1",
+		"ref": [
+			"[ALB security policies]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/describe-ssl-policies.html>",
+			"[NLB security policies]<https://docs.aws.amazon.com/elasticloadbalancing/latest/network/describe-ssl-policies.html>",
+			"[Classic Load Balancer SSL negotiation configurations]<https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-ssl-security-policy.html>"
+		],
+		"remediation": "aws elbv2 modify-listener --listener-arn <listener-arn> --ssl-policy ELBSecurityPolicy-TLS13-1-2-2021-06",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-update-certificates.html"
+	},
+	"ebsRecycleBinMissing": {
+		"category": "S",
+		"^description": "Recycle Bin not protecting backups: in {$COUNT} region(s) there is no Recycle Bin retention rule for EBS snapshots and/or AMIs, so deleted snapshots/AMIs cannot be recovered. Create region-level retention rules and lock them so they cannot be removed by a compromised principal.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "Create locked Recycle Bin rules for snapshots/AMIs",
+		"ref": [
+			"[Recycle Bin]<https://docs.aws.amazon.com/ebs/latest/userguide/recycle-bin.html>",
+			"[Lock Recycle Bin retention rules]<https://docs.aws.amazon.com/ebs/latest/userguide/recycle-bin-working-with-rules.html#recycle-bin-lock-rule>"
+		],
+		"remediation": "aws rbin create-rule --resource-type EBS_SNAPSHOT --retention-period RetentionPeriodValue=7,RetentionPeriodUnit=DAYS --lock-configuration 'UnlockDelay={UnlockDelayValue=7,UnlockDelayUnit=DAYS}'",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/ebs/latest/userguide/recycle-bin-working-with-rules.html"
+	},
+	"ebsSnapshotSharedExternally": {
+		"category": "S",
+		"^description": "EBS snapshot shared outside the organization: {$COUNT} self-owned EBS snapshot(s) grant createVolumePermission to AWS accounts outside your AWS Organization (or the account is not in an organization). Those accounts can copy the data. Remove sharing that is not required.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "Snapshot shared with external accounts",
+		"ref": [
+			"[Share an Amazon EBS snapshot]<https://docs.aws.amazon.com/ebs/latest/userguide/ebs-modifying-snapshot-permissions.html>"
+		],
+		"remediation": "aws ec2 modify-snapshot-attribute --snapshot-id {ResourceId} --attribute createVolumePermission --operation-type remove --user-ids <account-id>",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-modifying-snapshot-permissions.html"
 	}
 }

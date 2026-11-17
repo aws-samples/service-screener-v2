@@ -29,6 +29,10 @@ from services.ec2.drivers.Ec2NACL import Ec2NACL
 from services.ec2.drivers.Ec2Regional import Ec2Regional
 from services.ec2.drivers.Ec2KeyPair import Ec2KeyPair
 from services.ec2.drivers.Ec2SSM import Ec2SSM
+from services.ec2.drivers.Ec2Ami import Ec2Ami
+from services.ec2.drivers.Ec2EbsSnapshotSharing import Ec2EbsSnapshotSharing
+
+import concurrent.futures as cf
 
 class Ec2(Service):
     CHARTSTYPE = {
@@ -49,6 +53,8 @@ class Ec2(Service):
         self.asgClient = ssBoto.client('autoscaling', config=self.bConfig)
         self.wafv2Client = ssBoto.client('wafv2', config=self.bConfig)
         self.cwClient = ssBoto.client('cloudwatch', config=self.bConfig)
+        self.rbinClient = ssBoto.client('rbin', config=self.bConfig)
+        self.orgClient = ssBoto.client('organizations', config=self.bConfig)
         
         self.getOutdateSQLVersion()
         self.getWindowsVersion()
@@ -241,10 +247,11 @@ class Ec2(Service):
         
         arr = results.get('LoadBalancerDescriptions')
         while results.get('NextMarker') is not None:
-            results = self.elbClient.describe_load_balancers(
+            # Classic LB pagination must use the classic (elb) client
+            results = self.elbClassicClient.describe_load_balancers(
                 Marker = results.get('NextMarker')
             )
-            
+
             arr = arr + results.get('LoadBalancerDescriptions')
             
         return arr
@@ -419,6 +426,92 @@ class Ec2(Service):
             return None
         return managedSet
 
+    def _ruleSelected(self, ruleName):
+        """True when no --rules filter is set or ruleName is in it. Used to skip
+        expensive pre-fetches whose only consumer is a single check."""
+        rules = Config.get(self.RULESPREFIX, []) or []
+        return not rules or ruleName.lower() in rules
+
+    def getSelfImages(self):
+        """AMIs owned by this account (paginated; tag filters applied)."""
+        kwargs = {'Owners': ['self']}
+        if self.tags:
+            kwargs['Filters'] = self.tags
+        images = []
+        paginator = self.ec2Client.get_paginator('describe_images')
+        for page in paginator.paginate(**kwargs):
+            images.extend(page.get('Images', []))
+        return images
+
+    def getOrgContext(self):
+        """Organization membership for outside-org sharing checks, cached per scan.
+        inOrg: True / False / None (unknown). accounts: set of member account IDs, or
+        None when not listable (only the management or a delegated admin account can
+        call organizations:ListAccounts)."""
+        cacheKey = 'ec2::orgContext'
+        cached = Config.get(cacheKey, None)
+        if cached is not None:
+            return cached
+
+        ctx = {'inOrg': None, 'accounts': None, 'error': None}
+        try:
+            self.orgClient.describe_organization()
+            ctx['inOrg'] = True
+        except botocore.exceptions.ClientError as e:
+            code = e.response['Error']['Code']
+            if code == 'AWSOrganizationsNotInUseException':
+                ctx['inOrg'] = False
+            else:
+                ctx['error'] = code
+        except Exception as e:
+            ctx['error'] = type(e).__name__
+
+        if ctx['inOrg'] is True:
+            try:
+                accounts = set()
+                paginator = self.orgClient.get_paginator('list_accounts')
+                for page in paginator.paginate():
+                    for acct in page.get('Accounts', []):
+                        accounts.add(acct['Id'])
+                ctx['accounts'] = accounts
+            except botocore.exceptions.ClientError as e:
+                ctx['accountsError'] = e.response['Error']['Code']
+            except Exception as e:
+                ctx['accountsError'] = type(e).__name__
+
+        Config.set(cacheKey, ctx)
+        return ctx
+
+    def getSnapshotSharing(self):
+        """[(snapshot, {'perms': [...]} | {'error': code})] for every self-owned
+        snapshot. describe_snapshot_attribute is one call per snapshot, so the
+        calls are made concurrently (botocore clients are thread-safe)."""
+        kwargs = {'OwnerIds': ['self']}
+        if self.tags:
+            kwargs['Filters'] = self.tags
+        snapshots = []
+        paginator = self.ec2Client.get_paginator('describe_snapshots')
+        for page in paginator.paginate(**kwargs):
+            snapshots.extend(page.get('Snapshots', []))
+
+        def fetch(snap):
+            try:
+                resp = self.ec2Client.describe_snapshot_attribute(
+                    SnapshotId = snap['SnapshotId'],
+                    Attribute = 'createVolumePermission'
+                )
+                return {'perms': resp.get('CreateVolumePermissions', [])}
+            except botocore.exceptions.ClientError as e:
+                return {'error': e.response['Error']['Code']}
+            except Exception as e:
+                return {'error': type(e).__name__}
+
+        if not snapshots:
+            return []
+        with cf.ThreadPoolExecutor(max_workers=8) as executor:
+            perms = list(executor.map(fetch, snapshots))
+        return list(zip(snapshots, perms))
+
     def getChartGenCost(self):
         '''
         Generate Chart by EC2 Instance Type & Region
@@ -547,7 +640,7 @@ class Ec2(Service):
         
         # Regional-level checks (EBS encryption by default, service quotas)
         _pi('EC2::Regional Checks')
-        obj = Ec2Regional(self.ec2Client, self.compOptClient)
+        obj = Ec2Regional(self.ec2Client, self.compOptClient, self.rbinClient)
         obj.run(self.__class__)
         objs['EC2::Regional'] = obj.getInfo()
         
@@ -621,6 +714,40 @@ class Ec2(Service):
 
         obj.run(self.__class__)
         objs["EBS::Snapshots"] = obj.getInfo()
+
+        # EBS snapshot sharing (one describe_snapshot_attribute per snapshot -
+        # only fetched when the check is selected)
+        if self._ruleSelected('EbsSnapshotSharedExternally'):
+            try:
+                sharing = self.getSnapshotSharing()
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                _warn("Unable to list EBS snapshots for sharing check ({})".format(code))
+                objs["EBSSnapshot::unavailable"] = {'results': {'ebsSnapshotSharedExternally': [0, f"Unable to evaluate ({code})"]}, 'info': {}}
+                sharing = []
+            if sharing:
+                orgCtx = self.getOrgContext()
+                selfAccount = (Config.get('stsInfo', {}) or {}).get('Account')
+                for snap, perms in sharing:
+                    _pi('EBS::Snapshot Sharing', snap['SnapshotId'])
+                    obj = Ec2EbsSnapshotSharing(snap, perms, selfAccount, orgCtx)
+                    obj.run(self.__class__)
+                    objs[f"EBSSnapshot::{snap['SnapshotId']}"] = obj.getInfo()
+
+        # Self-owned AMI checks
+        if self._ruleSelected('Ec2AmiPublic'):
+            try:
+                images = self.getSelfImages()
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                _warn("Unable to list self-owned AMIs ({})".format(code))
+                objs["AMI::unavailable"] = {'results': {'ec2AmiPublic': [0, f"Unable to evaluate ({code})"]}, 'info': {}}
+                images = []
+            for image in images:
+                _pi('EC2::AMI', image['ImageId'])
+                obj = Ec2Ami(image)
+                obj.run(self.__class__)
+                objs[f"AMI::{image['ImageId']}"] = obj.getInfo()
         
         
         # ELB checks
