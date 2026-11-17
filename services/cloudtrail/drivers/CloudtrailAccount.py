@@ -306,6 +306,32 @@ class CloudtrailAccount(Evaluator):
             return
         self.results[key] = [-1, 'KMS events excluded by: {}'.format(', '.join(excluding))]
 
+    _ownTrailMemoLock = threading.Lock()
+
+    def _countOwnTrailHere(self, t, region, accountId):
+        """Evaluate each of this account's trails once per scan. Normally that is its
+        home Region. A multi-Region trail whose home Region is not part of the scan
+        (e.g. --regions subset) is counted in the first scanned Region where it is
+        visible, so it is not hidden (false PASS). Memoised per account."""
+        home = t.get('HomeRegion') or region
+        if home == region:
+            return True
+        if not t.get('IsMultiRegionTrail'):
+            return False
+        selected = Config.get('REGIONS_SELECTED', None)
+        if isinstance(selected, (list, tuple, set)) and home in selected:
+            return False  # counted when its home Region is scanned
+        memoKey = 'CloudTrail_ownTrailCounted::' + accountId
+        arn = t.get('TrailARN') or t.get('Name')
+        with CloudtrailAccount._ownTrailMemoLock:
+            seen = Config.get(memoKey, None) or set()
+            if arn in seen:
+                return False
+            seen = set(seen)
+            seen.add(arn)
+            Config.set(memoKey, seen)
+        return True
+
     def _checkTrailBucketSameAccount(self):
         """
         In a multi-account (AWS Organizations) environment, CloudTrail and AWS Config
@@ -347,8 +373,7 @@ class CloudtrailAccount(Evaluator):
         region = self.ctClient.meta.region_name
         for t in trails:
             if accountIdFromArn(t.get('TrailARN')) == accountId:
-                # Evaluate each own trail once: in its home Region.
-                if t.get('HomeRegion', region) == region:
+                if self._countOwnTrailHere(t, region, accountId):
                     own.append(t)
             else:
                 foreign.append(t)

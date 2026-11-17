@@ -157,6 +157,7 @@ def _runSame(c):
     acct = Config.get('stsInfo')['Account']
     Config.set('CloudTrail_ownedBuckets::' + acct, None)
     Config.set('CloudTrail_logArchive::' + acct, None)
+    Config.set('CloudTrail_ownTrailCounted::' + acct, None)
     return d.results['trailBucketSameAccount']
 
 
@@ -207,6 +208,64 @@ def test_log_archive_memo_survives_other_regions():
                    channels=[{'name': 'default', 's3BucketName': 'cfg-local'}], cfg=False)
     d = c.driver()
     d._checkTrailBucketSameAccount()
+    assert d.results['trailBucketSameAccount'][0] == 1
+
+
+def _homeRegionStubs(c, trails, buckets, channels, listBuckets=True):
+    c.st['org'].add_response('describe_organization', {'Organization': {
+        'Id': 'o-abcdefghij', 'MasterAccountId': OTHER}})
+    if listBuckets:  # bucket list is cached per account after the first Region
+        c.st['s3'].add_response('list_buckets', {'Buckets': [{'Name': b} for b in buckets],
+                                                 'Owner': {'ID': 'abc'}})
+    c.st['ct'].add_response('describe_trails', {'trailList': trails}, {'includeShadowTrails': True})
+    c.st['cfg'].add_response('describe_delivery_channels', {'DeliveryChannels': channels}, {})
+
+
+def test_multiregion_trail_home_not_scanned_flagged_once_then_fixed():
+    """Scan of us-east-1 + us-west-2 only; the account's multi-Region trail is homed in
+    eu-west-1 (not scanned) and writes to a bucket this account owns, while Config goes
+    to a central bucket. Previously this was a false PASS; now the trail is counted
+    in the first scanned Region where it is visible, and only there."""
+    Config.set('REGIONS_SELECTED', ['us-east-1', 'us-west-2'])
+    legacy = _trail('legacy', bucket='my-logs', home='eu-west-1')
+    central = [{'name': 'default', 's3BucketName': 'central-config-bucket'}]
+
+    c = Clients()
+    _homeRegionStubs(c, [legacy], ['my-logs'], central)
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    c.done()
+    r = d.results['trailBucketSameAccount']
+    assert r[0] == -1 and 'legacy' in r[1]
+
+    c = Clients()  # second scanned Region: same trail must not be reported again
+    _homeRegionStubs(c, [legacy], ['my-logs'], central, listBuckets=False)
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    c.done()
+    assert d.results['trailBucketSameAccount'][0] == 1
+
+    # FIX: trail now writes to the log archive account's bucket -> re-run passes
+    Config.set('CloudTrail_ownTrailCounted::' + ACCT, None)
+    Config.set('CloudTrail_ownedBuckets::' + ACCT, None)
+    c = Clients()
+    _homeRegionStubs(c, [_trail('legacy', bucket='archive-in-log-account', home='eu-west-1')],
+                     ['my-logs'], central)
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    c.done()
+    assert d.results['trailBucketSameAccount'][0] == 1
+
+
+def test_multiregion_trail_home_scanned_not_counted_elsewhere():
+    """When the home Region is scanned, the trail is evaluated there only."""
+    Config.set('REGIONS_SELECTED', ['us-east-1', 'eu-west-1'])
+    c = Clients()
+    _homeRegionStubs(c, [_trail('legacy', bucket='my-logs', home='eu-west-1')], ['my-logs'],
+                     [{'name': 'default', 's3BucketName': 'central-config-bucket'}])
+    d = c.driver()  # client Region is us-east-1
+    d._checkTrailBucketSameAccount()
+    c.done()
     assert d.results['trailBucketSameAccount'][0] == 1
 
 
