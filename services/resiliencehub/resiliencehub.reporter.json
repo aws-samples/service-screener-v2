@@ -1,0 +1,53 @@
+{
+    "resilienceHubAssessmentStale": {
+        "category": "R",
+        "^description": "{$COUNT} AWS Resilience Hub application(s) have never completed a successful resiliency assessment, or the last successful assessment is more than 30 days old. An assessment measures whether the application's current architecture can meet the RTO and RPO targets of its resiliency policy; once the application, its resources or the policy change, an old assessment no longer says anything about current recoverability. Enable the daily assessment schedule or re-run the assessment after changes.",
+        "shortDesc": "Keep Resilience Hub assessments current",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Running and managing Resilience Hub resiliency assessments]<https://docs.aws.amazon.com/resilience-hub/latest/userguide/resil-assessments.html>",
+            "[Scheduled assessments and drift notification]<https://docs.aws.amazon.com/resilience-hub/latest/userguide/scheduled-assessment.html>"
+        ],
+        "remediation": "aws resiliencehub update-app --app-arn {ResourceArn} --assessment-schedule Daily",
+        "remediation_risk": "low",
+        "remediation_doc": "https://docs.aws.amazon.com/resilience-hub/latest/userguide/resil-assessments.html"
+    },
+    "resilienceHubDriftOrBreach": {
+        "category": "R",
+        "^description": "{$COUNT} AWS Resilience Hub application(s) are in breach of their resiliency policy or have drifted. PolicyBreached means the latest assessment estimated that the application cannot recover within the RTO/RPO targets of its policy for at least one disruption type; drift means the application's resources or resiliency have changed since the last successful assessment. Review the assessment's resiliency recommendations and implement or re-assess.",
+        "shortDesc": "Resolve Resilience Hub policy breaches and drift",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Reviewing Resilience Hub assessment reports]<https://docs.aws.amazon.com/resilience-hub/latest/userguide/review-assessment.html>",
+            "[Scheduled assessments and drift notification]<https://docs.aws.amazon.com/resilience-hub/latest/userguide/scheduled-assessment.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/resilience-hub/latest/userguide/review-assessment.html"
+    },
+    "resilienceHubNoPolicy": {
+        "category": "R",
+        "^description": "{$COUNT} region(s) have AWS Resilience Hub applications with no resiliency policy attached. The resiliency policy records the application's recovery time objective (RTO) and recovery point objective (RPO) for application, infrastructure, Availability Zone and Region disruptions; without one, Resilience Hub has no targets to assess the application against and the recovery objectives are not defined in the tool.",
+        "shortDesc": "Attach a resiliency policy to Resilience Hub apps",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Managing resiliency policies]<https://docs.aws.amazon.com/resilience-hub/latest/userguide/resiliency-policies.html>",
+            "[Resilience Hub concepts (RTO and RPO)]<https://docs.aws.amazon.com/resilience-hub/latest/userguide/concepts-terms.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/resilience-hub/latest/userguide/resiliency-policies.html"
+    }
+}
