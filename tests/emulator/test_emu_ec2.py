@@ -931,3 +931,84 @@ def test_ssm_vpc_endpoints_missing(emu, isolatedVpc):
         if eps:
             ec2.delete_vpc_endpoints(VpcEndpointIds=eps)
         _terminate(ec2, iid)
+
+
+# --------------------------------------------------------------------------- #
+# vpcPeeringFullRoute (review flag)
+# --------------------------------------------------------------------------- #
+def _peerVpcs(ec2, a, b):
+    va = ec2.create_vpc(CidrBlock=a)['Vpc']['VpcId']
+    vb = ec2.create_vpc(CidrBlock=b)['Vpc']['VpcId']
+    return va, vb
+
+
+def test_vpc_peering_full_route(emu):
+    ec2 = emu.client('ec2')
+    va, vb = _peerVpcs(ec2, '10.211.0.0/16', '10.212.0.0/16')
+    pcx = ec2.create_vpc_peering_connection(VpcId=va, PeerVpcId=vb)['VpcPeeringConnection']['VpcPeeringConnectionId']
+    ec2.accept_vpc_peering_connection(VpcPeeringConnectionId=pcx)
+    rt = _mainRouteTable(ec2, va)
+    try:
+        def misconfigure():
+            ec2.create_route(RouteTableId=rt, DestinationCidrBlock='10.212.0.0/16', VpcPeeringConnectionId=pcx)
+
+        def fix():
+            ec2.delete_route(RouteTableId=rt, DestinationCidrBlock='10.212.0.0/16')
+            ec2.create_route(RouteTableId=rt, DestinationCidrBlock='10.212.1.0/24', VpcPeeringConnectionId=pcx)
+
+        before, after = assertFlagFixCycle(emu, 'ec2', 'vpcPeeringFullRoute', f'VPC::{va}', misconfigure, fix)
+        assert list(after.values()) == [1]
+        # the peer side without any peering route passes
+        assert runCheck(emu, 'ec2', 'vpcPeeringFullRoute', f'VPC::{vb}').statuses() == {f'VPC::{vb}': 1}
+    finally:
+        for cidr in ('10.212.0.0/16', '10.212.1.0/24'):
+            try:
+                ec2.delete_route(RouteTableId=rt, DestinationCidrBlock=cidr)
+            except Exception:
+                pass
+        ec2.delete_vpc_peering_connection(VpcPeeringConnectionId=pcx)
+        ec2.delete_vpc(VpcId=va)
+        ec2.delete_vpc(VpcId=vb)
+
+
+def test_vpc_tgw_full_route(emu):
+    """The emulator returns no Association on TGW attachments, so this exercises the
+    fallback (other VPC attachments of the same TGW); the association +
+    search_transit_gateway_routes path is stubbed in tests/test_stub_ec2.py."""
+    ec2 = emu.client('ec2')
+    va, vb = _peerVpcs(ec2, '10.213.0.0/16', '10.214.0.0/16')
+    sa = ec2.create_subnet(VpcId=va, CidrBlock='10.213.1.0/24')['Subnet']['SubnetId']
+    sb = ec2.create_subnet(VpcId=vb, CidrBlock='10.214.1.0/24')['Subnet']['SubnetId']
+    tgw = ec2.create_transit_gateway()['TransitGateway']['TransitGatewayId']
+    atts = [ec2.create_transit_gateway_vpc_attachment(TransitGatewayId=tgw, VpcId=v, SubnetIds=[s])
+            ['TransitGatewayVpcAttachment']['TransitGatewayAttachmentId'] for v, s in ((va, sa), (vb, sb))]
+    rt = _mainRouteTable(ec2, va)
+    try:
+        def misconfigure():
+            ec2.create_route(RouteTableId=rt, DestinationCidrBlock='10.0.0.0/8', TransitGatewayId=tgw)
+
+        def fix():
+            ec2.delete_route(RouteTableId=rt, DestinationCidrBlock='10.0.0.0/8')
+            ec2.create_route(RouteTableId=rt, DestinationCidrBlock='10.214.1.0/24', TransitGatewayId=tgw)
+
+        before, after = assertFlagFixCycle(emu, 'ec2', 'vpcPeeringFullRoute', f'VPC::{va}', misconfigure, fix)
+        assert list(after.values()) == [1]
+    finally:
+        for cidr in ('10.0.0.0/8', '10.214.1.0/24'):
+            try:
+                ec2.delete_route(RouteTableId=rt, DestinationCidrBlock=cidr)
+            except Exception:
+                pass
+        for a in atts:
+            ec2.delete_transit_gateway_vpc_attachment(TransitGatewayAttachmentId=a)
+        for _ in range(30):  # attachments are deleted asynchronously
+            left = [x for x in ec2.describe_transit_gateway_vpc_attachments(TransitGatewayAttachmentIds=atts)
+                    ['TransitGatewayVpcAttachments'] if x.get('State') != 'deleted']
+            if not left:
+                break
+            time.sleep(1)
+        ec2.delete_transit_gateway(TransitGatewayId=tgw)
+        ec2.delete_subnet(SubnetId=sa)
+        ec2.delete_subnet(SubnetId=sb)
+        ec2.delete_vpc(VpcId=va)
+        ec2.delete_vpc(VpcId=vb)

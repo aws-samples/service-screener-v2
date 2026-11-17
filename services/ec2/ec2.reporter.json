@@ -1640,6 +1640,24 @@
 		"remediation_risk": "low",
 		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html"
 	},
+	"vpcPeeringFullRoute": {
+		"category": "S",
+		"^description": "Peering / transit gateway routes open whole peer VPCs: {$COUNT} VPC(s) have a route to an active VPC peering connection or transit gateway whose destination equals or contains an entire CIDR block of a peer VPC, so every subnet of that peer is reachable from the associated subnets. This is a common default and is a review item, not necessarily a misconfiguration: where only some peer subnets need to be reached (for example a shared-services or data tier), route just those subnet CIDRs and keep security groups and network ACLs as the second layer of control.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Peering/TGW routes cover a whole peer VPC CIDR",
+		"ref": [
+			"[Update your route tables for a VPC peering connection]<https://docs.aws.amazon.com/vpc/latest/peering/vpc-peering-routing.html>",
+			"[VPC peering configurations with specific routes]<https://docs.aws.amazon.com/vpc/latest/peering/peering-configurations-partial-access.html>",
+			"[Transit gateway route tables]<https://docs.aws.amazon.com/vpc/latest/tgw/tgw-route-tables.html>"
+		],
+		"remediation": "aws ec2 delete-route --route-table-id <route-table-id> --destination-cidr-block <peer-vpc-cidr> && aws ec2 create-route --route-table-id <route-table-id> --destination-cidr-block <required-peer-subnet-cidr> --vpc-peering-connection-id <pcx-id> (or --transit-gateway-id <tgw-id>)",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/peering/peering-configurations-partial-access.html"
+	},
 	"vpnWeakTunnelCrypto": {
 		"category": "S",
 		"^description": "Site-to-Site VPN tunnels allow weak cryptography: {$COUNT} VPN connection(s) have tunnels that still accept IKEv1, SHA1 integrity or weak Diffie-Hellman groups (2, 5, or only group 14). Empty tunnel option lists mean the AWS defaults, which include these legacy options for compatibility. Restrict each tunnel to IKEv2, SHA2-256 or stronger and DH groups 19-21 (coordinate with the customer gateway configuration first).",

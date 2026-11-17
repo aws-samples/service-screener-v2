@@ -41,6 +41,10 @@ Why not the emulator:
 - naclAllowAllIngress (IPv6 / deny-ordering details) and sgUnrestrictedEgress ENI
   classification (ElastiCache / Redshift / OpenSearch interfaces cannot be created).
 - getNetworkACLs pagination (NextToken) - the emulator returns a single page.
+- vpcPeeringFullRoute (transit gateway path): emulator TGW attachments carry no Association
+  and search_transit_gateway_routes returns no propagated routes, so the association ->
+  route-table -> propagated-CIDR path, RAM-shared TGWs, IPv6 / prefix-list / blackhole
+  routes and AccessDenied responses are stubbed.
 
 Every client is a real botocore client (real API shapes / parameter validation) wrapped by
 botocore.stub.Stubber, pointed at an unroutable loopback endpoint with dummy credentials,
@@ -1206,4 +1210,150 @@ def test_ssm_vpc_endpoints_not_flagged_paths():
     assert _ssmEpResult([], vpc={'VpcId': 'vpc-1', 'OwnerId': OUTSIDER})[0] == 0
     assert _ssmEpResult(None, endpointsError='UnauthorizedOperation') == [0, 'Unable to evaluate (UnauthorizedOperation)']
     assert _ssmEpResult([], instSubnet='subnet-shared')[0] == 0                  # route table not visible
+
+
+# --------------------------------------------------------------------------- #
+# vpcPeeringFullRoute
+# --------------------------------------------------------------------------- #
+from services.ec2.drivers.Ec2Vpc import Ec2Vpc, getPeerRouteContext  # noqa: E402
+
+VPC_A, VPC_B = 'vpc-0aaaaaaaaaaaaaaa1', 'vpc-0bbbbbbbbbbbbbbb2'
+TGW, TGW_RT = 'tgw-0123456789abcdef0', 'tgw-rtb-0123456789abcdef0'
+PCX = 'pcx-0123456789abcdef0'
+
+
+def _vpcA(owner=SELF):
+    return {'VpcId': VPC_A, 'OwnerId': owner, 'CidrBlock': '10.1.0.0/16',
+            'CidrBlockAssociationSet': [{'CidrBlock': '10.1.0.0/16', 'CidrBlockState': {'State': 'associated'}}]}
+
+
+def _rtWith(*routes):
+    base = [{'DestinationCidrBlock': '10.1.0.0/16', 'GatewayId': 'local', 'State': 'active'}]
+    return {'RouteTables': [{'RouteTableId': 'rtb-0123456789abcdef0', 'VpcId': VPC_A,
+                             'Routes': base + list(routes), 'Associations': []}]}
+
+
+def _pcx(status='active'):
+    return {'VpcPeeringConnectionId': PCX, 'Status': {'Code': status},
+            'RequesterVpcInfo': {'VpcId': VPC_A, 'OwnerId': SELF, 'CidrBlock': '10.1.0.0/16'},
+            'AccepterVpcInfo': {'VpcId': VPC_B, 'OwnerId': OUTSIDER, 'CidrBlock': '10.2.0.0/16',
+                                'CidrBlockSet': [{'CidrBlock': '10.2.0.0/16'}, {'CidrBlock': '10.3.0.0/16'}],
+                                'Ipv6CidrBlockSet': [{'Ipv6CidrBlock': '2600:1f18:aa:bb00::/56'}]}}
+
+
+def _tgwAttachments(assoc=True, tgwOwner=SELF):
+    a = {'TransitGatewayAttachmentId': 'tgw-attach-0aaaaaaaaaaaaaaa1', 'TransitGatewayId': TGW,
+         'TransitGatewayOwnerId': tgwOwner, 'ResourceOwnerId': SELF, 'ResourceType': 'vpc',
+         'ResourceId': VPC_A, 'State': 'available'}
+    if assoc:
+        a['Association'] = {'TransitGatewayRouteTableId': TGW_RT, 'State': 'associated'}
+    return {'TransitGatewayAttachments': [a]}
+
+
+def _peerResult(routes, pcx=None, attachments=None, search=None, vpcOwner=SELF, errors=None):
+    """Drive getPeerRouteContext + Ec2Vpc._checkVpcPeeringFullRoute with stubbed responses."""
+    errors = errors or {}
+    ec2 = _client('ec2')
+    with Stubber(ec2) as st:
+        if 'describe_route_tables' in errors:
+            st.add_client_error('describe_route_tables', errors['describe_route_tables'])
+        else:
+            st.add_response('describe_route_tables', _rtWith(*routes), {})
+            if any(r.get('VpcPeeringConnectionId') and r.get('State', 'active') == 'active' for r in routes):
+                if 'describe_vpc_peering_connections' in errors:
+                    st.add_client_error('describe_vpc_peering_connections', errors['describe_vpc_peering_connections'])
+                else:
+                    st.add_response('describe_vpc_peering_connections', {'VpcPeeringConnections': pcx or []}, {})
+            if any(r.get('TransitGatewayId') and r.get('State', 'active') == 'active' for r in routes):
+                st.add_response('describe_transit_gateway_attachments', attachments or _tgwAttachments(),
+                                {'Filters': [{'Name': 'resource-type', 'Values': ['vpc']}]})
+                if search is not None:
+                    if isinstance(search, str):
+                        st.add_client_error('search_transit_gateway_routes', search)
+                    else:
+                        st.add_response('search_transit_gateway_routes',
+                                        {'Routes': search, 'AdditionalRoutesAvailable': False},
+                                        {'TransitGatewayRouteTableId': TGW_RT, 'Filters': ANY})
+        ctx = getPeerRouteContext(ec2, [_vpcA(vpcOwner)])
+        st.assert_no_pending_responses()
+    drv = Ec2Vpc(_vpcA(vpcOwner), [], ec2, selfAccount=SELF, peerRouting=ctx)
+    return _run(drv, '_checkVpcPeeringFullRoute').get('vpcPeeringFullRoute')
+
+
+def _pcxRoute(dest, **kw):
+    r = {'VpcPeeringConnectionId': PCX, 'State': 'active'}
+    r['DestinationIpv6CidrBlock' if ':' in dest else 'DestinationCidrBlock'] = dest
+    r.update(kw)
+    return r
+
+
+def test_peering_full_cidr_flag_fix():
+    bad = _peerResult([_pcxRoute('10.2.0.0/16')], pcx=[_pcx()])
+    assert bad[0] == -1 and '10.2.0.0/16' in bad[1] and VPC_B in bad[1]
+    good = _peerResult([_pcxRoute('10.2.4.0/24'), _pcxRoute('10.3.8.0/22')], pcx=[_pcx()])
+    assert good[0] == 1
+
+
+def test_peering_supernet_second_cidr_and_ipv6_flagged():
+    # a supernet route covering the peer's secondary CIDR, and a whole-IPv6-block route
+    assert _peerResult([_pcxRoute('10.0.0.0/8')], pcx=[_pcx()])[0] == -1
+    assert _peerResult([_pcxRoute('2600:1f18:aa:bb00::/56')], pcx=[_pcx()])[0] == -1
+    assert _peerResult([_pcxRoute('2600:1f18:aa:bb00::/64')], pcx=[_pcx()])[0] == 1
+
+
+def test_peering_inactive_or_blackhole_not_flagged():
+    assert _peerResult([_pcxRoute('10.2.0.0/16')], pcx=[_pcx('deleted')])[0] == 1
+    assert _peerResult([_pcxRoute('10.2.0.0/16', State='blackhole')])[0] == 1
+
+
+def test_peering_access_denied_not_pass():
+    res = _peerResult([_pcxRoute('10.2.0.0/16')], errors={'describe_vpc_peering_connections': 'UnauthorizedOperation'})
+    assert res[0] == 0 and 'UnauthorizedOperation' in res[1]
+    res = _peerResult([], errors={'describe_route_tables': 'UnauthorizedOperation'})
+    assert res == [0, 'Unable to evaluate (UnauthorizedOperation)']
+
+
+def test_prefix_list_destination_not_pass():
+    res = _peerResult([{'DestinationPrefixListId': 'pl-0123456789abcdef0', 'VpcPeeringConnectionId': PCX,
+                        'State': 'active'}], pcx=[_pcx()])
+    assert res[0] == 0
+
+
+def test_shared_vpc_not_evaluable():
+    res = _peerResult([], vpcOwner=OUTSIDER)
+    assert res[0] == 0 and 'shared' in res[1]
+
+
+def _tgwRoute(dest):
+    return {'DestinationCidrBlock': dest, 'TransitGatewayId': TGW, 'State': 'active'}
+
+
+PROPAGATED_B = [{'DestinationCidrBlock': '10.2.0.0/16', 'Type': 'propagated', 'State': 'active',
+                 'TransitGatewayAttachments': [{'ResourceId': VPC_B, 'ResourceType': 'vpc',
+                                                'TransitGatewayAttachmentId': 'tgw-attach-0bbbbbbbbbbbbbbb2'}]},
+                {'DestinationCidrBlock': '10.1.0.0/16', 'Type': 'propagated', 'State': 'active',
+                 'TransitGatewayAttachments': [{'ResourceId': VPC_A, 'ResourceType': 'vpc',
+                                                'TransitGatewayAttachmentId': 'tgw-attach-0aaaaaaaaaaaaaaa1'}]}]
+
+
+def test_tgw_associated_route_table_flag_fix():
+    bad = _peerResult([_tgwRoute('10.0.0.0/8')], search=PROPAGATED_B)
+    assert bad[0] == -1 and VPC_B in bad[1] and VPC_A not in bad[1].split('covers')[1]
+    good = _peerResult([_tgwRoute('10.2.1.0/24')], search=PROPAGATED_B)
+    assert good[0] == 1
+
+
+def test_tgw_default_route_with_isolated_route_table_passes():
+    # the associated TGW route table has no route to another VPC (inspection / egress only)
+    assert _peerResult([_tgwRoute('0.0.0.0/0')], search=[PROPAGATED_B[1]])[0] == 1
+
+
+def test_tgw_search_access_denied_not_pass():
+    res = _peerResult([_tgwRoute('10.0.0.0/8')], search='UnauthorizedOperation')
+    assert res[0] == 0 and 'UnauthorizedOperation' in res[1]
+
+
+def test_tgw_shared_from_other_account_without_association_not_pass():
+    res = _peerResult([_tgwRoute('10.0.0.0/8')], attachments=_tgwAttachments(assoc=False, tgwOwner=OUTSIDER))
+    assert res[0] == 0 and 'shared' in res[1]
 

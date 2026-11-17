@@ -1,3 +1,4 @@
+import ipaddress
 import re
 
 import boto3
@@ -16,13 +17,149 @@ _SSM_SERVICE = re.compile(r'\.(ssm|ssmmessages|ec2messages)$')
 LIVE_INSTANCE_STATES = ('pending', 'running', 'stopping', 'stopped')
 
 
+def _errCode(e):
+    if isinstance(e, botocore.exceptions.ClientError):
+        return e.response.get('Error', {}).get('Code', 'ClientError')
+    return type(e).__name__
+
+
+def _vpcCidrs(info):
+    """IPv4 + IPv6 CIDR strings of a VPC dict or a peering Requester/AccepterVpcInfo."""
+    out = [c.get('CidrBlock') for c in (info.get('CidrBlockSet') or info.get('CidrBlockAssociationSet') or [])
+           if c.get('CidrBlock') and (c.get('CidrBlockState') or {}).get('State', 'associated') == 'associated']
+    if not out and info.get('CidrBlock'):
+        out = [info['CidrBlock']]
+    for c in (info.get('Ipv6CidrBlockSet') or info.get('Ipv6CidrBlockAssociationSet') or []):
+        if c.get('Ipv6CidrBlock') and (c.get('Ipv6CidrBlockState') or {}).get('State', 'associated') == 'associated':
+            out.append(c['Ipv6CidrBlock'])
+    return out
+
+
+def _covers(dest, peer):
+    try:
+        d, p = ipaddress.ip_network(dest, strict=False), ipaddress.ip_network(peer, strict=False)
+    except ValueError:
+        return False
+    return d.version == p.version and d.supernet_of(p)
+
+
+def getPeerRouteContext(ec2Client, vpcs):
+    """Read-only context for vpcPeeringFullRoute:
+      {'error': code|None,
+       'routeTables': {vpcId: [routeTable, ..]},
+       'peerings': {pcxId: VpcPeeringConnection (active only)},
+       'peeringError': code|None,
+       'tgwPeers': {(tgwId, vpcId): {'peers': {peerVpcId: [cidr, ..]}, 'note': str|None, 'error': code|None}}}
+    TGW peers of a VPC are the other VPC attachments that have an active route in the
+    TGW route table associated with the VPC's attachment (search_transit_gateway_routes);
+    when that association is not visible, every other VPC attachment of the same TGW."""
+    ctx = {'error': None, 'routeTables': {}, 'peerings': {}, 'peeringError': None, 'tgwPeers': {}}
+    try:
+        for page in ec2Client.get_paginator('describe_route_tables').paginate():
+            for rt in page.get('RouteTables', []):
+                ctx['routeTables'].setdefault(rt.get('VpcId'), []).append(rt)
+    except Exception as e:
+        ctx['error'] = _errCode(e)
+        return ctx
+
+    def activeRoutes(target):
+        for rts in ctx['routeTables'].values():
+            for rt in rts:
+                for r in rt.get('Routes', []) or []:
+                    if r.get(target) and r.get('State', 'active') == 'active':
+                        yield rt.get('VpcId'), r
+
+    if any(True for _ in activeRoutes('VpcPeeringConnectionId')):
+        try:
+            for page in ec2Client.get_paginator('describe_vpc_peering_connections').paginate():
+                for pcx in page.get('VpcPeeringConnections', []):
+                    if (pcx.get('Status') or {}).get('Code') == 'active':
+                        ctx['peerings'][pcx['VpcPeeringConnectionId']] = pcx
+        except Exception as e:
+            ctx['peeringError'] = _errCode(e)
+
+    tgwVpcPairs = sorted({(r['TransitGatewayId'], v) for v, r in activeRoutes('TransitGatewayId')})
+    if not tgwVpcPairs:
+        return ctx
+    localCidrs = {v['VpcId']: _vpcCidrs(v) for v in vpcs or []}
+    attachments, attachErr = {}, None
+    try:
+        for page in ec2Client.get_paginator('describe_transit_gateway_attachments').paginate(
+                Filters=[{'Name': 'resource-type', 'Values': ['vpc']}]):
+            for a in page.get('TransitGatewayAttachments', []):
+                if a.get('State') in ('available', 'modifying', 'pendingAcceptance', 'pending'):
+                    attachments.setdefault(a.get('TransitGatewayId'), []).append(a)
+    except Exception as e:
+        attachErr = _errCode(e)
+    rtRoutes = {}
+
+    def searchRoutes(tgwRtId):
+        if tgwRtId not in rtRoutes:
+            try:
+                routes, more = [], False
+                for page in ec2Client.get_paginator('search_transit_gateway_routes').paginate(
+                        TransitGatewayRouteTableId=tgwRtId,
+                        Filters=[{'Name': 'state', 'Values': ['active']},
+                                 {'Name': 'attachment.resource-type', 'Values': ['vpc']}]):
+                    routes.extend(page.get('Routes', []))
+                    more = more or bool(page.get('AdditionalRoutesAvailable'))
+                rtRoutes[tgwRtId] = (routes, more, None)
+            except Exception as e:
+                rtRoutes[tgwRtId] = ([], False, _errCode(e))
+        return rtRoutes[tgwRtId]
+
+    for tgwId, vpcId in tgwVpcPairs:
+        entry = {'peers': {}, 'note': None, 'error': None}
+        ctx['tgwPeers'][(tgwId, vpcId)] = entry
+        if attachErr:
+            entry['error'] = attachErr
+            continue
+        tgwAtts = attachments.get(tgwId, [])
+        own = [a for a in tgwAtts if a.get('ResourceId') == vpcId]
+        assocRt = next(((a.get('Association') or {}).get('TransitGatewayRouteTableId') for a in own
+                        if (a.get('Association') or {}).get('State') == 'associated'), None)
+        if assocRt:
+            routes, more, err = searchRoutes(assocRt)
+            if err:
+                entry['error'] = err
+                continue
+            for r in routes:
+                for att in r.get('TransitGatewayAttachments', []) or []:
+                    peer = att.get('ResourceId')
+                    if att.get('ResourceType') != 'vpc' or not peer or peer == vpcId:
+                        continue
+                    cidrs = entry['peers'].setdefault(peer, [])
+                    # propagated routes advertise exactly the attached VPC's CIDRs
+                    if r.get('Type') == 'propagated' and r.get('DestinationCidrBlock'):
+                        cidrs.append(r['DestinationCidrBlock'])
+                    cidrs.extend(c for c in localCidrs.get(peer, []) if c not in cidrs)
+            if more:
+                entry['note'] = f"{assocRt} returned a partial route list (AdditionalRoutesAvailable)"
+        else:
+            for a in tgwAtts:
+                peer = a.get('ResourceId')
+                if peer and peer != vpcId:
+                    entry['peers'].setdefault(peer, list(localCidrs.get(peer, [])))
+            entry['note'] = 'TGW route table association not visible; using all VPC attachments of the TGW'
+            # A TGW shared from another account: attachments of other accounts are not
+            # visible to this account, so absence of a covered peer is not a PASS.
+            entry['partial'] = any(a.get('TransitGatewayOwnerId') and a.get('ResourceOwnerId')
+                                   and a['TransitGatewayOwnerId'] != a['ResourceOwnerId'] for a in own)
+        for peer in [p for p, c in entry['peers'].items() if not c]:
+            entry['peers'].pop(peer)
+            entry['note'] = ((entry['note'] + '; ') if entry['note'] else '') + f"CIDR of {peer} not visible"
+    return ctx
+
+
+
 class Ec2Vpc(Evaluator):
     """routing   - getSubnetRouting() context (None when vpcNoGatewayEndpoints is not run)
        endpoints - all VPC endpoints of the region (unfiltered), or None when unreadable
                    (endpointsError holds the error code)
-       instances - EC2 instance dicts of the region (None when ssmVpcEndpointsMissing is not run)"""
+       instances - EC2 instance dicts of the region (None when ssmVpcEndpointsMissing is not run)
+       peerRouting - getPeerRouteContext() (None when vpcPeeringFullRoute is not run)"""
     def __init__(self, vpc, flowLogs, ec2Client, routing=None, endpoints=None,
-                 endpointsError=None, selfAccount=None, instances=None):
+                 endpointsError=None, selfAccount=None, instances=None, peerRouting=None):
         super().__init__()
         self.vpc = vpc
         self.flowLogs = flowLogs
@@ -32,6 +169,7 @@ class Ec2Vpc(Evaluator):
         self.endpointsError = endpointsError
         self.selfAccount = selfAccount
         self.instances = instances
+        self.peerRouting = peerRouting
 
         self._resourceName = vpc['VpcId']
 
@@ -219,3 +357,79 @@ class Ec2Vpc(Evaluator):
             self.results[key] = [0, f"{where}; interface endpoint(s) {', '.join(dnsOff)} have private DNS disabled - verify a private hosted zone resolves the SSM hostnames{optNote}"]
             return
         self.results[key] = [-1, f"No {', '.join(missing)} interface endpoint for {where}{optNote}"]
+
+
+    def _checkVpcPeeringFullRoute(self):
+        """Review flag (SEC05-BP02): a route in this VPC to an active VPC peering
+        connection or transit gateway whose destination equals or contains a whole
+        CIDR block of a peer VPC makes every subnet of that peer reachable from the
+        associated subnets. Least-privilege network design routes only the peer
+        subnets that are needed. Blackhole routes are ignored; prefix-list
+        destinations are not expanded (reported as not evaluated)."""
+        key = 'vpcPeeringFullRoute'
+        ctx = self.peerRouting
+        if ctx is None:
+            return
+        vpcId = self.vpc['VpcId']
+        owner = self.vpc.get('OwnerId')
+        if self.selfAccount and owner and owner != self.selfAccount:
+            self.results[key] = [0, f"Not evaluable: VPC shared from account {owner} (route tables belong to the VPC owner)"]
+            return
+        if ctx.get('error'):
+            self.results[key] = [0, f"Unable to evaluate ({ctx['error']})"]
+            return
+
+        findings, unknown, notes, checked = [], [], [], 0
+        for rt in ctx.get('routeTables', {}).get(vpcId, []):
+            rtId = rt.get('RouteTableId')
+            for r in rt.get('Routes', []) or []:
+                pcxId, tgwId = r.get('VpcPeeringConnectionId'), r.get('TransitGatewayId')
+                if not (pcxId or tgwId) or r.get('State', 'active') != 'active':
+                    continue
+                dest = r.get('DestinationCidrBlock') or r.get('DestinationIpv6CidrBlock')
+                target = pcxId or tgwId
+                if not dest:
+                    unknown.append(f"{rtId} {r.get('DestinationPrefixListId') or '?'} -> {target} (prefix list)")
+                    continue
+                if pcxId:
+                    if ctx.get('peeringError'):
+                        unknown.append(f"{rtId} {dest} -> {pcxId} ({ctx['peeringError']})")
+                        continue
+                    pcx = ctx.get('peerings', {}).get(pcxId)
+                    if pcx is None:
+                        continue  # peering not active: route carries no traffic
+                    req, acc = pcx.get('RequesterVpcInfo') or {}, pcx.get('AccepterVpcInfo') or {}
+                    peerInfo = acc if req.get('VpcId') == vpcId else req
+                    peers = {peerInfo.get('VpcId') or '?': _vpcCidrs(peerInfo)}
+                else:
+                    entry = ctx.get('tgwPeers', {}).get((tgwId, vpcId)) or {}
+                    if entry.get('error'):
+                        unknown.append(f"{rtId} {dest} -> {tgwId} ({entry['error']})")
+                        continue
+                    if entry.get('note') and entry['note'] not in notes:
+                        notes.append(f"{tgwId}: {entry['note']}")
+                    peers = entry.get('peers') or {}
+                hit = False
+                for peerVpc, cidrs in sorted(peers.items()):
+                    full = [c for c in cidrs if _covers(dest, c)]
+                    if full:
+                        hit = True
+                        findings.append(f"{rtId} {dest} -> {target} covers {peerVpc} {', '.join(full)}")
+                if not hit and tgwId and entry.get('partial'):
+                    unknown.append(f"{rtId} {dest} -> {tgwId} (TGW shared from another account; peer VPCs not visible)")
+                    continue
+                checked += 1
+
+        noteTxt = (' [' + '; '.join(notes) + ']') if notes else ''
+        if findings:
+            shown = '; '.join(findings[:5]) + (f" (+{len(findings) - 5} more)" if len(findings) > 5 else '')
+            self.results[key] = [-1, f"{len(findings)} route(s) open a whole peer VPC CIDR: {shown}{noteTxt}"]
+            return
+        if unknown:
+            shown = '; '.join(unknown[:5]) + (f" (+{len(unknown) - 5} more)" if len(unknown) > 5 else '')
+            self.results[key] = [0, f"Unable to evaluate {len(unknown)} route(s): {shown}{noteTxt}"]
+            return
+        if not checked:
+            self.results[key] = [1, 'No active VPC peering or transit gateway routes']
+            return
+        self.results[key] = [1, f"{checked} peering/TGW route(s) limited to parts of the peer CIDRs{noteTxt}"]

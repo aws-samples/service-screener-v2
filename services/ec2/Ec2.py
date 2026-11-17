@@ -24,7 +24,7 @@ from services.ec2.drivers.Ec2ElbCommon import Ec2ElbCommon
 from services.ec2.drivers.Ec2ElbClassic import Ec2ElbClassic
 from services.ec2.drivers.Ec2AutoScaling import Ec2AutoScaling
 from services.ec2.drivers.Ec2EbsSnapshot import Ec2EbsSnapshot
-from services.ec2.drivers.Ec2Vpc import Ec2Vpc
+from services.ec2.drivers.Ec2Vpc import Ec2Vpc, getPeerRouteContext
 from services.ec2.drivers.Ec2NACL import Ec2NACL
 from services.ec2.drivers.Ec2Regional import Ec2Regional
 from services.ec2.drivers.Ec2KeyPair import Ec2KeyPair
@@ -1060,10 +1060,13 @@ class Ec2(Service):
             vpcRouting = getSubnetRouting(self.ec2Client)
             allEndpoints, allEndpointsErr = self.getAllVpcEndpoints()
         vpcInstances = list(instancesById.values()) if self._ruleSelected('ssmVpcEndpointsMissing') else None
+        peerRouting = None
+        if vpcs and self._ruleSelected('vpcPeeringFullRoute'):
+            peerRouting = getPeerRouteContext(self.ec2Client, vpcs)
         for vpc in vpcs:
             _pi('VPC::Virtual Private Cloud', vpc['VpcId'])
             obj = Ec2Vpc(vpc, flowLogs, self.ec2Client, vpcRouting, allEndpoints, allEndpointsErr, selfAccount,
-                         vpcInstances)
+                         vpcInstances, peerRouting)
             obj.run(self.__class__)
             objs[f"VPC::{vpc['VpcId']}"] = obj.getInfo()
             
