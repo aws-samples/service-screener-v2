@@ -19,6 +19,12 @@ class Securityhub(Service):
       - list_finding_aggregators           (cross-region aggregation)
       - list_enabled_products_for_import   (integrations)
 
+    Called lazily by the driver, only when the matching check runs:
+      - describe_security_hub_v2           (securityHubV2NotEnabled)
+      - describe_standards_controls        (shubControlsDisabledNoReason)
+      - list_automation_rules, describe_action_targets, ssm.list_documents,
+        events.list_rules                  (securityHubNoAutomationRules)
+
     Deliberately NOT called: get_findings. It paginates over every finding in the
     account (verified: NextToken on page one), which is exactly the unbounded
     enumeration SPEC_04's review flagged as blocking. The finding-count check is
@@ -43,6 +49,10 @@ class Securityhub(Service):
         super().__init__(region)
         ssBoto = self.ssBoto
         self.shClient = ssBoto.client('securityhub', config=self.bConfig)
+        ## Read-only clients used only by securityHubNoAutomationRules to
+        ## recognise response automation that lives outside Security Hub.
+        self.ssmClient = ssBoto.client('ssm', config=self.bConfig)
+        self.eventsClient = ssBoto.client('events', config=self.bConfig)
 
     # ------------------------------------------------------------------ #
     # Discovery
@@ -53,6 +63,7 @@ class Securityhub(Service):
             '_enabled': False,
             '_hub': None,
             '_standards': [],
+            '_standardsError': None,
             '_aggregators': [],
             '_products': [],
             '_unprocessedFindings': None,
@@ -75,7 +86,8 @@ class Securityhub(Service):
             print(f"Security Hub not available in region {self.region}: {e}")
             return None
 
-        detail['_standards'] = self._getEnabledStandards()
+        detail['_standards'], detail['_standardsError'] = \
+            self._getEnabledStandards()
         detail['_aggregators'] = self._listFindingAggregators()
         detail['_products'] = self._listProducts()
         detail['_unprocessedFindings'], detail['_findingsCapped'] = \
@@ -85,6 +97,9 @@ class Securityhub(Service):
         return detail
 
     def _getEnabledStandards(self):
+        """Returns (subscriptions, errorCode). errorCode is None on success so
+        standard-specific checks can report 'Unable to evaluate' instead of a
+        false FAIL when the list could not be read."""
         standards = []
         try:
             paginator = self.shClient.get_paginator('get_enabled_standards')
@@ -92,13 +107,8 @@ class Securityhub(Service):
                 standards += page.get('StandardsSubscriptions', []) or []
         except botocore.exceptions.ClientError as e:
             self._logClientError('get_enabled_standards', e)
-        except botocore.exceptions.OperationNotPageableError:
-            try:
-                standards = self.shClient.get_enabled_standards().get(
-                    'StandardsSubscriptions', []) or []
-            except botocore.exceptions.ClientError as e:
-                self._logClientError('get_enabled_standards', e)
-        return standards
+            return [], e.response.get('Error', {}).get('Code', 'Unknown')
+        return standards, None
 
     def _listFindingAggregators(self):
         aggregators = []
@@ -168,7 +178,9 @@ class Securityhub(Service):
         if detail is None:
             return objs
         try:
-            obj = SecurityhubCommon(detail, self.shClient, self.CIS_ARN_FRAGMENT)
+            obj = SecurityhubCommon(detail, self.shClient, self.CIS_ARN_FRAGMENT,
+                                    ssmClient=self.ssmClient,
+                                    eventsClient=self.eventsClient)
             obj.run(self.__class__)
             objs['SecurityHub::Account'] = obj.getInfo()
             del obj
