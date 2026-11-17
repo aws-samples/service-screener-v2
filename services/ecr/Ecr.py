@@ -23,6 +23,8 @@ class Ecr(Service):
       - registry scanning config     (get_registry_scanning_configuration)
       - replication configuration    (describe_registry)
       - pull-through cache rules     (describe_pull_through_cache_rules)
+      - managed signing config       (get_signing_configuration)
+      - active Notation-OCI AWS Signer profiles (signer.list_signing_profiles)
 
     Registry-level findings are emitted only on the first repository we
     discover in the region — subsequent repos report INFO deferring to it.
@@ -47,6 +49,8 @@ class Ecr(Service):
         self._registryScanningConfig = None
         self._replicationRules = None
         self._pullThroughCacheRules = None
+        self._signingConfig = None
+        self._notationProfiles = None
         self._registryDataLoaded = False
 
     # ------------------------------------------------------------------ #
@@ -84,6 +88,8 @@ class Ecr(Service):
                 r['_registryScanningConfig'] = self._registryScanningConfig
                 r['_replicationRules'] = self._replicationRules
                 r['_pullThroughCacheRules'] = self._pullThroughCacheRules
+                r['_signingConfig'] = self._signingConfig
+                r['_notationProfiles'] = self._notationProfiles
                 r['_reportRegistryChecks'] = (i == 0)
                 r['_ownAccount'] = self._ownAccount()
 
@@ -205,6 +211,49 @@ class Ecr(Service):
         except botocore.exceptions.ClientError as e:
             self._logClientError('describe_pull_through_cache_rules', e)
             self._pullThroughCacheRules = []
+
+        self._signingConfig = self._getSigningConfiguration()
+        self._notationProfiles = self._listNotationSigningProfiles()
+
+    def _getSigningConfiguration(self):
+        """Return the ECR managed signing configuration:
+            - {'rules': [...]}             when configured
+            - {'_missing': True}            when none is set
+            - {'_unreadable': <error code>} when it could not be read
+        """
+        try:
+            resp = self.ecrClient.get_signing_configuration()
+            cfg = resp.get('signingConfiguration') or {}
+            return {'rules': cfg.get('rules') or []}
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', '') or 'Unknown'
+            if code == 'SigningConfigurationNotFoundException':
+                return {'_missing': True}
+            self._logClientError('get_signing_configuration', e)
+            return {'_unreadable': code}
+        except botocore.exceptions.EndpointConnectionError:
+            return {'_unreadable': 'EndpointConnectionError'}
+
+    def _listNotationSigningProfiles(self):
+        """Return the list of ACTIVE AWS Signer profiles for the Notation
+        (OCI container image) platform, or {'_unreadable': <code>} on error."""
+        profiles = []
+        try:
+            signerClient = self.ssBoto.client('signer', config=self.bConfig)
+            paginator = signerClient.get_paginator('list_signing_profiles')
+            for page in paginator.paginate(statuses=['Active']):
+                for prof in page.get('profiles', []) or []:
+                    platformId = prof.get('platformId') or ''
+                    status = prof.get('status') or 'Active'
+                    if platformId.startswith('Notation-OCI') and status == 'Active':
+                        profiles.append(prof)
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', '') or 'Unknown'
+            self._logClientError('signer.list_signing_profiles', e)
+            return {'_unreadable': code}
+        except botocore.exceptions.EndpointConnectionError:
+            return {'_unreadable': 'EndpointConnectionError'}
+        return profiles
 
     def _ownAccount(self):
         info = Config.get('stsInfo', {})
