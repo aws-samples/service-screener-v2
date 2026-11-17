@@ -107,10 +107,10 @@ def test_no_custom_key_stores_records_nothing():
 
 
 def test_org_condition_helper():
-    assert orgConditionScopes({'StringEquals': {'aws:PrincipalOrgID': 'o-abc123'}})
-    assert orgConditionScopes({'ForAnyValue:StringLike': {'aws:PrincipalOrgPaths': ['o-abc/r-1/ou-1/*']}})
-    assert not orgConditionScopes({'StringNotEquals': {'aws:PrincipalOrgID': 'o-abc123'}})
-    assert not orgConditionScopes({'StringEqualsIfExists': {'aws:PrincipalOrgID': 'o-abc123'}})
+    assert orgConditionScopes({'StringEquals': {'aws:PrincipalOrgID': 'o-abc123defg'}})
+    assert orgConditionScopes({'ForAnyValue:StringLike': {'aws:PrincipalOrgPaths': ['o-abc123defg/r-1/ou-1/*']}})
+    assert not orgConditionScopes({'StringNotEquals': {'aws:PrincipalOrgID': 'o-abc123defg'}})
+    assert not orgConditionScopes({'StringEqualsIfExists': {'aws:PrincipalOrgID': 'o-abc123defg'}})
     assert not orgConditionScopes({'StringLike': {'aws:PrincipalOrgID': '*'}})
     assert not orgConditionScopes({'StringEquals': {'aws:PrincipalAccount': '111122223333'}})
     assert principalAccountId('111122223333') == '111122223333'
