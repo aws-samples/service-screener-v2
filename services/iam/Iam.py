@@ -190,6 +190,10 @@ class Iam(Service):
         fields = row[0].split(',')
         del row[0]
         for temp in row:
+            # Skip blank lines (the report may end with a newline); a blank
+            # row would otherwise become a user record with no fields.
+            if not temp.strip():
+                continue
             arr.append(dict(zip(fields, temp.split(','))))
         
         if not self.tags:

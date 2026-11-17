@@ -32,7 +32,7 @@ class RdsSecretsManager(Evaluator):
                 'AttributeValue': self.secret['ARN']
             },
             {
-                'AttributeKey': 'Eventname',
+                'AttributeKey': 'EventName',
                 'AttributeValue': 'GetSecretValue'
             }
         ]

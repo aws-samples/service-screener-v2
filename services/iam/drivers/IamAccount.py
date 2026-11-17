@@ -156,7 +156,7 @@ class IamAccount(IamCommon):
                 'AttributeValue': 'root'
             },
             {
-                'AttributeKey': 'Eventname',
+                'AttributeKey': 'EventName',
                 'AttributeValue': 'ConsoleLogin'
             }
         ]

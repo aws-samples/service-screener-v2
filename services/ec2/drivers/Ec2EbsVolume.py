@@ -156,7 +156,7 @@ class Ec2EbsVolume(Evaluator):
             else:
                 return
         else:
-            self.results['EBSSnapshot'] = [-1,self.ebsVolumeData['SnapshotId']] 
+            self.results['EBSSnapshot'] = [-1, self.ebsVolumeData.get('SnapshotId') or self.ebsVolumeData.get('VolumeId', '')] 
         
         return
     
