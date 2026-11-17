@@ -228,19 +228,21 @@
 	},
 	"eksNoIRSAConfigured": {
 		"category": "S",
-		"^description": "EKS IRSA: {$COUNT} of your clusters do not have OIDC provider configured for IAM Roles for Service Accounts. Use IRSA for pod-level IAM permissions instead of node-level roles.",
-		"shortDesc": "IRSA not configured",
+		"^description": "EKS workload identity: {$COUNT} of your clusters have no pod-level workload identity configured - the cluster OIDC issuer is not registered as an IAM OIDC provider (IRSA) and EKS Pod Identity is not in use. Use EKS Pod Identity or IRSA to give pods scoped IAM permissions instead of relying on the node IAM role.",
+		"shortDesc": "No IRSA or EKS Pod Identity configured",
 		"criticality": "H",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[IAM roles for service accounts]<https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html>"
+			"[IAM roles for service accounts]<https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html>",
+			"[Create an IAM OIDC provider for your cluster]<https://docs.aws.amazon.com/eks/latest/userguide/enable-iam-roles-for-service-accounts.html>",
+			"[EKS Pod Identity]<https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html"
+		"remediation_doc": "https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html"
 	},
 	"eksNoAutoscaling": {
 		"category": "C",
@@ -324,5 +326,23 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/eks/latest/userguide/eks-using-tags.html"
+	},
+	"eksNodeGroupAmiOutdated": {
+		"category": "S",
+		"^description": "EKS node group AMI outdated: {$COUNT} of your clusters have managed node groups running an EKS-optimized AMI release older than the latest release for their Kubernetes version. Update the node group AMI release version to receive the latest security patches.",
+		"shortDesc": "Node group AMI release outdated",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Update a managed node group]<https://docs.aws.amazon.com/eks/latest/userguide/update-managed-node-group.html>",
+			"[Retrieve recommended Amazon Linux AMI IDs]<https://docs.aws.amazon.com/eks/latest/userguide/retrieve-ami-id.html>",
+			"[Retrieve recommended Bottlerocket AMI IDs]<https://docs.aws.amazon.com/eks/latest/userguide/retrieve-ami-id-bottlerocket.html>"
+		],
+		"remediation": "aws eks update-nodegroup-version --cluster-name {ResourceName} --nodegroup-name <nodegroup-name>",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/eks/latest/userguide/update-managed-node-group.html"
 	}
 }
