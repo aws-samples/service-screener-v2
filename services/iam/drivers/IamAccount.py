@@ -8,6 +8,7 @@ from dateutil.tz import tzlocal
 from utils.Config import Config
 from utils.Tools import _warn, _pr
 from .IamCommon import IamCommon
+from .IamOrgData import OrgData, SCP, RCP, TAG, FULL_AWS_ACCESS_ID, statements, denyCoversAction, conditionKeys, scpGuardrails, SCP_GUARDRAILS
  
 class IamAccount(IamCommon):
     PASSWORD_POLICY_MIN_SCORE = 4
@@ -51,13 +52,16 @@ class IamAccount(IamCommon):
         self._policyDocumentsCache = dict(self._policyDocumentMap)
 
         # Check if AWS Organization is enabled
+        orgResp, orgErr = None, None
         try:
-            resp = self.orgClient.describe_organization()
+            orgResp = self.orgClient.describe_organization()
             self.organizationIsEnabled = True
         except botocore.exceptions.ClientError as e:
-            ecode = e.response['Error']['Code'] 
+            orgErr = e.response['Error']['Code']
 
-        
+        callerAccountId = (Config.get('stsInfo', {}) or {}).get('Account')
+        self.orgData = OrgData(self.orgClient, callerAccountId, orgResp, orgErr)
+
         self.init()
     
     def _getCustomerPolicies(self):
@@ -348,26 +352,6 @@ class IamAccount(IamCommon):
         else:
             return
 
-    def _checkSCPEnabled(self):
-        # Run this check only when AWS Organization is activated in the account
-        if self.organizationIsEnabled == True:
-            try:
-                # Get organization root ID
-                roots = self.orgClient.list_roots()
-                root_id = roots['Roots'][0]['Id']
-                
-                policies = self.orgClient.list_policies_for_target(
-                    TargetId=root_id,
-                    Filter='SERVICE_CONTROL_POLICY'
-                )
-                
-                # If no SCPs are attached, add to results
-                if len(policies.get('Policies', [])) == 0:
-                    self.results['SCPEnabled'] = [-1, '']
-                                    
-            except botocore.exceptions.ClientError as e:
-                ecode = e.response['Error']['Code']
-    
     def _checkAWSBackupPlans(self):
         """Check if AWS Backup plans are configured (FTR BAR-001.1)"""
         try:
@@ -732,94 +716,386 @@ class IamAccount(IamCommon):
         except botocore.exceptions.ClientError as e:
             print(f'Error checking permissions boundaries: {e.response["Error"]["Code"]}')
 
-    def _checkScpBestPractices(self):
-        """
-        Validate Service Control Policy (SCP) content against best practices.
-        
-        This check analyzes SCPs in AWS Organizations to ensure they follow security
-        best practices including:
-        - Denying root user actions to prevent use of root credentials
-        - Restricting access to specific AWS regions
-        - Preventing privilege escalation through IAM actions
-        
-        Only runs when AWS Organizations is enabled. If Organizations is not enabled,
-        the check is skipped.
-        
-        Validates Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 4.1, 4.2, 4.3, 5.1
-        """
-        # Skip check if AWS Organizations is not enabled
-        if not self.organizationIsEnabled:
+    # ------------------------------------------------------------------ #
+    # AWS Organizations checks (WAFS2027). All reads go through self.orgData
+    # (cached, thread-safe). Org-level reads that fail from a member account
+    # record [0, 'Not evaluable from member account'] - never a silent PASS.
+    # ------------------------------------------------------------------ #
+    MAX_DETAIL_LINES = 50
+    WORKLOAD_EXEMPT_LAMBDA_PREFIXES = (
+        'aws-controltower-', 'awscontroltower', 'awsaccelerator', 'aws-accelerator',
+        'aws-quicksetup', 'customizations-for-aws-control-tower',
+    )
+    RCP_PERIMETER_KEYS = {
+        'aws:principalorgid', 'aws:principalorgpaths', 'aws:resourceorgid', 'aws:resourceorgpaths',
+        'aws:sourceorgid', 'aws:sourceorgpaths',
+    }
+    BACKUP_TAMPER_ACTIONS = [
+        'backup:DeleteBackupVault', 'backup:DeleteBackupVaultAccessPolicy',
+        'backup:DeleteBackupVaultLockConfiguration', 'backup:DeleteRecoveryPoint',
+        'backup:PutBackupVaultAccessPolicy', 'backup:UpdateRecoveryPointLifecycle',
+    ]
+    CLASSIFICATION_KEYWORDS = ('classif', 'sensitiv', 'confidential')
+
+    def _detail(self, lines):
+        if len(lines) > self.MAX_DETAIL_LINES:
+            extra = len(lines) - self.MAX_DETAIL_LINES
+            lines = lines[:self.MAX_DETAIL_LINES] + ['... and {} more'.format(extra)]
+        return '<br>'.join(lines)
+
+    def _orgPrecondition(self, key, requireAllFeatures=False, featureMsg=None):
+        """Record [0, ...] for `key` and return False when the org check cannot run."""
+        pre = self.orgData.preconditionResult()
+        if pre:
+            self.results[key] = pre
+            return False
+        if requireAllFeatures:
+            org, _ = self.orgData.organization()
+            if org.get('FeatureSet') != 'ALL':
+                self.results[key] = [0, featureMsg or 'Not applicable: organization does not use All Features (see orgNotAllFeatures)']
+                return False
+        return True
+
+    def _customerAttached(self, pols):
+        return [p for p in pols if not p['AwsManaged'] and p['Id'] != FULL_AWS_ACCESS_ID and p['Targets']]
+
+    @staticmethod
+    def _targetLabel(t):
+        return '{} {} ({})'.format(t.get('Type', ''), t.get('Name', ''), t.get('TargetId', '')).strip()
+
+    def _policyGate(self, key, policyType, disabledResult):
+        """Common gate for policy-type checks. Returns the policy list or None
+        (after recording a result)."""
+        status, err = self.orgData.policyTypeStatus(policyType)
+        if err:
+            self.results[key] = self.orgData.notEvaluable(err)
+            return None
+        if status != 'ENABLED':
+            self.results[key] = disabledResult
+            return None
+        pols, err = self.orgData.policies(policyType)
+        if err:
+            self.results[key] = self.orgData.notEvaluable(err)
+            return None
+        return pols
+
+    def _checkOrgNotAllFeatures(self):
+        key = 'orgNotAllFeatures'
+        if not self._orgPrecondition(key):
             return
-        
+        org, _ = self.orgData.organization()
+        fs = org.get('FeatureSet')
+        if fs != 'ALL':
+            self.results[key] = [-1, 'Organization FeatureSet is {}'.format(fs)]
+        else:
+            self.results[key] = [1, 'Organization FeatureSet is ALL']
+
+    def _checkOrgMgmtAccountHostsWorkloads(self):
+        key = 'orgMgmtAccountHostsWorkloads'
+        if not self._orgPrecondition(key):
+            return
+        if not self.orgData.isManagementAccount():
+            self.results[key] = [1, 'This account is not the organization management account']
+            return
+
+        counts = {'EC2 instances': 0, 'Lambda functions': 0, 'RDS DB instances': 0, 'EKS clusters': 0}
+        errors = []
+        regions = [r for r in (Config.get('REGIONS_SELECTED', []) or []) if r != 'GLOBAL']
+        if not regions:
+            self.results[key] = [0, 'Unable to evaluate (no regions selected)']
+            return
+        probes = [
+            ('EC2 instances', 'ec2', 'describe_instances', 'Reservations',
+             {'Filters': [{'Name': 'instance-state-name', 'Values': ['pending', 'running', 'stopping', 'stopped']}]}),
+            ('Lambda functions', 'lambda', 'list_functions', 'Functions', {}),
+            ('RDS DB instances', 'rds', 'describe_db_instances', 'DBInstances', {}),
+            ('EKS clusters', 'eks', 'list_clusters', 'clusters', {}),
+        ]
+        for region in regions:
+            conf = bConfig(region_name=region)
+            for label, svc, op, rkey, kw in probes:
+                try:
+                    client = self.ssBoto.client(svc, config=conf)
+                    for page in client.get_paginator(op).paginate(**kw):
+                        items = page.get(rkey, [])
+                        if svc == 'ec2':
+                            counts[label] += sum(len(r.get('Instances', [])) for r in items)
+                        elif svc == 'lambda':
+                            # Control Tower / Landing Zone Accelerator / Quick Setup
+                            # deploy their own functions into the management account.
+                            counts[label] += len([f for f in items if not str(f.get('FunctionName', '')).lower()
+                                                  .startswith(self.WORKLOAD_EXEMPT_LAMBDA_PREFIXES)])
+                        else:
+                            counts[label] += len(items)
+                except botocore.exceptions.ClientError as e:
+                    errors.append('{} {}: {}'.format(region, label, e.response['Error']['Code']))
+
+        found = ['{}: {}'.format(k, v) for k, v in counts.items() if v > 0]
+        if found:
+            self.results[key] = [-1, 'Management account hosts workload resources in scanned regions ({}):<br>{}'.format(
+                ', '.join(regions), '<br>'.join(found))]
+        elif errors:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(self._detail(errors))]
+        else:
+            self.results[key] = [1, 'No EC2/Lambda/RDS/EKS workloads found in scanned regions ({})'.format(', '.join(regions))]
+
+    def _checkSCPEnabled(self):
+        key = 'SCPEnabled'
+        if not self._orgPrecondition(key, True, 'Not applicable: SCPs require All Features (see orgNotAllFeatures)'):
+            return
+        pols = self._policyGate(key, SCP, [-1, 'Service control policy type is not enabled on the organization root'])
+        if pols is None:
+            return
+        attached = self._customerAttached(pols)
+        if not attached:
+            self.results[key] = [-1, 'No SCP other than FullAWSAccess is attached to the root, any OU or any account']
+        else:
+            self.results[key] = [1, '{} customer SCP(s) attached: {}'.format(
+                len(attached), ', '.join(p['Name'] for p in attached[:20]))]
+
+    def _checkScpBestPractices(self):
+        """Evaluate the EFFECTIVE SCP set (directly attached + inherited from
+        every parent) of each OU and active member account for best-practice
+        guardrails: root user denial, region restriction and privilege
+        escalation prevention. A guardrail provided by any SCP in the path
+        counts, so guardrails split across several SCPs are not flagged.
+        The management account is skipped (SCPs never apply to it)."""
+        key = 'scpBestPractices'
+        if not self._orgPrecondition(key, True, 'Not applicable: SCPs require All Features (see orgNotAllFeatures)'):
+            return
+        pols = self._policyGate(key, SCP, [0, 'Not applicable: SCPs are not enabled (see SCPEnabled)'])
+        if pols is None:
+            return
+        if not self._customerAttached(pols):
+            self.results[key] = [0, 'Not applicable: no customer SCP is attached (see SCPEnabled)']
+            return
+        tree, err = self.orgData.tree()
+        if err:
+            self.results[key] = self.orgData.notEvaluable(err)
+            return
+
+        byTarget = {}
+        for p in pols:
+            for t in p['Targets']:
+                byTarget.setdefault(t.get('TargetId'), []).append(p)
+
+        org, _ = self.orgData.organization()
+        mgmtId = org.get('MasterAccountId')
+        nodes = tree['nodes']
+        evaluated, missing, unknown = 0, [], []
+        for nid, node in nodes.items():
+            if node['Type'] == 'ROOT':
+                continue
+            if node['Type'] == 'ACCOUNT' and (nid == mgmtId or (node.get('State') or 'ACTIVE') != 'ACTIVE'):
+                continue
+            evaluated += 1
+            have, unparsed, cur, seen = set(), False, nid, set()
+            while cur and cur not in seen:
+                seen.add(cur)
+                for p in byTarget.get(cur, []):
+                    if p['AwsManaged'] or p['Id'] == FULL_AWS_ACCESS_ID:
+                        continue
+                    if p['Content'] is None:
+                        unparsed = True
+                    have |= scpGuardrails(p['Content'])
+                cur = nodes.get(cur, {}).get('Parent')
+            lacking = [SCP_GUARDRAILS[g] for g in SCP_GUARDRAILS if g not in have]
+            if lacking:
+                label = '{} {} ({}): missing {}'.format(
+                    'OU' if node['Type'] == 'ORGANIZATIONAL_UNIT' else 'Account', node['Name'], nid, ', '.join(lacking))
+                (unknown if unparsed else missing).append(label)
+
+        if missing:
+            self.results[key] = [-1, '{} of {} OUs/member accounts lack effective SCP guardrails:<br>{}'.format(
+                len(missing), evaluated, self._detail(missing))]
+        elif unknown:
+            self.results[key] = [0, 'Unable to evaluate (unparseable SCP content):<br>{}'.format(self._detail(unknown))]
+        elif evaluated == 0:
+            self.results[key] = [0, 'No OUs or member accounts to evaluate (SCPs do not apply to the management account)']
+        else:
+            self.results[key] = [1, 'All {} OUs/member accounts have effective root-denial, region and privilege-escalation guardrails'.format(evaluated)]
+
+    def _checkOrgOuStructureFlat(self):
+        key = 'orgOuStructureFlat'
+        if not self._orgPrecondition(key):
+            return
+        roots, err = self.orgData.roots()
+        if err or not roots:
+            self.results[key] = self.orgData.notEvaluable(err or 'NoRoot')
+            return
+        rootId = roots[0]['Id']
         try:
-            from utils.Policy import Policy
-            
-            scps_with_issues = []
-            
-            # List all Service Control Policies
-            try:
-                paginator = self.orgClient.get_paginator('list_policies')
-                
-                for page in paginator.paginate(Filter='SERVICE_CONTROL_POLICY'):
-                    for policy in page.get('Policies', []):
-                        policy_name = policy['Name']
-                        policy_id = policy['Id']
-                        
-                        # Skip AWS managed default policies
-                        if policy.get('AwsManaged', False):
-                            continue
-                        
-                        try:
-                            # Get the policy document
-                            policy_detail = self.orgClient.describe_policy(PolicyId=policy_id)
-                            policy_content = policy_detail['Policy']['Content']
-                            
-                            # Parse the policy document (it's a JSON string)
-                            import json
-                            policy_document = json.loads(policy_content)
-                            
-                            # Create Policy object and validate
-                            policy_obj = Policy(policy_document)
-                            validation_results = policy_obj.validateScpBestPractices()
-                            
-                            # Check which best practices are missing
-                            missing_practices = []
-                            if not validation_results['denyRoot']:
-                                missing_practices.append('Missing root user denial')
-                            if not validation_results['restrictRegions']:
-                                missing_practices.append('Missing region restrictions')
-                            if not validation_results['preventPrivEscalation']:
-                                missing_practices.append('Missing privilege escalation prevention')
-                            
-                            # If any best practices are missing, add to issues list
-                            if missing_practices:
-                                issue_detail = f"{policy_name}: {', '.join(missing_practices)}"
-                                scps_with_issues.append(issue_detail)
-                        
-                        except botocore.exceptions.ClientError as e:
-                            ecode = e.response['Error']['Code']
-                            print(f'Error getting policy details for {policy_name}: {ecode}')
-                            continue
-                        except json.JSONDecodeError as e:
-                            print(f'Error parsing policy document for {policy_name}: {e}')
-                            continue
-            
-            except botocore.exceptions.ClientError as e:
-                ecode = e.response['Error']['Code']
-                if ecode == 'AccessDeniedException':
-                    print(f'Access denied when listing SCPs: {ecode}')
-                    return
-                else:
-                    print(f'Error listing SCPs: {ecode}')
-                    return
-            
-            # Store results if any SCPs have issues
-            if scps_with_issues:
-                self.results['scpBestPractices'] = [
-                    len(scps_with_issues),
-                    '<br>'.join(scps_with_issues)
-                ]
-        
+            ous = []
+            for page in self.orgClient.get_paginator('list_organizational_units_for_parent').paginate(ParentId=rootId):
+                ous.extend(page.get('OrganizationalUnits', []))
         except botocore.exceptions.ClientError as e:
-            ecode = e.response['Error']['Code']
-            print(f'Error checking SCP best practices: {ecode}')
+            self.results[key] = self.orgData.notEvaluable(e.response['Error']['Code'])
+            return
+        if not ous:
+            self.results[key] = [-1, 'No organizational units exist under the organization root']
+            return
+        org, _ = self.orgData.organization()
+        try:
+            direct = []
+            for page in self.orgClient.get_paginator('list_accounts_for_parent').paginate(ParentId=rootId):
+                direct.extend(a for a in page.get('Accounts', []) if a.get('Id') != org.get('MasterAccountId'))
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = self.orgData.notEvaluable(e.response['Error']['Code'])
+            return
+        if direct:
+            self.results[key] = [-1, '{} member account(s) attached directly to the root:<br>{}'.format(
+                len(direct), self._detail(['{} ({})'.format(a.get('Name', ''), a['Id']) for a in direct]))]
+        else:
+            self.results[key] = [1, '{} top-level OU(s); no member accounts attached directly to the root'.format(len(ous))]
+
+    def _checkOrgMemberAlternateContactsMissing(self):
+        """Alternate contacts of every other ACTIVE account in the org. The
+        scanned account itself is covered by hasAlternateContact."""
+        key = 'orgMemberAlternateContactsMissing'
+        if not self._orgPrecondition(key):
+            return
+        accounts, err = self.orgData.accounts()
+        if err:
+            self.results[key] = self.orgData.notEvaluable(err)
+            return
+        caller = self.orgData.callerAccountId
+        members = [a for a in accounts
+                   if a.get('Id') != caller and (a.get('State') or a.get('Status')) == 'ACTIVE']
+        if not members:
+            self.results[key] = [1, 'No other active member accounts in the organization']
+            return
+
+        missing, errors, ok = [], [], 0
+        for a in members:
+            gaps = []
+            for typ in ['SECURITY', 'BILLING', 'OPERATIONS']:
+                try:
+                    self.accClient.get_alternate_contact(AccountId=a['Id'], AlternateContactType=typ)
+                    ok += 1
+                except botocore.exceptions.ClientError as e:
+                    code = e.response['Error']['Code']
+                    if code == 'ResourceNotFoundException':
+                        gaps.append(typ)
+                        ok += 1
+                    else:
+                        errors.append('{} {}: {}'.format(a['Id'], typ, code))
+            if gaps:
+                missing.append('{} ({}): missing {}'.format(a.get('Name', ''), a['Id'], ', '.join(gaps)))
+            if ok == 0 and errors:
+                # Trusted access for AWS Account Management not enabled (or no
+                # permission): every further call would fail the same way.
+                break
+
+        if missing:
+            msg = '{} of {} member account(s) missing alternate contacts:<br>{}'.format(
+                len(missing), len(members), self._detail(missing))
+            if errors:
+                msg += '<br>Unable to read {} contact(s)'.format(len(errors))
+            self.results[key] = [-1, msg]
+        elif errors:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(errors[0].split(': ')[-1])]
+        else:
+            self.results[key] = [1, 'All {} member account(s) have SECURITY, BILLING and OPERATIONS contacts'.format(len(members))]
+
+    def _checkOrgNoResourceControlPolicies(self):
+        key = 'orgNoResourceControlPolicies'
+        if not self._orgPrecondition(key, True):
+            return
+        pols = self._policyGate(key, RCP, [-1, 'Resource control policy type is not enabled on the organization root'])
+        if pols is None:
+            return
+        attached = self._customerAttached(pols)
+        if not attached:
+            self.results[key] = [-1, 'No RCP other than RCPFullAWSAccess is attached']
+            return
+        perimeter, unparsed = [], []
+        for p in attached:
+            if p['Content'] is None:
+                unparsed.append(p['Name'])
+                continue
+            for s in statements(p['Content']):
+                if s.get('Effect') == 'Deny' and any(k in self.RCP_PERIMETER_KEYS for (_, k) in conditionKeys(s)):
+                    perimeter.append(p)
+                    break
+        if perimeter:
+            self.results[key] = [1, 'Org data-perimeter RCP(s) attached: {}'.format('; '.join(
+                '{} -> {}'.format(p['Name'], ', '.join(self._targetLabel(t) for t in p['Targets'][:5])) for p in perimeter))]
+        elif unparsed:
+            self.results[key] = [0, 'Unable to evaluate (unparseable RCP content: {})'.format(', '.join(unparsed))]
+        else:
+            self.results[key] = [-1, 'Customer RCP(s) attached ({}) but none Deny on aws:PrincipalOrgID / aws:ResourceOrgID / aws:SourceOrgID'.format(
+                ', '.join(p['Name'] for p in attached))]
+
+    def _checkOrgNoTagPolicy(self):
+        key = 'orgNoTagPolicy'
+        if not self._orgPrecondition(key, True):
+            return
+        pols = self._policyGate(key, TAG, [-1, 'Tag policy type is not enabled on the organization root'])
+        if pols is None:
+            return
+        attached = self._customerAttached(pols)
+        if not attached:
+            self.results[key] = [-1, 'No tag policy is attached to the root, any OU or any account']
+            return
+        classKeys = []
+        for p in attached:
+            tags = p['Content'].get('tags', {}) if isinstance(p['Content'], dict) else {}
+            for name, spec in (tags.items() if isinstance(tags, dict) else []):
+                tagKey = name
+                if isinstance(spec, dict) and isinstance(spec.get('tag_key'), dict):
+                    tagKey = spec['tag_key'].get('@@assign', name)
+                if any(w in str(tagKey).lower() for w in self.CLASSIFICATION_KEYWORDS):
+                    classKeys.append('{} ({})'.format(tagKey, p['Name']))
+        detail = 'data-classification tag key(s): {}'.format(', '.join(classKeys)) if classKeys \
+            else 'no tag policy defines a data-classification-like tag key'
+        self.results[key] = [1, '{} tag policy(ies) attached ({}); {}'.format(
+            len(attached), ', '.join(p['Name'] for p in attached), detail)]
+
+    def _checkRootCentralizedAccessNotEnabled(self):
+        key = 'rootCentralizedAccessNotEnabled'
+        if not self._orgPrecondition(key, True):
+            return
+        try:
+            enabled = self.iamClient.list_organizations_features().get('EnabledFeatures', []) or []
+        except botocore.exceptions.ClientError as e:
+            code = e.response['Error']['Code']
+            if code == 'ServiceAccessNotEnabledException' and self.orgData.isManagementAccount():
+                self.results[key] = [-1, 'Trusted access for IAM is not enabled in AWS Organizations; centralized root access is off']
+            elif code in ('AccountNotManagementOrDelegatedAdministratorException', 'AccessDenied', 'AccessDeniedException') \
+                    and not self.orgData.isManagementAccount():
+                self.results[key] = [0, 'Not evaluable from member account']
+            elif code == 'OrganizationNotInAllFeaturesModeException':
+                self.results[key] = [0, 'Not applicable: organization does not use All Features (see orgNotAllFeatures)']
+            else:
+                self.results[key] = [0, 'Unable to evaluate ({})'.format(code)]
+            return
+        lacking = [f for f in ('RootCredentialsManagement', 'RootSessions') if f not in enabled]
+        if lacking:
+            self.results[key] = [-1, 'Centralized root access feature(s) not enabled: {}'.format(', '.join(lacking))]
+        else:
+            self.results[key] = [1, 'RootCredentialsManagement and RootSessions are enabled']
+
+    def _checkScpNoBackupTamperProtection(self):
+        key = 'scpNoBackupTamperProtection'
+        if not self._orgPrecondition(key, True, 'Not applicable: SCPs require All Features (see orgNotAllFeatures)'):
+            return
+        pols = self._policyGate(key, SCP, [0, 'Not applicable: SCPs are not enabled (see SCPEnabled)'])
+        if pols is None:
+            return
+        covered, protecting, unparsed = set(), set(), []
+        for p in self._customerAttached(pols):
+            if p['Content'] is None:
+                unparsed.append(p['Name'])
+                continue
+            for s in statements(p['Content']):
+                for a in self.BACKUP_TAMPER_ACTIONS:
+                    if denyCoversAction(s, a):
+                        covered.add(a)
+                        protecting.add(p['Name'])
+        uncovered = [a for a in self.BACKUP_TAMPER_ACTIONS if a not in covered]
+        if not uncovered:
+            self.results[key] = [1, 'Attached SCP(s) deny backup tampering actions: {}'.format(', '.join(sorted(protecting)))]
+        elif unparsed:
+            self.results[key] = [0, 'Unable to evaluate (unparseable SCP content: {})'.format(', '.join(unparsed))]
+        else:
+            self.results[key] = [-1, 'No attached SCP denies: {}'.format(', '.join(uncovered))]

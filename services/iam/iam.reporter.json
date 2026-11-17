@@ -601,15 +601,16 @@
 	},
 	"SCPEnabled": {
 		"category": "S",
-		"^description": "Enabling service control policies (SCPs) in AWS Organizations provides central control over the maximum available permissions for the IAM users and IAM roles in your organization, helping to ensure your accounts stay within your organization's access control guidelines. SCPs are a type of organization policy that are available only when you have enabled all AWS Organizations features, not just consolidated billing, offering the ability to centrally define and enforce the maximum permissions that can be granted to IAM users and roles across your organization's accounts, which helps maintain security and compliance by making it possible to centrally manage and enforce access control policies across your entire organization.",
-		"shortDesc": "Enable Service Control Policy (SCP)",
-		"criticality": "L",
+		"^description": "No service control policy (SCP) other than the default FullAWSAccess is attached anywhere in your AWS Organization (root, organizational units or accounts), or the SCP policy type is not enabled on the root. FullAWSAccess allows everything, so without at least one customer SCP there are no organization-wide guardrails on the maximum permissions of IAM users and roles in member accounts. SCPs are available only when the organization uses All Features. This check reads the organization from the management account or a delegated administrator; from a member account it is reported as not evaluable.",
+		"shortDesc": "Attach Service Control Policies (SCPs)",
+		"criticality": "M",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Enable Service Control Policy (SCP)]<https://docs.aws.amazon.com/organizations/latest/userguide/enable-policy-type.html>"
+			"[Enable Service Control Policy (SCP)]<https://docs.aws.amazon.com/organizations/latest/userguide/enable-policy-type.html>",
+			"[Service control policies (SCPs)]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -738,7 +739,7 @@
 	},
 	"scpBestPractices": {
 		"category": "S",
-		"^description": "{$COUNT} Service Control Policies (SCPs) in your AWS Organization are missing recommended security guardrails. SCPs are a type of organization policy that you can use to manage permissions across your organization, providing central control over the maximum available permissions for all accounts. Best practice SCPs should include: (1) Denying root user actions to prevent use of root credentials across member accounts, (2) Restricting access to specific AWS regions to limit where resources can be created, and (3) Preventing privilege escalation by denying sensitive IAM actions like creating policy versions or setting default policy versions. These guardrails provide defense-in-depth by ensuring that even if individual account policies are misconfigured, organizational controls prevent high-risk actions. Review the identified SCPs and enhance them with appropriate Deny statements to implement these security patterns.",
+		"^description": "One or more organizational units or member accounts in your AWS Organization are missing recommended guardrails in their EFFECTIVE set of service control policies (SCPs attached directly plus those inherited from every parent OU and the root). Best-practice SCP guardrails are: (1) denying root user actions in member accounts, (2) restricting access to approved AWS Regions (aws:RequestedRegion), and (3) preventing privilege escalation by denying sensitive IAM actions such as iam:CreatePolicyVersion, iam:SetDefaultPolicyVersion or iam:PassRole. A guardrail provided by any SCP in the inheritance path counts, so splitting guardrails across several SCPs is fine. The management account is not evaluated because SCPs never apply to it. Review the listed OUs/accounts and attach SCPs with the missing Deny statements at the root or a parent OU.",
 		"shortDesc": "Improve SCP security guardrails",
 		"criticality": "M",
 		"downtime": 0,
@@ -805,5 +806,139 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_users_remove.html"
+	},
+	"orgMgmtAccountHostsWorkloads": {
+		"category": "S",
+		"^description": "The AWS Organizations management account hosts workload resources (EC2 instances, Lambda functions, RDS DB instances or EKS clusters) in the scanned Regions. The management account cannot be restricted by service control policies and holds organization-wide privileges, so workloads running there are outside your guardrails and widen the blast radius of a compromise. Use the management account only for organization, billing and identity administration and move workloads into member accounts. Functions deployed by AWS Control Tower, Landing Zone Accelerator and Quick Setup are excluded.",
+		"shortDesc": "Move workloads out of the management account",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Best practices for the management account]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_best-practices_mgmt-acct.html>",
+			"[Organizing your AWS environment using multiple accounts]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/management-account.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_best-practices_mgmt-acct.html"
+	},
+	"orgNotAllFeatures": {
+		"category": "S",
+		"^description": "Your AWS Organization uses only the consolidated billing feature set. Without All Features you cannot use service control policies, resource control policies, tag, backup or declarative policies, or centralized root access, so no organization-wide guardrails can be enforced. Enable all features in AWS Organizations (every member account must approve, or accounts created by the organization are switched automatically).",
+		"shortDesc": "Enable all features in AWS Organizations",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Enabling all features in your organization]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_org_support-all-features.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_org_support-all-features.html"
+	},
+	"orgMemberAlternateContactsMissing": {
+		"category": "S",
+		"^description": "One or more member accounts in your AWS Organization are missing SECURITY, BILLING or OPERATIONS alternate contacts. AWS sends security notifications, abuse reports and billing or operational notices to these contacts; when they are missing, only the root user email of each account is notified. Set alternate contacts (ideally distribution lists) for every member account centrally from the management account or the AWS Account Management delegated administrator. Requires trusted access for AWS Account Management; from a member account this check is not evaluable.",
+		"shortDesc": "Set alternate contacts for all member accounts",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Update alternate contacts for any account in your organization]<https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-update-contact-alternate.html>",
+			"[Enable trusted access for AWS Account Management]<https://docs.aws.amazon.com/accounts/latest/reference/using-orgs-trusted-access.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/accounts/latest/reference/manage-acct-update-contact-alternate.html"
+	},
+	"orgNoResourceControlPolicies": {
+		"category": "S",
+		"^description": "No resource control policy (RCP) enforces an organization data perimeter. Either the RCP policy type is not enabled on the organization root, only the default RCPFullAWSAccess is attached, or no attached RCP has a Deny statement conditioned on aws:PrincipalOrgID / aws:ResourceOrgID / aws:SourceOrgID (or the OrgPaths variants). RCPs centrally restrict which principals can access resources such as S3 buckets, KMS keys, SQS queues and Secrets Manager secrets in member accounts, preventing access from identities outside your organization even when a resource policy is misconfigured.",
+		"shortDesc": "Enforce a data perimeter with RCPs",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Resource control policies (RCPs)]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_rcps.html>",
+			"[Data perimeter policy examples]<https://github.com/aws-samples/data-perimeter-policy-examples>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_rcps.html"
+	},
+	"orgNoTagPolicy": {
+		"category": "S",
+		"^description": "No AWS Organizations tag policy is attached to the root, an OU or an account (or the tag policy type is not enabled). Tag policies standardize tag keys and values, such as a data-classification key, across accounts so resources can be identified, governed and protected according to their sensitivity. The detail shows whether any attached tag policy defines a classification-like tag key (name-based, informational only).",
+		"shortDesc": "Attach a tag policy (e.g. data classification)",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Tag policies]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_tag-policies.html>",
+			"[Data classification and tagging]<https://docs.aws.amazon.com/whitepapers/latest/data-classification/data-classification-models.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_tag-policies.html"
+	},
+	"orgOuStructureFlat": {
+		"category": "S",
+		"^description": "Your AWS Organization has no organizational units, or member accounts are attached directly to the organization root. Without an OU structure (for example Security, Infrastructure, Workloads, Sandbox) you cannot apply different guardrails to different environments, and every policy must be attached at the root or per account. Group accounts into OUs by function and compliance requirements rather than by reporting structure.",
+		"shortDesc": "Organize accounts into OUs",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Recommended OUs and accounts]<https://docs.aws.amazon.com/whitepapers/latest/organizing-your-aws-environment/recommended-ous-and-accounts.html>",
+			"[Managing organizational units]<https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_ous.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_ous.html"
+	},
+	"rootCentralizedAccessNotEnabled": {
+		"category": "S",
+		"^description": "Centralized root access for member accounts is not enabled (IAM ListOrganizationsFeatures does not report RootCredentialsManagement and RootSessions). With centralized root access you can remove root user credentials from member accounts, prevent their recovery, and perform the few root-only tasks through short-lived privileged sessions from the management account or a delegated administrator. Enable trusted access for IAM and both features in the IAM console.",
+		"shortDesc": "Enable centralized root access",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Centrally manage root access for member accounts]<https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-enable-root-access.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_root-enable-root-access.html"
+	},
+	"scpNoBackupTamperProtection": {
+		"category": "S",
+		"^description": "No attached service control policy denies the AWS Backup actions used to tamper with backups (backup:DeleteBackupVault, DeleteBackupVaultAccessPolicy, DeleteBackupVaultLockConfiguration, DeleteRecoveryPoint, PutBackupVaultAccessPolicy, UpdateRecoveryPointLifecycle). Ransomware actors with administrator access in a member account commonly delete recovery points or shorten retention before encrypting data. Attach an SCP that denies these actions except for a designated backup administration role, and consider AWS Backup Vault Lock in compliance mode for immutable backups.",
+		"shortDesc": "Protect backups from tampering with an SCP",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Backup and SCPs]<https://docs.aws.amazon.com/aws-backup/latest/devguide/backup-scp.html>",
+			"[AWS Backup Vault Lock]<https://docs.aws.amazon.com/aws-backup/latest/devguide/vault-lock.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps_examples.html"
 	}
 }
