@@ -146,8 +146,8 @@ class Ec2EbsVolume(Evaluator):
         if len(snapshotData['Snapshots']) > 0:
             self.hasFastSnapshot(snapshotData['Snapshots'])
 
-            # take latest snapshot to calculate how recently it was created
-            snapshotStartTime = snapshotData['Snapshots'][0]['StartTime']
+            # DescribeSnapshots does not return snapshots in date order - use the newest
+            snapshotStartTime = max(snap['StartTime'] for snap in snapshotData['Snapshots'])
             timeDelta = datetime.datetime.now().timestamp() - snapshotStartTime.timestamp()
             launchDay = int(timeDelta / (60*60*24))
             

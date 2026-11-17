@@ -868,3 +868,18 @@ class Ec2Instance(Evaluator):
             exposure = ', '.join(publicIps) if publicIps else 'none'
             msg += f"; public IPv4: {exposure}{'; IPv6 assigned' if hasIpv6 else ''}"
         self.results[key] = [status, msg]
+
+    def _checkEc2AutoRecoveryDisabled(self):
+        """Simplified automatic recovery restores the instance after a system status
+        check failure. It is on by default ('default'); flag only an explicit opt-out."""
+        key = 'ec2AutoRecoveryDisabled'
+        inst = self.ec2InstanceData
+        if (inst.get('State') or {}).get('Name') not in ('running', 'stopped'):
+            return
+        mode = (inst.get('MaintenanceOptions') or {}).get('AutoRecovery')
+        if mode == 'disabled':
+            self.results[key] = [-1, 'AutoRecovery=disabled']
+        elif mode == 'default':
+            self.results[key] = [1, 'AutoRecovery=default']
+        else:
+            self.results[key] = [0, 'Unable to evaluate (MaintenanceOptions.AutoRecovery not returned)']

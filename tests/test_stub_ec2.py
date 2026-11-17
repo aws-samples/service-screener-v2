@@ -21,6 +21,15 @@ Why not the emulator:
   managed-service ENIs and RAM-shared subnets cannot be created in the emulator.
 - vpcEndpointPolicyFullAccess (services without endpoint-policy support, unknown service
   names, perimeter Deny statements): response shapes the emulator does not produce.
+- vpnWeakTunnelCrypto: ec2.ModifyVpnTunnelOptions is NotImplemented, so the same-connection
+  fix (default options -> IKEv2/SHA2/DH 20) is stubbed.
+- ec2AutoRecoveryDisabled: ec2.ModifyInstanceMaintenanceOptions is NotImplemented.
+- ec2SshdRunning: an emulator instance cannot become an SSM managed node, and the emulator
+  rejects ssm.ListInventoryEntries TypeName=AWS:Service (InvalidTypeNameException).
+- albMtlsOff (passthrough / internet-facing / trust-store paths) and vpcNoGatewayEndpoints
+  (shared VPC, interface endpoint, unassociated route table): response shapes beyond the
+  emulator flag -> fix test.
+- EBSUpToDateSnapshot: DescribeSnapshots result ordering (newest not first).
 
 Every client is a real botocore client (real API shapes / parameter validation) wrapped by
 botocore.stub.Stubber, pointed at an unroutable loopback endpoint with dummy credentials,
@@ -704,3 +713,272 @@ def test_endpoint_policy_support_lookup_falls_back_per_service():
         support, err = Ec2.getEndpointPolicySupport(types.SimpleNamespace(ec2Client=ec2), [good, bad])
         st.assert_no_pending_responses()
     assert support == {good: True} and err == 'InvalidServiceName'
+
+
+# --------------------------------------------------------------------------- #
+# vpcNoGatewayEndpoints
+# --------------------------------------------------------------------------- #
+from services.ec2.drivers.Ec2Vpc import Ec2Vpc  # noqa: E402
+
+VPC = {'VpcId': 'vpc-1', 'OwnerId': SELF}
+
+
+def _vpcEndpointsResult(endpoints, vpc=VPC, routeTables=None, endpointsError=None):
+    routeTables = routeTables if routeTables is not None else [
+        _rt('rtb-main', 'vpc-1', [NAT_ROUTE], main=True),
+        _rt('rtb-pub', 'vpc-1', [IGW_ROUTE], subnet='subnet-pub')]
+    routing = _routing(routeTables, [{'SubnetId': 'subnet-a', 'VpcId': 'vpc-1'},
+                                     {'SubnetId': 'subnet-pub', 'VpcId': 'vpc-1'}])
+    obj = Ec2Vpc(vpc, [], None, routing, endpoints, endpointsError, SELF)
+    return _run(obj, '_checkVpcNoGatewayEndpoints').get('vpcNoGatewayEndpoints')
+
+
+def _gw(service, rts, state='available', epType='Gateway'):
+    return {'VpcEndpointId': 'vpce-' + service, 'VpcId': 'vpc-1', 'VpcEndpointType': epType, 'State': state,
+            'ServiceName': f'com.amazonaws.us-east-1.{service}', 'RouteTableIds': rts}
+
+
+def test_vpc_no_gateway_endpoint_flag_fix():
+    res = _vpcEndpointsResult([])
+    assert res[0] == -1 and 'subnet-a' in res[1] and 'subnet-pub' not in res[1]
+    # endpoint on the public route table only does not cover the private subnet
+    assert _vpcEndpointsResult([_gw('s3', ['rtb-pub'])])[0] == -1
+    assert _vpcEndpointsResult([_gw('s3', ['rtb-main'], state='deleted')])[0] == -1
+    res = _vpcEndpointsResult([_gw('s3', ['rtb-main'])])
+    assert res[0] == 1 and 'DynamoDB' in res[1]
+    assert _vpcEndpointsResult([_gw('s3', ['rtb-main']), _gw('dynamodb', ['rtb-main'])]) == \
+        [1, 'S3 endpoint covers all 1 private subnet(s)']
+    # an S3 interface endpoint keeps S3 traffic private for the whole VPC
+    assert _vpcEndpointsResult([_gw('s3', [], epType='Interface')])[0] == 1
+
+
+def test_vpc_no_gateway_endpoint_not_evaluable_paths():
+    assert _vpcEndpointsResult([], vpc={'VpcId': 'vpc-1', 'OwnerId': OUTSIDER})[0] == 0      # shared VPC
+    res = _vpcEndpointsResult(None, endpointsError='UnauthorizedOperation')
+    assert res == [0, 'Unable to evaluate (UnauthorizedOperation)']
+    routing = _routing(None, None, error='UnauthorizedOperation')
+    assert _run(Ec2Vpc(VPC, [], None, routing, [], None, SELF),
+                '_checkVpcNoGatewayEndpoints')['vpcNoGatewayEndpoints'][0] == 0
+    # only public subnets -> nothing to cover
+    assert _vpcEndpointsResult([], routeTables=[_rt('rtb-main', 'vpc-1', [IGW_ROUTE], main=True)]) == [1, 'No private subnets']
+
+
+# --------------------------------------------------------------------------- #
+# vpnWeakTunnelCrypto
+# --------------------------------------------------------------------------- #
+from services.ec2.drivers.Ec2VpnConnection import Ec2VpnConnection  # noqa: E402
+
+
+def _vals(*v):
+    return [{'Value': x} for x in v]
+
+
+STRONG_TUNNEL_OPTS = {'OutsideIpAddress': '198.51.100.1', 'IkeVersions': _vals('ikev2'),
+                      'Phase1IntegrityAlgorithms': _vals('SHA2-256'), 'Phase2IntegrityAlgorithms': _vals('SHA2-256'),
+                      'Phase1DHGroupNumbers': _vals(19, 20), 'Phase2DHGroupNumbers': _vals(19, 20)}
+
+
+def _vpnResult(tunnels):
+    ec2 = _client('ec2')
+    with Stubber(ec2) as st:
+        st.add_response('describe_vpn_connections', {'VpnConnections': [
+            {'VpnConnectionId': 'vpn-0123', 'State': 'available', 'Type': 'ipsec.1', 'CustomerGatewayId': 'cgw-1',
+             'Options': {'TunnelOptions': tunnels}}]})
+        vpns = Ec2.getVpnConnections(types.SimpleNamespace(ec2Client=ec2, tags=[]))
+        st.assert_no_pending_responses()
+    return _run(Ec2VpnConnection(vpns[0]), '_checkVpnWeakTunnelCrypto')['vpnWeakTunnelCrypto']
+
+
+def test_vpn_weak_tunnel_flag_fix_same_connection():
+    # misconfigured: tunnel options never customised (AWS defaults, lists omitted)
+    res = _vpnResult([{'OutsideIpAddress': '198.51.100.1'}, {'OutsideIpAddress': '198.51.100.2'}])
+    assert res[0] == -1 and 'default' in res[1] and '198.51.100.2' in res[1]
+    # fixed with modify-vpn-tunnel-options on both tunnels
+    assert _vpnResult([STRONG_TUNNEL_OPTS, dict(STRONG_TUNNEL_OPTS, OutsideIpAddress='198.51.100.2')])[0] == 1
+
+
+def test_vpn_weak_tunnel_individual_settings():
+    assert _vpnResult([dict(STRONG_TUNNEL_OPTS, IkeVersions=_vals('ikev1', 'ikev2'))])[0] == -1
+    assert _vpnResult([dict(STRONG_TUNNEL_OPTS, Phase2IntegrityAlgorithms=_vals('SHA1', 'SHA2-256'))])[0] == -1
+    assert _vpnResult([dict(STRONG_TUNNEL_OPTS, Phase1DHGroupNumbers=_vals(2, 20))])[0] == -1
+    res = _vpnResult([dict(STRONG_TUNNEL_OPTS, Phase2DHGroupNumbers=_vals(14))])
+    assert res[0] == -1 and 'only DH group 14' in res[1]
+    assert _vpnResult([dict(STRONG_TUNNEL_OPTS, Phase2DHGroupNumbers=_vals(14, 20))])[0] == 1
+    assert _vpnResult([])[0] == 0
+
+
+# --------------------------------------------------------------------------- #
+# albMtlsOff / albTargetGroupPlaintext
+# --------------------------------------------------------------------------- #
+TS_ARN = 'arn:aws:elasticloadbalancing:us-east-1:111111111111:truststore/ts/0123456789abcdef'
+
+
+def _alb(scheme='internal'):
+    return {'LoadBalancerArn': 'arn:aws:elasticloadbalancing:us-east-1:111111111111:loadbalancer/app/a/1',
+            'LoadBalancerName': 'a', 'Type': 'application', 'Scheme': scheme}
+
+
+def _mtlsResult(mutualAuth, scheme='internal', trustStore=None, tsError=None):
+    Config.set('ec2::elbv2TrustStores::us-east-1', None)
+    elbv2 = _client('elbv2')
+    listener = {'ListenerArn': 'arn:l', 'Protocol': 'HTTPS', 'Port': 443}
+    if mutualAuth is not None:
+        listener['MutualAuthentication'] = mutualAuth
+    with Stubber(elbv2) as st:
+        st.add_response('describe_listeners', {'Listeners': [listener]})
+        if trustStore is not None:
+            st.add_response('describe_trust_stores', {'TrustStores': [trustStore]}, {'TrustStoreArns': [TS_ARN]})
+        elif tsError:
+            st.add_client_error('describe_trust_stores', service_error_code=tsError, http_status_code=400)
+        res = _run(Ec2ElbCommon(_alb(scheme), [], elbv2, None), '_checkAlbMtlsOff').get('albMtlsOff')
+        st.assert_no_pending_responses()
+    Config.set('ec2::elbv2TrustStores::us-east-1', None)
+    return res
+
+
+TRUST_STORE = {'Name': 'ts', 'TrustStoreArn': TS_ARN, 'Status': 'ACTIVE', 'NumberOfCaCertificates': 1,
+               'TotalRevokedEntries': 3}
+
+
+def test_alb_mtls_flag_fix_and_informational_paths():
+    assert _mtlsResult(None)[0] == -1                                    # internal, mTLS never configured
+    assert _mtlsResult({'Mode': 'off'})[0] == -1
+    res = _mtlsResult({'Mode': 'verify', 'TrustStoreArn': TS_ARN}, trustStore=TRUST_STORE)
+    assert res == [1, 'mTLS verify on HTTPS:443']
+    res = _mtlsResult({'Mode': 'verify', 'TrustStoreArn': TS_ARN, 'IgnoreClientCertificateExpiry': True},
+                      trustStore=dict(TRUST_STORE, TotalRevokedEntries=0))
+    assert res[0] == 1 and 'no revocation list' in res[1] and 'expired' in res[1]
+    assert _mtlsResult({'Mode': 'verify', 'TrustStoreArn': TS_ARN}, tsError='AccessDenied')[0] == 1
+    assert _mtlsResult({'Mode': 'passthrough'})[0] == 0
+    assert _mtlsResult({'Mode': 'off'}, scheme='internet-facing')[0] == 0
+
+
+def test_alb_mtls_listener_access_denied_not_pass():
+    elbv2 = _client('elbv2')
+    with Stubber(elbv2) as st:
+        st.add_client_error('describe_listeners', service_error_code='AccessDenied', http_status_code=403)
+        res = _run(Ec2ElbCommon(_alb(), [], elbv2, None), '_checkAlbMtlsOff')['albMtlsOff']
+    assert res == [0, 'Unable to evaluate (AccessDenied)']
+
+
+def _tgResult(pages):
+    elbv2 = _client('elbv2')
+    with Stubber(elbv2) as st:
+        for i, groups in enumerate(pages):
+            resp = {'TargetGroups': groups}
+            if i < len(pages) - 1:
+                resp['NextMarker'] = f'm{i}'
+            st.add_response('describe_target_groups', resp)
+        res = _run(Ec2ElbCommon(_alb(), [], elbv2, None), '_checkAlbTargetGroupPlaintext').get('albTargetGroupPlaintext')
+        st.assert_no_pending_responses()
+    return res
+
+
+def test_alb_target_group_plaintext_paginates_and_lambda_ignored():
+    https = {'TargetGroupName': 'tls', 'Protocol': 'HTTPS', 'Port': 443}
+    http = {'TargetGroupName': 'plain', 'Protocol': 'HTTP', 'Port': 80}
+    lam = {'TargetGroupName': 'fn', 'TargetType': 'lambda'}
+    assert _tgResult([[https], [http]]) == [-1, 'HTTP target group(s): plain']
+    assert _tgResult([[https, lam]])[0] == 1
+    assert _tgResult([[lam]]) is None
+
+
+# --------------------------------------------------------------------------- #
+# ec2AutoRecoveryDisabled
+# --------------------------------------------------------------------------- #
+from services.ec2.drivers.Ec2Instance import Ec2Instance  # noqa: E402
+
+
+def _autoRecoveryResult(mode, state='running'):
+    inst = {'InstanceId': 'i-0123456789abcdef0', 'State': {'Name': state}}
+    if mode is not None:
+        inst['MaintenanceOptions'] = {'AutoRecovery': mode, 'RebootMigration': 'default'}
+    obj = Ec2Instance.__new__(Ec2Instance)       # skip __init__ (image / CloudWatch lookups)
+    obj.results = {}
+    obj.ec2InstanceData = inst
+    return _run(obj, '_checkEc2AutoRecoveryDisabled').get('ec2AutoRecoveryDisabled')
+
+
+def test_auto_recovery_flag_fix_same_instance():
+    assert _autoRecoveryResult('disabled')[0] == -1
+    assert _autoRecoveryResult('default')[0] == 1          # after modify-instance-maintenance-options
+    assert _autoRecoveryResult(None)[0] == 0
+    assert _autoRecoveryResult('disabled', state='terminated') is None
+
+
+# --------------------------------------------------------------------------- #
+# ec2SshdRunning
+# --------------------------------------------------------------------------- #
+IID = 'i-0123456789abcdef0'
+
+
+def _svc(name, status):
+    return {'Name': name, 'DisplayName': name, 'Status': status, 'ServiceType': 'Win32OwnProcess', 'StartType': 'Automatic'}
+
+
+def _sshdResult(platform='Windows', pages=None, invError=None, managed=True):
+    ssm = _client('ssm')
+    ns = types.SimpleNamespace(ssmClient=ssm)
+    info = [{'InstanceId': IID, 'PingStatus': 'Online', 'PlatformType': platform}] if managed else []
+    with Stubber(ssm) as st:
+        st.add_response('describe_instance_information', {'InstanceInformationList': info}, {'MaxResults': 50})
+        managedSet = Ec2.getSSMManagedInstances(ns)
+        if invError:
+            st.add_client_error('list_inventory_entries', service_error_code=invError, http_status_code=400)
+        for i, entries in enumerate(pages or []):
+            resp = {'TypeName': 'AWS:Service', 'InstanceId': IID, 'CaptureTime': '2026-11-16T00:00:00Z', 'Entries': entries}
+            expected = {'InstanceId': IID, 'TypeName': 'AWS:Service', 'MaxResults': 50}
+            if i:
+                expected['NextToken'] = f't{i}'
+            if i < len(pages) - 1:
+                resp['NextToken'] = f't{i + 1}'
+            st.add_response('list_inventory_entries', resp, expected)
+        obj = Ec2SSM(IID, managedSet, {'InstanceId': IID, 'State': {'Name': 'running'}}, ns.ssmError,
+                     ns.ssmPingStatus, ssm, ns.ssmPlatform)
+        res = _run(obj, '_checkEc2SshdRunning').get('ec2SshdRunning')
+        st.assert_no_pending_responses()
+    return res
+
+
+def test_sshd_rdp_running_flag_fix():
+    res = _sshdResult(pages=[[_svc('Dhcp', 'Running')], [_svc('TermService', 'Running'), _svc('sshd', 'Stopped')]])
+    assert res[0] == -1 and 'RDP' in res[1] and 'sshd' not in res[1]
+    # fixed: TermService stopped / disabled, inventory refreshed
+    assert _sshdResult(pages=[[_svc('TermService', 'Stopped'), _svc('Dhcp', 'Running')]])[0] == 1
+    assert _sshdResult(pages=[[_svc('sshd', 'Running')]])[0] == -1
+
+
+def test_sshd_not_evaluable_paths():
+    assert _sshdResult(platform='Linux')[0] == 0                    # AWS:Service is Windows-only
+    assert _sshdResult(managed=False)[0] == 0
+    assert _sshdResult(pages=[[]])[0] == 0                          # inventory not collected
+    assert _sshdResult(invError='InvalidInstanceId') == [0, 'Unable to evaluate (InvalidInstanceId)']
+
+
+# --------------------------------------------------------------------------- #
+# EBSUpToDateSnapshot (overlap of dlmNoSnapshotPolicy): newest snapshot, not the first returned
+# --------------------------------------------------------------------------- #
+import datetime as _dt  # noqa: E402
+from services.ec2.drivers.Ec2EbsVolume import Ec2EbsVolume  # noqa: E402
+
+
+def _snapshotFreshness(ages):
+    ec2 = _client('ec2')
+    now = _dt.datetime.now(_dt.timezone.utc)
+    snaps = [{'SnapshotId': f'snap-{i}', 'VolumeId': 'vol-1', 'StartTime': now - _dt.timedelta(days=a), 'State': 'completed'}
+             for i, a in enumerate(ages)]
+    obj = Ec2EbsVolume.__new__(Ec2EbsVolume)
+    obj.results = {}
+    obj.ec2Client = ec2
+    obj.ebsVolumeData = {'VolumeId': 'vol-1', 'SnapshotId': ''}
+    with Stubber(ec2) as st:
+        st.add_response('describe_snapshots', {'Snapshots': snaps})
+        st.add_response('describe_fast_snapshot_restores', {'FastSnapshotRestores': []})
+        _run(obj, '_checkSnapshot')
+    return obj.results
+
+
+def test_up_to_date_snapshot_uses_newest():
+    assert _snapshotFreshness([30, 1]) == {}                        # oldest returned first: still up to date
+    assert _snapshotFreshness([30, 20])['EBSUpToDateSnapshot'][0] == -1
+

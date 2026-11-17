@@ -30,7 +30,8 @@ def _igwDefaultRoutes(routeTable):
 def getSubnetRouting(ec2Client):
     """Effective route table per subnet (explicit association, else the VPC main
     route table), memoized per region:
-      {'subnets': {subnetId: {'routeTableId': .., 'igwRoutes': [..]}}, 'error': None|code}
+      {'subnets': {subnetId: {'routeTableId': .., 'igwRoutes': [..]}},
+       'subnetVpc': {subnetId: vpcId}, 'error': None|code}
     A subnet missing from 'subnets' has no visible route table (e.g. a subnet shared
     from another account through AWS RAM - participants cannot read its route table)."""
     region = ec2Client.meta.region_name
@@ -39,7 +40,7 @@ def getSubnetRouting(ec2Client):
     if cached is not None:
         return cached
 
-    ctx = {'subnets': {}, 'error': None}
+    ctx = {'subnets': {}, 'subnetVpc': {}, 'error': None}
     try:
         routeTables = []
         for page in ec2Client.get_paginator('describe_route_tables').paginate():
@@ -66,6 +67,7 @@ def getSubnetRouting(ec2Client):
 
     for sn in subnets:
         sid = sn.get('SubnetId')
+        ctx['subnetVpc'][sid] = sn.get('VpcId')
         entry = explicit.get(sid) or mainByVpc.get(sn.get('VpcId'))
         if entry is not None:
             ctx['subnets'][sid] = entry

@@ -1622,5 +1622,106 @@
 		"remediation": "aws ec2 modify-vpc-endpoint --vpc-endpoint-id {ResourceId} --policy-document file://endpoint-policy.json",
 		"remediation_risk": "medium",
 		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-access.html"
+	},
+	"vpcNoGatewayEndpoints": {
+		"category": "S",
+		"^description": "VPC private subnets without an S3 endpoint: {$COUNT} VPC(s) have private subnets (no default route to an internet gateway) whose route table is not associated with an S3 gateway endpoint, and the VPC has no S3 interface endpoint. S3 traffic from those subnets leaves the VPC through a NAT device and the public S3 endpoint (or cannot reach S3 at all), and cannot be restricted with an endpoint policy. Add a free S3 gateway endpoint (and a DynamoDB one if the VPC uses DynamoDB) and associate it with the private route tables.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Private subnets lack an S3 gateway endpoint",
+		"ref": [
+			"[Gateway endpoints for Amazon S3]<https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html>",
+			"[Gateway endpoints for Amazon DynamoDB]<https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-ddb.html>"
+		],
+		"remediation": "aws ec2 create-vpc-endpoint --vpc-id {ResourceId} --vpc-endpoint-type Gateway --service-name com.amazonaws.<region>.s3 --route-table-ids <private-route-table-ids>",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html"
+	},
+	"vpnWeakTunnelCrypto": {
+		"category": "S",
+		"^description": "Site-to-Site VPN tunnels allow weak cryptography: {$COUNT} VPN connection(s) have tunnels that still accept IKEv1, SHA1 integrity or weak Diffie-Hellman groups (2, 5, or only group 14). Empty tunnel option lists mean the AWS defaults, which include these legacy options for compatibility. Restrict each tunnel to IKEv2, SHA2-256 or stronger and DH groups 19-21 (coordinate with the customer gateway configuration first).",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "M",
+		"needFullTest": 0,
+		"shortDesc": "VPN tunnels permit IKEv1/SHA1/weak DH groups",
+		"ref": [
+			"[Tunnel options for your Site-to-Site VPN connection]<https://docs.aws.amazon.com/vpn/latest/s2svpn/VPNTunnels.html>",
+			"[Modify Site-to-Site VPN tunnel options]<https://docs.aws.amazon.com/vpn/latest/s2svpn/modify-vpn-tunnel-options.html>"
+		],
+		"remediation": "aws ec2 modify-vpn-tunnel-options --vpn-connection-id {ResourceId} --vpn-tunnel-outside-ip-address <ip> --tunnel-options 'IKEVersions=[{Value=ikev2}],Phase1IntegrityAlgorithms=[{Value=SHA2-256}],Phase2IntegrityAlgorithms=[{Value=SHA2-256}],Phase1DHGroupNumbers=[{Value=20}],Phase2DHGroupNumbers=[{Value=20}]'",
+		"remediation_risk": "high",
+		"remediation_doc": "https://docs.aws.amazon.com/vpn/latest/s2svpn/modify-vpn-tunnel-options.html"
+	},
+	"albMtlsOff": {
+		"category": "S",
+		"^description": "Internal ALB without mutual TLS: {$COUNT} internal Application Load Balancer(s) have HTTPS listeners with mutual TLS off, so any client that reaches the listener is accepted without a client certificate. For service-to-service traffic consider mTLS in verify mode with a trust store (and a revocation list). Internet-facing ALBs and passthrough mode are reported as informational only.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "Internal ALB HTTPS listener without mTLS",
+		"ref": [
+			"[Mutual authentication with TLS in Application Load Balancer]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/mutual-authentication.html>"
+		],
+		"remediation": "aws elbv2 modify-listener --listener-arn <listener-arn> --mutual-authentication Mode=verify,TrustStoreArn=<trust-store-arn>",
+		"remediation_risk": "high",
+		"remediation_doc": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/mutual-authentication.html"
+	},
+	"albTargetGroupPlaintext": {
+		"category": "S",
+		"^description": "ALB target groups use HTTP: {$COUNT} Application Load Balancer(s) forward to target groups with protocol HTTP, so traffic between the load balancer and the targets is not encrypted even when the listener uses HTTPS. Terminating TLS at the ALB is common inside a VPC; use HTTPS target groups where data classification or compliance requires end-to-end encryption in transit.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "ALB forwards to HTTP target groups",
+		"ref": [
+			"[Target groups for your Application Load Balancers]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html>",
+			"[Encryption in transit - Elastic Load Balancing]<https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/data-protection.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-target-group.html"
+	},
+	"ec2AutoRecoveryDisabled": {
+		"category": "R",
+		"^description": "EC2 automatic recovery disabled: {$COUNT} instance(s) have simplified automatic recovery explicitly disabled (MaintenanceOptions.AutoRecovery=disabled). After a system status check failure (underlying hardware issue) they are not moved to healthy hardware automatically.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "EC2 simplified auto recovery disabled",
+		"ref": [
+			"[Simplified automatic recovery for EC2 instances]<https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-configuration-recovery.html>"
+		],
+		"remediation": "aws ec2 modify-instance-maintenance-options --instance-id {ResourceId} --auto-recovery default",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-configuration-recovery.html"
+	},
+	"ec2SshdRunning": {
+		"category": "S",
+		"^description": "Remote login service running on SSM-managed instances: {$COUNT} Windows instance(s) reachable through Session Manager still run the RDP (TermService) or OpenSSH (sshd) service according to SSM Inventory (AWS:Service). Prefer Session Manager / Fleet Manager for interactive access and stop or disable the remote login service to reduce attack surface. SSM collects service inventory for Windows only, so Linux instances are not evaluated.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "L",
+		"needFullTest": 0,
+		"shortDesc": "RDP/SSH service running on managed instance",
+		"ref": [
+			"[Reduce manual management and interactive access]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_protect_compute_reduce_manual_management.html>",
+			"[AWS Systems Manager Inventory - metadata collected]<https://docs.aws.amazon.com/systems-manager/latest/userguide/inventory-schema.html>",
+			"[AWS Systems Manager Session Manager]<https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html"
 	}
 }

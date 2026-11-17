@@ -229,3 +229,96 @@ class Ec2ElbCommon(Evaluator):
             self.results[key] = [0, 'Unable to evaluate (' + '; '.join(unknown) + ')']
         else:
             self.results[key] = [1, '; '.join(good)]
+
+    def _getTrustStore(self, arn):
+        """describe_trust_stores for one trust store, memoized per region.
+        Returns the TrustStore dict, or {'_error': code}."""
+        cacheKey = 'ec2::elbv2TrustStores::' + self.elbClient.meta.region_name
+        with self._lock:
+            table = Config.get(cacheKey, None)
+            if table is None:
+                table = {}
+                Config.set(cacheKey, table)
+            if arn not in table:
+                try:
+                    resp = self.elbClient.describe_trust_stores(TrustStoreArns=[arn])
+                    found = [t for t in resp.get('TrustStores', []) if t.get('TrustStoreArn') == arn]
+                    table[arn] = found[0] if found else {'_error': 'TrustStoreNotFound'}
+                except botocore.exceptions.ClientError as e:
+                    table[arn] = {'_error': e.response['Error']['Code']}
+            return table[arn]
+
+    def _checkAlbMtlsOff(self):
+        """HTTPS listeners of internal ALBs (service-to-service traffic, where client
+        certificates are practical) without mutual TLS. Internet-facing ALBs usually
+        serve browsers/third parties, so mTLS off there is informational only.
+        verify = ALB validates client certificates against a trust store;
+        passthrough = the certificate chain is forwarded and the target must verify it."""
+        key = 'albMtlsOff'
+        if self.elb.get('Type') != 'application':
+            return
+        try:
+            listeners = [l for l in self._getListeners() if l.get('Protocol') == 'HTTPS']
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({e.response['Error']['Code']})"]
+            return
+        if not listeners:
+            return
+
+        internal = self.elb.get('Scheme') == 'internal'
+        off, passthrough, verify = [], [], []
+        for l in listeners:
+            label = f"HTTPS:{l.get('Port')}"
+            ma = l.get('MutualAuthentication') or {}
+            mode = str(ma.get('Mode') or 'off').lower()
+            if mode == 'verify':
+                note = []
+                tsArn = ma.get('TrustStoreArn')
+                if tsArn:
+                    ts = self._getTrustStore(tsArn)
+                    if '_error' in ts:
+                        note.append(f"trust store unreadable ({ts['_error']})")
+                    else:
+                        if ts.get('Status') and ts.get('Status') != 'ACTIVE':
+                            note.append(f"trust store {ts.get('Status')}")
+                        if not ts.get('TotalRevokedEntries'):
+                            note.append('no revocation list')
+                if ma.get('IgnoreClientCertificateExpiry'):
+                    note.append('expired client certificates accepted')
+                verify.append(label + (f" ({', '.join(note)})" if note else ''))
+            elif mode == 'passthrough':
+                passthrough.append(label)
+            else:
+                off.append(label)
+
+        if off and internal:
+            self.results[key] = [-1, f"Internal ALB without mTLS on {', '.join(off)}"]
+        elif off:
+            self.results[key] = [0, f"Internet-facing ALB without mTLS on {', '.join(off)} (informational; mTLS applies where clients can hold certificates)"]
+        elif passthrough:
+            self.results[key] = [0, f"mTLS passthrough on {', '.join(passthrough)}: targets must validate the forwarded client certificate"
+                                    + (f"; verify on {', '.join(verify)}" if verify else '')]
+        else:
+            self.results[key] = [1, f"mTLS verify on {', '.join(verify)}"]
+
+    def _checkAlbTargetGroupPlaintext(self):
+        """ALB target groups using HTTP: traffic between the load balancer and the
+        targets is not encrypted, even when the listener terminates HTTPS."""
+        key = 'albTargetGroupPlaintext'
+        if self.elb.get('Type') != 'application':
+            return
+        try:
+            groups = []
+            paginator = self.elbClient.get_paginator('describe_target_groups')
+            for page in paginator.paginate(LoadBalancerArn=self.elb['LoadBalancerArn']):
+                groups.extend(page.get('TargetGroups', []))
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({e.response['Error']['Code']})"]
+            return
+
+        plain = [g.get('TargetGroupName') for g in groups if g.get('Protocol') == 'HTTP']
+        encrypted = [g.get('TargetGroupName') for g in groups if g.get('Protocol') == 'HTTPS']
+        if plain:
+            self.results[key] = [-1, f"HTTP target group(s): {', '.join(plain)}"]
+        elif encrypted:
+            self.results[key] = [1, f"HTTPS target group(s): {', '.join(encrypted)}"]

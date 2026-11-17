@@ -536,3 +536,167 @@ def test_vpc_endpoint_policy_full_access(emu):
         if ep:
             ec2.delete_vpc_endpoints(VpcEndpointIds=[ep['VpcEndpointId']])
         ec2.delete_vpc(VpcId=vpc)
+
+
+# --------------------------------------------------------------------------- #
+# WAFS2027 chunk 3: network / VPN / ALB / instance recovery
+# Not covered here (emulator gaps -> tests/test_stub_ec2.py):
+# - vpnWeakTunnelCrypto same-connection fix: ModifyVpnTunnelOptions is NotImplemented, so the
+#   emulator test compares a default connection (FAIL) with one created with strong options (PASS).
+# - ec2AutoRecoveryDisabled same-instance fix: ModifyInstanceMaintenanceOptions is NotImplemented.
+# - ec2SshdRunning: emulator instances cannot become SSM managed nodes and AWS:Service inventory
+#   is rejected (InvalidTypeNameException).
+# --------------------------------------------------------------------------- #
+def _mainRouteTable(ec2, vpc):
+    rts = ec2.describe_route_tables(Filters=[{'Name': 'vpc-id', 'Values': [vpc]},
+                                             {'Name': 'association.main', 'Values': ['true']}])['RouteTables']
+    return rts[0]['RouteTableId']
+
+
+def test_vpc_no_gateway_endpoints(emu):
+    ec2 = emu.client('ec2')
+    vpc = ec2.create_vpc(CidrBlock='10.96.0.0/16')['Vpc']['VpcId']
+    sub = ec2.create_subnet(VpcId=vpc, CidrBlock='10.96.1.0/24', AvailabilityZone='us-east-1a')['Subnet']['SubnetId']
+    ep = {}
+    try:
+        def fix():
+            ep.update(ec2.create_vpc_endpoint(VpcId=vpc, ServiceName='com.amazonaws.us-east-1.s3',
+                                              VpcEndpointType='Gateway',
+                                              RouteTableIds=[_mainRouteTable(ec2, vpc)])['VpcEndpoint'])
+
+        # misconfigure: a private subnet (main route table, no IGW route) and no endpoint
+        before, after = assertFlagFixCycle(emu, 'ec2', 'vpcNoGatewayEndpoints', f'VPC::{vpc}', lambda: None, fix)
+        assert list(after.values()) == [1]
+    finally:
+        if ep:
+            ec2.delete_vpc_endpoints(VpcEndpointIds=[ep['VpcEndpointId']])
+        ec2.delete_subnet(SubnetId=sub)
+        ec2.delete_vpc(VpcId=vpc)
+
+
+STRONG_TUNNEL = {'IKEVersions': [{'Value': 'ikev2'}],
+                 'Phase1IntegrityAlgorithms': [{'Value': 'SHA2-256'}],
+                 'Phase2IntegrityAlgorithms': [{'Value': 'SHA2-256'}],
+                 'Phase1DHGroupNumbers': [{'Value': 20}],
+                 'Phase2DHGroupNumbers': [{'Value': 20}]}
+
+
+def test_vpn_weak_tunnel_crypto(emu):
+    """Default tunnel options (IKEv1/SHA1/DH 2 allowed) -> FAIL; a connection created with
+    IKEv2/SHA2-256/DH 20 only -> PASS. ModifyVpnTunnelOptions is NotImplemented, so the
+    same-connection fix is in tests/test_stub_ec2.py."""
+    ec2 = emu.client('ec2')
+    cgws = [ec2.create_customer_gateway(BgpAsn=65000, PublicIp=ip, Type='ipsec.1')['CustomerGateway']['CustomerGatewayId']
+            for ip in ('203.0.113.10', '203.0.113.11')]
+    vgws = [ec2.create_vpn_gateway(Type='ipsec.1')['VpnGateway']['VpnGatewayId'] for _ in range(2)]
+    vpns = []
+    try:
+        weak = ec2.create_vpn_connection(CustomerGatewayId=cgws[0], VpnGatewayId=vgws[0], Type='ipsec.1',
+                                         Options={'StaticRoutesOnly': True})['VpnConnection']['VpnConnectionId']
+        vpns.append(weak)
+        strong = ec2.create_vpn_connection(CustomerGatewayId=cgws[1], VpnGatewayId=vgws[1], Type='ipsec.1',
+                                           Options={'StaticRoutesOnly': True,
+                                                    'TunnelOptions': [STRONG_TUNNEL, STRONG_TUNNEL]})['VpnConnection']['VpnConnectionId']
+        vpns.append(strong)
+        res = runCheck(emu, 'ec2', 'vpnWeakTunnelCrypto', 'VPN::')
+        st = res.statuses()
+        assert st.get(f'VPN::{weak}') == -1, st
+        assert st.get(f'VPN::{strong}') == 1, st
+        msg = res.results[f'VPN::{weak}']['vpnWeakTunnelCrypto'][1]
+        assert 'IKEv1' in msg and 'SHA1' in msg and 'DH group(s) 2' in msg, msg
+    finally:
+        for v in vpns:
+            ec2.delete_vpn_connection(VpnConnectionId=v)
+        for g in vgws:
+            ec2.delete_vpn_gateway(VpnGatewayId=g)
+        for g in cgws:
+            ec2.delete_customer_gateway(CustomerGatewayId=g)
+
+
+def test_alb_target_group_plaintext(emu, uid, alb):
+    elbv2 = emu.client('elbv2')
+    vpc = alb['VpcId']
+    httpTg = elbv2.create_target_group(Name=f'ss-http-{uid}', Protocol='HTTP', Port=80, VpcId=vpc,
+                                       TargetType='instance')['TargetGroups'][0]['TargetGroupArn']
+    httpsTg = elbv2.create_target_group(Name=f'ss-https-{uid}', Protocol='HTTPS', Port=443, VpcId=vpc,
+                                        TargetType='instance')['TargetGroups'][0]['TargetGroupArn']
+    listener = {}
+    try:
+        def misconfigure():
+            listener.update(elbv2.create_listener(LoadBalancerArn=alb['LoadBalancerArn'], Protocol='HTTP', Port=80,
+                                                  DefaultActions=[{'Type': 'forward', 'TargetGroupArn': httpTg}])['Listeners'][0])
+
+        def fix():
+            elbv2.modify_listener(ListenerArn=listener['ListenerArn'],
+                                  DefaultActions=[{'Type': 'forward', 'TargetGroupArn': httpsTg}])
+
+        _, after = assertFlagFixCycle(emu, 'ec2', 'albTargetGroupPlaintext', f"ELB::{alb['LoadBalancerName']}", misconfigure, fix)
+        assert list(after.values()) == [1]
+    finally:
+        if listener:
+            elbv2.delete_listener(ListenerArn=listener['ListenerArn'])
+        elbv2.delete_target_group(TargetGroupArn=httpTg)
+        elbv2.delete_target_group(TargetGroupArn=httpsTg)
+
+
+def test_ec2_auto_recovery_disabled(emu):
+    """Instance launched with AutoRecovery=disabled -> FAIL, default -> PASS.
+    ModifyInstanceMaintenanceOptions is NotImplemented, so the same-instance fix is stubbed."""
+    ec2 = emu.client('ec2')
+    ami = _amazonAmi(ec2)
+    off = on = None
+    try:
+        off = ec2.run_instances(ImageId=ami, MinCount=1, MaxCount=1, InstanceType='t3.micro',
+                                MaintenanceOptions={'AutoRecovery': 'disabled'})['Instances'][0]['InstanceId']
+        on = ec2.run_instances(ImageId=ami, MinCount=1, MaxCount=1, InstanceType='t3.micro')['Instances'][0]['InstanceId']
+        _waitState(ec2, off, 'running')
+        _waitState(ec2, on, 'running')
+        st = runCheck(emu, 'ec2', 'ec2AutoRecoveryDisabled', 'EC2::').statuses()
+        assert st.get(f'EC2::{off}') == -1, st
+        assert st.get(f'EC2::{on}') == 1, st
+    finally:
+        _terminate(ec2, off, on)
+
+
+def test_alb_mtls_off_internal(emu, uid, certificate):
+    """Internal ALB, HTTPS listener with mTLS off -> FAIL; verify mode with a trust store -> PASS."""
+    elbv2 = emu.client('elbv2')
+    s3 = emu.client('s3')
+    bucket = f'ss-test-ts-{uid}'
+    s3.create_bucket(Bucket=bucket)
+    d = tempfile.mkdtemp()
+    subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', d + '/ca.key',
+                    '-out', d + '/ca.pem', '-days', '30', '-subj', f'/CN=ss-test-ca-{uid}'],
+                   check=True, capture_output=True)
+    s3.put_object(Bucket=bucket, Key='ca.pem', Body=open(d + '/ca.pem', 'rb').read())
+    lb = elbv2.create_load_balancer(Name=f'ss-ialb-{uid}', Subnets=_subnets(emu), Type='application',
+                                    Scheme='internal')['LoadBalancers'][0]
+    tg = elbv2.create_target_group(Name=f'ss-mtls-{uid}', Protocol='HTTPS', Port=443, VpcId=lb['VpcId'],
+                                   TargetType='instance')['TargetGroups'][0]['TargetGroupArn']
+    listener, ts = {}, {}
+    try:
+        def misconfigure():
+            listener.update(elbv2.create_listener(LoadBalancerArn=lb['LoadBalancerArn'], Protocol='HTTPS', Port=443,
+                                                  Certificates=[{'CertificateArn': certificate}],
+                                                  DefaultActions=[{'Type': 'forward', 'TargetGroupArn': tg}])['Listeners'][0])
+
+        def fix():
+            ts.update(elbv2.create_trust_store(Name=f'ss-ts-{uid}', CaCertificatesBundleS3Bucket=bucket,
+                                               CaCertificatesBundleS3Key='ca.pem')['TrustStores'][0])
+            elbv2.modify_listener(ListenerArn=listener['ListenerArn'],
+                                  MutualAuthentication={'Mode': 'verify', 'TrustStoreArn': ts['TrustStoreArn']})
+
+        _, after = assertFlagFixCycle(emu, 'ec2', 'albMtlsOff', f"ELB::{lb['LoadBalancerName']}", misconfigure, fix)
+        assert list(after.values()) == [1]
+    finally:
+        if listener:
+            elbv2.delete_listener(ListenerArn=listener['ListenerArn'])
+        elbv2.delete_load_balancer(LoadBalancerArn=lb['LoadBalancerArn'])
+        elbv2.delete_target_group(TargetGroupArn=tg)
+        if ts:
+            elbv2.delete_trust_store(TrustStoreArn=ts['TrustStoreArn'])
+        s3.delete_object(Bucket=bucket, Key='ca.pem')
+        s3.delete_bucket(Bucket=bucket)
+        for f in ('ca.key', 'ca.pem'):
+            os.remove(os.path.join(d, f))
+        os.rmdir(d)

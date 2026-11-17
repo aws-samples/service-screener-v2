@@ -33,6 +33,7 @@ from services.ec2.drivers.Ec2Ami import Ec2Ami
 from services.ec2.drivers.Ec2EbsSnapshotSharing import Ec2EbsSnapshotSharing
 from services.ec2.drivers.Ec2LaunchTemplate import Ec2LaunchTemplate
 from services.ec2.drivers.Ec2VpcEndpoint import Ec2VpcEndpoint
+from services.ec2.drivers.Ec2VpnConnection import Ec2VpnConnection
 from services.ec2.drivers.Ec2NetworkInterface import Ec2NetworkInterface, classifyEni, getSubnetRouting
 
 import concurrent.futures as cf
@@ -408,8 +409,10 @@ class Ec2(Service):
         """
         managedSet = set()
         pingStatus = {}
+        platform = {}
         self.ssmError = None
         self.ssmPingStatus = pingStatus
+        self.ssmPlatform = platform
         try:
             # MaxResults=50 is the API maximum — request full pages to
             # minimize round-trips for large fleets.
@@ -417,6 +420,7 @@ class Ec2(Service):
             for info in results.get('InstanceInformationList', []):
                 managedSet.add(info['InstanceId'])
                 pingStatus[info['InstanceId']] = info.get('PingStatus')
+                platform[info['InstanceId']] = info.get('PlatformType')
             
             while results.get('NextToken'):
                 results = self.ssmClient.describe_instance_information(
@@ -426,6 +430,7 @@ class Ec2(Service):
                 for info in results.get('InstanceInformationList', []):
                     managedSet.add(info['InstanceId'])
                     pingStatus[info['InstanceId']] = info.get('PingStatus')
+                    platform[info['InstanceId']] = info.get('PlatformType')
         except botocore.exceptions.ClientError as e:
             self.ssmError = e.response['Error']['Code']
             _warn("Unable to retrieve SSM managed instances ({}); skipping SSM check to avoid false positives.".format(e.response['Error']['Code']))
@@ -569,6 +574,25 @@ class Ec2(Service):
         for page in paginator.paginate(**kwargs):
             endpoints.extend(page.get('VpcEndpoints', []))
         return endpoints
+
+    def getAllVpcEndpoints(self):
+        """Every VPC endpoint of the region (no tag filter: an untagged endpoint
+        still serves a tagged VPC). Returns (endpoints, None) or (None, errorCode)."""
+        try:
+            endpoints = []
+            paginator = self.ec2Client.get_paginator('describe_vpc_endpoints')
+            for page in paginator.paginate():
+                endpoints.extend(page.get('VpcEndpoints', []))
+            return endpoints, None
+        except botocore.exceptions.ClientError as e:
+            return None, e.response['Error']['Code']
+
+    def getVpnConnections(self):
+        """DescribeVpnConnections is not paginated and returns every connection."""
+        kwargs = {}
+        if self.tags:
+            kwargs['Filters'] = self.tags
+        return self.ec2Client.describe_vpn_connections(**kwargs).get('VpnConnections', [])
 
     def getEndpointPolicySupport(self, serviceNames):
         """({serviceName: VpcEndpointPolicySupported}, errorCode|None). Unknown /
@@ -980,12 +1004,33 @@ class Ec2(Service):
         # VPC Checks
         vpcs = self.getVpcs()
         flowLogs = self.getFlowLogs()
+        vpcRouting, allEndpoints, allEndpointsErr = None, None, None
+        if vpcs and self._ruleSelected('vpcNoGatewayEndpoints'):
+            vpcRouting = getSubnetRouting(self.ec2Client)
+            allEndpoints, allEndpointsErr = self.getAllVpcEndpoints()
         for vpc in vpcs:
             _pi('VPC::Virtual Private Cloud', vpc['VpcId'])
-            obj = Ec2Vpc(vpc, flowLogs, self.ec2Client)
+            obj = Ec2Vpc(vpc, flowLogs, self.ec2Client, vpcRouting, allEndpoints, allEndpointsErr, selfAccount)
             obj.run(self.__class__)
             objs[f"VPC::{vpc['VpcId']}"] = obj.getInfo()
             
+        # Site-to-Site VPN tunnel options
+        if self._ruleSelected('vpnWeakTunnelCrypto'):
+            try:
+                vpns = self.getVpnConnections()
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                _warn("Unable to list VPN connections ({})".format(code))
+                objs["VPN::unavailable"] = {'results': {'vpnWeakTunnelCrypto': [0, f"Unable to evaluate ({code})"]}, 'info': {}}
+                vpns = []
+            for vpn in vpns:
+                if vpn.get('State') in ('deleting', 'deleted'):
+                    continue
+                _pi('VPC::VPN Connection', vpn['VpnConnectionId'])
+                obj = Ec2VpnConnection(vpn)
+                obj.run(self.__class__)
+                objs[f"VPN::{vpn['VpnConnectionId']}"] = obj.getInfo()
+
         # NACL Checks
         nacls = self.getNetworkACLs()
         for nacl in nacls:
@@ -1009,14 +1054,16 @@ class Ec2(Service):
         # If the managed-instance lookup failed (getSSMManagedInstances returns
         # None) EC2SSMNotManaged is skipped to avoid false positives;
         # ec2InstanceWithKeyPair then reports "Unable to evaluate".
-        if ssmManagedSet is not None or self._ruleSelected('ec2InstanceWithKeyPair'):
+        if (ssmManagedSet is not None or self._ruleSelected('ec2InstanceWithKeyPair')
+                or self._ruleSelected('ec2SshdRunning')):
             for instanceArr in instances:
                 for instanceData in instanceArr['Instances']:
                     if instanceData['State']['Name'] not in ('running', 'stopped'):
                         continue
                     _pi('EC2::SSM Check', instanceData['InstanceId'])
                     obj = Ec2SSM(instanceData['InstanceId'], ssmManagedSet, instanceData,
-                                 getattr(self, 'ssmError', None), getattr(self, 'ssmPingStatus', None))
+                                 getattr(self, 'ssmError', None), getattr(self, 'ssmPingStatus', None),
+                                 self.ssmClient, getattr(self, 'ssmPlatform', None))
                     obj.run(self.__class__)
                     objs[f"SSM::{instanceData['InstanceId']}"] = obj.getInfo()
         
