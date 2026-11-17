@@ -1,0 +1,19 @@
+{
+  "codecommitNoApprovalRule": {
+    "category": "S",
+    "^description": "{$COUNT} CodeCommit repository(ies) have no associated approval rule template that requires at least one approval for pull requests into the default branch. Without an approval rule, any principal with codecommit:MergePullRequest* can merge their own change unreviewed, so a single compromised or careless identity can introduce vulnerable or malicious code into the main line. Create an approval rule template that requires one or more approvals (optionally from a defined approval pool) for the default branch and associate it with the repository.",
+    "shortDesc": "Require pull request approvals with an approval rule template",
+    "criticality": "L",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": [
+      "[Working with approval rule templates]<https://docs.aws.amazon.com/codecommit/latest/userguide/approval-rule-templates.html>",
+      "[Associate an approval rule template with a repository]<https://docs.aws.amazon.com/codecommit/latest/userguide/how-to-associate-template.html>"
+    ],
+    "remediation": null,
+    "remediation_risk": null,
+    "remediation_doc": "https://docs.aws.amazon.com/codecommit/latest/userguide/approval-rule-templates.html"
+  }
+}
