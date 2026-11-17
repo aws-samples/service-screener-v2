@@ -2,8 +2,10 @@ import botocore
 
 from services.Evaluator import Evaluator
 
-# Stock (publicly published) AMI owners: no in-house image build step.
-STOCK_OWNER_ALIASES = ('amazon', 'aws-marketplace')
+# Stock (publicly published) Amazon AMIs: no in-house image build step.
+# AWS Marketplace AMIs are not counted: they are often vendor appliances
+# (firewalls, NVAs) meant to run as published and cannot be rebuilt in-house.
+STOCK_OWNER_ALIASES = ('amazon',)
 IMAGEBUILDER_TAG = 'Ec2ImageBuilderArn'
 
 
@@ -17,8 +19,8 @@ class Ec2ImageBuilder(Evaluator):
     """Region-level: are EC2 instances launched from images produced by a build
     pipeline? Image Builder is one of several valid tools (Packer, a central image
     factory account), so only the unambiguous case FAILs: no enabled Image Builder
-    pipeline in the region AND instances run stock Amazon / Marketplace AMIs as-is.
-    Self-owned or cross-account AMIs (possibly built by other tooling) are INFO."""
+    pipeline in the region AND instances run stock Amazon AMIs as-is.
+    Self-owned, cross-account or AWS Marketplace (vendor appliance) AMIs are INFO."""
 
     def __init__(self, ibClient, ec2Client, instances):
         super().__init__()
@@ -98,8 +100,8 @@ class Ec2ImageBuilder(Evaluator):
 
         if stock:
             shown = ', '.join(stock[:5]) + (f" (+{len(stock) - 5} more)" if len(stock) > 5 else '')
-            self.results[key] = [-1, f"No enabled Image Builder pipeline{disabledNote}; {len(stock)}/{len(live)} instance(s) run stock Amazon/Marketplace AMIs: {shown}"]
+            self.results[key] = [-1, f"No enabled Image Builder pipeline{disabledNote}; {len(stock)}/{len(live)} instance(s) run stock Amazon AMIs: {shown}"]
         elif built:
-            self.results[key] = [0, f"No enabled Image Builder pipeline{disabledNote}; instances use custom or cross-account AMIs - verify they come from a hardened image pipeline (Packer, central image factory, ...)"]
+            self.results[key] = [0, f"No enabled Image Builder pipeline{disabledNote}; instances use custom, cross-account or Marketplace AMIs - verify they come from a hardened image pipeline (Packer, central image factory, ...)"]
         else:
             self.results[key] = [0, f"Unable to evaluate (source AMIs of {len(unknown)} instance(s) not readable){disabledNote}"]

@@ -1695,17 +1695,17 @@
 	},
 	"albMtlsOff": {
 		"category": "S",
-		"^description": "Internal ALB without mutual TLS: {$COUNT} internal Application Load Balancer(s) have HTTPS listeners with mutual TLS off, so any client that reaches the listener is accepted without a client certificate. For service-to-service traffic consider mTLS in verify mode with a trust store (and a revocation list). Internet-facing ALBs and passthrough mode are reported as informational only.",
+		"^description": "ALB mutual TLS accepts expired client certificates: {$COUNT} Application Load Balancer(s) have HTTPS listeners with mutual TLS in verify mode but IgnoreClientCertificateExpiry enabled, so clients presenting expired (and possibly no longer controlled) certificates are still authenticated. Disable IgnoreClientCertificateExpiry and keep a revocation list on the trust store. Listeners without mTLS (off) and passthrough mode are reported as informational only, because whether mTLS is needed depends on the clients (for service-to-service traffic consider mTLS in verify mode with a trust store).",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"criticality": "L",
 		"needFullTest": 0,
-		"shortDesc": "Internal ALB HTTPS listener without mTLS",
+		"shortDesc": "ALB mTLS accepts expired client certificates",
 		"ref": [
 			"[Mutual authentication with TLS in Application Load Balancer]<https://docs.aws.amazon.com/elasticloadbalancing/latest/application/mutual-authentication.html>"
 		],
-		"remediation": "aws elbv2 modify-listener --listener-arn <listener-arn> --mutual-authentication Mode=verify,TrustStoreArn=<trust-store-arn>",
+		"remediation": "aws elbv2 modify-listener --listener-arn <listener-arn> --mutual-authentication Mode=verify,TrustStoreArn=<trust-store-arn>,IgnoreClientCertificateExpiry=false",
 		"remediation_risk": "high",
 		"remediation_doc": "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/mutual-authentication.html"
 	},
@@ -1763,7 +1763,7 @@
 	},
 	"imagebuilderNoPipeline": {
 		"category": "S",
-		"^description": "No image build pipeline: in {$COUNT} Region(s) there is no enabled EC2 Image Builder pipeline and EC2 instances run stock Amazon / AWS Marketplace AMIs directly, so hardening, patch baselines and security tooling are applied (if at all) at boot instead of being baked into a tested, versioned image. Build hardened golden images with EC2 Image Builder (for example with the CIS / STIG hardening components) or another pipeline (Packer, a central image factory account) and launch instances from them. Instances on self-owned or cross-account AMIs are not flagged.",
+		"^description": "No image build pipeline: in {$COUNT} Region(s) there is no enabled EC2 Image Builder pipeline and EC2 instances run stock Amazon-published AMIs directly, so hardening, patch baselines and security tooling are applied (if at all) at boot instead of being baked into a tested, versioned image. Build hardened golden images with EC2 Image Builder (for example with the CIS / STIG hardening components) or another pipeline (Packer, a central image factory account) and launch instances from them. Instances on self-owned, cross-account or AWS Marketplace (vendor appliance) AMIs are not flagged.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,

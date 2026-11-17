@@ -249,11 +249,15 @@ class Ec2ElbCommon(Evaluator):
             return table[arn]
 
     def _checkAlbMtlsOff(self):
-        """HTTPS listeners of internal ALBs (service-to-service traffic, where client
-        certificates are practical) without mutual TLS. Internet-facing ALBs usually
-        serve browsers/third parties, so mTLS off there is informational only.
-        verify = ALB validates client certificates against a trust store;
-        passthrough = the certificate chain is forwarded and the target must verify it."""
+        """Mutual TLS on ALB HTTPS listeners.
+        Whether mTLS is needed depends on the use case (service-to-service HTTPS
+        without client certificates is common, browsers rarely hold certificates),
+        so mTLS off is informational (0) for every scheme, and so is passthrough
+        (the target must verify the forwarded certificate chain).
+        It is a finding (-1) only when mTLS is configured in verify mode but
+        weakened with IgnoreClientCertificateExpiry, so the listener accepts
+        expired client certificates. Verify mode without that flag passes;
+        a missing revocation list is noted in the message."""
         key = 'albMtlsOff'
         if self.elb.get('Type') != 'application':
             return
@@ -266,7 +270,7 @@ class Ec2ElbCommon(Evaluator):
             return
 
         internal = self.elb.get('Scheme') == 'internal'
-        off, passthrough, verify = [], [], []
+        off, passthrough, verify, weak = [], [], [], []
         for l in listeners:
             label = f"HTTPS:{l.get('Port')}"
             ma = l.get('MutualAuthentication') or {}
@@ -284,17 +288,19 @@ class Ec2ElbCommon(Evaluator):
                         if not ts.get('TotalRevokedEntries'):
                             note.append('no revocation list')
                 if ma.get('IgnoreClientCertificateExpiry'):
-                    note.append('expired client certificates accepted')
+                    weak.append(label + (f" ({', '.join(note)})" if note else ''))
+                    continue
                 verify.append(label + (f" ({', '.join(note)})" if note else ''))
             elif mode == 'passthrough':
                 passthrough.append(label)
             else:
                 off.append(label)
 
-        if off and internal:
-            self.results[key] = [-1, f"Internal ALB without mTLS on {', '.join(off)}"]
+        if weak:
+            self.results[key] = [-1, f"mTLS verify accepts expired client certificates (IgnoreClientCertificateExpiry) on {', '.join(weak)}"]
         elif off:
-            self.results[key] = [0, f"Internet-facing ALB without mTLS on {', '.join(off)} (informational; mTLS applies where clients can hold certificates)"]
+            scheme = 'Internal' if internal else 'Internet-facing'
+            self.results[key] = [0, f"{scheme} ALB without mTLS on {', '.join(off)} (informational; mTLS applies where clients can hold certificates)"]
         elif passthrough:
             self.results[key] = [0, f"mTLS passthrough on {', '.join(passthrough)}: targets must validate the forwarded client certificate"
                                     + (f"; verify on {', '.join(verify)}" if verify else '')]

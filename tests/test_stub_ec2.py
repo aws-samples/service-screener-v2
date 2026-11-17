@@ -652,6 +652,17 @@ from services.ec2.drivers.Ec2UserDataScan import decodeUserData, findSecrets  # 
     ('docker login --password-stdin', []),
     ('PWD=/home/ec2-user', []),
     ('-----BEGIN PUBLIC KEY-----', []),
+    # cloud-init account settings and boolean / null values are not credentials (review fix round 2)
+    ('#cloud-config\nusers:\n  - name: bob\n    lock_passwd: false\n', []),
+    ('users:\n  - name: bob\n    lock_passwd: true\n    ssh_pwauth: true\n', []),
+    ('chpasswd:\n  expire: false\n', []),
+    ('password: null', []),
+    ('password: None\n', []),
+    ('DB_PASSWORD=false', []),
+    ('password: "yes"', []),
+    # real literals that merely start like a boolean still match
+    ('password: falsehood1', ['password literal']),
+    ('plain_text_passwd: hunter22', ['password literal']),
     ('ssh-rsa AAAAB3NzaC1yc2E user@host', []),
 ])
 def test_user_data_patterns(text, expected):
@@ -863,14 +874,20 @@ TRUST_STORE = {'Name': 'ts', 'TrustStoreArn': TS_ARN, 'Status': 'ACTIVE', 'Numbe
 
 
 def test_alb_mtls_flag_fix_and_informational_paths():
-    assert _mtlsResult(None)[0] == -1                                    # internal, mTLS never configured
-    assert _mtlsResult({'Mode': 'off'})[0] == -1
-    res = _mtlsResult({'Mode': 'verify', 'TrustStoreArn': TS_ARN}, trustStore=TRUST_STORE)
-    assert res == [1, 'mTLS verify on HTTPS:443']
+    # FLAG: verify mode weakened to accept expired client certificates
     res = _mtlsResult({'Mode': 'verify', 'TrustStoreArn': TS_ARN, 'IgnoreClientCertificateExpiry': True},
                       trustStore=dict(TRUST_STORE, TotalRevokedEntries=0))
-    assert res[0] == 1 and 'no revocation list' in res[1] and 'expired' in res[1]
+    assert res[0] == -1 and 'expired' in res[1] and 'no revocation list' in res[1]
+    # FIX: same listener without IgnoreClientCertificateExpiry
+    res = _mtlsResult({'Mode': 'verify', 'TrustStoreArn': TS_ARN, 'IgnoreClientCertificateExpiry': False},
+                      trustStore=TRUST_STORE)
+    assert res == [1, 'mTLS verify on HTTPS:443']
+    res = _mtlsResult({'Mode': 'verify', 'TrustStoreArn': TS_ARN}, trustStore=dict(TRUST_STORE, TotalRevokedEntries=0))
+    assert res[0] == 1 and 'no revocation list' in res[1]
     assert _mtlsResult({'Mode': 'verify', 'TrustStoreArn': TS_ARN}, tsError='AccessDenied')[0] == 1
+    # mTLS off / passthrough: informational for every scheme (review fix round 2 - use-case dependent)
+    assert _mtlsResult(None)[0] == 0                                     # internal, mTLS never configured
+    assert _mtlsResult({'Mode': 'off'})[0] == 0
     assert _mtlsResult({'Mode': 'passthrough'})[0] == 0
     assert _mtlsResult({'Mode': 'off'}, scheme='internet-facing')[0] == 0
 
@@ -1262,6 +1279,8 @@ def test_imagebuilder_no_pipeline_paths():
     # self-owned / cross-account / Image Builder-tagged AMIs: possibly built by other tooling -> INFO
     assert _ibResult([], [{'ImageId': 'ami-0aaa', 'OwnerId': SELF}])[0] == 0
     assert _ibResult([], [{'ImageId': 'ami-0aaa', 'OwnerId': ORG_MEMBER}])[0] == 0
+    # AWS Marketplace AMIs (vendor appliances meant to run as published) -> INFO, not stock
+    assert _ibResult([], [{'ImageId': 'ami-0aaa', 'ImageOwnerAlias': 'aws-marketplace', 'OwnerId': '679593333241'}])[0] == 0
     assert _ibResult([], [{'ImageId': 'ami-0aaa', 'ImageOwnerAlias': 'amazon',
                            'Tags': [{'Key': 'Ec2ImageBuilderArn', 'Value': 'x'}]}])[0] == 0
     # deregistered AMI -> per-image retry, still not evaluable

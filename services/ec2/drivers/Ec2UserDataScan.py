@@ -11,6 +11,8 @@ Patterns are deliberately narrow to keep false positives low:
 - PEM private keys: any '-----BEGIN ... PRIVATE KEY-----' header.
 - Passwords: password / passwd assigned a literal of 4+ characters; values that
   start with $, %, {, < (variable / template / placeholder references) do not match.
+  Boolean / null values (true/false/yes/no/null/none/...) and the cloud-init key
+  'lock_passwd' (a boolean account-lock flag) are not credentials and do not match.
 """
 import base64
 import binascii
@@ -18,13 +20,18 @@ import gzip
 import io
 import re
 
+# Boolean / null-like values are settings, not credentials (e.g. cloud-init
+# 'lock_passwd: false', 'password: null').
+_NON_SECRET_VALUES = r'(?:true|false|yes|no|null|none|nil|on|off|disabled?|enabled?)'
+
 PATTERNS = (
     ('AWS access key ID', re.compile(r'(?<![A-Z0-9])(?:AKIA|ASIA)[A-Z0-9]{16}(?![A-Z0-9])')),
     ('AWS secret access key', re.compile(
         r'(?i)(?:aws_?)?secret_?access_?key["\']?\s*[:=]\s*["\']?[A-Za-z0-9/+]{40}(?![A-Za-z0-9/+])')),
     ('private key (PEM)', re.compile(r'-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----')),
     ('password literal', re.compile(
-        r'(?i)(?<![a-z])(?:password|passwd)["\']?\s*[:=]\s*["\']?(?![$%{<\s"\'`])[^\s"\'`;]{4,}')),
+        r'(?i)(?<![a-z])(?<!lock_)(?:password|passwd)["\']?\s*[:=]\s*["\']?(?![$%{<\s"\'`])'
+        r'(?!' + _NON_SECRET_VALUES + r'(?:[\s"\'`;,]|$))[^\s"\'`;]{4,}')),
 )
 
 # EC2 user data is limited to 16 KB before base64; bound decompression anyway.

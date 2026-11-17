@@ -507,6 +507,36 @@ def test_ec2_user_data_secrets_launch_template(emu, uid):
         ec2.delete_launch_template(LaunchTemplateId=ltId)
 
 
+_CLOUD_INIT_USER_DATA = ('#cloud-config\n'
+                         'users:\n'
+                         '  - name: bob\n'
+                         '    lock_passwd: false\n'
+                         '    ssh_pwauth: false\n'
+                         'chpasswd:\n'
+                         '  expire: false\n'
+                         'password: null\n')
+
+
+def test_ec2_user_data_cloud_init_settings_not_flagged(emu, uid):
+    """Regression (review round 2): cloud-init 'lock_passwd: false' / 'password: null' are
+    settings, not credentials -> must not FAIL; adding a real literal password -> FAIL."""
+    import base64
+    ec2 = emu.client('ec2')
+    lt = ec2.create_launch_template(LaunchTemplateName=f'ss-test-ci-{uid}', LaunchTemplateData={
+        'ImageId': _amazonAmi(ec2),
+        'UserData': base64.b64encode(_CLOUD_INIT_USER_DATA.encode()).decode()})['LaunchTemplate']
+    ltId = lt['LaunchTemplateId']
+    try:
+        st = runCheck(emu, 'ec2', 'ec2UserDataSecrets', f'LaunchTemplate::{ltId}').statuses()
+        assert st and -1 not in st.values(), st
+        ec2.create_launch_template_version(LaunchTemplateId=ltId, SourceVersion='1', LaunchTemplateData={
+            'UserData': base64.b64encode((_CLOUD_INIT_USER_DATA + '    plain_text_passwd: hunter22\n').encode()).decode()})
+        st = runCheck(emu, 'ec2', 'ec2UserDataSecrets', f'LaunchTemplate::{ltId}').statuses()
+        assert list(st.values()) == [-1], st
+    finally:
+        ec2.delete_launch_template(LaunchTemplateId=ltId)
+
+
 def test_vpc_endpoint_policy_full_access(emu):
     ec2 = emu.client('ec2')
     vpc = ec2.create_vpc(CidrBlock='10.97.0.0/16')['Vpc']['VpcId']
@@ -706,7 +736,8 @@ def test_ec2_auto_recovery_disabled(emu):
 
 
 def test_alb_mtls_off_internal(emu, uid, certificate):
-    """Internal ALB, HTTPS listener with mTLS off -> FAIL; verify mode with a trust store -> PASS."""
+    """Internal ALB: HTTPS listener with mTLS off -> INFO (use-case dependent);
+    verify mode with IgnoreClientCertificateExpiry=True -> FAIL; expiry enforced -> PASS."""
     elbv2 = emu.client('elbv2')
     s3 = emu.client('s3')
     bucket = f'ss-test-ts-{uid}'
@@ -722,16 +753,23 @@ def test_alb_mtls_off_internal(emu, uid, certificate):
                                    TargetType='instance')['TargetGroups'][0]['TargetGroupArn']
     listener, ts = {}, {}
     try:
+        listener.update(elbv2.create_listener(LoadBalancerArn=lb['LoadBalancerArn'], Protocol='HTTPS', Port=443,
+                                              Certificates=[{'CertificateArn': certificate}],
+                                              DefaultActions=[{'Type': 'forward', 'TargetGroupArn': tg}])['Listeners'][0])
+        st = runCheck(emu, 'ec2', 'albMtlsOff', f"ELB::{lb['LoadBalancerName']}").statuses()
+        assert list(st.values()) == [0], st
+        ts.update(elbv2.create_trust_store(Name=f'ss-ts-{uid}', CaCertificatesBundleS3Bucket=bucket,
+                                           CaCertificatesBundleS3Key='ca.pem')['TrustStores'][0])
+
         def misconfigure():
-            listener.update(elbv2.create_listener(LoadBalancerArn=lb['LoadBalancerArn'], Protocol='HTTPS', Port=443,
-                                                  Certificates=[{'CertificateArn': certificate}],
-                                                  DefaultActions=[{'Type': 'forward', 'TargetGroupArn': tg}])['Listeners'][0])
+            elbv2.modify_listener(ListenerArn=listener['ListenerArn'],
+                                  MutualAuthentication={'Mode': 'verify', 'TrustStoreArn': ts['TrustStoreArn'],
+                                                        'IgnoreClientCertificateExpiry': True})
 
         def fix():
-            ts.update(elbv2.create_trust_store(Name=f'ss-ts-{uid}', CaCertificatesBundleS3Bucket=bucket,
-                                               CaCertificatesBundleS3Key='ca.pem')['TrustStores'][0])
             elbv2.modify_listener(ListenerArn=listener['ListenerArn'],
-                                  MutualAuthentication={'Mode': 'verify', 'TrustStoreArn': ts['TrustStoreArn']})
+                                  MutualAuthentication={'Mode': 'verify', 'TrustStoreArn': ts['TrustStoreArn'],
+                                                        'IgnoreClientCertificateExpiry': False})
 
         _, after = assertFlagFixCycle(emu, 'ec2', 'albMtlsOff', f"ELB::{lb['LoadBalancerName']}", misconfigure, fix)
         assert list(after.values()) == [1]
