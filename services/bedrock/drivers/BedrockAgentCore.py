@@ -188,7 +188,7 @@ class BedrockAgentCore(Evaluator):
                 self.iamClient, roleName, self.BROAD_RUNTIME_ACTIONS
             )
             if findings is None:
-                unverified += 1  # Throttled — count as unverified
+                unverified += 1  # Policies not readable — count as unverified
                 continue
             elif findings:
                 offenders.append(f"{name}({'; '.join(findings)})")

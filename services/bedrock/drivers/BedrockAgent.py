@@ -68,7 +68,7 @@ class BedrockAgent(Evaluator):
         findings = _inspectRoleForBroadPolicies(self.iamClient, roleName, self.BROAD_ACTIONS)
         if findings is None:
             # Throttled — cannot determine, report INFO instead of false PASS
-            self.results['bedrockAgentIamRoleOverprivileged'] = [0, "IAM inspection throttled — cannot verify role scope"]
+            self.results['bedrockAgentIamRoleOverprivileged'] = [0, "Unable to evaluate (IAM role policies not readable)"]
         elif findings:
             self.results['bedrockAgentIamRoleOverprivileged'] = [
                 -1,
@@ -234,10 +234,14 @@ def _inspectRoleForBroadPolicies(iamClient, roleName, broadActions):
     """
     Returns a list of findings (strings) for any policy on the role that grants
     wildcard actions or wildcard resources with broad actions.
-    Returns [] when the role looks scoped, or when the inspection cannot complete
-    (e.g., AccessDenied) — caller treats [] as "pass".
+    Returns [] only when every policy on the role was read and none is broad.
+    Returns None when the inspection could not complete (AccessDenied,
+    NoSuchEntity, throttling, or any policy document that could not be read)
+    and nothing broad was found — callers must report this as "unable to
+    evaluate", never as a pass.
     """
     findings = []
+    incomplete = False
     try:
         # Inline policies
         inline = iamClient.list_role_policies(RoleName=roleName)
@@ -248,6 +252,7 @@ def _inspectRoleForBroadPolicies(iamClient, roleName, broadActions):
                 if _statementsAreBroad(policyDoc, broadActions):
                     findings.append(f"inline:{policyName}")
             except botocore.exceptions.ClientError:
+                incomplete = True
                 continue
 
         # Attached managed policies
@@ -268,15 +273,16 @@ def _inspectRoleForBroadPolicies(iamClient, roleName, broadActions):
                 if _statementsAreBroad(policyDoc, broadActions):
                     findings.append(f"managed:{policyName}")
             except botocore.exceptions.ClientError:
+                incomplete = True
                 continue
     except botocore.exceptions.ClientError as e:
         code = e.response.get('Error', {}).get('Code', '')
-        if code in ('Throttling', 'ThrottlingException', 'TooManyRequestsException', 'RequestLimitExceeded'):
-            return None  # Signal throttle — caller should report INFO, not PASS
-        if code not in ('AccessDenied', 'AccessDeniedException', 'NoSuchEntity', 'NoSuchEntityException'):
+        if code not in ('AccessDenied', 'AccessDeniedException', 'NoSuchEntity', 'NoSuchEntityException',
+                        'Throttling', 'ThrottlingException', 'TooManyRequestsException', 'RequestLimitExceeded'):
             print(f"IAM inspection error on role {roleName}: {code}")
-        # Treat unavailable inspection as no finding
-        return []
+        return findings or None
+    if incomplete and not findings:
+        return None
     return findings
 
 
