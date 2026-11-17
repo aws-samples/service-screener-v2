@@ -29,7 +29,11 @@ class Config(Service):
       - describe_retention_configurations  (paginated)
       - describe_configuration_aggregators (paginated)
       - describe_remediation_configurations (batched, 25 rule names per call,
-                                             only for NON_COMPLIANT rules)
+                                             for every Config rule)
+
+    API failures are recorded in detail['_errors'] ({api_name: error_code}) so
+    checks can report 'Unable to evaluate (<code>)' instead of treating an
+    empty (unreadable) list as a real absence.
 
     The class name MUST be `Config` and the module MUST be
     services/config/Config.py: Screener.getServiceModuleDynamically builds the
@@ -75,6 +79,7 @@ class Config(Service):
         a taggable resource, so a tag filter cannot meaningfully include or
         exclude it. Behaving otherwise would silently drop account-level findings.
         """
+        self._errors = {}
         try:
             recorders = self._describeConfigurationRecorders()
             detail = {
@@ -89,8 +94,6 @@ class Config(Service):
                 '_aggregators': self._describeConfigurationAggregators(),
                 '_keyResourceTypes': self.KEY_RESOURCE_TYPES,
             }
-            ## Only meaningful for rules that are actually failing, so derive the
-            ## non-compliant set first and query remediation for just those.
             nonCompliant = [
                 entry.get('ConfigRuleName')
                 for entry in detail['_compliance']
@@ -98,8 +101,16 @@ class Config(Service):
                 and entry.get('ConfigRuleName')
             ]
             detail['_nonCompliantRules'] = nonCompliant
+            ## Remediation is queried for every rule (not just NON_COMPLIANT
+            ## ones): configNoRemediationActions filters to the failing rules,
+            ## while configRemediationManualOnly needs the account-wide view.
+            allRuleNames = [
+                r.get('ConfigRuleName') for r in detail['_configRules']
+                if r.get('ConfigRuleName')
+            ]
             detail['_remediationConfigurations'] = \
-                self._describeRemediationConfigurations(nonCompliant)
+                self._describeRemediationConfigurations(allRuleNames)
+            detail['_errors'] = dict(self._errors)
 
             _pi('Config', f"Account posture in {self.region}")
             return detail
@@ -230,6 +241,10 @@ class Config(Service):
     # ------------------------------------------------------------------ #
     def _logClientError(self, where, error):
         code = error.response.get('Error', {}).get('Code', 'Unknown')
+        ## Remember the failure so checks never mistake "unreadable" for "absent".
+        if not hasattr(self, '_errors'):
+            self._errors = {}
+        self._errors.setdefault(where, code)
         if code in ('AccessDenied', 'AccessDeniedException', 'AuthorizationError'):
             return
         msg = error.response.get('Error', {}).get('Message', str(error))
