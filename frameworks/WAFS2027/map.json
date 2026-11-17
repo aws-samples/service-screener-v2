@@ -31,7 +31,6 @@
                 "iam.scpBestPractices"
             ],
             "FND01-BP04 Establish a strategy for experimental and temporary environments": [
-                "ec2.EC2StoppedTooLong",
                 "iam.enableCostBudget"
             ]
         },
@@ -73,16 +72,13 @@
             "FND02-BP03 Employ a centralized identity provider": [
                 "iam.hasExternalIdentityProvider",
                 "iam.hasSSORoles",
-                "iam.iamUsersWithFederationAvailable",
-                "iam.noUsersFound",
-                "iam.userNotUsingGroup"
+                "iam.iamUsersWithFederationAvailable"
             ],
             "FND02-BP04 Establish controls to manage access based on lifecycle": [
                 "iam.SCPEnabled",
                 "iam.consoleLastAccess365",
                 "iam.consoleLastAccess90",
                 "iam.groupEmptyUsers",
-                "iam.missingPermissionsBoundaries",
                 "iam.unusedRole",
                 "iam.userNoActivity90days",
                 "iam.userNotUsingGroup"
@@ -95,7 +91,6 @@
                 "iam.ManagedPolicyFullAccessOneServ",
                 "iam.missingPermissionsBoundaries",
                 "iam.missingPolicyConditions",
-                "iam.scpBestPractices",
                 "iam.userNotUsingGroup",
                 "iam.wildcardActionsDetection"
             ],
@@ -140,9 +135,7 @@
                 "iam.unusedCustomerManagedPolicy",
                 "iam.unusedRole",
                 "iam.userNoActivity90days",
-                "kms.GrantDuplicate",
-                "kms.KeyUnused",
-                "secretsmanager.smNotUsedRecently"
+                "kms.GrantDuplicate"
             ],
             "FND02-BP10 Establish workload and machine identity federation": [
                 "ec2.EC2IamProfile",
@@ -168,19 +161,46 @@
         },
         "FND04 Resource and inventory management": {
             "FND04-BP01 Implement standardized attribution policies": [
-                "acm.acmCertNoTags"
+                "acm.acmCertNoTags",
+                "cloudformation.cfnNoTags",
+                "dynamodb.resourcesWithoutTags",
+                "ec2.EC2HasTag",
+                "eks.eksClusterNoTags",
+                "rds.DBInstanceWithoutTags"
             ],
-            "FND04-BP02 Establish an organization view of cloud inventory and dependencies": [],
+            "FND04-BP02 Establish an organization view of cloud inventory and dependencies": [
+                "config.configAggregatorMissing",
+                "ssm.ssmInventoryNotConfigured"
+            ],
             "FND04-BP03 Establish standard repositories of shared resources and patterns": [],
-            "FND04-BP04 Implement mechanisms for patch management": [],
+            "FND04-BP04 Implement mechanisms for patch management": [
+                "ec2.EC2SSMNotManaged",
+                "rds.AutoMinorVersionUpgrade",
+                "ssm.ssmDefaultHostManagementDisabled",
+                "ssm.ssmManagedInstanceNotPatched"
+            ],
             "FND04-BP05 Establish service quota management": [
                 "cloudwatch.missingServiceQuotaAlarms",
                 "ec2.EC2ServiceQuotas",
                 "lambda.lambdaQuotasNotMonitored"
             ],
-            "FND04-BP06 Establish centralized backup standards and mechanisms": [],
-            "FND04-BP07 Establish cross-Region replication and failover capabilities": [],
-            "FND04-BP08 Establish resilience testing tooling": []
+            "FND04-BP06 Establish centralized backup standards and mechanisms": [
+                "backup.backupCriticalResourcesUnprotected",
+                "backup.backupCrossAccountDisabled",
+                "backup.backupNoPlanExists",
+                "backup.backupPlanNotAssigned",
+                "iam.hasAWSBackupPlans"
+            ],
+            "FND04-BP07 Establish cross-Region replication and failover capabilities": [
+                "backup.backupPlanNoCrossRegionCopy",
+                "ecr.ecrReplicationNotConfigured",
+                "efs.ReplicationEnabled",
+                "rds.CrossRegionBackupNotEnabled",
+                "s3.CrossRegionReplication"
+            ],
+            "FND04-BP08 Establish resilience testing tooling": [
+                "backup.backupRecoveryPointNeverRestored"
+            ]
         },
         "FND05 Security and compliance": {
             "FND05-BP01 Shift compliance checks left with proactive controls": [
@@ -337,7 +357,6 @@
                 "backup.backupCrossAccountDisabled",
                 "backup.backupNoLogicallyAirGappedVault",
                 "backup.backupNoPlanExists",
-                "backup.backupRecoveryPointNeverRestored",
                 "backup.backupVaultNoLock",
                 "cloudtrail.LogFileValidationEnabled",
                 "ec2.EBSSnapshot"
@@ -363,10 +382,13 @@
         "FND07 Networking and connectivity": {
             "FND07-BP01 Define your network and connectivity strategy and centralized resources": [],
             "FND07-BP02 Implement centralized network protection controls": [
-                "route53.route53ResolverDnsFirewallNotConfigured"
+                "route53.route53ResolverDnsFirewallNotConfigured",
+                "wafv2.wafv2AlbWithoutWebAcl",
+                "wafv2.wafv2CloudFrontWithoutWebAcl"
             ],
             "FND07-BP03 Establish centralized DNS management": [
                 "route53.route53DanglingDnsRecords",
+                "route53.route53DomainAutoRenewDisabled",
                 "route53.route53DomainPrivacyDisabled",
                 "route53.route53DomainTransferLockDisabled"
             ]
@@ -438,8 +460,6 @@
                 "codebuild.cbPlaintextCredentialsInEnvVars",
                 "codebuild.cbSourceCredentialsInsecure",
                 "codebuild.cbSourceUrlCredentials",
-                "cognito.cognitoClientNoSecret",
-                "ec2.EC2KeyPairNotInUse",
                 "ecs.ecsTaskDefinitionNoSecretsInEnvVars",
                 "inspector.inspectorCodeRepositoryScanningDisabled",
                 "rds.DBwithSomeSecretsManagerOnly",
@@ -462,6 +482,7 @@
                 "cognito.cognitoAdvancedSecurityNotEnforced",
                 "cognito.cognitoClientImplicitGrantEnabled",
                 "cognito.cognitoClientInsecureAuthFlow",
+                "cognito.cognitoClientNoSecret",
                 "cognito.cognitoClientTokenRevocationDisabled",
                 "cognito.cognitoClientUserExistenceErrors",
                 "cognito.cognitoCompromisedCredentialIncompleteFilter",
@@ -487,6 +508,7 @@
                 "appsync.appsyncApiKeyExpiringSoon",
                 "cloudwatch.trailWOMAAuthFail6",
                 "cloudwatch.trailWOMAalarm4",
+                "ec2.EC2KeyPairNotInUse",
                 "iam.bedrockApiKeyUnusedUser",
                 "iam.consoleLastAccess365",
                 "iam.consoleLastAccess45",
@@ -496,6 +518,7 @@
                 "iam.mfaActive",
                 "iam.passwordLastChange365",
                 "iam.passwordLastChange90",
+                "iam.rootMfaActive",
                 "iam.unusedRole",
                 "iam.userNoActivity90days",
                 "secretsmanager.smLastChangedOld",
@@ -510,7 +533,6 @@
                 "bedrock.bedrockAgentIamRoleOverprivileged",
                 "bedrock.bedrockKBRoleOverprivileged",
                 "cloudformation.cfnIAMCapabilityGranted",
-                "cloudwatch.trailWOMAunauthAPI2",
                 "cognito.cognitoClientExcessiveScopes",
                 "cognito.cognitoGroupOverlyPermissiveRole",
                 "ec2.EC2IamProfile",
@@ -534,7 +556,6 @@
                 "redshift.IAMRoles",
                 "s3.WildcardPrincipalsActions",
                 "sns.snsPolicyOverlyBroadActions",
-                "sns.snsPolicyVersionOutdated",
                 "sqs.AccessPolicy",
                 "stepfunctions.sfnIAMRoleAllowsPassRole",
                 "stepfunctions.sfnRoleOverprivileged"
@@ -568,7 +589,6 @@
                 "kms.KeyPolicyCrossAccount",
                 "kms.KeyPolicyWildcardPrincipal",
                 "lambda.lambdaPublicAccess",
-                "lambda.lambdaURLInUsed",
                 "lambda.lambdaURLWithoutAuth",
                 "rds.SnapshotRDSIsPublic",
                 "s3.MacieToEnable",
@@ -603,7 +623,6 @@
         },
         "SEC04 Detection": {
             "SEC04-BP01 Configure service and application logging": [
-                "acm.acmCertTransparencyDisabled",
                 "apigateway.AccessLogging",
                 "apigateway.ExecutionLogging",
                 "appsync.appsyncCloudWatchLogsNotEnabled",
@@ -677,7 +696,6 @@
             ],
             "SEC04-BP02 Prepare metrics, alarms, and dashboards": [
                 "apigateway.CloudWatchAlarms",
-                "apigateway.PerformanceMonitoring",
                 "cloudtrail.CloudWatchAlarmsConfigured",
                 "cloudtrail.HasInsightSelectors",
                 "cloudwatch.alarmsWithoutSNS",
@@ -703,13 +721,9 @@
                 "cloudwatch.trailWithCWLogsWithoutMetrics",
                 "cognito.cognitoAccountTakeoverNoNotification",
                 "config.configDeliveryChannelSNSMissing",
-                "lambda.lambdaNoCloudWatchAlarms",
-                "opensearch.CloudWatchAlarms",
                 "rds.EventSubscriptionNotConfigured",
                 "redshift.EventNotifications",
-                "route53.route53HealthCheckNoAlarm",
                 "s3.CloudWatchRequestMetrics",
-                "sqs.QueueMonitoring",
                 "wafv2.wafv2CloudWatchMetricsDisabled",
                 "wafv2.wafv2RuleVisibilityDisabled",
                 "wafv2.wafv2SampledRequestsDisabled"
@@ -755,7 +769,6 @@
                 "efs.MountTargetSecurityGroups",
                 "eks.eksClusterSGRestriction",
                 "eks.eksPublicEndpointNoCidrRestriction",
-                "elasticache.DefaultPort",
                 "rds.PubliclyAccessible",
                 "rds.SecurityGroupDefault",
                 "rds.SecurityGroupIPRangeNotPrivateCidr",
@@ -911,8 +924,7 @@
         "SEC07 Data classification": {
             "SEC07-BP01 Understand your data classification scheme": [
                 "ec2.EBSVolumeDataClassification",
-                "efs.NoSensitiveDataInTags",
-                "route53.route53PublicZoneSensitiveNames"
+                "efs.NoSensitiveDataInTags"
             ],
             "SEC07-BP02 Apply data protection controls based on data sensitivity": [
                 "config.configRulesNonCompliant",
@@ -947,7 +959,6 @@
                 "cloudwatch.trailWOMACMK7",
                 "kinesis.kinesisKMSKeyRotationDisabled",
                 "kms.AdminIsGrantor",
-                "kms.DisabledKey",
                 "kms.GrantDuplicate",
                 "kms.GrantMissingEncryptionContext",
                 "kms.GrantOldAge",
@@ -1035,6 +1046,7 @@
             "SEC08-BP03 Automate data at rest protection": [
                 "accessanalyzer.aaUnusedAccessAnalyzerMissing",
                 "backup.backupCriticalResourcesUnprotected",
+                "backup.backupNoLogicallyAirGappedVault",
                 "backup.backupNoPlanExists",
                 "cloudformation.cfnDriftDetected",
                 "config.configNoRemediationActions",
@@ -1045,7 +1057,8 @@
                 "guardduty.S3ProtectionDisabled",
                 "iam.EnableConfigService",
                 "iam.PartialEnableConfigService",
-                "iam.hasAWSBackupPlans"
+                "iam.hasAWSBackupPlans",
+                "s3.MacieToEnable"
             ],
             "SEC08-BP04 Enforce access control": [
                 "accessanalyzer.aaUnresolvedExternalAccess",
@@ -1076,7 +1089,6 @@
                 "s3.PublicReadAccessBlock",
                 "s3.PublicWriteAccessBlock",
                 "s3.S3AccountPublicAccessBlock",
-                "s3.UnpredictableBucketNames",
                 "s3.WildcardPrincipalsActions",
                 "secretsmanager.smResourcePolicyPublicAccess",
                 "sns.snsPublicAccess",
@@ -1098,7 +1110,6 @@
                 "acm.acmImportedCertNoAutoRenewal",
                 "acm.acmRSAKeyLength",
                 "acm.acmWildcardCert",
-                "cloudfront.CustomSSLCertificate",
                 "cloudtrail.LogFileValidationEnabled",
                 "rds.CACertExpiringIn365days",
                 "sns.snsPlatformAppCertExpiringSoon"
@@ -1177,8 +1188,6 @@
         "SEC11 Application security": {
             "SEC11-BP01 Embed security ownership in workload teams, and train for application security": [],
             "SEC11-BP02 Follow established secure coding guidelines": [
-                "apigateway.CORSConfiguration",
-                "apigateway.RequestValidation",
                 "appsync.appsyncIntrospectionEnabled",
                 "inspector.inspectorCodeRepositoryScanningDisabled",
                 "inspector.inspectorLambdaCodeScanningDisabled"
@@ -1203,12 +1212,10 @@
                 "inspector.inspectorCodeRepositoryScanningDisabled"
             ],
             "SEC11-BP07 Deploy software programmatically": [
-                "apigateway.CanaryDeployment",
                 "cloudformation.cfnDriftDetected",
                 "cloudformation.cfnNoRollbackConfiguration",
                 "cloudformation.cfnRollbackFailed",
                 "cloudformation.cfnStackPolicyMissing",
-                "cloudformation.cfnTerminationProtectionDisabled",
                 "ecr.ecrTagImmutability",
                 "ecs.ecsServiceDeploymentCircuitBreakerEnabled",
                 "ecs.ecsServiceDeploymentCircuitBreakerRollback",
@@ -1266,13 +1273,10 @@
                 "backup.backupPlanInfrequentSchedule",
                 "backup.backupPlanNoCompletionWindow",
                 "backup.backupPlanNoContinuousBackup",
-                "backup.backupPlanNoLifecycle",
                 "backup.backupPlanNoRules",
                 "backup.backupPlanNotAssigned",
-                "backup.backupRecoveryPointExpiredLifecycle",
                 "backup.backupVaultEmpty",
                 "dynamodb.disabledPointInTimeRecovery",
-                "ec2.EBSSnapshotDeletedVolume",
                 "efs.AutomatedBackup",
                 "elasticache.BackupEnabled",
                 "iam.hasAWSBackupPlans",
@@ -1296,7 +1300,6 @@
             "REL13-BP01 Define recovery objectives for downtime and data loss": [],
             "REL13-BP02 Use defined recovery strategies to meet the recovery objectives": [
                 "backup.backupPlanNoCrossRegionCopy",
-                "dynamodb.globalTableVersion",
                 "ecr.ecrReplicationNotConfigured",
                 "efs.ReplicationEnabled",
                 "elasticache.GlobalDatastoreConfig",
@@ -1304,7 +1307,6 @@
                 "rds.CrossRegionBackupNotEnabled",
                 "redshift.CrossRegionSnapshots",
                 "s3.BucketReplication",
-                "s3.CrossRegionReplication",
                 "secretsmanager.smReplicationNotConfigured"
             ],
             "REL13-BP03 Test disaster recovery implementation to validate the implementation": [
