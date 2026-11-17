@@ -256,7 +256,7 @@
     },
     "cbServiceRoleOverprivileged": {
         "category": "S",
-        "^description": "{$COUNT} CodeBuild project(s) use a service role with administrator access (the AWS managed AdministratorAccess policy, or an attached/inline statement allowing Action \"*\" on Resource \"*\"). A build runs whatever its source, buildspec and downloaded dependencies tell it to, so the service role's permissions are effectively granted to every contributor and every third-party package in the build. A compromised dependency or a malicious commit can then take over the whole account. Scope the role to the specific buckets, repositories, log groups and keys the build needs.",
+        "^description": "{$COUNT} CodeBuild project(s) use a service role with administrator or administrator-equivalent access (the AWS managed AdministratorAccess, PowerUserAccess or IAMFullAccess policy, or an attached/inline statement that on Resource \"*\" allows Action \"*\", Action \"iam:*\" or any NotAction). A build runs whatever its source, buildspec and downloaded dependencies tell it to, so the service role's permissions are effectively granted to every contributor and every third-party package in the build. A compromised dependency or a malicious commit can then take over the whole account. Scope the role to the specific buckets, repositories, log groups and keys the build needs.",
         "shortDesc": "Scope the CodeBuild service role to least privilege",
         "criticality": "H",
         "downtime": 0,
@@ -274,7 +274,7 @@
     },
     "cbWebhookUnfiltered": {
         "category": "S",
-        "^description": "{$COUNT} CodeBuild project(s) have a source webhook that builds pull requests from any actor: either the webhook has no filter groups, or a filter group matching PULL_REQUEST_CREATED/UPDATED/REOPENED/CLOSED has no ACTOR_ACCOUNT_ID filter, and comment approval for pull request builds is not required. Un-reviewed code from any contributor or fork then runs with the project's service role, secrets and network access. Restrict PR builds with an ACTOR_ACCOUNT_ID filter or require comment approval (pullRequestBuildPolicy). Repository visibility is not visible to this check; the risk is lower for private repositories with only trusted collaborators.",
+        "^description": "{$COUNT} CodeBuild project(s) have a source webhook that builds pull requests from any actor: either the webhook has no filter groups, or a filter group matching PULL_REQUEST_CREATED/UPDATED/REOPENED/CLOSED has no ACTOR_ACCOUNT_ID filter, and comment approval for pull request builds is not required (or read/triage-level roles may approve, which is not a gate). Un-reviewed code from any contributor or fork then runs with the project's service role, secrets and network access. Restrict PR builds with an ACTOR_ACCOUNT_ID filter or require comment approval (pullRequestBuildPolicy). Repository visibility is not visible to this check; the risk is lower for private repositories with only trusted collaborators.",
         "shortDesc": "Restrict webhook PR builds to trusted actors",
         "criticality": "M",
         "downtime": 0,

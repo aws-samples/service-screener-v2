@@ -83,6 +83,17 @@ class CodebuildProject(Evaluator):
     ## builds behind an approving comment from a repository collaborator.
     PR_APPROVAL_GATED = frozenset(['ALL_PULL_REQUESTS', 'FORK_PULL_REQUESTS'])
 
+    ## pullRequestBuildPolicy.approverRoles below write access. A comment
+    ## approval any reader/triager can give is not a trust gate.
+    LOW_TRUST_APPROVER_ROLES = frozenset([
+        'GITHUB_READ', 'GITHUB_TRIAGE',
+        'GITLAB_GUEST', 'GITLAB_PLANNER', 'GITLAB_REPORTER',
+        'BITBUCKET_READ',
+    ])
+
+    ## Webhook.status values for which the webhook does not trigger builds.
+    WEBHOOK_INACTIVE = frozenset(['CREATE_FAILED', 'DELETING'])
+
     IAM_DENIED_CODES = ('AccessDenied', 'AccessDeniedException',
                         'UnauthorizedOperation', 'AuthorizationError')
 
@@ -484,9 +495,16 @@ class CodebuildProject(Evaluator):
         A build executes whatever the source and its dependencies tell it to,
         so its service role is effectively granted to every contributor and
         every package the build pulls. FAIL when that role carries
-        administrator access: the AWS managed AdministratorAccess policy, or a
-        customer managed / inline statement that Allows Action "*" (or "*:*")
-        on Resource "*".
+        administrator or administrator-equivalent access: the AWS managed
+        AdministratorAccess, PowerUserAccess or IAMFullAccess policy, or a
+        customer managed / inline statement that Allows on Resource "*" either
+        Action "*" / "*:*", Action "iam:*" (self-escalation), or any NotAction
+        (PowerUser shape).
+
+        The IamCommon evaluators (services/iam/drivers/IamCommon.py) are not
+        reused: they write IAM-service result keys (FullAdminAccess,
+        InlinePolicy, ...) onto the evaluator rather than returning a verdict,
+        and do not cover NotAction.
 
         A permissions boundary caps the effective permissions; when the role
         has one that is not itself admin-shaped, report INFO instead of FAIL.
@@ -542,7 +560,8 @@ class CodebuildProject(Evaluator):
 
         if not adminSources:
             return [1, f"service role '{roleName}' has no administrator-level "
-                       "policy (AdministratorAccess or Allow *:* on *)"]
+                       "policy (AdministratorAccess/PowerUserAccess/"
+                       "IAMFullAccess, or Allow *, iam:* or NotAction on *)"]
 
         boundary = (role.get('PermissionsBoundary') or {}).get(
             'PermissionsBoundaryArn')
@@ -561,7 +580,8 @@ class CodebuildProject(Evaluator):
                            f"by permissions boundary {boundary}; review that "
                            "the boundary is least privilege"]
 
-        return [-1, f"service role '{roleName}' grants administrator access "
+        return [-1, f"service role '{roleName}' grants administrator or "
+                    "administrator-equivalent access "
                     f"via {self._joinNames(adminSources)} - any code the build "
                     "runs (source, dependencies, buildspec) can do anything in "
                     "the account"]
@@ -576,9 +596,9 @@ class CodebuildProject(Evaluator):
                 arn = policy.get('PolicyArn') or ''
                 pname = policy.get('PolicyName') or arn.rsplit('/', 1)[-1]
                 if self._isAwsManagedArn(arn):
-                    ## Only AdministratorAccess among AWS managed policies
-                    ## grants *:* on *; others are not fetched (cost).
-                    if arn.endswith(':policy/AdministratorAccess'):
+                    ## AWS managed policies are matched by name (not fetched,
+                    ## for cost): admin and admin-equivalent ones only.
+                    if self._awsManagedIsAdmin(arn):
                         sources.append(f'{pname} (attached)')
                     continue
                 if self._managedPolicyIsAdmin(arn):
@@ -599,12 +619,24 @@ class CodebuildProject(Evaluator):
         parts = arn.split(':')
         return len(parts) >= 6 and parts[4] == 'aws'
 
+    ## AWS managed policies treated as administrator-equivalent:
+    ##   AdministratorAccess -- Allow * on *
+    ##   PowerUserAccess     -- Allow NotAction iam/organizations/account on *
+    ##   IAMFullAccess       -- iam:* lets the role grant itself admin
+    ADMIN_EQUIVALENT_AWS_POLICIES = frozenset([
+        'AdministratorAccess', 'PowerUserAccess', 'IAMFullAccess'])
+
+    @classmethod
+    def _awsManagedIsAdmin(cls, arn):
+        ## arn:<partition>:iam::aws:policy[/path]/<name>
+        return arn.rsplit('/', 1)[-1] in cls.ADMIN_EQUIVALENT_AWS_POLICIES
+
     def _managedPolicyIsAdmin(self, policyArn):
         cacheKey = 'policy::' + policyArn
         if cacheKey in self.roleCache:
             return self.roleCache[cacheKey]
         if self._isAwsManagedArn(policyArn):
-            result = policyArn.endswith(':policy/AdministratorAccess')
+            result = self._awsManagedIsAdmin(policyArn)
         else:
             pol = self.iamClient.get_policy(PolicyArn=policyArn).get('Policy') or {}
             versionId = pol.get('DefaultVersionId')
@@ -617,9 +649,21 @@ class CodebuildProject(Evaluator):
         self.roleCache[cacheKey] = result
         return result
 
-    @staticmethod
-    def _documentIsAdmin(doc):
-        """True when any Allow statement grants Action * / *:* on Resource *."""
+    ## Actions that, granted on Resource "*", let a principal escalate to
+    ## full administrator (attach/put any policy on itself, etc.).
+    ESCALATION_WILDCARDS = frozenset(['iam:*'])
+
+    @classmethod
+    def _documentIsAdmin(cls, doc):
+        """
+        True when any Allow statement on Resource "*" grants:
+          - Action "*" or "*:*" (administrator), or
+          - NotAction ... (everything except the listed actions - e.g. the
+            PowerUserAccess shape; admin-equivalent for a build role), or
+          - Action "iam:*" (can grant itself administrator).
+        Statements with NotResource or a narrower Resource are not counted;
+        Conditions are not evaluated (a conditioned admin grant still FAILs).
+        """
         if isinstance(doc, str):
             try:
                 doc = json.loads(urllib.parse.unquote(doc))
@@ -633,17 +677,22 @@ class CodebuildProject(Evaluator):
         for st in statements:
             if not isinstance(st, dict) or st.get('Effect') != 'Allow':
                 continue
-            actions = st.get('Action')
-            if actions is None:
-                continue
-            actions = actions if isinstance(actions, list) else [actions]
-            if not any(a in ('*', '*:*') for a in actions):
-                continue
             if 'NotResource' in st:
                 continue
             resources = st.get('Resource')
             resources = resources if isinstance(resources, list) else [resources]
-            if '*' in resources:
+            if '*' not in resources:
+                continue
+            if 'NotAction' in st:
+                return True
+            actions = st.get('Action')
+            if actions is None:
+                continue
+            actions = actions if isinstance(actions, list) else [actions]
+            actions = [a.lower() for a in actions if isinstance(a, str)]
+            if any(a in ('*', '*:*') for a in actions):
+                return True
+            if any(a in cls.ESCALATION_WILDCARDS for a in actions):
                 return True
         return False
 
@@ -658,7 +707,9 @@ class CodebuildProject(Evaluator):
           - a filter group matches an unreviewed PULL_REQUEST_* event and has no
             ACTOR_ACCOUNT_ID include filter (excludeMatchedPattern false),
         unless pullRequestBuildPolicy.requiresCommentApproval gates PR builds
-        behind collaborator approval.
+        behind collaborator approval AND no approverRoles entry is a
+        read/triage-level role (those do not gate anything). A webhook whose
+        status is CREATE_FAILED or DELETING does not trigger builds: INFO.
 
         Repository visibility is not observable through CodeBuild, so a private
         repository with only trusted collaborators is still reported; the
@@ -671,14 +722,36 @@ class CodebuildProject(Evaluator):
                 0, f"Project '{self.name}' has no source webhook"]
             return
 
+        status = webhook.get('status')
+        if status in self.WEBHOOK_INACTIVE:
+            self.results[key] = [
+                0,
+                f"Project '{self.name}' webhook is {status} and does not "
+                "trigger builds"
+                + (f" ({webhook.get('statusMessage')})"
+                   if webhook.get('statusMessage') else "")]
+            return
+
         policy = webhook.get('pullRequestBuildPolicy') or {}
         approval = policy.get('requiresCommentApproval')
-        if approval in self.PR_APPROVAL_GATED:
+        approvers = [r for r in (policy.get('approverRoles') or []) if r]
+        weakApprovers = sorted(set(approvers) & self.LOW_TRUST_APPROVER_ROLES)
+        if approval in self.PR_APPROVAL_GATED and not weakApprovers:
+            approverText = (', '.join(approvers) if approvers
+                            else 'default write-level-and-above roles')
             self.results[key] = [
                 1,
                 f"Project '{self.name}' webhook requires comment approval for "
-                f"pull request builds ({approval})"]
+                f"pull request builds ({approval}; approvers: {approverText})"]
             return
+        ## Approval by read/triage-level users is not a meaningful gate: anyone
+        ## who can read the repository (any GitHub user for a public repo) can
+        ## approve. Fall through to the actor-filter evaluation.
+        weakNote = ''
+        if approval in self.PR_APPROVAL_GATED and weakApprovers:
+            weakNote = (f" Comment approval ({approval}) is configured but "
+                        f"low-trust roles can approve ({', '.join(weakApprovers)}),"
+                        " so it does not gate builds.")
 
         groups = webhook.get('filterGroups') or []
         if not groups:
@@ -688,7 +761,8 @@ class CodebuildProject(Evaluator):
                 "event - including pull requests from any contributor or fork "
                 "- starts a build with the project's service role. (Repository "
                 "visibility is not visible to this check; lower risk if the "
-                "repository is private and collaborators are trusted.)"]
+                "repository is private and collaborators are trusted.)"
+                + weakNote]
             return
 
         offending = []
@@ -711,7 +785,8 @@ class CodebuildProject(Evaluator):
                 f"ACTOR_ACCOUNT_ID filter in {self._joinNames(offending)} - "
                 "un-reviewed code from any contributor or fork runs with the "
                 "project's service role. (Repository visibility is not visible "
-                "to this check; lower risk if the repository is private.)"]
+                "to this check; lower risk if the repository is private.)"
+                + weakNote]
         else:
             self.results[key] = [
                 1,
@@ -740,21 +815,33 @@ class CodebuildProject(Evaluator):
     def _checkCbProjectNoTestReports(self):
         """
         Evidence that the project publishes test / code-coverage reports:
-          a. its inline buildspec has a top-level 'reports:' section; or
+          a. its inline buildspec (YAML or JSON, e.g. CDK BuildSpec.fromObject)
+             has a non-empty top-level 'reports' section; or
           b. a recent report in any report group was produced by this
              project (report.executionId names the project); or
           c. a report group named '<project>-<name>' exists (the name CodeBuild
-             gives auto-created report groups).
-        FAIL when the inline buildspec has no reports section and (b)/(c) find
-        nothing, or when the buildspec lives in the source and (b)/(c) are
-        fully readable and find nothing. If report data cannot be read and the
-        buildspec is not inline, report 'Unable to evaluate'.
+             gives auto-created report groups), attributed to the project with
+             the LONGEST matching name so 'app' does not claim 'app-api-tests'
+             that belongs to project 'app-api'.
+
+        Outcomes:
+          - inline buildspec structurally parsed and has no reports section:
+            FAIL (the buildspec is authoritative for which reports a build
+            publishes; b/c are still checked first in case reports are
+            supplied by a buildspec override);
+          - buildspec in the source repository, or an inline buildspec that
+            could not be parsed: FAIL only when b/c are fully readable and find
+            nothing; 'Unable to evaluate' when report data cannot be read.
+
+        Heuristic limits (tier 3, criticality L): only the 25 newest reports
+        per group are sampled for (b); a prefix-named group (c) is attributed
+        by name only.
         """
         key = 'cbProjectNoTestReports'
         buildspec = (self.source.get('buildspec') or '')
-        inline = '\n' in buildspec.strip()
+        state = self._buildspecReportsState(buildspec)
 
-        if inline and re.search(r'(?m)^reports\s*:', buildspec):
+        if state == 'reports':
             self.results[key] = [
                 1, f"Project '{self.name}' buildspec defines a reports section"]
             return
@@ -765,13 +852,16 @@ class CodebuildProject(Evaluator):
                 self.results[key] = [
                     1, f"Project '{self.name}' has published test reports"]
                 return
-            prefix = self.name + '-'
-            if any(g.startswith(prefix) for g in index.get('groupNames', [])):
+            knownProjects = set(index.get('projectNames') or []) | {self.name}
+            ownGroups = [g for g in index.get('groupNames', [])
+                         if self._groupOwner(g, knownProjects) == self.name]
+            if ownGroups:
                 self.results[key] = [
-                    1, f"Project '{self.name}' has a report group"]
+                    1, f"Project '{self.name}' has a report group "
+                       f"({self._joinNames(ownGroups)})"]
                 return
 
-        if inline:
+        if state == 'noreports':
             self.results[key] = [
                 -1,
                 f"Project '{self.name}' inline buildspec has no reports section "
@@ -790,7 +880,92 @@ class CodebuildProject(Evaluator):
         self.results[key] = [
             -1,
             f"Project '{self.name}' has not published any test or coverage "
-            "report to a CodeBuild report group"]
+            "report to a CodeBuild report group"
+            + (" (inline buildspec could not be parsed)"
+               if state == 'unknown' else "")]
+
+    ## Top-level key line in a block-style YAML buildspec: optional quotes.
+    _YAML_TOP_KEY = re.compile(
+        r"""^(?P<indent>[ ]*)(?P<q>["']?)(?P<key>[A-Za-z0-9_-]+)(?P=q)\s*:""")
+
+    def _buildspecReportsState(self, buildspec):
+        """
+        Classify the project's buildspec field without a YAML library:
+          'path'      -- not inline (empty, a file path, or an S3 ARN)
+          'reports'   -- inline, with a non-empty top-level reports section
+          'noreports' -- inline, structurally parsed, no reports section
+          'unknown'   -- looks inline but could not be parsed reliably
+        """
+        text = buildspec.strip()
+        if not text:
+            return 'path'
+
+        if text.startswith('{'):
+            ## JSON (CDK BuildSpec.fromObject) - or YAML flow style.
+            try:
+                doc = json.loads(text)
+            except ValueError:
+                doc = None
+            if isinstance(doc, dict):
+                return 'reports' if doc.get('reports') else 'noreports'
+            ## YAML flow mapping: look for a reports key; cannot be sure it is
+            ## top level, so absence is inconclusive.
+            if re.search(r"""[{,]\s*["']?reports["']?\s*:""", text):
+                return 'reports'
+            return 'unknown'
+
+        if '\n' not in text:
+            ## A single line that is not a mapping is a path / S3 ARN. A
+            ## single-line 'key: value' YAML is inline but cannot hold phases.
+            if re.match(r"""^["']?[A-Za-z0-9_-]+["']?\s*:\s""", text):
+                return 'noreports'
+            return 'path'
+
+        ## Block-style YAML. Top-level keys share the indentation of the first
+        ## key line (normally column 0).
+        topIndent = None
+        topKeys = {}
+        lines = text.splitlines()
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#') or stripped == '---':
+                continue
+            m = self._YAML_TOP_KEY.match(line)
+            if topIndent is None:
+                if not m:
+                    return 'unknown'
+                topIndent = len(m.group('indent'))
+            if m and len(m.group('indent')) == topIndent:
+                k = m.group('key')
+                rest = line[m.end():].split('#', 1)[0].strip()
+                topKeys[k] = (i, rest)
+        if not topKeys or not ({'version', 'phases'} & set(topKeys)):
+            return 'unknown'
+        if 'reports' not in topKeys:
+            return 'noreports'
+
+        ## Non-empty: an inline value, or at least one more-indented line next.
+        i, rest = topKeys['reports']
+        if rest and rest not in ('~', 'null', '{}', 'Null', 'NULL'):
+            return 'reports'
+        for line in lines[i + 1:]:
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#'):
+                continue
+            indent = len(line) - len(line.lstrip(' '))
+            return 'reports' if indent > topIndent else 'noreports'
+        return 'noreports'
+
+    @staticmethod
+    def _groupOwner(groupName, projectNames):
+        """Project an auto-named '<project>-<x>' report group belongs to: the
+        longest project name that prefixes it."""
+        best = None
+        for p in projectNames:
+            if groupName.startswith(p + '-') and (best is None
+                                                  or len(p) > len(best)):
+                best = p
+        return best
 
     # ------------------------------------------------------------------ #
     # Helpers

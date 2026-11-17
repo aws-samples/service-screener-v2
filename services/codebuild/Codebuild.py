@@ -53,12 +53,17 @@ class Codebuild(Service):
         ## reuse one service role, so its policies are evaluated once.
         self._roleEvalCache = {}
         self._reportIndex = None
+        self._projectNames = []
 
     # ------------------------------------------------------------------ #
     # Discovery
     # ------------------------------------------------------------------ #
     def getResources(self):
         names = self._listProjectNames()
+        ## Every project name in the region (before tag filtering), used to
+        ## attribute auto-named '<project>-<group>' report groups to the
+        ## project with the longest matching name.
+        self._projectNames = list(names)
         if not names:
             return []
 
@@ -179,6 +184,8 @@ class Codebuild(Service):
         """
         Lazily build (once per region) the evidence cbProjectNoTestReports needs:
           groupNames      -- names of every report group in the region
+          projectNames    -- every project name in the region (for
+                             longest-prefix attribution of group names)
           projects        -- project names seen as the executionId of a recent
                              report in any report group
           listError       -- error code if list_report_groups failed (index
@@ -190,6 +197,7 @@ class Codebuild(Service):
             return self._reportIndex
 
         index = {'groupNames': [], 'projects': set(),
+                 'projectNames': list(self._projectNames),
                  'listError': None, 'linkageError': None}
         self._reportIndex = index
 

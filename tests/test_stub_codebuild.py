@@ -74,14 +74,17 @@ def _reportIndex(executionProject, linkageError=None):
     svc = _IndexOnly.__new__(_IndexOnly)
     svc.cbClient = cb
     svc._reportIndex = None
+    svc._projectNames = ['app', 'app-api']
     with st:
         index = svc._getReportIndex()
         st.assert_no_pending_responses()
     return index
 
 
-def _reportsResult(index):
-    obj = CodebuildProject(_project(), None, reportIndexFn=lambda: index)
+def _reportsResult(index, buildspec='buildspec.yml', name='app'):
+    src = {'type': 'NO_SOURCE', 'buildspec': buildspec}
+    obj = CodebuildProject(_project(name=name, source=src), None,
+                           reportIndexFn=lambda: index)
     obj._checkCbProjectNoTestReports()
     return obj.results['cbProjectNoTestReports'][0]
 
@@ -199,3 +202,111 @@ def test_no_webhook_is_info():
     obj = CodebuildProject(_project(), None)
     obj._checkCbWebhookUnfiltered()
     assert obj.results['cbWebhookUnfiltered'][0] == 0
+
+
+# ---------------------------------------------------------------- reports (fix round 1)
+CDK_JSON_REPORTS = json.dumps({
+    'version': '0.2',
+    'phases': {'build': {'commands': ['npm test']}},
+    'reports': {f'arn:aws:codebuild:us-east-1:{ACCT}:report-group/MyStack-RG1A2B': {
+        'files': ['junit.xml'], 'file-format': 'JUNITXML'}}}, indent=2)
+CDK_JSON_NO_REPORTS = json.dumps({
+    'version': '0.2', 'phases': {'build': {'commands': ['npm test']}}}, indent=2)
+
+
+def test_reports_cdk_json_buildspec_with_unreadable_linkage():
+    """Review repro: CDK BuildSpec.fromObject writes indented JSON. A top-level
+    'reports' key must PASS even when report linkage is AccessDenied; the same
+    JSON without reports is a definitive FAIL."""
+    denied = _reportIndex('x', linkageError='AccessDeniedException')
+    assert _reportsResult(denied, CDK_JSON_NO_REPORTS) == -1
+    assert _reportsResult(denied, CDK_JSON_REPORTS) == 1
+
+
+def test_buildspec_state_parsing_variants():
+    st = CodebuildProject(_project(), None)._buildspecReportsState
+    assert st('buildspec.yml') == 'path'
+    assert st('arn:aws:s3:::bucket/specs/build.yml') == 'path'
+    assert st('') == 'path'
+    assert st('{version: 0.2, phases: {build: {commands: [make]}}, reports: {u: {files: [a.xml]}}}') == 'reports'
+    assert st('{version: 0.2, phases: {build: {commands: [make]}}}') == 'unknown'
+    assert st('"version": 0.2\n"phases":\n  build:\n    commands: [make]\n"reports":\n  u:\n    files: [a]\n') == 'reports'
+    assert st('version: 0.2\nphases:\n  build:\n    commands:\n      - make\n') == 'noreports'
+    ## nested 'reports:' under phases is not top level
+    assert st('version: 0.2\nphases:\n  build:\n    reports: x\n') == 'noreports'
+    ## empty reports section
+    assert st('version: 0.2\nreports:\nphases:\n  build:\n    commands: [x]\n') == 'noreports'
+    assert st('# comment\n---\nversion: 0.2\nreports:\n  u:\n    files: [a]\n') == 'reports'
+    assert st('not yaml at all\n  more\n') == 'unknown'
+
+
+def test_unparseable_inline_buildspec_not_failed_when_linkage_unreadable():
+    denied = _reportIndex('x', linkageError='AccessDeniedException')
+    obj = CodebuildProject(_project(source={'type': 'NO_SOURCE', 'buildspec': 'oops\n  ::\n'}),
+                           None, reportIndexFn=lambda: denied)
+    obj._checkCbProjectNoTestReports()
+    assert obj.results['cbProjectNoTestReports'] == [0, 'Unable to evaluate (AccessDeniedException)']
+
+
+def test_report_group_prefix_attributed_to_longest_project_name():
+    index = {'groupNames': ['app-api-tests'], 'projects': set(),
+             'projectNames': ['app', 'app-api'], 'listError': None, 'linkageError': None}
+    ## Flag: group belongs to app-api, not app.
+    assert _reportsResult(index, name='app') == -1
+    assert _reportsResult(index, name='app-api') == 1
+    ## Fix: app gets its own group.
+    index['groupNames'].append('app-unit')
+    assert _reportsResult(index, name='app') == 1
+
+
+# ---------------------------------------------------------------- service role (fix round 1)
+def test_document_admin_equivalent_shapes():
+    isAdmin = CodebuildProject._documentIsAdmin
+    assert isAdmin({'Statement': [{'Effect': 'Allow', 'NotAction': ['iam:*', 'organizations:*'],
+                                   'Resource': '*'}]}) is True
+    assert isAdmin({'Statement': [{'Effect': 'Allow', 'Action': 'IAM:*', 'Resource': '*'}]}) is True
+    assert isAdmin({'Statement': [{'Effect': 'Allow', 'NotAction': 's3:*',
+                                   'Resource': 'arn:aws:s3:::b/*'}]}) is False
+    assert isAdmin({'Statement': [{'Effect': 'Deny', 'NotAction': 's3:*', 'Resource': '*'}]}) is False
+    assert isAdmin({'Statement': [{'Effect': 'Allow', 'Action': 'iam:GetRole', 'Resource': '*'}]}) is False
+
+
+def _attachedResult(policyArn, policyName):
+    iam = _client('iam')
+    st = Stubber(iam)
+    st.add_response('get_role', {'Role': {'Path': '/', 'RoleName': 'cb-role',
+                                          'RoleId': 'AROAEXAMPLEEXAMPLE1', 'Arn': ROLE_ARN,
+                                          'CreateDate': NOW}}, {'RoleName': 'cb-role'})
+    st.add_response('list_attached_role_policies', {'AttachedPolicies': [
+        {'PolicyName': policyName, 'PolicyArn': policyArn}], 'IsTruncated': False})
+    st.add_response('list_role_policies', {'PolicyNames': [], 'IsTruncated': False})
+    obj = CodebuildProject(_project(), None, iamClient=iam)
+    with st:
+        obj._checkCbServiceRoleOverprivileged()
+        st.assert_no_pending_responses()
+    return obj.results['cbServiceRoleOverprivileged'][0]
+
+
+def test_aws_managed_admin_equivalent_policies_flag():
+    assert _attachedResult('arn:aws:iam::aws:policy/PowerUserAccess', 'PowerUserAccess') == -1
+    assert _attachedResult('arn:aws:iam::aws:policy/IAMFullAccess', 'IAMFullAccess') == -1
+    assert _attachedResult('arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess',
+                           'AWSCodeBuildDeveloperAccess') == 1
+
+
+# ---------------------------------------------------------------- webhook (fix round 1)
+def test_webhook_low_trust_approver_roles_do_not_gate():
+    base = {'url': 'https://x', 'filterGroups': []}
+    weak = dict(base, pullRequestBuildPolicy={
+        'requiresCommentApproval': 'ALL_PULL_REQUESTS',
+        'approverRoles': ['GITHUB_READ', 'GITHUB_WRITE']})
+    strong = dict(base, pullRequestBuildPolicy={
+        'requiresCommentApproval': 'ALL_PULL_REQUESTS',
+        'approverRoles': ['GITHUB_WRITE', 'GITHUB_MAINTAIN', 'GITHUB_ADMIN']})
+    assert _webhook(weak) == -1
+    assert _webhook(strong) == 1
+
+
+def test_webhook_inactive_status_is_info():
+    assert _webhook({'url': 'https://x', 'filterGroups': [], 'status': 'CREATE_FAILED'}) == 0
+    assert _webhook({'url': 'https://x', 'filterGroups': [], 'status': 'ACTIVE'}) == -1

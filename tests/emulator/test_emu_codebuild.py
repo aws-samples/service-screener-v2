@@ -146,3 +146,49 @@ def test_cb_project_no_test_reports(emu, uid):
         except Exception:
             pass
         _cleanupRole(iam, role)
+
+
+def test_cb_project_no_test_reports_json_buildspec(emu, uid):
+    """CDK BuildSpec.fromObject writes the inline buildspec as indented JSON."""
+    iam, cb = emu.client('iam'), emu.client('codebuild')
+    role, project = f'ss-cb-role-{uid}', f'ss-cb-rj-{uid}'
+    arn = _role(iam, role)
+    noRep = json.dumps({'version': '0.2', 'phases': {'build': {'commands': ['make test']}}}, indent=2)
+    rep = json.dumps({'version': '0.2', 'phases': {'build': {'commands': ['make test']}},
+                      'reports': {'arn:aws:codebuild:us-east-1:000000000000:report-group/Stack-RG1A2B':
+                                  {'files': ['junit.xml'], 'file-format': 'JUNITXML'}}}, indent=2)
+    try:
+        _noSourceProject(cb, project, arn, rep)
+        assertFlagFixCycle(
+            emu, 'codebuild', 'cbProjectNoTestReports', project,
+            lambda: cb.update_project(name=project, source={'type': 'NO_SOURCE', 'buildspec': noRep}),
+            lambda: cb.update_project(name=project, source={'type': 'NO_SOURCE', 'buildspec': rep}))
+    finally:
+        try:
+            cb.delete_project(name=project)
+        except Exception:
+            pass
+        _cleanupRole(iam, role)
+
+
+def test_cb_service_role_notaction_inline(emu, uid):
+    """Allow NotAction on * (PowerUser shape) is administrator-equivalent."""
+    iam, cb = emu.client('iam'), emu.client('codebuild')
+    role, project = f'ss-cb-role-{uid}', f'ss-cb-na-{uid}'
+    arn = _role(iam, role)
+    powerDoc = json.dumps({'Version': '2012-10-17', 'Statement': [
+        {'Effect': 'Allow', 'NotAction': ['iam:*', 'organizations:*', 'account:*'], 'Resource': '*'}]})
+    scopedDoc = json.dumps({'Version': '2012-10-17', 'Statement': [
+        {'Effect': 'Allow', 'Action': ['logs:CreateLogStream', 'logs:PutLogEvents'], 'Resource': '*'}]})
+    try:
+        _noSourceProject(cb, project, arn)
+        assertFlagFixCycle(
+            emu, 'codebuild', 'cbServiceRoleOverprivileged', project,
+            lambda: iam.put_role_policy(RoleName=role, PolicyName='inline', PolicyDocument=powerDoc),
+            lambda: iam.put_role_policy(RoleName=role, PolicyName='inline', PolicyDocument=scopedDoc))
+    finally:
+        try:
+            cb.delete_project(name=project)
+        except Exception:
+            pass
+        _cleanupRole(iam, role)
