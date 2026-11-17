@@ -60,7 +60,39 @@ class cloudfrontDist(Evaluator):
             if 'SSLv3' in y['CustomOriginConfig']['OriginSslProtocols']['Items']:
                 self.results['DeprecatedSSLProtocol'] = [-1, '']
                 break
-    
+
+    # Viewer security policies that only negotiate TLS 1.2+ with modern ciphers.
+    VIEWER_MIN_TLS_OK = ('TLSv1.2_2021', 'TLSv1.2_2025', 'TLSv1.3_2025')
+    ORIGIN_TLS_OLD = ('TLSv1', 'TLSv1.1')
+
+    def _checkViewerMinTlsOld(self):
+        """Viewer min TLS below TLSv1.2_2021 (custom cert) or HTTPS custom origins allowing TLSv1/TLSv1.1.
+        SSLv3 on origins is reported separately by DeprecatedSSLProtocol (no duplicate finding)."""
+        cfg = self.distConfig.get('DistributionConfig', {})
+        issues = []
+
+        viewerCert = cfg.get('ViewerCertificate') or {}
+        # With the default *.cloudfront.net certificate the security policy is fixed by
+        # CloudFront and cannot be changed; CustomSSLCertificate covers that case.
+        if not viewerCert.get('CloudFrontDefaultCertificate', False):
+            minProto = viewerCert.get('MinimumProtocolVersion', '')
+            if minProto and minProto not in self.VIEWER_MIN_TLS_OK:
+                issues.append(f'viewer MinimumProtocolVersion {minProto}')
+
+        for origin in (cfg.get('Origins') or {}).get('Items', []) or []:
+            coc = origin.get('CustomOriginConfig')
+            if not coc or coc.get('OriginProtocolPolicy') == 'http-only':
+                continue
+            protos = (coc.get('OriginSslProtocols') or {}).get('Items', []) or []
+            old = [p for p in protos if p in self.ORIGIN_TLS_OLD]
+            if old:
+                issues.append(f"origin {origin.get('Id', '?')} allows {'/'.join(old)}")
+
+        if issues:
+            self.results['cloudfrontViewerMinTlsOld'] = [-1, '; '.join(issues)]
+        else:
+            self.results['cloudfrontViewerMinTlsOld'] = [1, 'Viewer and origin TLS policies require TLS 1.2+']
+
     def _checkOriginFailover(self):
         dist = self.dist
         resp = self.distConfig
