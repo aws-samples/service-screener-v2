@@ -1,0 +1,20 @@
+{
+    "avpPolicyStoreValidationOff": {
+        "category": "S",
+        "^description": "{$COUNT} Verified Permissions policy store(s) have policy validation mode set to OFF. In OFF mode, Verified Permissions accepts any syntactically valid Cedar policy without checking it against the policy store schema, so a policy that references a misspelt entity type, action or attribute is stored without error. Such a policy silently never matches (an intended permit or forbid has no effect) or matches more than intended, and the authorization model drifts from what was reviewed. STRICT mode rejects policies and templates that do not conform to the schema.",
+        "shortDesc": "Set policy store validation mode to STRICT",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Policy validation in Verified Permissions]<https://docs.aws.amazon.com/verifiedpermissions/latest/userguide/policy-validation-mode.html>",
+            "[Policy store schema]<https://docs.aws.amazon.com/verifiedpermissions/latest/userguide/schema.html>",
+            "[UpdatePolicyStore API]<https://docs.aws.amazon.com/verifiedpermissions/latest/apireference/API_UpdatePolicyStore.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/verifiedpermissions/latest/userguide/policy-validation-mode.html"
+    }
+}
