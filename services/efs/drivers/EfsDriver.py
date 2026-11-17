@@ -14,6 +14,27 @@ class EfsDriver(Evaluator):
 
         self.init()
 
+    # ---- per-file-system reads, fetched once and shared by every check ----
+    def _lifecycleConfiguration(self):
+        efs_id = self.efs['FileSystemId']
+        return self._memo(('describe_lifecycle_configuration', efs_id),
+                          lambda: self.efs_client.describe_lifecycle_configuration(FileSystemId=efs_id))
+
+    def _fileSystemPolicy(self):
+        efs_id = self.efs['FileSystemId']
+        return self._memo(('describe_file_system_policy', efs_id),
+                          lambda: self.efs_client.describe_file_system_policy(FileSystemId=efs_id))
+
+    def _mountTargets(self):
+        efs_id = self.efs['FileSystemId']
+        return self._memo(('describe_mount_targets', efs_id),
+                          lambda: self.efs_client.describe_mount_targets(FileSystemId=efs_id))
+
+    def _accessPoints(self):
+        efs_id = self.efs['FileSystemId']
+        return self._memo(('describe_access_points', efs_id),
+                          lambda: self.efs_client.describe_access_points(FileSystemId=efs_id))
+
     def _checkEncrypted(self):
         self.results['EncryptedAtRest'] = [1, 'Enabled']
         if self.efs['Encrypted'] != 1:
@@ -23,9 +44,7 @@ class EfsDriver(Evaluator):
         self.results['Lifecycle'] = [1, 'Enabled']
         efs_id = self.efs['FileSystemId']
 
-        life_cycle = self.efs_client.describe_lifecycle_configuration(
-            FileSystemId=efs_id
-        )
+        life_cycle = self._lifecycleConfiguration()
 
         if len(life_cycle['LifecyclePolicies']) == 0:
             self.results['EnabledLifecycle'] = [-1, 'Disabled']
@@ -112,9 +131,7 @@ class EfsDriver(Evaluator):
         efs_id = self.efs['FileSystemId']
 
         try:
-            policy_response = self.efs_client.describe_file_system_policy(
-                FileSystemId=efs_id
-            )
+            policy_response = self._fileSystemPolicy()
             
             # If API call succeeds and returns a policy, mark as pass
             if 'Policy' in policy_response and policy_response['Policy']:
@@ -135,9 +152,7 @@ class EfsDriver(Evaluator):
         efs_id = self.efs['FileSystemId']
 
         try:
-            mount_targets = self.efs_client.describe_mount_targets(
-                FileSystemId=efs_id
-            )
+            mount_targets = self._mountTargets()
             
             # Validate mount targets exist before checking security groups
             if 'MountTargets' not in mount_targets or len(mount_targets['MountTargets']) == 0:
@@ -186,9 +201,7 @@ class EfsDriver(Evaluator):
         efs_id = self.efs['FileSystemId']
 
         try:
-            access_points = self.efs_client.describe_access_points(
-                FileSystemId=efs_id
-            )
+            access_points = self._accessPoints()
             
             # Check if any access points exist for this file system
             if 'AccessPoints' in access_points and len(access_points['AccessPoints']) > 0:
@@ -213,7 +226,7 @@ class EfsDriver(Evaluator):
         # Check 1: Security groups on mount targets
         has_security_groups = False
         try:
-            mount_targets = self.efs_client.describe_mount_targets(FileSystemId=efs_id)
+            mount_targets = self._mountTargets()
             if 'MountTargets' in mount_targets and len(mount_targets['MountTargets']) > 0:
                 # Check if all mount targets have security groups
                 all_have_sg = all(
@@ -229,7 +242,7 @@ class EfsDriver(Evaluator):
         # Check 2: IAM file system policy
         has_policy = False
         try:
-            policy_response = self.efs_client.describe_file_system_policy(FileSystemId=efs_id)
+            policy_response = self._fileSystemPolicy()
             if 'Policy' in policy_response and policy_response['Policy']:
                 has_policy = True
         except self.efs_client.exceptions.PolicyNotFound:
@@ -243,7 +256,7 @@ class EfsDriver(Evaluator):
         # Check 3: Access points
         has_access_points = False
         try:
-            access_points = self.efs_client.describe_access_points(FileSystemId=efs_id)
+            access_points = self._accessPoints()
             if 'AccessPoints' in access_points and len(access_points['AccessPoints']) > 0:
                 has_access_points = True
             if not has_access_points:
@@ -266,9 +279,7 @@ class EfsDriver(Evaluator):
         efs_id = self.efs['FileSystemId']
 
         try:
-            policy_response = self.efs_client.describe_file_system_policy(
-                FileSystemId=efs_id
-            )
+            policy_response = self._fileSystemPolicy()
             
             # Check if policy exists
             if 'Policy' not in policy_response or not policy_response['Policy']:
@@ -361,9 +372,7 @@ class EfsDriver(Evaluator):
         lifecycle_enabled = False
         
         try:
-            life_cycle = self.efs_client.describe_lifecycle_configuration(
-                FileSystemId=efs_id
-            )
+            life_cycle = self._lifecycleConfiguration()
             if 'LifecyclePolicies' in life_cycle and len(life_cycle['LifecyclePolicies']) > 0:
                 lifecycle_enabled = True
         except botocore.exceptions.ClientError:
