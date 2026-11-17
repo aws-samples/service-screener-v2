@@ -64,8 +64,14 @@ def test_instance_snapshot_shared_inside_org_not_flagged():
     assert _runShared([OTHER, '999999999999'], orgAccounts={ACCT, OTHER})[0] == -1
 
 
-def test_instance_snapshot_public_only_left_to_existing_check():
-    assert _runShared(['all'])[0] == 1                   # reported by SnapshotRDSIsPublic
+def test_instance_snapshot_public_flag_fix():
+    # SnapshotRDSIsPublic only covers snapshots of DBs that still exist, so a
+    # public snapshot must fail here (regression: it used to PASS).
+    res = _runShared(['all'])
+    assert res[0] == -1 and 'Public' in res[1]
+    res = _runShared(['all', OTHER], orgAccounts={ACCT})
+    assert res[0] == -1 and OTHER in res[1]
+    assert _runShared([ACCT])[0] == 1                    # fixed: public access removed
 
 
 def test_instance_snapshot_shared_unreadable_is_info():
@@ -136,25 +142,56 @@ def test_mariadb_audit_plugin_requires_audit_export_flag_fix():
     assert _mariadbWithAudit(['error', 'audit'])[0] == 1
 
 
-def test_mariadb_option_group_unreadable_still_requires_error_log():
+def _mariadbOptionGroupDenied(exports):
     rds = _client()
-    db = {'DBInstanceIdentifier': 'mdb2', 'Engine': 'mariadb', 'EnabledCloudwatchLogsExports': ['error'],
+    db = {'DBInstanceIdentifier': 'mdb2', 'Engine': 'mariadb', 'EnabledCloudwatchLogsExports': exports,
           'OptionGroupMemberships': [{'OptionGroupName': 'og-x', 'Status': 'in-sync'}]}
     with Stubber(rds) as st:
         st.add_client_error('describe_option_groups', service_error_code='AccessDenied')
         d = _driver(RdsMariadb, 'mariadb', db, rds)
         d._checkRdsLogExportsDisabled()
-    assert d.results['rdsLogExportsDisabled'][0] == 1
+    return d.results['rdsLogExportsDisabled']
+
+
+def test_mariadb_option_group_unreadable_is_not_a_pass():
+    # error log missing is a definite FAIL regardless of the audit plugin
+    assert _mariadbOptionGroupDenied([])[0] == -1
+    # error exported but audit requirement unknown -> not evaluable, never PASS
+    assert _mariadbOptionGroupDenied(['error'])[0] == 0
+    assert 'AccessDenied' in _mariadbOptionGroupDenied(['error'])[1]
+    # both exported -> requirement met whatever the plugin status
+    assert _mariadbOptionGroupDenied(['error', 'audit'])[0] == 1
 
 
 def test_mariadb_secure_transport_flag_fix():
-    db = {'DBInstanceIdentifier': 'mdb3', 'Engine': 'mariadb'}
+    db = {'DBInstanceIdentifier': 'mdb3', 'Engine': 'mariadb', 'EngineVersion': '10.11.9'}
     d = _driver(RdsMariadb, 'mariadb', db, params={})
     d._checkRdsSecureTransportNotRequired()
     assert d.results['rdsSecureTransportNotRequired'][0] == -1
     d = _driver(RdsMariadb, 'mariadb', db, params={'require_secure_transport': 'ON'})
     d._checkRdsSecureTransportNotRequired()
     assert d.results['rdsSecureTransportNotRequired'][0] == 1
+
+
+def _secureTransport(engine, version, params):
+    db = {'DBInstanceIdentifier': 'mdbv', 'Engine': engine, 'EngineVersion': version}
+    d = _driver(RdsMariadb, engine, db, params=params)
+    d._checkRdsSecureTransportNotRequired()
+    return d.results['rdsSecureTransportNotRequired']
+
+
+def test_mariadb_secure_transport_version_aware_default():
+    # 10.5 - 11.4: default OFF -> unset flags, ON fixes
+    assert _secureTransport('mariadb', '11.4.5', {})[0] == -1
+    assert _secureTransport('mariadb', '10.6.20', {})[0] == -1
+    assert _secureTransport('mariadb', '10.6.20', {'require_secure_transport': '1'})[0] == 1
+    # 11.8+: default ON -> unset is a PASS, explicit OFF flags
+    assert _secureTransport('mariadb', '11.8.3', {})[0] == 1
+    assert _secureTransport('mariadb', '11.8.3', {'require_secure_transport': 'OFF'})[0] == -1
+    # < 10.5: parameter not supported -> not evaluable
+    assert _secureTransport('mariadb', '10.4.34', {})[0] == 0
+    # MySQL default OFF for every version
+    assert _secureTransport('mysql', '8.4.3', {})[0] == -1
 
 
 def test_mysql_general_log_only_flags_when_enabled():

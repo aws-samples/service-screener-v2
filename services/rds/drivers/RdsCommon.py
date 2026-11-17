@@ -879,8 +879,9 @@ class RdsCommon(Evaluator):
 
     def _hasAuditPluginOption(self):
         # MySQL/MariaDB audit log only exists when MARIADB_AUDIT_PLUGIN is
-        # added to the instance's option group. Returns True/False, or None
-        # when the option group cannot be read.
+        # added to the instance's option group. Returns (found, errorCode);
+        # errorCode is set (and found is None) when an option group cannot
+        # be read.
         found = False
         for og in self.db.get('OptionGroupMemberships', []) or []:
             name = og.get('OptionGroupName')
@@ -896,25 +897,29 @@ class RdsCommon(Evaluator):
                         options += [o.get('OptionName') for o in grp.get('Options', [])]
                     Config.set(cacheKey, options)
                 except botocore.exceptions.ClientError as e:
-                    _warn("Unable to describe option group {}: {}".format(name, e.response['Error']['Code']))
-                    return None
+                    code = e.response.get('Error', {}).get('Code', 'ClientError')
+                    _warn("Unable to describe option group {}: {}".format(name, code))
+                    return None, code
             if 'MARIADB_AUDIT_PLUGIN' in options:
                 found = True
-        return found
+        return found, None
 
     def _checkRdsLogExportsDisabled(self):
         if self._isClusterMemberInstance():
             return
 
         rawEngine = self.db.get('Engine', '')
+        auditUnknown = None
         if self.engine in ('postgres', 'aurora-postgresql'):
             required = ['postgresql']
         elif self.engine == 'aurora-mysql':
             required = ['audit']
         elif self.engine in ('mysql', 'mariadb'):
             required = ['error']
-            if self.isCluster == False and self._hasAuditPluginOption() == True:
-                required.append('audit')
+            if self.isCluster == False:
+                hasAudit, auditUnknown = self._hasAuditPluginOption()
+                if hasAudit == True:
+                    required.append('audit')
         elif self.engine == 'sqlserver':
             required = ['error']
         elif rawEngine.startswith('oracle'):
@@ -927,6 +932,10 @@ class RdsCommon(Evaluator):
         if missing:
             self.results['rdsLogExportsDisabled'] = [-1, 'Not exported to CloudWatch Logs: {} (exported: {})'.format(
                 ', '.join(missing), ', '.join(exported) if exported else 'none')]
+        elif auditUnknown and 'audit' not in exported:
+            # Option group unreadable: cannot tell whether an audit log export
+            # is also required, so do not PASS.
+            self.results['rdsLogExportsDisabled'] = [0, 'Unable to evaluate ({}) - option group unreadable; audit plugin status unknown'.format(auditUnknown)]
         else:
             self.results['rdsLogExportsDisabled'] = [1, 'Exported: ' + ', '.join(exported)]
 
@@ -943,7 +952,19 @@ class RdsCommon(Evaluator):
 
         val = self.dbParams.get('require_secure_transport', None)
         if val is None:
-            # Engine default is OFF for RDS MySQL, MariaDB and Aurora MySQL.
+            ver = self._engineVersionTuple()
+            if self.engine == 'mariadb' and ver is not None and ver < (10, 5):
+                # Parameter only exists on RDS for MariaDB 10.5 and higher.
+                self.results['rdsSecureTransportNotRequired'] = [0, 'require_secure_transport not supported on MariaDB ' + self.db.get('EngineVersion', '')]
+                return
+            if self.engine == 'mariadb' and ver is not None and ver >= (11, 8):
+                # RDS for MariaDB 11.8+ defaults require_secure_transport to ON.
+                self.results['rdsSecureTransportNotRequired'] = [1, 'require_secure_transport not set (engine default ON for MariaDB 11.8+)']
+                return
+            if self.engine == 'mariadb' and ver is None:
+                self.results['rdsSecureTransportNotRequired'] = [0, 'Unable to evaluate (engine version unknown; default depends on MariaDB version)']
+                return
+            # Engine default is OFF for RDS MySQL, Aurora MySQL and MariaDB 10.5 - 11.4.
             self.results['rdsSecureTransportNotRequired'] = [-1, 'require_secure_transport not set (engine default OFF)']
             return
 
@@ -951,6 +972,14 @@ class RdsCommon(Evaluator):
             self.results['rdsSecureTransportNotRequired'] = [1, 'require_secure_transport=' + str(val)]
         else:
             self.results['rdsSecureTransportNotRequired'] = [-1, 'require_secure_transport=' + str(val)]
+
+    def _engineVersionTuple(self):
+        # '10.11.6' -> (10, 11); None when unparsable / missing.
+        try:
+            parts = str(self.db.get('EngineVersion', '')).split('.')
+            return (int(parts[0]), int(parts[1]))
+        except (ValueError, IndexError):
+            return None
 
     def _checkAuroraNoGlobalDatabase(self):
         if self.isCluster == False or self.engine not in ('aurora-mysql', 'aurora-postgresql'):

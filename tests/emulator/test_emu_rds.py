@@ -204,6 +204,32 @@ def test_rds_cluster_snapshot_shared_externally(emu, uid, sg):
         _deleteCluster(rds, cl)
 
 
+def test_rds_public_cluster_snapshot_after_source_deleted(emu, uid, sg):
+    # Regression: restore=all used to PASS here on the assumption that
+    # SnapshotRDSIsPublic covers it, but that check only inspects snapshots of
+    # live DBs/clusters. Delete the source cluster, then flag -> fix.
+    rds = emu.client('rds')
+    cl = f'ss-rdspubdb-{uid}'
+    snap = f'ss-rdspubsnap-{uid}'
+    try:
+        def misconfigure():
+            _createCluster(rds, cl, sg)
+            rds.create_db_cluster_snapshot(DBClusterIdentifier=cl, DBClusterSnapshotIdentifier=snap)
+            rds.get_waiter('db_cluster_snapshot_available').wait(DBClusterSnapshotIdentifier=snap, WaiterConfig=WAIT)
+            _deleteCluster(rds, cl)
+            rds.modify_db_cluster_snapshot_attribute(DBClusterSnapshotIdentifier=snap, AttributeName='restore',
+                                                     ValuesToAdd=['all'])
+
+        def fix():
+            rds.modify_db_cluster_snapshot_attribute(DBClusterSnapshotIdentifier=snap, AttributeName='restore',
+                                                     ValuesToRemove=['all'])
+
+        assertFlagFixCycle(emu, 'rds', 'rdsSnapshotSharedExternally', snap, misconfigure, fix)
+    finally:
+        _quiet(rds.delete_db_cluster_snapshot, DBClusterSnapshotIdentifier=snap)
+        _deleteCluster(rds, cl)
+
+
 # ---------------- auroraNoGlobalDatabase ----------------
 def test_aurora_no_global_database(emu, uid, sg):
     rds = emu.client('rds')

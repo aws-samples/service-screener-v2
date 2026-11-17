@@ -95,14 +95,24 @@ class Rds(Service):
             
         return finalArr
             
+    # rds describe_db_cluster_snapshots also returns DocumentDB and Neptune
+    # cluster snapshots; those engines are not RDS and are skipped here.
+    NON_RDS_SNAPSHOT_ENGINES = ('docdb', 'neptune')
+
     def getManualSnapshots(self):
         # Manual DB snapshots and DB cluster snapshots owned by this account
         # (automated snapshots mirror the source DB and cannot be shared).
         snaps = []
-        for page in self.rdsClient.get_paginator('describe_db_snapshots').paginate(SnapshotType='manual'):
-            snaps += [(s, False) for s in page.get('DBSnapshots', [])]
-        for page in self.rdsClient.get_paginator('describe_db_cluster_snapshots').paginate(SnapshotType='manual'):
-            snaps += [(s, True) for s in page.get('DBClusterSnapshots', [])]
+        for op, key, isCluster in (('describe_db_snapshots', 'DBSnapshots', False),
+                                   ('describe_db_cluster_snapshots', 'DBClusterSnapshots', True)):
+            try:
+                for page in self.rdsClient.get_paginator(op).paginate(SnapshotType='manual'):
+                    snaps += [(s, isCluster) for s in page.get(key, [])]
+            except botocore.exceptions.ClientError as e:
+                _warn("Unable to list RDS manual snapshots ({}): {}".format(op, e.response.get('Error', {}).get('Code')))
+
+        snaps = [(s, c) for (s, c) in snaps
+                 if (s.get('Engine') or '').lower() not in self.NON_RDS_SNAPSHOT_ENGINES]
 
         if not self.tags:
             return snaps

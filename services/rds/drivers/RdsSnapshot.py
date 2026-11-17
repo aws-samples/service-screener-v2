@@ -55,12 +55,19 @@ class RdsSnapshot(Evaluator):
             return
 
         shared = []
+        public = False
         for attr in attrs:
             if attr.get('AttributeName') != 'restore':
                 continue
             for v in attr.get('AttributeValues', []) or []:
-                # 'all' (public) is reported by SnapshotRDSIsPublic
-                if v == 'all' or v == self.accountId:
+                if v == 'all':
+                    # Public: restorable by every AWS account. SnapshotRDSIsPublic
+                    # only looks at snapshots of DBs/clusters that still exist,
+                    # so a public snapshot whose source was deleted would
+                    # otherwise never be reported.
+                    public = True
+                    continue
+                if v == self.accountId:
                     continue
                 shared.append(v)
 
@@ -71,7 +78,12 @@ class RdsSnapshot(Evaluator):
             external = shared
             note = 'organization membership not verifiable from this account'
 
-        if external:
+        if public:
+            msg = 'Public: restorable by any AWS account (restore=all)'
+            if external:
+                msg += '; also shared with: {} ({})'.format(', '.join(sorted(external)), note)
+            self.results['rdsSnapshotSharedExternally'] = [-1, msg]
+        elif external:
             self.results['rdsSnapshotSharedExternally'] = [-1, 'Restorable by account(s): {} ({})'.format(', '.join(sorted(external)), note)]
         else:
             self.results['rdsSnapshotSharedExternally'] = [1, 'Not shared with external accounts']
