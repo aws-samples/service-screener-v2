@@ -147,6 +147,7 @@ def _profile(status='Active', version='0000000001'):
 
 
 def _runSigner(add, arns=None):
+    Config.init()  # each test is a fresh scan (signing profiles are cached per scan)
     sig = _client('signer')
     csc = _csc('Enforce')
     if arns:
