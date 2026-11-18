@@ -4,6 +4,7 @@ import datetime
 import re
 import time
 from utils.Config import Config
+from services.ec2.acctCache import acctKey
 
 from datetime import timedelta
 from utils.Tools import aws_parseInstanceFamily, _warn
@@ -136,8 +137,8 @@ class Ec2Instance(Evaluator):
         self.ec2ImageStatus - 'found' | 'missing' (deregistered / no longer shared) | 'error:<code>'
         Deprecated and disabled AMIs are included so they can be reported."""
         imageId = self.ec2InstanceData['ImageId']
-        cacheKey = 'ec2::image::' + imageId
-        statusKey = 'ec2::imagestatus::' + imageId
+        cacheKey = acctKey('ec2::image::' + imageId)
+        statusKey = acctKey('ec2::imagestatus::' + imageId)
         cached = Config.get(cacheKey, "__unset__")
         if cached != "__unset__":
             self.ec2ImageInfo = cached
@@ -173,7 +174,7 @@ class Ec2Instance(Evaluator):
                           lambda: self._fetchInstanceTypeInfo(instanceTypeStr))
 
     def _fetchInstanceTypeInfo(self, instanceTypeStr):
-        cacheKey = 'ec2::instancetype::' + instanceTypeStr
+        cacheKey = acctKey('ec2::instancetype::' + instanceTypeStr)
         cached = Config.get(cacheKey, "__unset__")
         if cached != "__unset__":
             return cached
@@ -467,7 +468,7 @@ class Ec2Instance(Evaluator):
         instance = self.ec2InstanceData
         subnetId = instance.get('SubnetId')
 
-        cacheKey = 'ec2::subnet::' + str(subnetId)
+        cacheKey = acctKey('ec2::subnet::' + str(subnetId))
         subnets = Config.get(cacheKey, "__unset__")
         if subnets == "__unset__":
             results = self.ec2Client.describe_subnets(
@@ -555,7 +556,7 @@ class Ec2Instance(Evaluator):
 
     def checkInstanceTypeAvailable(self, instanceType):
         region = self.ec2Client.meta.region_name
-        cacheKey = 'ec2::instancetypeoffering::' + region + '::' + instanceType
+        cacheKey = acctKey('ec2::instancetypeoffering::' + region + '::' + instanceType)
         available = Config.get(cacheKey, None)
 
         if available is None:

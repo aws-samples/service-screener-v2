@@ -308,8 +308,9 @@ class Ec2Regional(Evaluator):
         accidental or malicious deletion. A resource type is required only when
         the region holds self-owned resources of that type.
           FAIL  - no Recycle Bin rule for a required type
-          INFO  - rules exist but only tag-level, or the region-level rule is not locked
-          PASS  - a locked region-level rule exists for every required type"""
+          INFO  - rules exist but only tag-level, the region-level rule is not locked
+                  (unlocked / pending_unlock), or the locked rule has exclusion tags
+          PASS  - a locked region-level rule without exclusions exists for every required type"""
         key = 'ebsRecycleBinMissing'
         if self.rbinClient is None:
             self.results[key] = [0, 'Unable to evaluate (rbin client unavailable)']
@@ -337,19 +338,27 @@ class Ec2Regional(Evaluator):
                     missing.append(rtype)
                     continue
 
-                regionLocked = regionUnlocked = tagLevel = 0
+                regionLocked = regionLockedExcl = regionUnlocked = tagLevel = 0
                 for summary in rules:
                     detail = self.rbinClient.get_rule(Identifier=summary['Identifier'])
                     lockState = detail.get('LockState') or summary.get('LockState')
                     if detail.get('ResourceTags'):
                         tagLevel += 1
                     elif lockState == 'locked':
-                        regionLocked += 1
+                        # a region-level rule with exclusion tags leaves the excluded
+                        # resources unprotected
+                        if detail.get('ExcludeResourceTags'):
+                            regionLockedExcl += 1
+                        else:
+                            regionLocked += 1
                     else:
+                        # 'unlocked' or 'pending_unlock' - the rule can be deleted
                         regionUnlocked += 1
 
                 if regionLocked:
                     ok.append(rtype)
+                elif regionLockedExcl:
+                    warns.append(f"{rtype}: locked region-level rule excludes resources by tag; excluded resources are not protected")
                 elif regionUnlocked:
                     warns.append(f"{rtype}: region-level rule not locked")
                 else:

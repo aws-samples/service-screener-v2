@@ -3,6 +3,7 @@ import re
 import botocore
 
 from utils.Config import Config
+from services.ec2.acctCache import acctKey
 from services.Evaluator import Evaluator
 
 DEFAULT_ROUTES = ('0.0.0.0/0', '::/0')
@@ -54,7 +55,7 @@ def getSubnetRouting(ec2Client):
     A subnet missing from 'subnets' has no visible route table (e.g. a subnet shared
     from another account through AWS RAM - participants cannot read its route table)."""
     region = ec2Client.meta.region_name
-    cacheKey = 'ec2::subnetRouting::' + str(region)
+    cacheKey = acctKey('ec2::subnetRouting::' + str(region))
     cached = Config.get(cacheKey, None)
     if cached is not None:
         return cached
