@@ -104,17 +104,24 @@ def runCheck(emu, service, check, resource=None):
     return CheckRunner.run(service, check, region=REGION, session=emu, resource=resource, emulator=True)
 
 
-def assertFlagFixCycle(emu, service, check, resource, misconfigure, fix):
+def assertFlagFixCycle(emu, service, check, resource, misconfigure, fix, expectAfter=1):
     """The standard test for every new check:
     1. misconfigure() -> check must return -1 for `resource`
-    2. fix()          -> re-run; check must NOT return -1 for `resource`
+    2. fix()          -> re-run; check must return `expectAfter` (default 1, PASS)
+
+    A fixed resource must PASS. Only pass expectAfter=0 for checks whose
+    correct "good" state is informational by design (state the reason in the
+    test); an 'Unable to evaluate' result after the fix is a failure.
     """
     misconfigure()
     before = runCheck(emu, service, check, resource).statuses()
     assert before, f'{service}.{check}: no result for {resource} (errors: {runCheck(emu, service, check, resource).errors[:1]})'
     assert all(s == -1 for s in before.values()), f'{service}.{check} expected -1 after misconfigure, got {before}'
     fix()
-    after = runCheck(emu, service, check, resource).statuses()
+    res = runCheck(emu, service, check, resource)
+    after = res.statuses()
     assert after, f'{service}.{check}: no result for {resource} after fix'
-    assert all(s != -1 for s in after.values()), f'{service}.{check} still -1 after fix: {after}'
+    assert all(s == expectAfter for s in after.values()), \
+        f'{service}.{check} expected {expectAfter} after fix, got {after} ' \
+        f'(messages: {[m for r in res.results.values() for k, m in r.items() if k.lower() == check.lower()][:2]})'
     return before, after
