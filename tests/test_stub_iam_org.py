@@ -435,11 +435,24 @@ class TestBackupTamperScp:
 
 # --------------------------------------------------------------------------- #
 class TestPolicyHelpers:
-    @pytest.mark.parametrize('op', ['StringLike', 'StringEquals', 'ArnLike', 'ArnEquals'])
+    @pytest.mark.parametrize('op', ['StringLike', 'ArnLike', 'ArnEquals'])
     def test_root_denial_operators(self, op):
         doc = {'Statement': [{'Effect': 'Deny', 'Action': '*', 'Resource': '*',
                               'Condition': {op: {'aws:PrincipalArn': ['arn:aws:iam::*:root']}}}]}
         assert 'denyRoot' in scpGuardrails(doc)
+
+    def test_root_denial_string_equals_is_literal(self):
+        # StringEquals has no wildcard support: "arn:aws:iam::*:root" matches
+        # no real principal, so it denies nothing. A literal root ARN covers
+        # only that account.
+        wild = {'Statement': [{'Effect': 'Deny', 'Action': '*', 'Resource': '*',
+                               'Condition': {'StringEquals': {'aws:PrincipalArn': 'arn:aws:iam::*:root'}}}]}
+        assert 'denyRoot' not in scpGuardrails(wild)
+        lit = {'Statement': [{'Effect': 'Deny', 'Action': '*', 'Resource': '*',
+                              'Condition': {'StringEquals': {'aws:PrincipalArn': 'arn:aws:iam::111122223333:root'}}}]}
+        assert 'denyRoot' in scpGuardrails(lit, ['111122223333'])
+        assert 'denyRoot' not in scpGuardrails(lit, ['111122223333', '444455556666'])
+        assert 'denyRoot' not in scpGuardrails(lit)
 
     def test_broad_deny_star_is_not_privesc_guardrail(self):
         doc = {'Statement': [{'Effect': 'Deny', 'Action': '*', 'Resource': '*',

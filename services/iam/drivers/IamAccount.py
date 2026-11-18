@@ -12,7 +12,7 @@ from .IamCommon import IamCommon
 from . import IamPolicyHelpers
 from . import IamX509
 from .IamOrgData import OrgData, SCP, RCP, TAG, BACKUP, DECLARATIVE_EC2, FULL_AWS_ACCESS_ID, statements, denyCoversAction, conditionKeys, scpGuardrails, SCP_GUARDRAILS, \
-    denyIsUnconditionalGuardrail, guardrailCoverage
+    denyIsUnconditionalGuardrail, guardrailCoverage, NOT_IN_ORG
 from .IamSsoData import SsoData, parseIsoDuration
 
 
@@ -68,7 +68,7 @@ class IamAccount(IamCommon):
             # describe_organization / list_accounts results are reused.
             self.orgData = orgData
             org, orgErr = orgData.organization()
-            self.organizationIsEnabled = orgErr is None
+            self.organizationIsEnabled = orgErr is None and bool(org)
             self.orgInfo = org or None
         else:
             orgResp, orgErr = None, None
@@ -81,6 +81,13 @@ class IamAccount(IamCommon):
             callerAccountId = (Config.get('stsInfo', {}) or {}).get('Account')
             self.orgData = OrgData(self.orgClient, callerAccountId, orgResp, orgErr)
             self.orgInfo = (orgResp or {}).get('Organization') or None
+        # Only AWSOrganizationsNotInUseException means "standalone account".
+        # Any other describe_organization error (AccessDenied, throttling...)
+        # leaves membership unknown, so checks that branch on it must record
+        # [0, 'Unable to evaluate (<code>)'] instead of treating the account as
+        # standalone (organizationIsEnabled is False in both cases).
+        self.orgErr = orgErr
+        self.orgStateUnknown = orgErr is not None and orgErr != NOT_IN_ORG
         self.ssoData = SsoData(ssBoto, Config.get('REGIONS_SELECTED', []) or [])
 
         self.init()
@@ -347,7 +354,17 @@ class IamAccount(IamCommon):
             if ecode == 'ResourceNotFoundException':
                 return 0
 
+    def _orgUnknown(self, key):
+        """Record [0, 'Unable to evaluate (<code>)'] for `key` and return True
+        when describe_organization failed with anything but NOT_IN_ORG."""
+        if self.orgStateUnknown:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(self.orgErr)]
+            return True
+        return False
+
     def _checkHasOrganization(self):
+        if self._orgUnknown('hasOrganization'):
+            return
         if (self.organizationIsEnabled == False):
                 self.results['hasOrganization'] = [-1, '']
     
@@ -983,15 +1000,32 @@ class IamAccount(IamCommon):
         if targets is None:
             return
 
+        # A root-user denial must cover the root of every member account the
+        # node applies to (an OU: its active member accounts below it).
+        tree, _ = self.orgData.tree()
+        nodes = (tree or {}).get('nodes', {})
+        targetIds = {nid for nid, _n, _p in targets}
+        memberAccounts = {}
+        for nid, node, _p in targets:
+            if node['Type'] != 'ACCOUNT':
+                continue
+            cur, seen = nid, set()
+            while cur and cur not in seen:
+                seen.add(cur)
+                if cur in targetIds:
+                    memberAccounts.setdefault(cur, set()).add(nid)
+                cur = nodes.get(cur, {}).get('Parent')
+
         evaluated, missing, unknown = 0, [], []
         lackCount = {g: 0 for g in SCP_GUARDRAILS}
         for nid, node, pathPols in targets:
             evaluated += 1
             have, unparsed = set(), False
+            accts = sorted(memberAccounts.get(nid, ())) or None
             for p in pathPols:
                 if p['Content'] is None:
                     unparsed = True
-                have |= scpGuardrails(p['Content'])
+                have |= scpGuardrails(p['Content'], accts)
             lacking = [SCP_GUARDRAILS[g] for g in SCP_GUARDRAILS if g not in have]
             if lacking and not unparsed:
                 for g in SCP_GUARDRAILS:
@@ -1989,6 +2023,8 @@ class IamAccount(IamCommon):
         """AWS Control Tower landing zone (and its enabled controls) must be in
         sync. Only evaluable from the Organizations management account (where
         Control Tower runs). No landing zone is a design choice - INFO only."""
+        if self._orgUnknown('controlTowerLandingZoneDrift'):
+            return
         if not self.organizationIsEnabled:
             self.results['controlTowerLandingZoneDrift'] = [0, 'No AWS Organization - AWS Control Tower not in use']
             return
@@ -2118,6 +2154,8 @@ class IamAccount(IamCommon):
         member account. Only the management account (or a Health delegated
         administrator, which can only exist once the view is enabled) can
         read the status."""
+        if self._orgUnknown('healthOrgViewDisabled'):
+            return
         if not self.organizationIsEnabled:
             self.results['healthOrgViewDisabled'] = [0, 'No AWS Organization - organizational view not applicable']
             return
@@ -2488,6 +2526,8 @@ class IamAccount(IamCommon):
         attributed to owners / workloads. Cost allocation tags are managed by
         the payer (management) account; member accounts are not evaluable."""
         key = 'costAllocationTagsNotActivated'
+        if self._orgUnknown(key):
+            return
         if self.organizationIsEnabled and not self._isOrgManagementAccount():
             self.results[key] = [0, 'Not evaluable from member account']
             return
@@ -3055,6 +3095,8 @@ class IamAccount(IamCommon):
             return
 
         account = (Config.get('stsInfo', {}) or {}).get('Account')
+        if self._orgUnknown(key):
+            return
         if self.organizationIsEnabled:
             admins = self._sirDelegatedAdmins()
             isMgmt = self._isOrgManagementAccount()

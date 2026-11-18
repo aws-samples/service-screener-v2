@@ -27,9 +27,9 @@ MIN_EXTERNAL_ID_LENGTH = 8
 
 
 def buildTrustContext(orgData, selfAccount):
-    """{'self', 'orgAccounts' (set|None), 'inOrg' (bool|None), 'reason'}"""
+    """{'self', 'orgAccounts' (set|None), 'inOrg' (bool|None), 'mgmt', 'orgId', 'reason'}"""
     ctx = {'self': str(selfAccount) if selfAccount else None, 'orgAccounts': None, 'inOrg': None,
-           'mgmt': None, 'reason': None}
+           'mgmt': None, 'orgId': None, 'reason': None}
     org, err = orgData.organization()
     if err == 'AWSOrganizationsNotInUseException':
         ctx['inOrg'] = False
@@ -39,6 +39,7 @@ def buildTrustContext(orgData, selfAccount):
         return ctx
     ctx['inOrg'] = True
     ctx['mgmt'] = org.get('MasterAccountId')
+    ctx['orgId'] = org.get('Id')
     accounts, err = orgData.accounts()
     if err:
         ctx['reason'] = 'organization account list not readable ({})'.format(err)
@@ -129,12 +130,50 @@ def externalIdWeakness(stmt, knownAccounts):
     return None
 
 
-def hasOrgCondition(stmt):
+def _orgValueIsOwn(key, base, value, orgId):
+    """True when one condition value only admits principals of org `orgId`."""
+    oid = orgId.lower() if base.endswith('ignorecase') else orgId
+    v = value.lower() if base.endswith('ignorecase') else value
+    if key == 'aws:principalorgid':
+        # No wildcards: "o-abc*" or "*" would admit other organizations.
+        return v == oid
+    # aws:PrincipalOrgPaths values look like "o-abc/r-ab12/ou-ab12-1111/".
+    # The org part must be the literal own org ID (wildcards allowed after it
+    # only with StringLike, where they stay inside our org).
+    return v.startswith(oid + '/') and (base.startswith('stringlike') or not any(c in v for c in '*?'))
+
+
+def orgConditionScope(stmt, orgId):
+    """How an aws:PrincipalOrgID / aws:PrincipalOrgPaths condition restricts the
+    statement:
+      'own'     - every value names our organization (orgId) with an enforced
+                  operator (StringEquals/StringLike, no IfExists, which would
+                  also admit principals that are in no organization)
+      'unknown' - an enforced org condition exists but our org ID is unknown
+      None      - no enforced org condition, or it admits other organizations
+                  (a vendor's org ID, a wildcard)
+    Conditions are ANDed, so one 'own' block restricts the whole statement."""
+    result = None
     for op, k, vals in _conditions(stmt):
-        base = op.split(':')[-1]
-        if k in ORG_CONDITION_KEYS and base.startswith('string') and 'not' not in base and vals:
-            return True
-    return False
+        if k not in ORG_CONDITION_KEYS or not vals:
+            continue
+        prefix, _, base = op.rpartition(':')
+        if base.endswith('ifexists') or prefix == 'forallvalues':
+            continue
+        if prefix == 'foranyvalue' and k != 'aws:principalorgpaths':
+            continue
+        if base not in ('stringequals', 'stringlike', 'stringequalsignorecase'):
+            continue
+        if not orgId:
+            result = 'unknown'
+            continue
+        if all(_orgValueIsOwn(k, base, v, orgId) for v in vals):
+            return 'own'
+    return result
+
+
+def hasOrgCondition(stmt, orgId):
+    return orgConditionScope(stmt, orgId) == 'own'
 
 
 def crossAccountTrusts(trustDoc, ctx):
@@ -152,12 +191,22 @@ def crossAccountTrusts(trustDoc, ctx):
             continue
         accounts = {principalAccount(p) for p in _asList(principal.get('AWS'))}
         accounts.discard(None)
+        # Our own org ID is only meaningful when the account is in an org; a
+        # standalone account has no org, so any org condition names another.
+        orgId = ctx.get('orgId') if ctx.get('inOrg') else None
+        scope = orgConditionScope(s, orgId)
+        if scope == 'unknown' and ctx.get('inOrg') is False:
+            scope = None
         for acc in sorted(accounts):
             cls = classifyAccount(acc, ctx)
             if cls in ('self', 'org'):
                 continue
+            if scope == 'unknown':
+                # Org-conditioned, but the condition cannot be compared with
+                # our org ID: neither PASS nor FAIL.
+                cls = 'unknown'
             known = set(accounts) | ({ctx['self']} if ctx.get('self') else set())
-            out.append({'account': acc, 'class': cls, 'orgConditioned': hasOrgCondition(s),
+            out.append({'account': acc, 'class': cls, 'orgConditioned': scope == 'own',
                         'externalIdWeakness': externalIdWeakness(s, known)})
     return out
 

@@ -739,7 +739,7 @@
 	},
 	"scpBestPractices": {
 		"category": "S",
-		"^description": "One or more organizational units or member accounts in your AWS Organization are missing recommended guardrails in their EFFECTIVE set of service control policies (SCPs attached directly plus those inherited from every parent OU and the root). Best-practice SCP guardrails are: (1) denying root user actions in member accounts, (2) restricting access to approved AWS Regions (aws:RequestedRegion), and (3) preventing privilege escalation by denying sensitive IAM actions such as iam:CreatePolicyVersion, iam:SetDefaultPolicyVersion or iam:PassRole. A guardrail provided by any SCP in the inheritance path counts, so splitting guardrails across several SCPs is fine. The management account is not evaluated because SCPs never apply to it. OUs without active member accounts are skipped, and an unconditional Deny \"*\" (for example a Suspended or Quarantine OU SCP) meets every guardrail. Review the listed OUs/accounts and attach SCPs with the missing Deny statements at the root or a parent OU.",
+		"^description": "One or more organizational units or member accounts in your AWS Organization are missing recommended guardrails in their EFFECTIVE set of service control policies (SCPs attached directly plus those inherited from every parent OU and the root). Best-practice SCP guardrails are: (1) denying root user actions in member accounts (a Deny of all actions on all resources conditioned on the root user ARN of every member account, e.g. aws:PrincipalArn arn:aws:iam::*:root - denying only a few actions such as iam:CreateAccessKey does not count), (2) restricting access to approved AWS Regions (a Deny of all actions, or a NotAction that exempts only global services, on all resources with StringNotEquals/StringNotLike aws:RequestedRegion - a region condition on a single action does not count), and (3) preventing privilege escalation by denying sensitive IAM actions such as iam:CreatePolicyVersion, iam:SetDefaultPolicyVersion or iam:PassRole for every principal (only principal exceptions such as a break-glass role are allowed; a Deny that applies only to the root user or to one specific role does not count). A guardrail provided by any SCP in the inheritance path counts, so splitting guardrails across several SCPs is fine. The management account is not evaluated because SCPs never apply to it. OUs without active member accounts are skipped, and an unconditional Deny \"*\" (for example a Suspended or Quarantine OU SCP) meets every guardrail. Review the listed OUs/accounts and attach SCPs with the missing Deny statements at the root or a parent OU.",
 		"shortDesc": "Improve SCP security guardrails",
 		"criticality": "M",
 		"downtime": 0,
@@ -1160,7 +1160,7 @@
 	},
 	"longTermKeyNotContained": {
 		"category": "S",
-		"^description": "{$COUNT} IAM user(s) with an active access key have neither a permissions boundary nor identity policies that restrict where the key can be used. When a long-term key must remain, limit its blast radius with a permissions boundary and a network condition (aws:SourceIp, aws:SourceVpc, aws:SourceVpce or aws:VpcSourceIp) - for example a Deny statement for requests that do not come from your network - so a leaked key cannot be used from elsewhere. Network perimeters enforced by SCPs/RCPs are not visible from the account and are not considered.",
+		"^description": "{$COUNT} IAM user(s) with an active access key have neither a permissions boundary nor identity policies that restrict where the key can be used. A permissions boundary only counts when its own document ties requests to a network (a boundary such as AdministratorAccess restricts nothing). A Deny only counts as a guard when it denies all actions on all resources for requests NOT from your network (NotIpAddress aws:SourceIp, StringNotEquals aws:SourceVpc/aws:SourceVpce); a Deny of a single action or of a listed bad IP does not. When a long-term key must remain, limit its blast radius with a permissions boundary and a network condition (aws:SourceIp, aws:SourceVpc, aws:SourceVpce or aws:VpcSourceIp) - for example a Deny statement for requests that do not come from your network - so a leaked key cannot be used from elsewhere. Network perimeters enforced by SCPs/RCPs are not visible from the account and are not considered.",
 		"shortDesc": "Restrict remaining access keys by network and boundary",
 		"criticality": "L",
 		"downtime": 0,
@@ -1230,7 +1230,7 @@
 	},
 	"sirMembershipMissing": {
 		"category": "S",
-		"^description": "{$COUNT} account(s) have no active AWS Security Incident Response membership in the scanned Regions. AWS Security Incident Response triages GuardDuty and Security Hub findings, provides a case-management workflow and gives 24/7 access to the AWS Customer Incident Response Team (CIRT), shortening the time to contain and recover from a security event. Consider subscribing from the AWS Organizations management account or a Security Incident Response delegated administrator account (it is an optional, paid service). Plain member accounts of an organization are reported as not evaluable.",
+		"^description": "{$COUNT} account(s) have no active AWS Security Incident Response membership in the scanned Regions. AWS Security Incident Response triages GuardDuty and Security Hub findings, provides a case-management workflow and gives 24/7 access to the AWS Customer Incident Response Team (CIRT), shortening the time to contain and recover from a security event. Consider subscribing from the AWS Organizations management account or a Security Incident Response delegated administrator account (it is an optional, paid service). Plain member accounts of an organization are reported as not evaluable. If the account's organization membership cannot be read (e.g. organizations:DescribeOrganization is denied), the result is 'Unable to evaluate' rather than treating the account as standalone.",
 		"shortDesc": "Consider an AWS Security Incident Response membership",
 		"criticality": "L",
 		"downtime": 0,
@@ -1506,7 +1506,7 @@
 	},
 	"thirdPartyRoleNoExternalId": {
 		"category": "S",
-		"^description": "{$COUNT} IAM roles trust an AWS account outside your organization without requiring a strong sts:ExternalId (missing, IfExists, wildcard, shorter than 8 characters, numeric-only or equal to an account ID) or an aws:PrincipalOrgID condition. Third parties that assume roles in many customer accounts must be given a unique external ID to prevent the confused deputy problem.",
+		"^description": "{$COUNT} IAM roles trust an AWS account outside your organization without requiring a strong sts:ExternalId (missing, IfExists, wildcard, shorter than 8 characters, numeric-only or equal to an account ID) or an enforced aws:PrincipalOrgID / aws:PrincipalOrgPaths condition naming your own organization (a vendor's organization ID, a wildcard or an IfExists operator does not restrict access to your organization). Third parties that assume roles in many customer accounts must be given a unique external ID to prevent the confused deputy problem.",
 		"shortDesc": "Require a unique sts:ExternalId for third-party roles",
 		"criticality": "M",
 		"downtime": 0,
@@ -1523,7 +1523,7 @@
 	},
 	"thirdPartyRoleOverprivileged": {
 		"category": "S",
-		"^description": "{$COUNT} IAM roles trusted by an AWS account outside your organization have admin-level permissions (AdministratorAccess, IAMFullAccess, or a policy allowing *, *:* or iam:* on all resources). A compromise at the third party then becomes full control of your account. Grant third-party roles only the permissions the vendor documents as required.",
+		"^description": "{$COUNT} IAM roles trusted by an AWS account outside your organization have admin-level permissions (AdministratorAccess, IAMFullAccess, or a policy allowing *, *:* or iam:* on all resources). Trusts restricted by an enforced aws:PrincipalOrgID / aws:PrincipalOrgPaths condition naming your own organization are not counted; a condition naming another organization, a wildcard or IfExists is. A compromise at the third party then becomes full control of your account. Grant third-party roles only the permissions the vendor documents as required.",
 		"shortDesc": "Least privilege for third-party roles",
 		"criticality": "H",
 		"downtime": 0,

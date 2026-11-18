@@ -256,8 +256,136 @@ SCP_GUARDRAILS = {
 }
 
 
-def scpGuardrails(doc):
-    """Which best-practice guardrails a single SCP document provides."""
+# Representative actions a statement must deny for it to count as a broad
+# guardrail. A Deny "*" (or a NotAction with a few exemptions) covers them; a
+# Deny of one action (e.g. only iam:CreateAccessKey) does not.
+_ROOT_SAMPLE_ACTIONS = ['ec2:RunInstances', 's3:DeleteBucket', 'iam:CreateUser', 'iam:CreateAccessKey',
+                        'lambda:CreateFunction', 'kms:ScheduleKeyDeletion']
+# Regional services only: global services (iam:*, organizations:*, sts:* ...)
+# are legitimately exempted by AWS's own region-deny example SCP.
+_REGION_SAMPLE_ACTIONS = ['ec2:RunInstances', 'lambda:CreateFunction', 'rds:CreateDBInstance',
+                          'dynamodb:CreateTable', 's3:CreateBucket']
+# Two unrelated accounts: a root pattern must match both to cover "the root
+# user of any account" when no account list is given.
+_GENERIC_ACCOUNTS = ['123456789012', '210987654321']
+_SAMPLE_IAM_RESOURCES = ['arn:aws:iam::{}:role/zz-any-role', 'arn:aws:iam::{}:user/zz-any-user',
+                         'arn:aws:iam::{}:policy/zz-any-policy']
+
+
+def _denyCoversAll(stmt, actions):
+    return all(denyCoversAction(stmt, a) for a in actions)
+
+
+def _resourceIsAll(stmt):
+    """Resource is "*" (or absent) and there is no NotResource."""
+    if 'NotResource' in stmt:
+        return False
+    if 'Resource' not in stmt:
+        return True
+    return any(str(r) == '*' for r in _asList(stmt.get('Resource')))
+
+
+def _resourceCoversAnyIam(stmt, accountIds):
+    if 'NotResource' in stmt:
+        return False
+    if 'Resource' not in stmt:
+        return True
+    pats = [str(r) for r in _asList(stmt.get('Resource'))]
+    return all(any(fnmatch.fnmatchcase(tpl.format(acct), pat) for pat in pats for tpl in _SAMPLE_IAM_RESOURCES)
+               for acct in accountIds)
+
+
+def _isExceptionCondition(op, key, vals):
+    """A condition that only exempts principals (everyone else is denied)."""
+    base = _baseOperator(op)
+    if key == 'aws:requestedregion':
+        return False
+    if base.startswith('stringnot') or base.startswith('arnnot'):
+        return True
+    if base == 'bool' and key in _EXCEPTION_BOOL_KEYS and all(v.lower() == 'false' for v in vals):
+        return True
+    return False
+
+
+def _rootPatternCovers(op, pattern, accountId):
+    # Partition-agnostic: compare against the commercial-partition ARN and
+    # let a wildcard partition (arn:*:iam::...) match too.
+    rootArn = 'arn:aws:iam::{}:root'.format(accountId)
+    if op in ('stringequals', 'stringequalsignorecase'):
+        # StringEquals has no wildcards: "arn:aws:iam::*:root" is literal.
+        return pattern.lower() == rootArn if op.endswith('ignorecase') else pattern == rootArn
+    # StringLike / ArnLike / ArnEquals all support * and ? wildcards.
+    return fnmatch.fnmatchcase(rootArn, pattern)
+
+
+def _rootDenial(stmt, accountIds):
+    """True when the Deny blocks the root user of every account in accountIds
+    for (nearly) every action: Action "*" (or a NotAction that still covers
+    common actions) on Resource "*", gated only by an aws:PrincipalArn match on
+    the root ARN plus optional principal exceptions."""
+    if not (_denyCoversAll(stmt, _ROOT_SAMPLE_ACTIONS) and _resourceIsAll(stmt)):
+        return False
+    rootKeyFound = False
+    for (op, key), vals in conditionKeys(stmt).items():
+        base = op[len('foranyvalue:'):] if op.startswith('foranyvalue:') else op
+        if base.endswith('ifexists'):
+            base = base[:-len('ifexists')]
+        if key == 'aws:principalarn' and base in ('stringlike', 'stringequals', 'stringequalsignorecase',
+                                                  'arnlike', 'arnequals') \
+                and not op.startswith('forallvalues:') \
+                and all(any(_rootPatternCovers(base, v, a) for v in vals) for a in accountIds):
+            rootKeyFound = True
+            continue
+        if _isExceptionCondition(op, key, vals):
+            continue
+        return False
+    return rootKeyFound
+
+
+def _regionRestriction(stmt):
+    """True when the Deny blocks regional services outside an approved region
+    list: Action "*" (or a NotAction exempting global services) on Resource
+    "*", conditioned on StringNotEquals/StringNotLike aws:RequestedRegion,
+    plus optional principal exceptions."""
+    if not (_denyCoversAll(stmt, _REGION_SAMPLE_ACTIONS) and _resourceIsAll(stmt)):
+        return False
+    regionFound = False
+    for (op, key), vals in conditionKeys(stmt).items():
+        if key == 'aws:requestedregion':
+            if op.startswith('forallvalues:') or op.startswith('foranyvalue:'):
+                return False
+            base = op[:-len('ifexists')] if op.endswith('ifexists') else op
+            # StringNotLike "*" excludes every region, i.e. denies nothing.
+            if base in ('stringnotequals', 'stringnotlike', 'stringnotequalsignorecase') and vals \
+                    and not (base == 'stringnotlike' and any(v.strip('*?') == '' for v in vals)):
+                regionFound = True
+                continue
+            return False
+        if _isExceptionCondition(op, key, vals):
+            continue
+        return False
+    return regionFound
+
+
+def _privEscPrevention(stmt, accountIds):
+    """True when the Deny blocks at least one privilege-escalation IAM action
+    for everyone (only principal exceptions allowed) on IAM resources in
+    general, not on one specific role/user/policy."""
+    if not denyIsUnconditionalGuardrail(stmt):
+        return False
+    if not _resourceCoversAnyIam(stmt, accountIds):
+        return False
+    # Only IAM-specific action patterns count: a broad Deny "*" scoped by a
+    # condition (e.g. region deny) is not a privilege-escalation guardrail.
+    iamPatterns = [p for p in _asList(stmt.get('Action')) if str(p).lower().startswith('iam:')]
+    return any(_actionMatches(p, a) for p in iamPatterns for a in PRIV_ESC_ACTIONS)
+
+
+def scpGuardrails(doc, accountIds=None):
+    """Which best-practice guardrails a single SCP document provides to the
+    member accounts `accountIds` (default: any account, i.e. the root-user
+    pattern must use a wildcard account)."""
+    accountIds = [str(a) for a in accountIds] if accountIds else _GENERIC_ACCOUNTS
     found = set()
     for s in statements(doc):
         if s.get('Effect') != 'Deny':
@@ -265,21 +393,15 @@ def scpGuardrails(doc):
         # A Deny "*" without a narrowing condition (quarantine / suspended
         # SCP) blocks every action - including root user, out-of-region and
         # privilege-escalation actions - so it provides every guardrail.
-        if any(str(p) == '*' for p in _asList(s.get('Action'))) and denyIsUnconditionalGuardrail(s):
+        if any(str(p) == '*' for p in _asList(s.get('Action'))) and _resourceIsAll(s) \
+                and denyIsUnconditionalGuardrail(s):
             found.update(SCP_GUARDRAILS)
             continue
-        conds = conditionKeys(s)
-        for (op, key), vals in conds.items():
-            baseOp = op[:-len('ifexists')] if op.endswith('ifexists') else op
-            if key == 'aws:principalarn' and baseOp in ('stringlike', 'stringequals', 'arnlike', 'arnequals') \
-                    and any(v.endswith(':root') for v in vals):
-                found.add('denyRoot')
-            if key == 'aws:requestedregion' and op.startswith('stringnot'):
-                found.add('restrictRegions')
-        # Only IAM-specific action patterns count: a broad Deny "*" scoped by a
-        # condition (e.g. region deny) is not a privilege-escalation guardrail.
-        iamPatterns = [p for p in _asList(s.get('Action')) if str(p).lower().startswith('iam:')]
-        if any(_actionMatches(p, a) for p in iamPatterns for a in PRIV_ESC_ACTIONS):
+        if _rootDenial(s, accountIds):
+            found.add('denyRoot')
+        if _regionRestriction(s):
+            found.add('restrictRegions')
+        if _privEscPrevention(s, accountIds):
             found.add('preventPrivEscalation')
     return found
 

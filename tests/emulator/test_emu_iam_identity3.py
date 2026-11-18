@@ -15,6 +15,7 @@ tested with botocore Stubber in tests/test_stub_iam_identity3.py.
 """
 import io
 import json
+import time
 import zipfile
 
 from tests.emulator.conftest import assertFlagFixCycle, runCheck
@@ -140,6 +141,13 @@ def test_resource_explorer_aggregator(emu):
 
         def fix():
             re2.update_index_type(Arn=arn, Type='AGGREGATOR')
+            # Promotion is asynchronous (UPDATING -> ACTIVE), in AWS as in the
+            # emulator; the check correctly reports UPDATING as 0, so wait for
+            # the index to become ACTIVE before re-running it.
+            deadline = time.time() + 60
+            while re2.get_index().get('State') != 'ACTIVE':
+                assert time.time() < deadline, 'aggregator index did not become ACTIVE'
+                time.sleep(1)
 
         assertFlagFixCycle(emu, 'iam', 'resourceExplorerNoAggregatorIndex', 'Account', misconfigure, fix)
     finally:

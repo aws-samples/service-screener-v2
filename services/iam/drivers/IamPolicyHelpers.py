@@ -364,27 +364,140 @@ def statementNetworkConditionKeys(stmt):
     return found
 
 
+_IP_NETWORK_KEYS = frozenset(('aws:sourceip', 'aws:vpcsourceip'))
+_ANY_NETWORK_VALUES = frozenset(('0.0.0.0/0', '::/0', '*'))
+# A Deny guard must cover (nearly) every action: Action "*" or a NotAction
+# that still denies these common data / control plane actions.
+_GUARD_SAMPLE_ACTIONS = ['s3:GetObject', 'ec2:RunInstances', 'iam:CreateUser', 'dynamodb:Scan',
+                         'secretsmanager:GetSecretValue', 'sts:GetSessionToken']
+# Conditions that may accompany the network test in the documented
+# "deny unless from my network" guard without narrowing it for the user.
+_GUARD_EXCEPTION_BOOL_KEYS = frozenset(('aws:viaawsservice', 'aws:principalisawsservice'))
+
+
+def _splitOperator(op):
+    """('forallvalues'|'foranyvalue'|'', baseLower, ifExists)"""
+    op = str(op).lower()
+    prefix, _, base = op.rpartition(':')
+    ifExists = base.endswith('ifexists')
+    if ifExists:
+        base = base[:-len('ifexists')]
+    return prefix, base, ifExists
+
+
+def _conditionEntries(stmt):
+    condition = stmt.get('Condition')
+    if not isinstance(condition, dict):
+        return None if condition else []
+    out = []
+    for op, block in condition.items():
+        if not isinstance(block, dict):
+            return None
+        for key, vals in block.items():
+            vals = vals if isinstance(vals, list) else [vals]
+            out.append((op, str(key).lower(), [str(v) for v in vals]))
+    return out
+
+
+def _isNetworkRestriction(op, key, vals, negated):
+    """True when (op, key, vals) restricts to (negated=False) or denies
+    outside of (negated=True) a specific network."""
+    if key not in NETWORK_CONDITION_KEYS or not vals:
+        return False
+    prefix, base, ifExists = _splitOperator(op)
+    if prefix:
+        return False
+    if any(v.strip() in _ANY_NETWORK_VALUES for v in vals):
+        return False
+    if key in _IP_NETWORK_KEYS:
+        ops = ('notipaddress',) if negated else ('ipaddress',)
+    elif key == 'aws:sourcevpcarn':
+        ops = ('arnnotequals', 'arnnotlike') if negated else ('arnequals', 'arnlike')
+    else:
+        ops = ('stringnotequals', 'stringnotlike') if negated else ('stringequals', 'stringlike')
+    if base not in ops:
+        return False
+    if negated:
+        # A missing key makes a negated operator true with or without IfExists,
+        # so the Deny still applies to requests from anywhere else.
+        return True
+    # IfExists on an Allow admits requests where the key is absent (e.g.
+    # aws:SourceVpc outside a VPC endpoint), i.e. from anywhere.
+    return not ifExists
+
+
+def _resourceIsAll(stmt):
+    if 'NotResource' in stmt:
+        return False
+    res = stmt.get('Resource', '*')
+    res = res if isinstance(res, list) else [res]
+    return any(str(r) == '*' for r in res)
+
+
+def _denyCoversAll(stmt, actions):
+    if 'NotAction' in stmt:
+        excluded = [str(a).lower() for a in (stmt['NotAction'] if isinstance(stmt['NotAction'], list) else [stmt['NotAction']])]
+        return all(not any(fnmatch.fnmatchcase(a.lower(), p) for p in excluded) for a in actions)
+    acts = stmt.get('Action')
+    acts = [str(a).lower() for a in (acts if isinstance(acts, list) else [acts]) if a is not None]
+    return all(any(fnmatch.fnmatchcase(a.lower(), p) for p in acts) for a in actions)
+
+
+def isNetworkDenyGuard(stmt):
+    """True when a Deny statement blocks (nearly) every action on every
+    resource for requests that do not come from a listed network, i.e. the
+    documented "deny unless from my IP / VPC / VPC endpoint" guard. A Deny of
+    one action, a denylist (IpAddress), or a Deny narrowed by unrelated
+    conditions is not a guard."""
+    if str(stmt.get('Effect', '')).lower() != 'deny':
+        return False
+    if not (_resourceIsAll(stmt) and _denyCoversAll(stmt, _GUARD_SAMPLE_ACTIONS)):
+        return False
+    entries = _conditionEntries(stmt)
+    if not entries:
+        return False
+    network = False
+    for op, key, vals in entries:
+        if key in NETWORK_CONDITION_KEYS:
+            if not _isNetworkRestriction(op, key, vals, negated=True):
+                return False
+            network = True
+            continue
+        prefix, base, _ = _splitOperator(op)
+        if not prefix and base == 'bool' and key in _GUARD_EXCEPTION_BOOL_KEYS \
+                and all(v.lower() == 'false' for v in vals):
+            continue
+        return False
+    return network
+
+
+def allowIsNetworkRestricted(stmt):
+    """True when an Allow statement only applies from a listed network."""
+    entries = _conditionEntries(stmt) or []
+    return any(_isNetworkRestriction(op, key, vals, negated=False) for op, key, vals in entries)
+
+
 def networkContainment(policyDocs):
-    """How a set of identity policies ties long-term credentials to a
-    network location. Returns (contained, reason):
-    - a Deny statement conditioned on a network key (the usual "deny unless
-      from my IP / VPC endpoint" guard), or
-    - every Allow statement carries a network condition.
-    No Allow statement at all returns (None, ...): the identity policies grant
+    """How a set of identity policies (or a permissions boundary) ties
+    long-term credentials to a network location. Returns (contained, reason):
+    - a Deny guard (see isNetworkDenyGuard), or
+    - every Allow statement is restricted to a listed network
+      (IpAddress aws:SourceIp, StringEquals aws:SourceVpc/aws:SourceVpce ...).
+    No Allow statement at all returns (None, ...): the policies grant
     nothing, so there is nothing to contain."""
     allows, conditionedAllows = 0, 0
     for doc in policyDocs:
         for stmt in PolicyPrincipal.iterStatements(doc):
             effect = str(stmt.get('Effect', '')).lower()
-            keys = statementNetworkConditionKeys(stmt)
-            if effect == 'deny' and keys:
-                return True, 'Deny statement conditioned on {}'.format(', '.join(sorted(keys)))
+            if effect == 'deny' and isNetworkDenyGuard(stmt):
+                return True, 'Deny statement for requests outside {}'.format(
+                    ', '.join(sorted(statementNetworkConditionKeys(stmt))))
             if effect == 'allow':
                 allows += 1
-                if keys:
+                if allowIsNetworkRestricted(stmt):
                     conditionedAllows += 1
     if allows == 0:
-        return None, 'identity policies grant no permissions'
+        return None, 'grant no permissions'
     if allows == conditionedAllows:
         return True, 'every Allow statement has a network condition'
     return False, '{} of {} Allow statement(s) without a network condition and no network Deny guard'.format(
