@@ -189,9 +189,21 @@ class OpensearchCommon(Evaluator):
             publicSids.append(str(stmt.get('Sid') or f'#{idx}'))
 
         if publicSids:
-            fgac = (status.get('AdvancedSecurityOptions') or {}).get('Enabled') is True
-            note = ' (fine-grained access control is enabled but does not restrict network exposure)' if fgac else ''
-            self.results[key] = [-1, 'Public endpoint with access policy allowing any principal without IP/org restriction: ' + ', '.join(publicSids) + note]
+            sids = ', '.join(publicSids)
+            aso = status.get('AdvancedSecurityOptions') or {}
+            fgac = aso.get('Enabled') is True
+            anonymous = aso.get('AnonymousAuthEnabled') is True
+            if fgac and not anonymous:
+                # AWS documents an open resource policy as the recommended setup for FGAC:
+                # every request must still authenticate (internal users, SAML/JWT or IAM),
+                # so data is not anonymously accessible. Only network exposure remains.
+                self.results[key] = [0, 'Public endpoint with open access policy (' + sids + '); fine-grained access control '
+                                        'requires authentication for every request (anonymous auth disabled), but the '
+                                        'endpoint is reachable from the internet - consider IP restriction or a VPC']
+                return
+            note = (' (fine-grained access control has anonymous authentication enabled)' if fgac else
+                    ' (fine-grained access control is not enabled)')
+            self.results[key] = [-1, 'Public endpoint with access policy allowing any principal without IP/org restriction: ' + sids + note]
             return
 
         self.results[key] = [1, 'Access policy does not allow anonymous access']

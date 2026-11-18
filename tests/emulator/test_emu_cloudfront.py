@@ -41,10 +41,20 @@ def _delete(cf, distId):
         time.sleep(1)
 
 
+def _customCert(certArn, minProto):
+    return {'ACMCertificateArn': certArn, 'SSLSupportMethod': 'sni-only', 'MinimumProtocolVersion': minProto}
+
+
 def test_cloudfront_origin_allows_tls10(emu, uid):
     cf = emu.client('cloudfront')
+    acm = emu.client('acm')
     ref = f'ss-test-{uid}'
-    distId = cf.create_distribution(DistributionConfig=_distConfig(ref, ['TLSv1.2']))['Distribution']['Id']
+    certArn = acm.request_certificate(DomainName=f'o{uid}.example.com', ValidationMethod='DNS')['CertificateArn']
+    # A custom certificate with TLSv1.2_2021 so the viewer side requires TLS 1.2+ and the
+    # fixed state is a genuine PASS (the default certificate is INFO, see below).
+    cfg = _distConfig(ref, ['TLSv1.2'])
+    cfg['ViewerCertificate'] = _customCert(certArn, 'TLSv1.2_2021')
+    distId = cf.create_distribution(DistributionConfig=cfg)['Distribution']['Id']
     try:
         def setProtocols(protos):
             def m(cfg):
@@ -57,6 +67,10 @@ def test_cloudfront_origin_allows_tls10(emu, uid):
                            lambda: _update(cf, distId, setProtocols(['TLSv1.2'])))
     finally:
         _delete(cf, distId)
+        try:
+            acm.delete_certificate(CertificateArn=certArn)
+        except Exception:
+            pass
 
 
 def test_cloudfront_viewer_min_tls_old(emu, uid):
@@ -66,14 +80,17 @@ def test_cloudfront_viewer_min_tls_old(emu, uid):
     certArn = acm.request_certificate(DomainName=f'{uid}.example.com', ValidationMethod='DNS')['CertificateArn']
     distId = cf.create_distribution(DistributionConfig=_distConfig(ref, ['TLSv1.2']))['Distribution']['Id']
     try:
-        # Default *.cloudfront.net certificate: policy not configurable -> not flagged by this check.
-        st = runCheck(emu, 'cloudfront', CHECK, distId).statuses()
-        assert st and all(s != -1 for s in st.values()), st
+        # Default *.cloudfront.net certificate: CloudFront fixes the viewer policy at TLSv1
+        # (TLS 1.0/1.1 accepted) -> INFO with that explanation, never PASS.
+        res = runCheck(emu, 'cloudfront', CHECK, distId)
+        st = res.statuses()
+        assert st and all(s == 0 for s in st.values()), st
+        msgs = [m for r in res.results.values() for k, m in r.items() if k.lower() == CHECK.lower()]
+        assert msgs and all('fixed at TLSv1' in m[1] for m in msgs), msgs
 
         def setViewer(minProto):
             def m(cfg):
-                cfg['ViewerCertificate'] = {'ACMCertificateArn': certArn, 'SSLSupportMethod': 'sni-only',
-                                            'MinimumProtocolVersion': minProto}
+                cfg['ViewerCertificate'] = _customCert(certArn, minProto)
             return m
 
         assertFlagFixCycle(emu, 'cloudfront', CHECK, distId,

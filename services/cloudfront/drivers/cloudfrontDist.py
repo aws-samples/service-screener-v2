@@ -70,13 +70,22 @@ class cloudfrontDist(Evaluator):
         SSLv3 on origins is reported separately by DeprecatedSSLProtocol (no duplicate finding)."""
         cfg = self.distConfig.get('DistributionConfig', {})
         issues = []
+        viewerNote = None
 
         viewerCert = cfg.get('ViewerCertificate') or {}
-        # With the default *.cloudfront.net certificate the security policy is fixed by
-        # CloudFront and cannot be changed; CustomSSLCertificate covers that case.
-        if not viewerCert.get('CloudFrontDefaultCertificate', False):
+        if viewerCert.get('CloudFrontDefaultCertificate', False):
+            # With the default *.cloudfront.net certificate CloudFront fixes the viewer
+            # security policy at TLSv1, so TLS 1.0/1.1 viewers are accepted. It cannot be
+            # changed without a custom certificate (see CustomSSLCertificate), so this is
+            # INFO - never PASS, because the viewer side does not require TLS 1.2+.
+            viewerNote = ('default *.cloudfront.net certificate: viewer security policy is fixed at TLSv1 '
+                          '(TLS 1.0/1.1 accepted); use a custom certificate with TLSv1.2_2021 or later '
+                          'to require TLS 1.2+')
+        else:
             minProto = viewerCert.get('MinimumProtocolVersion', '')
-            if minProto and minProto not in self.VIEWER_MIN_TLS_OK:
+            if not minProto:
+                viewerNote = 'Unable to evaluate (MinimumProtocolVersionMissing)'
+            elif minProto not in self.VIEWER_MIN_TLS_OK:
                 issues.append(f'viewer MinimumProtocolVersion {minProto}')
 
         for origin in (cfg.get('Origins') or {}).get('Items', []) or []:
@@ -89,7 +98,11 @@ class cloudfrontDist(Evaluator):
                 issues.append(f"origin {origin.get('Id', '?')} allows {'/'.join(old)}")
 
         if issues:
+            if viewerNote:
+                issues.append(viewerNote)
             self.results['cloudfrontViewerMinTlsOld'] = [-1, '; '.join(issues)]
+        elif viewerNote:
+            self.results['cloudfrontViewerMinTlsOld'] = [0, viewerNote]
         else:
             self.results['cloudfrontViewerMinTlsOld'] = [1, 'Viewer and origin TLS policies require TLS 1.2+']
 
