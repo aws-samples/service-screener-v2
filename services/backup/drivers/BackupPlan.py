@@ -148,7 +148,13 @@ class BackupPlan(Evaluator):
     # 4. Plan has no resource selections
     # ------------------------------------------------------------------ #
     def _checkBackupPlanNotAssigned(self):
-        if not self.selections:
+        err = self.plan.get('_selectionsError')
+        if err and not self.selections:
+            # list_backup_selections failed: the plan may have selections.
+            self.results['backupPlanNotAssigned'] = [
+                0, f"Unable to evaluate ({err}) - list_backup_selections failed"
+            ]
+        elif not self.selections:
             self.results['backupPlanNotAssigned'] = [
                 -1, "Plan has 0 resource selections — protects nothing"
             ]
@@ -259,7 +265,9 @@ class BackupPlan(Evaluator):
             self.results[key] = [0, "No rules to evaluate"]
             return
         if not self.selections:
-            self.results[key] = [0, "Plan has no resource selections - see backupPlanNotAssigned"]
+            err = self.plan.get('_selectionsError')
+            self.results[key] = [0, (f"Unable to evaluate ({err}) - list_backup_selections failed" if err
+                                     else "Plan has no resource selections - see backupPlanNotAssigned")]
             return
 
         covers = self._selectionsCoverScannableTypes()
