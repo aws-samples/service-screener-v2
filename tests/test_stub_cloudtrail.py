@@ -110,6 +110,7 @@ def test_kms_excluded_then_fixed():
     assert d.results['cloudtrailExcludesKmsEvents'][0] == -1
     c.done()
 
+    Config.set('__sharedMemo', None)  # re-run = new scan (trail reads are cached per scan)
     c = Clients()
     _kmsStubs(c, {'EventSelectors': [{'ReadWriteType': 'All', 'IncludeManagementEvents': True,
                                       'ExcludeManagementEventSources': []}]})
@@ -158,6 +159,7 @@ def _runSame(c):
     Config.set('CloudTrail_ownedBuckets::' + acct, None)
     Config.set('CloudTrail_logArchive::' + acct, None)
     Config.set('CloudTrail_ownTrailCounted::' + acct, None)
+    Config.set('__sharedMemo', None)  # describe_organization is read once per scan
     return d.results['trailBucketSameAccount']
 
 
@@ -212,9 +214,10 @@ def test_log_archive_memo_survives_other_regions():
 
 
 def _homeRegionStubs(c, trails, buckets, channels, listBuckets=True):
-    c.st['org'].add_response('describe_organization', {'Organization': {
-        'Id': 'o-abcdefghij', 'MasterAccountId': OTHER}})
-    if listBuckets:  # bucket list is cached per account after the first Region
+    # bucket list and describe_organization are read once per scan, in the first Region
+    if listBuckets:
+        c.st['org'].add_response('describe_organization', {'Organization': {
+            'Id': 'o-abcdefghij', 'MasterAccountId': OTHER}})
         c.st['s3'].add_response('list_buckets', {'Buckets': [{'Name': b} for b in buckets],
                                                  'Owner': {'ID': 'abc'}})
     c.st['ct'].add_response('describe_trails', {'trailList': trails}, {'includeShadowTrails': True})
@@ -248,6 +251,7 @@ def test_multiregion_trail_home_not_scanned_flagged_once_then_fixed():
     # FIX: trail now writes to the log archive account's bucket -> re-run passes
     Config.set('CloudTrail_ownTrailCounted::' + ACCT, None)
     Config.set('CloudTrail_ownedBuckets::' + ACCT, None)
+    Config.set('__sharedMemo', None)
     c = Clients()
     _homeRegionStubs(c, [_trail('legacy', bucket='archive-in-log-account', home='eu-west-1')],
                      ['my-logs'], central)

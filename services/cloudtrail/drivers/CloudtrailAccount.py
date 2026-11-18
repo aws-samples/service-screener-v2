@@ -5,7 +5,8 @@ import threading
 
 from utils.Config import Config
 from services.Evaluator import Evaluator
-from services.cloudtrail.drivers.CloudtrailHelper import selectorCoverage, ownedBucketNames, errCode, accountIdFromArn
+from services.cloudtrail.drivers.CloudtrailHelper import selectorCoverage, ownedBucketNames, errCode, accountIdFromArn, \
+    trailStatus, trailEventSelectors
 
 class CloudtrailAccount(Evaluator):
     def __init__(self, ctClient, sizeofTrail, s3Client=None, cfgClient=None, orgClient=None):
@@ -214,8 +215,9 @@ class CloudtrailAccount(Evaluator):
                     return
                 raise
             
-            # Check if any trail is an organization trail
-            response = self.ctClient.describe_trails()
+            # Check if any trail is an organization trail. includeShadowTrails
+            # defaults to true, so this is the same read as _describeTrails().
+            response = self._describeTrails()
             trails = response.get('trailList', [])
             
             hasOrgTrail = False
@@ -235,6 +237,11 @@ class CloudtrailAccount(Evaluator):
     def _accountId(self):
         return (Config.get('stsInfo', {}) or {}).get('Account')
 
+    def _describeTrails(self):
+        """describe_trails(includeShadowTrails=True), fetched once for this driver."""
+        return self._memo(('describe_trails', self.ctClient.meta.region_name, True),
+                          lambda: self.ctClient.describe_trails(includeShadowTrails=True))
+
     def _regionTrails(self):
         """All trails that apply to this Region (incl. multi-Region and organization
         shadow trails), each with its logging status and event selector coverage.
@@ -243,7 +250,7 @@ class CloudtrailAccount(Evaluator):
             if self._trailCache is not None:
                 return self._trailCache
             try:
-                trails = self.ctClient.describe_trails(includeShadowTrails=True).get('trailList', []) or []
+                trails = self._describeTrails().get('trailList', []) or []
             except Exception as e:
                 self._trailCache = (None, errCode(e))
                 return self._trailCache
@@ -253,12 +260,12 @@ class CloudtrailAccount(Evaluator):
                 arn = t.get('TrailARN')
                 info = {'trail': t, 'logging': None, 'coverage': None, 'error': None}
                 try:
-                    st = self.ctClient.get_trail_status(Name=arn)
+                    st = trailStatus(self, self.ctClient, arn)
                     info['logging'] = st.get('IsLogging') is True
                 except Exception as e:
                     info['error'] = errCode(e)
                 try:
-                    sel = self.ctClient.get_event_selectors(TrailName=arn)
+                    sel = trailEventSelectors(self, self.ctClient, arn)
                     info['coverage'] = selectorCoverage(sel)
                 except Exception as e:
                     info['error'] = info['error'] or errCode(e)
@@ -344,7 +351,10 @@ class CloudtrailAccount(Evaluator):
             return
 
         try:
-            self.orgClient.describe_organization()
+            # Account-level answer (Organizations is a global service): read it
+            # once per scan instead of once per scanned Region.
+            self._sharedMemo(('organizations', 'global', 'describe_organization'),
+                             lambda: self.orgClient.describe_organization())
         except Exception as e:
             c = errCode(e)
             if c == 'AWSOrganizationsNotInUseException':
@@ -364,7 +374,7 @@ class CloudtrailAccount(Evaluator):
             return
 
         try:
-            trails = self.ctClient.describe_trails(includeShadowTrails=True).get('trailList', []) or []
+            trails = self._describeTrails().get('trailList', []) or []
         except Exception as e:
             self.results[key] = [0, 'Unable to evaluate ({})'.format(errCode(e))]
             return

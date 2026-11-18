@@ -14,12 +14,14 @@ from . import IamX509
 from .IamOrgData import OrgData, SCP, RCP, TAG, BACKUP, DECLARATIVE_EC2, FULL_AWS_ACCESS_ID, statements, denyCoversAction, conditionKeys, scpGuardrails, SCP_GUARDRAILS, \
     denyIsUnconditionalGuardrail, guardrailCoverage
 from .IamSsoData import SsoData, parseIsoDuration
- 
+
+
 class IamAccount(IamCommon):
     PASSWORD_POLICY_MIN_SCORE = 4
     ROOT_LOGIN_MAX_COUNT = 3
     
-    def __init__(self, none, awsClients, users, roles, ssBoto, authDetails=None, policyDocumentMap=None):
+    def __init__(self, none, awsClients, users, roles, ssBoto, authDetails=None, policyDocumentMap=None,
+                 orgData=None, credentialReport=None):
         super().__init__()
         
         self.ssBoto = ssBoto
@@ -57,29 +59,47 @@ class IamAccount(IamCommon):
             ]
         self._policyDocumentsCache = dict(self._policyDocumentMap)
 
-        # Check if AWS Organization is enabled
-        orgResp, orgErr = None, None
-        try:
-            orgResp = self.orgClient.describe_organization()
-            self.organizationIsEnabled = True
-        except botocore.exceptions.ClientError as e:
-            orgErr = e.response['Error']['Code']
+        # get_credential_report() response already read by Iam.getUsers().
+        self._credentialReport = credentialReport
 
-        callerAccountId = (Config.get('stsInfo', {}) or {}).get('Account')
-        self.orgData = OrgData(self.orgClient, callerAccountId, orgResp, orgErr)
-        self.orgInfo = (orgResp or {}).get('Organization') or None
+        # Check if AWS Organization is enabled
+        if orgData is not None:
+            # Shared with the Iam service (role trust context): its
+            # describe_organization / list_accounts results are reused.
+            self.orgData = orgData
+            org, orgErr = orgData.organization()
+            self.organizationIsEnabled = orgErr is None
+            self.orgInfo = org or None
+        else:
+            orgResp, orgErr = None, None
+            try:
+                orgResp = self.orgClient.describe_organization()
+                self.organizationIsEnabled = True
+            except botocore.exceptions.ClientError as e:
+                orgErr = e.response['Error']['Code']
+
+            callerAccountId = (Config.get('stsInfo', {}) or {}).get('Account')
+            self.orgData = OrgData(self.orgClient, callerAccountId, orgResp, orgErr)
+            self.orgInfo = (orgResp or {}).get('Organization') or None
         self.ssoData = SsoData(ssBoto, Config.get('REGIONS_SELECTED', []) or [])
 
         self.init()
     
+    # ------------------------------------------------------------------ #
+    # Read-once API helpers: several checks need the same response.
+    # ------------------------------------------------------------------ #
+    def _iamList(self, op):
+        """Response of a non-paginated, argument-less IAM list call
+        (list_saml_providers / list_open_id_connect_providers), fetched once."""
+        return self._memo(('iam', op), lambda: getattr(self.iamClient, op)())
+
     def _getCustomerPolicies(self):
         """Cached fetch of all customer managed policies with preloaded documents"""
         if self._customerPoliciesCache is not None:
             return self._customerPoliciesCache
         
         self._customerPoliciesCache = []
-        paginator = self.iamClient.get_paginator('list_policies')
-        for page in paginator.paginate(Scope='Local'):
+        for page in self._pages(self.iamClient, 'list_policies', Scope='Local'):
             self._customerPoliciesCache.extend(page.get('Policies', []))
         
         return self._customerPoliciesCache
@@ -92,10 +112,7 @@ class IamAccount(IamCommon):
             if policyArn in self._policyDocumentMap:
                 self._policyDocumentsCache[key] = self._policyDocumentMap[policyArn]
             else:
-                resp = self.iamClient.get_policy_version(
-                    PolicyArn=policyArn,
-                    VersionId=versionId
-                )
+                resp = self._iamPolicyVersion(policyArn, versionId)
                 self._policyDocumentsCache[key] = resp['PolicyVersion']['Document']
         return self._policyDocumentsCache[key]
         
@@ -231,7 +248,7 @@ class IamAccount(IamCommon):
         for label, op, rkey in (('SAML', 'list_saml_providers', 'SAMLProviderList'),
                                 ('OIDC', 'list_open_id_connect_providers', 'OpenIDConnectProviderList')):
             try:
-                counts[label] = len(getattr(self.iamClient, op)().get(rkey, []) or [])
+                counts[label] = len(self._iamList(op).get(rkey, []) or [])
             except botocore.exceptions.ClientError as e:
                 errors.append('iam.{}: {}'.format(op, e.response['Error']['Code']))
 
@@ -279,7 +296,8 @@ class IamAccount(IamCommon):
         budgetClient = self.budgetClient
         
         try:
-            resp = budgetClient.describe_budgets(AccountId=stsInfo['Account'])
+            # First page of the describe_budgets paginator (same request).
+            resp = next(self._pages(budgetClient, 'describe_budgets', AccountId=stsInfo['Account']))
         
             # An empty 'Budgets' list means no budget is configured.
             if resp.get('Budgets'):
@@ -381,7 +399,12 @@ class IamAccount(IamCommon):
     def _checkAWSBackupPlans(self):
         """Check if AWS Backup plans are configured (FTR BAR-001.1)"""
         try:
-            resp = self.backupClient.list_backup_plans()
+            if self.backupClient.meta.region_name in self._scanRegions():
+                # First page of the list_backup_plans paginator (same request),
+                # shared with the DR Region detection.
+                resp = next(self._pages(self.backupClient, 'list_backup_plans'))
+            else:
+                resp = self.backupClient.list_backup_plans()
             plans = resp.get('BackupPlansList', [])
             
             if len(plans) == 0:
@@ -419,12 +442,12 @@ class IamAccount(IamCommon):
             has_federation = False
             
             # Check for SAML providers
-            saml_resp = self.iamClient.list_saml_providers()
+            saml_resp = self._iamList('list_saml_providers')
             if len(saml_resp.get('SAMLProviderList', [])) > 0:
                 has_federation = True
             
             # Check for OIDC providers
-            oidc_resp = self.iamClient.list_open_id_connect_providers()
+            oidc_resp = self._iamList('list_open_id_connect_providers')
             if len(oidc_resp.get('OpenIDConnectProviderList', [])) > 0:
                 has_federation = True
             
@@ -436,7 +459,8 @@ class IamAccount(IamCommon):
             users_with_credentials = []
             
             try:
-                report = self.iamClient.get_credential_report()
+                report = self._credentialReport if self._credentialReport is not None \
+                    else self.iamClient.get_credential_report()
                 rows = report.get('Content').decode('UTF-8').split("\n")
                 
                 # Skip header and root account
@@ -491,9 +515,7 @@ class IamAccount(IamCommon):
             }
             
             potentially_unnecessary = []
-            paginator = self.iamClient.get_paginator('list_policies')
-            
-            for page in paginator.paginate(Scope='Local'):
+            for page in self._pages(self.iamClient, 'list_policies', Scope='Local'):
                 for policy in page.get('Policies', []):
                     policy_name = policy['PolicyName']
                     
@@ -681,7 +703,7 @@ class IamAccount(IamCommon):
                         attached = self.iamClient.list_attached_user_policies(UserName=entity_name).get('AttachedPolicies', [])
                     
                     for p in attached:
-                        policy_info = self.iamClient.get_policy(PolicyArn=p['PolicyArn'])
+                        policy_info = self._iamPolicy(p['PolicyArn'])
                         doc = self._getPolicyDocument(p['PolicyArn'], policy_info['Policy']['DefaultVersionId'])
                         if isinstance(doc, str):
                             doc = _json.loads(doc)
@@ -715,8 +737,7 @@ class IamAccount(IamCommon):
                     users_source = self._authDetails['users']
                 else:
                     users_source = []
-                    paginator = self.iamClient.get_paginator('list_users')
-                    for page in paginator.paginate():
+                    for page in self._pages(self.iamClient, 'list_users'):
                         users_source.extend(page.get('Users', []))
 
                 for user in users_source:
@@ -893,7 +914,7 @@ class IamAccount(IamCommon):
             for label, svc, op, rkey, kw in probes:
                 try:
                     client = self.ssBoto.client(svc, config=conf)
-                    for page in client.get_paginator(op).paginate(**kw):
+                    for page in self._pages(client, op, **kw):
                         items = page.get(rkey, [])
                         if svc == 'ec2':
                             counts[label] += sum(len(r.get('Instances', [])) for r in items)
@@ -1002,9 +1023,7 @@ class IamAccount(IamCommon):
             return
         rootId = roots[0]['Id']
         try:
-            ous = []
-            for page in self.orgClient.get_paginator('list_organizational_units_for_parent').paginate(ParentId=rootId):
-                ous.extend(page.get('OrganizationalUnits', []))
+            ous = self.orgData.listChildren('list_organizational_units_for_parent', 'OrganizationalUnits', ParentId=rootId)
         except botocore.exceptions.ClientError as e:
             self.results[key] = self.orgData.notEvaluable(e.response['Error']['Code'])
             return
@@ -1013,9 +1032,8 @@ class IamAccount(IamCommon):
             return
         org, _ = self.orgData.organization()
         try:
-            direct = []
-            for page in self.orgClient.get_paginator('list_accounts_for_parent').paginate(ParentId=rootId):
-                direct.extend(a for a in page.get('Accounts', []) if a.get('Id') != org.get('MasterAccountId'))
+            direct = [a for a in self.orgData.listChildren('list_accounts_for_parent', 'Accounts', ParentId=rootId)
+                      if a.get('Id') != org.get('MasterAccountId')]
         except botocore.exceptions.ClientError as e:
             self.results[key] = self.orgData.notEvaluable(e.response['Error']['Code'])
             return
@@ -1738,7 +1756,7 @@ class IamAccount(IamCommon):
             try:
                 ct = self.ssBoto.client('controltower', config=bConfig(region_name=region))
                 lzs = []
-                for page in ct.get_paginator('list_landing_zones').paginate():
+                for page in self._pages(ct, 'list_landing_zones'):
                     lzs.extend(page.get('landingZones', []))
                 if not lzs:
                     continue
@@ -1807,10 +1825,10 @@ class IamAccount(IamCommon):
             try:
                 out = []
                 if self.iamClient.can_paginate(op):
-                    for page in self.iamClient.get_paginator(op).paginate():
+                    for page in self._pages(self.iamClient, op):
                         out.extend(page.get(resultKey, []))
                 else:
-                    out = getattr(self.iamClient, op)().get(resultKey, [])
+                    out = self._iamList(op).get(resultKey, [])
                 return out
             except botocore.exceptions.ClientError as e:
                 errors.append('iam.{}: {}'.format(op, e.response['Error']['Code']))
@@ -1850,7 +1868,7 @@ class IamAccount(IamCommon):
                 try:
                     client = self.ssBoto.client(svc, config=bConfig(region_name=region))
                     n = 0
-                    for page in client.get_paginator(op).paginate(**kw):
+                    for page in self._pages(client, op, **kw):
                         n += len(page.get(rkey, []))
                     ok = True
                     if n:
@@ -1986,8 +2004,7 @@ class IamAccount(IamCommon):
             client = self._controlTowerClient(region)
             try:
                 arns = []
-                paginator = client.get_paginator('list_landing_zones')
-                for page in paginator.paginate():
+                for page in self._pages(client, 'list_landing_zones'):
                     arns.extend(lz.get('arn') for lz in page.get('landingZones', []) if lz.get('arn'))
             except botocore.exceptions.ClientError as e:
                 errors.append('{}: {}'.format(region, e.response['Error']['Code']))
@@ -2174,7 +2191,7 @@ class IamAccount(IamCommon):
             client = self._regionalClient('rolesanywhere', region)
             try:
                 anchors = []
-                for page in client.get_paginator('list_trust_anchors').paginate():
+                for page in self._pages(client, 'list_trust_anchors'):
                     anchors.extend(page.get('trustAnchors', []))
                 crls = []
                 for page in client.get_paginator('list_crls').paginate():
@@ -2272,7 +2289,7 @@ class IamAccount(IamCommon):
         if arn in self._policyDocumentMap:
             return self._policyDocumentMap[arn]
         try:
-            ver = self.iamClient.get_policy(PolicyArn=arn)['Policy']['DefaultVersionId']
+            ver = self._iamPolicy(arn)['Policy']['DefaultVersionId']
             doc = self._getPolicyDocument(arn, ver)
         except (botocore.exceptions.ClientError, KeyError):
             return None
@@ -2437,7 +2454,7 @@ class IamAccount(IamCommon):
             return
         try:
             budgets = []
-            for page in self.budgetClient.get_paginator('describe_budgets').paginate(AccountId=account):
+            for page in self._pages(self.budgetClient, 'describe_budgets', AccountId=account):
                 budgets.extend(page.get('Budgets', []))
             if not budgets:
                 self.results[key] = [0, 'No budgets configured (see enableCostBudget)']
@@ -2539,7 +2556,7 @@ class IamAccount(IamCommon):
                     for cl in page.get('DBClusters', []):
                         stores[cl['DBClusterArn']] = ('{} cluster {} ({})'.format(
                             cl.get('Engine', 'RDS'), cl.get('DBClusterIdentifier'), region), cl.get('TagList', []))
-                for page in c.get_paginator('describe_db_instances').paginate():
+                for page in self._pages(c, 'describe_db_instances'):
                     for db in page.get('DBInstances', []):
                         if db.get('DBClusterIdentifier'):
                             continue   # data lives in (and is tagged on) the cluster
@@ -2653,7 +2670,7 @@ class IamAccount(IamCommon):
         for region in self._scanRegions():
             try:
                 backup = self._regionalClient('backup', region)
-                for page in backup.get_paginator('list_backup_plans').paginate():
+                for page in self._pages(backup, 'list_backup_plans'):
                     for plan in page.get('BackupPlansList', []):
                         body = backup.get_backup_plan(BackupPlanId=plan['BackupPlanId']).get('BackupPlan', {})
                         for rule in body.get('Rules', []) or []:
@@ -2909,7 +2926,7 @@ class IamAccount(IamCommon):
         for region in self._scanRegions():
             def lambdas():
                 c = self._regionalClient('lambda', region)
-                for page in c.get_paginator('list_functions').paginate():
+                for page in self._pages(c, 'list_functions'):
                     for fn in page.get('Functions', []):
                         use(fn.get('Role'), 'Lambda', '{} ({})'.format(fn.get('FunctionName'), region))
 
@@ -2983,8 +3000,9 @@ class IamAccount(IamCommon):
         account in the scanned Regions (deduplicated by membershipId).
         Returns (memberships, errors, unsupportedRegions); each membership dict
         carries '_queryRegion' (the Region whose endpoint returned it)."""
-        if getattr(self, '_sirCache', None) is not None:
-            return self._sirCache
+        return self._memo(('sirMemberships',), self._fetchSirMemberships)
+
+    def _fetchSirMemberships(self):
         found, errors, unsupported = {}, [], []
         for region in self._scanRegions():
             try:
@@ -3002,8 +3020,7 @@ class IamAccount(IamCommon):
                 errors.append('{}: {}'.format(region, code))
             except (botocore.exceptions.EndpointConnectionError, botocore.exceptions.UnknownEndpointError):
                 unsupported.append(region)
-        self._sirCache = (list(found.values()), errors, unsupported)
-        return self._sirCache
+        return (list(found.values()), errors, unsupported)
 
     def _sirDelegatedAdmins(self):
         """Account IDs registered as Security Incident Response delegated
