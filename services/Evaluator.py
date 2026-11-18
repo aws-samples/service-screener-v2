@@ -22,13 +22,36 @@ _slow_log_lock = threading.Lock()
 _memo_init_lock = threading.Lock()
 
 
+_TRANSIENT_ERROR_CODES = frozenset((
+    'Throttling', 'ThrottlingException', 'ThrottledException', 'TooManyRequestsException',
+    'RequestLimitExceeded', 'RequestThrottled', 'RequestThrottledException', 'SlowDown',
+    'ProvisionedThroughputExceededException', 'ServiceUnavailable', 'ServiceUnavailableException',
+    'InternalError', 'InternalFailure', 'InternalServerError', 'InternalServerException',
+))
+
+
+def _isTransient(e):
+    """Errors a later retry may not hit: never cache them, so one throttled
+    call does not become 'unable to evaluate' for every later check."""
+    if isinstance(e, (botocore.exceptions.ConnectionError, botocore.exceptions.ReadTimeoutError,
+                      botocore.exceptions.ConnectTimeoutError)):
+        return True
+    if isinstance(e, botocore.exceptions.ClientError):
+        err = e.response.get('Error', {}) or {}
+        status = (e.response.get('ResponseMetadata', {}) or {}).get('HTTPStatusCode') or 0
+        return err.get('Code') in _TRANSIENT_ERROR_CODES or status >= 500 or status == 429
+    return False
+
+
 def _memoFetch(store, lock, key, fn):
     with lock:
         if key not in store:
             try:
                 store[key] = (True, fn())
-            except Exception as e:  # cached and re-raised to every caller
-                store[key] = (False, e)
+            except Exception as e:
+                if _isTransient(e):
+                    raise            # not cached: the next caller retries
+                store[key] = (False, e)  # cached and re-raised to every caller
     ok, value = store[key]
     if ok:
         # Each caller gets its own copy: some checks modify what they read.

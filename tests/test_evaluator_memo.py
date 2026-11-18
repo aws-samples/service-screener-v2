@@ -66,3 +66,31 @@ def test_shared_memo_across_instances_and_reset_by_config_init():
     Config.init()
     D()._sharedMemo(('gd', 'us-east-1'), fn)
     assert len(calls) == 3
+
+
+@pytest.mark.parametrize('code,status', [('ThrottlingException', 400), ('TooManyRequestsException', 429),
+                                         ('InternalFailure', 500), ('ServiceUnavailable', 503)])
+def test_transient_errors_not_cached(code, status):
+    d, calls = D(), []
+    def fn():
+        calls.append(1)
+        if len(calls) == 1:
+            raise botocore.exceptions.ClientError(
+                {'Error': {'Code': code, 'Message': 'x'}, 'ResponseMetadata': {'HTTPStatusCode': status}}, 'Op')
+        return 'ok'
+    with pytest.raises(botocore.exceptions.ClientError):
+        d._memo('k', fn)
+    assert d._memo('k', fn) == 'ok' and len(calls) == 2
+
+
+def test_transient_errors_not_cached_shared():
+    Config.init()
+    calls = []
+    def fn():
+        calls.append(1)
+        if len(calls) == 1:
+            raise botocore.exceptions.ClientError({'Error': {'Code': 'Throttling', 'Message': 'x'}}, 'Op')
+        return ['org']
+    with pytest.raises(botocore.exceptions.ClientError):
+        D()._sharedMemo('org', fn)
+    assert D()._sharedMemo('org', fn) == ['org'] and len(calls) == 2
