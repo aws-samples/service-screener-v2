@@ -33,72 +33,6 @@ def _pattern(names):
     })
 
 
-def test_eventbridge_rule_without_target_then_with_target(emu, uid):
-    sm, name = _secret(emu, uid)
-    ev = emu.client('events')
-    sns = emu.client('sns')
-    rule = f'ss-sm-{uid}'
-    topic = sns.create_topic(Name=f'ss-sm-{uid}')['TopicArn']
-    try:
-        def misconfigure():
-            # A matching rule with no target alerts nobody.
-            ev.put_rule(Name=rule, EventPattern=_pattern(['DeleteSecret', 'PutResourcePolicy']), State='ENABLED')
-
-        def fix():
-            ev.put_targets(Rule=rule, Targets=[{'Id': '1', 'Arn': topic}])
-
-        assertFlagFixCycle(emu, 'secretsmanager', CHECK, RES, misconfigure, fix)
-    finally:
-        try:
-            ev.remove_targets(Rule=rule, Ids=['1'])
-        except Exception:
-            pass
-        try:
-            ev.delete_rule(Name=rule)
-        except Exception:
-            pass
-        sns.delete_topic(TopicArn=topic)
-        _cleanupSecret(sm, name)
-
-
-def test_eventbridge_partial_coverage_flags_then_full_passes(emu, uid):
-    sm, name = _secret(emu, uid)
-    ev = emu.client('events')
-    sns = emu.client('sns')
-    rule = f'ss-sm-{uid}'
-    topic = sns.create_topic(Name=f'ss-sm-{uid}')['TopicArn']
-    try:
-        def misconfigure():
-            # Only deletion is covered; policy changes go unnoticed. A
-            # disabled catch-all rule must not count either.
-            ev.put_rule(Name=rule, EventPattern=_pattern(['DeleteSecret']), State='ENABLED')
-            ev.put_targets(Rule=rule, Targets=[{'Id': '1', 'Arn': topic}])
-            ev.put_rule(Name=rule + '-off', EventPattern=json.dumps({'source': ['aws.secretsmanager']}),
-                        State='DISABLED')
-            ev.put_targets(Rule=rule + '-off', Targets=[{'Id': '1', 'Arn': topic}])
-
-        def fix():
-            ev.put_rule(Name=rule, EventPattern=json.dumps({
-                'source': ['aws.secretsmanager'],
-                'detail': {'eventName': [{'prefix': 'Delete'}, 'PutResourcePolicy']}}), State='ENABLED')
-
-        before, _ = assertFlagFixCycle(emu, 'secretsmanager', CHECK, RES, misconfigure, fix)
-        msg = runCheck(emu, 'secretsmanager', CHECK, RES).results[RES][CHECK][1]
-        assert 'DeleteSecret' in msg and 'PutResourcePolicy' in msg
-    finally:
-        for r in (rule, rule + '-off'):
-            try:
-                ev.remove_targets(Rule=r, Ids=['1'])
-            except Exception:
-                pass
-            try:
-                ev.delete_rule(Name=r)
-            except Exception:
-                pass
-        sns.delete_topic(TopicArn=topic)
-        _cleanupSecret(sm, name)
-
-
 @contextlib.contextmanager
 def _loggingTrail(emu, uid):
     """A logging multi-region trail delivering to a CloudWatch Logs group.
@@ -138,6 +72,111 @@ def _loggingTrail(emu, uid):
                 fn()
             except Exception:
                 pass
+
+
+def test_eventbridge_rule_without_target_then_with_target(emu, uid):
+    sm, name = _secret(emu, uid)
+    ev = emu.client('events')
+    sns = emu.client('sns')
+    rule = f'ss-sm-{uid}'
+    topic = sns.create_topic(Name=f'ss-sm-{uid}')['TopicArn']
+    try:
+        # EventBridge only receives CloudTrail API-call events while a trail
+        # is logging, so the cycle runs with a logging trail in place.
+        with _loggingTrail(emu, uid):
+            def misconfigure():
+                # A matching rule with no target alerts nobody.
+                ev.put_rule(Name=rule, EventPattern=_pattern(['DeleteSecret', 'PutResourcePolicy']), State='ENABLED')
+
+            def fix():
+                ev.put_targets(Rule=rule, Targets=[{'Id': '1', 'Arn': topic}])
+
+            assertFlagFixCycle(emu, 'secretsmanager', CHECK, RES, misconfigure, fix)
+    finally:
+        try:
+            ev.remove_targets(Rule=rule, Ids=['1'])
+        except Exception:
+            pass
+        try:
+            ev.delete_rule(Name=rule)
+        except Exception:
+            pass
+        sns.delete_topic(TopicArn=topic)
+        _cleanupSecret(sm, name)
+
+
+def test_eventbridge_partial_coverage_flags_then_full_passes(emu, uid):
+    sm, name = _secret(emu, uid)
+    ev = emu.client('events')
+    sns = emu.client('sns')
+    rule = f'ss-sm-{uid}'
+    topic = sns.create_topic(Name=f'ss-sm-{uid}')['TopicArn']
+    try:
+        with _loggingTrail(emu, uid):
+            def misconfigure():
+                # Only deletion is covered; policy changes go unnoticed. A
+                # disabled catch-all rule must not count either.
+                ev.put_rule(Name=rule, EventPattern=_pattern(['DeleteSecret']), State='ENABLED')
+                ev.put_targets(Rule=rule, Targets=[{'Id': '1', 'Arn': topic}])
+                ev.put_rule(Name=rule + '-off', EventPattern=json.dumps({'source': ['aws.secretsmanager']}),
+                            State='DISABLED')
+                ev.put_targets(Rule=rule + '-off', Targets=[{'Id': '1', 'Arn': topic}])
+
+            def fix():
+                ev.put_rule(Name=rule, EventPattern=json.dumps({
+                    'source': ['aws.secretsmanager'],
+                    'detail': {'eventName': [{'prefix': 'Delete'}, 'PutResourcePolicy']}}), State='ENABLED')
+
+            before, _ = assertFlagFixCycle(emu, 'secretsmanager', CHECK, RES, misconfigure, fix)
+            msg = runCheck(emu, 'secretsmanager', CHECK, RES).results[RES][CHECK][1]
+            assert 'DeleteSecret' in msg and 'PutResourcePolicy' in msg
+    finally:
+        for r in (rule, rule + '-off'):
+            try:
+                ev.remove_targets(Rule=r, Ids=['1'])
+            except Exception:
+                pass
+            try:
+                ev.delete_rule(Name=r)
+            except Exception:
+                pass
+        sns.delete_topic(TopicArn=topic)
+        _cleanupSecret(sm, name)
+
+
+def test_eventbridge_rule_needs_logging_trail(emu, uid):
+    """Review fix: a matching rule with a target never fires unless a
+    CloudTrail trail is logging, because EventBridge receives "AWS API Call
+    via CloudTrail" events only through a logging trail."""
+    sm, name = _secret(emu, uid)
+    ev = emu.client('events')
+    sns = emu.client('sns')
+    rule = f'ss-sm-{uid}'
+    topic = sns.create_topic(Name=f'ss-sm-{uid}')['TopicArn']
+    try:
+        with _loggingTrail(emu, uid) as (ct, trail, logs, lg):
+            def misconfigure():
+                ct.stop_logging(Name=trail)
+                ev.put_rule(Name=rule, EventPattern=_pattern(['DeleteSecret', 'PutResourcePolicy']), State='ENABLED')
+                ev.put_targets(Rule=rule, Targets=[{'Id': '1', 'Arn': topic}])
+
+            def fix():
+                ct.start_logging(Name=trail)
+
+            before, after = assertFlagFixCycle(emu, 'secretsmanager', CHECK, RES, misconfigure, fix)
+            msg = runCheck(emu, 'secretsmanager', CHECK, RES).results[RES][CHECK][1]
+            assert f'EventBridge rule {rule}' in msg, msg
+    finally:
+        try:
+            ev.remove_targets(Rule=rule, Ids=['1'])
+        except Exception:
+            pass
+        try:
+            ev.delete_rule(Name=rule)
+        except Exception:
+            pass
+        sns.delete_topic(TopicArn=topic)
+        _cleanupSecret(sm, name)
 
 
 def _putSecretsFilter(logs, lg, ns, metric):

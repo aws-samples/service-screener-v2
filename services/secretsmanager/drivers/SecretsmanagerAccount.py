@@ -18,7 +18,12 @@ class SecretsmanagerAccount(Evaluator):
         1. EventBridge: an ENABLED rule on the default event bus (not managed by
            an AWS service) that has at least one target and whose EventPattern
            would match the CloudTrail "AWS API Call via CloudTrail" event for
-           the call.
+           the call. EventBridge only receives "AWS API Call via CloudTrail"
+           events when a CloudTrail trail with logging enabled exists, so the
+           rule only counts when a trail that covers this region is logging and
+           records write management events; if no such trail can be confirmed
+           because a trail's status or selectors cannot be read, the result is
+           "Unable to evaluate".
         2. CloudWatch Logs: a metric filter on the log group of a CloudTrail
            trail that covers this region and is logging, whose filter pattern
            matches the call, with a CloudWatch alarm on the resulting metric
@@ -85,6 +90,7 @@ class SecretsmanagerAccount(Evaluator):
     # ------------------------------------------------------------------ #
     def _checkSecretChangeNotMonitored(self):
         self.errors = []
+        self._runCache = {}
         covered = {e: [] for e in self.REQUIRED_EVENTS}
 
         for source in (self._eventBridgeCoverage, self._metricFilterCoverage):
@@ -110,10 +116,15 @@ class SecretsmanagerAccount(Evaluator):
             return
 
         have = [e for e in self.REQUIRED_EVENTS if covered[e]]
-        msg = (f"No EventBridge rule with a target, and no alarmed CloudTrail metric "
+        msg = (f"No EventBridge rule with a target (fed by a logging CloudTrail trail), and no alarmed CloudTrail metric "
                f"filter, alerts on Secrets Manager {', '.join(missing)} in {self.region}")
         if have:
             msg += f" (only {', '.join(have)} is covered)"
+        unfed = self._runCache.get('ebRulesWithoutTrail')
+        if unfed:
+            msg += (f"; {', '.join(unfed)} would match, but no CloudTrail trail covering "
+                    f"{self.region} is logging write management events, so EventBridge "
+                    f"never receives these API-call events")
         self.results['secretChangeNotMonitored'] = [-1, msg]
 
     # ------------------------------------------------------------------ #
@@ -149,7 +160,48 @@ class SecretsmanagerAccount(Evaluator):
             if not self._ruleHasTargets(rule.get('Name'), rule.get('EventBusName')):
                 continue
             out.append((f"EventBridge rule {rule.get('Name')}", events))
+        if out and not self._trailFeedsEventBridge():
+            # No logging trail records the calls, so no "AWS API Call via
+            # CloudTrail" event ever reaches these rules.
+            self._runCache['ebRulesWithoutTrail'] = sorted(label for label, _ in out)
+            return []
         return out
+
+    def _trailFeedsEventBridge(self):
+        """True when at least one CloudTrail trail that covers this region is
+        logging and records write management events from Secrets Manager.
+        Read errors are recorded in self.errors (-> "Unable to evaluate" when
+        nothing else covers the calls)."""
+        try:
+            trails = self._describeTrails()
+        except botocore.exceptions.ClientError as e:
+            self.errors.append(self._code(e))
+            return False
+        for trail in trails:
+            if not self._trailCoversRegion(trail):
+                continue
+            ctClient = self._trailClient(trail)
+            if not self._trailIsLogging(trail, ctClient):
+                continue
+            if self._trailLogsWriteManagementEvents(trail, ctClient):
+                return True
+        return False
+
+    def _describeTrails(self):
+        cache = self.__dict__.setdefault('_runCache', {})
+        if 'trails' not in cache:
+            try:
+                cache['trails'] = (True, self.ctClient.describe_trails(
+                    includeShadowTrails=True).get('trailList', []) or [])
+            except botocore.exceptions.ClientError as e:
+                cache['trails'] = (False, e)
+        ok, value = cache['trails']
+        if not ok:
+            raise value
+        return value
+
+    def _trailCoversRegion(self, trail):
+        return bool(trail.get('IsMultiRegionTrail')) or trail.get('HomeRegion') in (None, self.region)
 
     def _ruleHasTargets(self, name, bus):
         try:
@@ -264,7 +316,7 @@ class SecretsmanagerAccount(Evaluator):
     def _metricFilterCoverage(self):
         out = []
         try:
-            trails = self.ctClient.describe_trails(includeShadowTrails=True).get('trailList', []) or []
+            trails = self._describeTrails()
         except botocore.exceptions.ClientError as e:
             self.errors.append(self._code(e))
             return out
@@ -274,7 +326,7 @@ class SecretsmanagerAccount(Evaluator):
             lgArn = trail.get('CloudWatchLogsLogGroupArn')
             if not lgArn:
                 continue
-            if not trail.get('IsMultiRegionTrail') and trail.get('HomeRegion') not in (None, self.region):
+            if not self._trailCoversRegion(trail):
                 continue
             lgRegion, lgAccount, lgName = self._parseLogGroupArn(lgArn)
             if not lgName:
@@ -321,6 +373,23 @@ class SecretsmanagerAccount(Evaluator):
         return self.ctClient
 
     def _trailIsLogging(self, trail, client):
+        return self._perTrail('logging', trail, lambda: self._readTrailIsLogging(trail, client))
+
+    def _trailLogsWriteManagementEvents(self, trail, client):
+        return self._perTrail('selectors', trail, lambda: self._readTrailLogsWriteManagementEvents(trail, client))
+
+    def _perTrail(self, kind, trail, fn):
+        """Read each trail's status / selectors once per check run (both the
+        EventBridge and the metric-filter path need them). A read error is
+        appended to self.errors on the first read only, which is enough: the
+        list is only tested for being non-empty."""
+        cache = self.__dict__.setdefault('_runCache', {})
+        key = (kind, trail.get('TrailARN') or trail.get('Name'))
+        if key not in cache:
+            cache[key] = fn()
+        return cache[key]
+
+    def _readTrailIsLogging(self, trail, client):
         try:
             resp = client.get_trail_status(Name=trail.get('TrailARN') or trail.get('Name'))
             return resp.get('IsLogging') is True
@@ -329,7 +398,7 @@ class SecretsmanagerAccount(Evaluator):
             self.errors.append(self._code(e))
             return False
 
-    def _trailLogsWriteManagementEvents(self, trail, client):
+    def _readTrailLogsWriteManagementEvents(self, trail, client):
         """True when the trail records write management events from Secrets
         Manager (DeleteSecret / PutResourcePolicy are write management events)."""
         try:

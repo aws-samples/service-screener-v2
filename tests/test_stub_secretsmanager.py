@@ -56,6 +56,11 @@ class Harness:
         return d.results[KEY]
 
 
+TRAIL = f'arn:aws:cloudtrail:us-east-1:{ACCT}:trail/t'
+# A multi-region trail without CloudWatch Logs delivery: feeds EventBridge only.
+NOLOG_TRAIL = {'Name': 't', 'TrailARN': TRAIL, 'HomeRegion': 'us-east-1', 'IsMultiRegionTrail': True}
+
+
 def _rule(name, pattern, state='ENABLED'):
     return {'Name': name, 'Arn': f'arn:aws:events:us-east-1:{ACCT}:rule/{name}',
             'EventPattern': json.dumps(pattern), 'State': state, 'EventBusName': 'default'}
@@ -68,12 +73,18 @@ def test_no_monitoring_flags_and_rule_with_target_passes():
     ct.add_response('describe_trails', {'trailList': []})
     assert h.run()[0] == -1
 
+    # Fix: a rule with a target, fed by a logging trail that records write
+    # management events (EventBridge only receives CloudTrail API-call events
+    # when such a trail exists).
     h = Harness()
     ev, ct = h.stubs
     ev.add_response('list_rules', {'Rules': [_rule('r', {'source': ['aws.secretsmanager']})]})
     ev.add_response('list_targets_by_rule', {'Targets': [{'Id': '1', 'Arn': f'arn:aws:sns:us-east-1:{ACCT}:t'}]},
                     {'Rule': 'r', 'EventBusName': 'default'})
-    ct.add_response('describe_trails', {'trailList': []})
+    ct.add_response('describe_trails', {'trailList': [NOLOG_TRAIL]})
+    ct.add_response('get_trail_status', {'IsLogging': True}, {'Name': TRAIL})
+    ct.add_response('get_event_selectors', {'TrailARN': TRAIL, 'EventSelectors': [
+        {'ReadWriteType': 'All', 'IncludeManagementEvents': True}]}, {'TrailName': TRAIL})
     assert h.run()[0] == 1
 
 
@@ -222,7 +233,6 @@ def test_json_filter_boolean_structure_and_field_values():
 
 
 LG = f'arn:aws:logs:us-east-1:{ACCT}:log-group:lg:*'
-TRAIL = f'arn:aws:cloudtrail:us-east-1:{ACCT}:trail/t'
 SM_FILTER = {'filterName': 'sm', 'logGroupName': 'lg',
              'filterPattern': '{ $.eventSource = secretsmanager.amazonaws.com }',
              'metricTransformations': [{'metricName': 'SM', 'metricNamespace': 'CIS', 'metricValue': '1'}]}
@@ -290,12 +300,92 @@ def test_trail_log_group_in_other_account_is_not_evaluable():
         ev.add_response('list_rules', {'Rules': rules})
         if withRule:
             ev.add_response('list_targets_by_rule', {'Targets': [{'Id': '1', 'Arn': f'arn:aws:sns:us-east-1:{ACCT}:t'}]})
+        orgTrail = 'arn:aws:cloudtrail:us-east-1:999988887777:trail/org'
         ct.add_response('describe_trails', {'trailList': [{
-            'Name': 'org', 'TrailARN': 'arn:aws:cloudtrail:us-east-1:999988887777:trail/org',
+            'Name': 'org', 'TrailARN': orgTrail,
             'HomeRegion': 'us-east-1', 'IsMultiRegionTrail': True, 'IsOrganizationTrail': True,
             'CloudWatchLogsLogGroupArn': 'arn:aws:logs:us-east-1:999988887777:log-group:org-lg:*'}]})
+        if withRule:
+            # The organization trail logs this member account's calls, which
+            # is what delivers them to the local EventBridge rule.
+            ct.add_response('get_trail_status', {'IsLogging': True}, {'Name': orgTrail})
+            ct.add_response('get_event_selectors', {'TrailARN': orgTrail}, {'TrailName': orgTrail})
         return h
 
     res = build(False).run()
     assert res[0] == 0 and 'TrailLogGroupInOtherAccount' in res[1]
     assert build(True).run()[0] == 1
+
+
+# --------------------------------------------------------------------------- #
+# Review fix: an EventBridge rule only receives "AWS API Call via CloudTrail"
+# events when a CloudTrail trail covering the region is logging and records
+# write management events. Without one the rule never fires, so it must not
+# count as coverage (old code returned PASS in every case below).
+# --------------------------------------------------------------------------- #
+def _ruleHarness(trails):
+    h = Harness()
+    ev, ct = h.stubs
+    ev.add_response('list_rules', {'Rules': [_rule('r', {
+        'source': ['aws.secretsmanager'], 'detail-type': ['AWS API Call via CloudTrail']})]})
+    ev.add_response('list_targets_by_rule', {'Targets': [{'Id': '1', 'Arn': f'arn:aws:sns:us-east-1:{ACCT}:t'}]},
+                    {'Rule': 'r', 'EventBusName': 'default'})
+    ct.add_response('describe_trails', {'trailList': trails})
+    return h, ct
+
+
+def test_eventbridge_rule_without_any_trail_fails():
+    h, ct = _ruleHarness([])
+    res = h.run()
+    assert res[0] == -1, res
+    assert 'EventBridge rule r would match' in res[1] and 'CloudTrail' in res[1]
+
+
+def test_eventbridge_rule_with_stopped_trail_fails():
+    h, ct = _ruleHarness([NOLOG_TRAIL])
+    ct.add_response('get_trail_status', {'IsLogging': False}, {'Name': TRAIL})
+    assert h.run()[0] == -1
+
+
+def test_eventbridge_rule_with_data_events_only_trail_fails():
+    h, ct = _ruleHarness([NOLOG_TRAIL])
+    ct.add_response('get_trail_status', {'IsLogging': True}, {'Name': TRAIL})
+    ct.add_response('get_event_selectors', {'TrailARN': TRAIL, 'EventSelectors': [
+        {'ReadWriteType': 'All', 'IncludeManagementEvents': False,
+         'DataResources': [{'Type': 'AWS::S3::Object', 'Values': ['arn:aws:s3']}]}]}, {'TrailName': TRAIL})
+    assert h.run()[0] == -1
+
+
+def test_eventbridge_rule_with_single_region_trail_elsewhere_fails():
+    other = {'Name': 'eu', 'TrailARN': f'arn:aws:cloudtrail:eu-west-1:{ACCT}:trail/eu',
+             'HomeRegion': 'eu-west-1', 'IsMultiRegionTrail': False}
+    h, ct = _ruleHarness([other])
+    assert h.run()[0] == -1
+
+
+def test_eventbridge_rule_trail_status_unreadable_is_not_evaluable():
+    h, ct = _ruleHarness([NOLOG_TRAIL])
+    ct.add_client_error('get_trail_status', 'AccessDeniedException', expected_params={'Name': TRAIL})
+    res = h.run()
+    assert res == [0, 'Unable to evaluate (AccessDeniedException)'], res
+
+
+def test_eventbridge_rule_with_logging_management_trail_passes():
+    h, ct = _ruleHarness([NOLOG_TRAIL])
+    ct.add_response('get_trail_status', {'IsLogging': True}, {'Name': TRAIL})
+    ct.add_response('get_event_selectors', {'TrailARN': TRAIL, 'AdvancedEventSelectors': [
+        {'Name': 'mgmt', 'FieldSelectors': [{'Field': 'eventCategory', 'Equals': ['Management']}]}]},
+        {'TrailName': TRAIL})
+    res = h.run()
+    assert res == [1, 'DeleteSecret: EventBridge rule r; PutResourcePolicy: EventBridge rule r'], res
+
+
+def test_trail_reads_are_shared_between_eventbridge_and_metric_filter_paths():
+    """One describe_trails / get_trail_status / get_event_selectors per trail,
+    even though both paths need them (the Stubber fails on extra calls)."""
+    h, ct = _ruleHarness([dict(NOLOG_TRAIL, CloudWatchLogsLogGroupArn=LG)])
+    ct.add_response('get_trail_status', {'IsLogging': True}, {'Name': TRAIL})
+    ct.add_response('get_event_selectors', {'TrailARN': TRAIL}, {'TrailName': TRAIL})
+    _withAlarmedFilter(h)
+    res = h.run()
+    assert res[0] == 1 and 'metric filter sm on lg' in res[1] and 'EventBridge rule r' in res[1], res

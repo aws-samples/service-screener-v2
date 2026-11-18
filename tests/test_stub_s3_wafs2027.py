@@ -473,3 +473,14 @@ def test_account_bpa_flag_fix_and_denied_is_info():
 def test_storage_lens_denied_is_info():
     assert _run(_control, '_checkStorageLens', 'StorageLens', lambda s: s['s3control'].add_client_error(
         'list_storage_lens_configurations', 'AccessDenied', 'denied', 403)) == [0, 'Unable to evaluate (AccessDenied)']
+
+
+def test_glacier_vault_policy_public_reporter_is_high_criticality():
+    """Review fix: an unscoped wildcard-principal vault policy is a public
+    data exposure ("Anyone could read, delete or upload archives"); it is rated
+    like the other public S3 findings (s3AccessPointPublic), not Low."""
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    with open(os.path.join(root, 'services', 's3', 's3.reporter.json')) as fh:
+        rep = json.load(fh)
+    assert rep['glacierVaultPolicyPublic']['criticality'] == 'H'
+    assert rep['glacierVaultPolicyPublic']['criticality'] == rep['s3AccessPointPublic']['criticality']
