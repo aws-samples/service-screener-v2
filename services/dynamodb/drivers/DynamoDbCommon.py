@@ -459,7 +459,7 @@ class DynamoDbCommon(Evaluator):
                 if 'BillingModeSummary' in self.tables['Table'] and 'BillingMode' in self.tables['Table']['BillingModeSummary'] and self.tables['Table']['BillingModeSummary']['BillingMode'] == 'PROVISIONED':
                     self.results['autoScalingStatus'] = [-1 , '']
                 
-        except botocore.exceptions as e:
+        except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']
             print(ecode)
     
@@ -470,9 +470,10 @@ class DynamoDbCommon(Evaluator):
 
             if len(results['RecoveryPoints']) < 1:
                 self.results['disabledBackup'] = [-1, '']
-        except botocore.exception as e:
+        except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']
-            print(ecode)
+            # Recovery points could not be read: do not report the table as backed up.
+            self.results['disabledBackup'] = [0, f'Unable to evaluate ({ecode})']
             
     # logic to check service limits max GSI per table
     def _check_service_limits_max_gsi_table(self):
@@ -616,7 +617,7 @@ class DynamoDbCommon(Evaluator):
                 if _wcuTarget <= 50.0:
                     self.results['autoScalingLowUtil'] = [-1, 'WCU = ' + str(_wcuTarget)]
                    
-        except botocore.exceptions as e:
+        except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']
             print(ecode)
     
