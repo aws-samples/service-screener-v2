@@ -70,6 +70,47 @@ def test_root_expiry_window_flag_fix():
     assert _run(_ca(Type='SUBORDINATE', NotAfter=now + timedelta(days=60)), m, k) == -1
 
 
+def test_subordinate_in_place_renewal_flag_then_pass():
+    """In-place renewal of the SAME subordinate CA (the AWS remediation the emulator rejects with
+    InvalidStateException): 30 days left -> FAIL; after ImportCertificateAuthorityCertificate with
+    a 5-year certificate, DescribeCertificateAuthority reports the new NotAfter -> PASS."""
+    now = datetime.now(timezone.utc)
+    m, k = '_checkPcaCaCertExpiringOrFailed', 'pcaCaCertExpiringOrFailed'
+    sub = dict(Type='SUBORDINATE')
+    flagged = _run(_ca(NotAfter=now + timedelta(days=30), **sub), m, k)
+    assert flagged == -1
+
+    c = _client()
+    pem = '-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n'
+    with Stubber(c) as st:
+        st.add_response('import_certificate_authority_certificate', {},
+                        {'CertificateAuthorityArn': ARN, 'Certificate': pem.encode(),
+                         'CertificateChain': pem.encode()})
+        st.add_response('describe_certificate_authority',
+                        {'CertificateAuthority': _ca(NotAfter=now + timedelta(days=5 * 365), **sub)},
+                        {'CertificateAuthorityArn': ARN})
+        c.import_certificate_authority_certificate(CertificateAuthorityArn=ARN, Certificate=pem.encode(),
+                                                   CertificateChain=pem.encode())
+        renewed = c.describe_certificate_authority(CertificateAuthorityArn=ARN)['CertificateAuthority']
+        st.assert_no_pending_responses()
+    assert renewed['Arn'] == ARN
+    d = AcmPcaCa(renewed, c)
+    d._checkPcaCaCertExpiringOrFailed()
+    assert d.results[k][0] == 1, d.results[k]
+    assert 'SUBORDINATE CA certificate valid for' in d.results[k][1]
+
+
+def test_retired_ca_is_not_applicable_not_pass():
+    """A CA retired by replacement (DELETED / DISABLED) is neither flagged nor reported as PASS."""
+    m, k = '_checkPcaCaCertExpiringOrFailed', 'pcaCaCertExpiringOrFailed'
+    now = datetime.now(timezone.utc)
+    for st in ('DELETED', 'DISABLED'):
+        detail, c = _described(_ca(Type='SUBORDINATE', Status=st, NotAfter=now + timedelta(days=30)))
+        d = AcmPcaCa(detail, c)
+        d._checkPcaCaCertExpiringOrFailed()
+        assert d.results[k] == [0, f'Not applicable (CA status {st})']
+
+
 def test_failed_and_expired_status():
     m, k = '_checkPcaCaCertExpiringOrFailed', 'pcaCaCertExpiringOrFailed'
     assert _run(_ca(Status='FAILED', FailureReason='OTHER'), m, k) == -1

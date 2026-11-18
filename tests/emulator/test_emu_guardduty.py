@@ -43,11 +43,21 @@ def test_guardduty_no_findings_export(emu, uid):
                 _deleteDestinations(gd, did)
 
             def fix():
-                gd.create_publishing_destination(
+                destId = gd.create_publishing_destination(
                     DetectorId=did, DestinationType='S3',
                     DestinationProperties={
                         'DestinationArn': f'arn:aws:s3:::{bucket}',
-                        'KmsKeyArn': 'arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000'})
+                        'KmsKeyArn': 'arn:aws:kms:us-east-1:000000000000:key/00000000-0000-0000-0000-000000000000'}
+                )['DestinationId']
+                ## A new destination starts in PENDING_VERIFICATION (INFO, correctly: GuardDuty
+                ## has not yet verified it can write) and becomes PUBLISHING once verified.
+                ## The fix is complete only when the destination is PUBLISHING.
+                for _ in range(60):
+                    if gd.describe_publishing_destination(
+                            DetectorId=did, DestinationId=destId)['Status'] == 'PUBLISHING':
+                        return
+                    time.sleep(1)
+                raise AssertionError('publishing destination never reached PUBLISHING')
 
             assertFlagFixCycle(emu, 'guardduty', 'guardDutyNoFindingsExport', did, misconfigure, fix)
         finally:

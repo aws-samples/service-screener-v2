@@ -80,30 +80,43 @@ def _createSubCa(pca, name):
 
 def test_pca_ca_cert_expiring(emu, uid):
     """Subordinate CA whose certificate expires in 30 days (< 90-day subordinate threshold).
-    Fix = replace it with a new subordinate CA holding a 5-year certificate and retire the old CA
-    (the emulator rejects re-importing a CA certificate into an ACTIVE/DISABLED CA, and a
-    self-signed root cannot be re-issued past its own validity). The retired CA must no longer
-    be flagged and the replacement must PASS. The 365-day root threshold is covered by
-    tests/test_stub_acm.py."""
+
+    In AWS the fix is an in-place renewal (ImportCertificateAuthorityCertificate on the ACTIVE
+    CA). The emulator rejects that (InvalidStateException for ACTIVE and DISABLED CAs), so the
+    in-place FAIL -> PASS on the SAME CA is proven by
+    tests/test_stub_acm.py::test_subordinate_in_place_renewal_flag_then_pass.
+
+    Here the fix is the other real-world remediation: replace the CA with a new subordinate
+    holding a 5-year certificate and retire the old one. Assertions:
+      - old CA: FAIL before the fix,
+      - replacement CA: PASS (a genuinely passing state produced by the emulator),
+      - retired (DELETED) old CA: INFO 'Not applicable', never FAIL and never PASS.
+    assertFlagFixCycle cannot express this (it re-checks the same resource), so the cycle is
+    written out explicitly."""
     pca = emu.client('acm-pca')
+    key = 'pcaCaCertExpiringOrFailed'
     rootArn = _createRootCa(pca, f'ss-root-{uid}')
     subArn = newArn = None
     try:
         _installRootCert(pca, rootArn, {'Value': 10, 'Type': 'YEARS'})
         subArn = _createSubCa(pca, f'ss-sub-{uid}')
+        _installSubCert(pca, subArn, rootArn, {'Value': 30, 'Type': 'DAYS'})
 
-        def misconfigure():
-            _installSubCert(pca, subArn, rootArn, {'Value': 30, 'Type': 'DAYS'})
+        before = runCheck(emu, 'acm', key, subArn.split('/')[-1]).statuses()
+        assert before and all(v == -1 for v in before.values()), before
 
-        def fix():
-            nonlocal newArn
-            newArn = _createSubCa(pca, f'ss-sub2-{uid}')
-            _installSubCert(pca, newArn, rootArn, {'Value': 5, 'Type': 'YEARS'})
-            _deleteCa(pca, subArn)
+        newArn = _createSubCa(pca, f'ss-sub2-{uid}')
+        _installSubCert(pca, newArn, rootArn, {'Value': 5, 'Type': 'YEARS'})
+        _deleteCa(pca, subArn)
 
-        assertFlagFixCycle(emu, 'acm', 'pcaCaCertExpiringOrFailed', subArn.split('/')[-1], misconfigure, fix)
-        after = runCheck(emu, 'acm', 'pcaCaCertExpiringOrFailed', newArn.split('/')[-1]).statuses()
-        assert after and all(v == 1 for v in after.values()), after
+        res = runCheck(emu, 'acm', key, newArn.split('/')[-1])
+        after = res.statuses()
+        assert after and all(v == 1 for v in after.values()), \
+            (after, [m for r in res.results.values() for k, m in r.items() if k.lower() == key.lower()])
+
+        retired = runCheck(emu, 'acm', key, subArn.split('/')[-1])
+        msgs = [m for r in retired.results.values() for k, m in r.items() if k.lower() == key.lower()]
+        assert msgs and all(m == [0, 'Not applicable (CA status DELETED)'] for m in msgs), msgs
     finally:
         for a in (newArn, subArn):
             if a:
