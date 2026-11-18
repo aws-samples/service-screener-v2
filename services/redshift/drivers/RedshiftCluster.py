@@ -24,9 +24,12 @@ class RedshiftCluster(Evaluator):
             for param_group in self.cluster.get('ClusterParameterGroups', []):
                 group_name = param_group['ParameterGroupName']
                 if group_name not in self._parameter_cache:
-                    resp = self.rsClient.describe_cluster_parameters(
-                        ParameterGroupName=group_name
-                    )
+                    # Clusters often share a parameter group: read it once per scan.
+                    resp = self._sharedMemo(
+                        (self.rsClient.meta.region_name, 'describe_cluster_parameters', group_name),
+                        lambda: self.rsClient.describe_cluster_parameters(
+                            ParameterGroupName=group_name
+                        ))
                     # Create lookup dict for faster parameter access
                     params = {p['ParameterName']: p['ParameterValue'] 
                              for p in resp.get('Parameters', [])}
@@ -227,7 +230,10 @@ class RedshiftCluster(Evaluator):
     def _checkEventNotifications(self):
         """Validate SNS event notifications are configured for cluster events"""
         try:
-            resp = self.rsClient.describe_event_subscriptions()
+            # Account/region-wide list, identical for every cluster: read once per scan.
+            resp = self._sharedMemo(
+                (self.rsClient.meta.region_name, 'describe_event_subscriptions'),
+                lambda: self.rsClient.describe_event_subscriptions())
             subscriptions = resp.get('EventSubscriptionsList', [])
             
             # Check if any subscription covers this cluster

@@ -193,14 +193,20 @@ class GuarddutyDriver(Evaluator):
             return self._detector
         if self._detectorFailed:
             return None
-        try:
-            self._detector = self.gd_client.get_detector(
-                DetectorId=self.detector_id
-            )
-            return self._detector
-        except ClientError:
+
+        def fetch():
+            try:
+                return self.gd_client.get_detector(DetectorId=self.detector_id)
+            except ClientError:
+                return None
+
+        ## Checks run concurrently: _memo makes sure only one thread calls the API.
+        detector = self._memo(('get_detector', self.detector_id), fetch)
+        if detector is None:
             self._detectorFailed = True
-            return None
+        else:
+            self._detector = detector
+        return detector
 
     def _featureStatus(self, name):
         """
