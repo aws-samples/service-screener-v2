@@ -188,7 +188,7 @@
     },
     "securityHubNoAutomationRules": {
         "category": "S",
-        "^description": "{$COUNT} region(s) have Security Hub enabled but no sign of automated finding handling: no Security Hub automation rule, no custom action, no EventBridge rule matching aws.securityhub events and no self-owned SSM Automation runbook. Findings are then triaged, suppressed and remediated entirely by hand, which does not scale and slows response. This is a heuristic: automation that runs in an external SOAR polling the API is not visible here.",
+        "^description": "{$COUNT} region(s) have Security Hub enabled but no sign of automated finding handling: no ENABLED Security Hub automation rule and no ENABLED EventBridge rule with a target on the default bus that matches Security Hub finding events (source aws.securityhub with detail-type 'Security Hub Findings - Imported', 'Findings Imported V2', or a custom action / insight event). A custom action without an EventBridge rule, or an SSM Automation document nothing invokes, does not respond to findings and is not counted. Findings are then triaged, suppressed and remediated entirely by hand, which does not scale and slows response. Member accounts of a Security Hub administrator and Regions linked into another aggregation Region are reported as informational, because automation rules for their findings are owned by the administrator account or the aggregation Region. This is a heuristic: automation that runs in an external SOAR polling the API is not visible here.",
         "shortDesc": "Automate Security Hub finding response",
         "criticality": "L",
         "downtime": 0,

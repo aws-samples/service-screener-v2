@@ -4,7 +4,7 @@ import time
 
 import pytest
 
-from tests.emulator.conftest import assertFlagFixCycle
+from tests.emulator.conftest import assertFlagFixCycle, runCheck
 
 TRUST = json.dumps({'Version': '2012-10-17', 'Statement': [{
     'Effect': 'Allow', 'Principal': {'Service': 'arc-region-switch.amazonaws.com'},
@@ -31,6 +31,29 @@ def _createPlan(rs, name, roleArn):
         ])['plan']['arn']
 
 
+def _latencyZone(emu, uid):
+    """Multi-Region evidence: Route 53 latency records for one name in two
+    Regions. Returns a cleanup function."""
+    r53 = emu.client('route53')
+    zid = r53.create_hosted_zone(Name=f'ss-arc-{uid}.example.com', CallerReference=f'ss-arc-{uid}')['HostedZone']['Id']
+    r53.change_resource_record_sets(HostedZoneId=zid, ChangeBatch={'Changes': [
+        {'Action': 'CREATE', 'ResourceRecordSet': {
+            'Name': f'api.ss-arc-{uid}.example.com', 'Type': 'CNAME', 'SetIdentifier': r, 'Region': r,
+            'TTL': 60, 'ResourceRecords': [{'Value': f'app.{r}.example.net'}]}}
+        for r in ('us-east-1', 'us-west-2')]})
+
+    def cleanup():
+        try:
+            for rec in r53.list_resource_record_sets(HostedZoneId=zid)['ResourceRecordSets']:
+                if rec['Type'] not in ('NS', 'SOA'):
+                    r53.change_resource_record_sets(HostedZoneId=zid, ChangeBatch={'Changes': [
+                        {'Action': 'DELETE', 'ResourceRecordSet': rec}]})
+            r53.delete_hosted_zone(Id=zid)
+        except Exception:
+            pass
+    return cleanup
+
+
 def _deletePlans(rs, arns):
     for arn in arns:
         try:
@@ -45,10 +68,12 @@ def test_arc_region_switch_plan_missing(emu, uid):
     if rs.list_plans().get('plans') or rc.list_clusters().get('Clusters'):
         pytest.skip('emulator already has ARC plans/clusters; account-level absence cannot be staged')
     roleName, roleArn = _role(emu, uid)
-    created = {'plans': [], 'clusters': []}
+    created = {'plans': [], 'clusters': [], 'zone': None}
     try:
         def misconfigure():
-            pass  # account starts with no plan and no cluster
+            ## No plan and no cluster, plus a multi-Region workload (latency
+            ## records in two Regions): only then is missing ARC a finding.
+            created['zone'] = _latencyZone(emu, uid)
 
         def fixWithPlan():
             created['plans'].append(_createPlan(rs, f'ss-arc-{uid}', roleArn))
@@ -64,6 +89,8 @@ def test_arc_region_switch_plan_missing(emu, uid):
 
         assertFlagFixCycle(emu, 'arc', 'regionSwitchPlanMissing', 'Account', removePlan, fixWithCluster)
     finally:
+        if created['zone']:
+            created['zone']()
         _deletePlans(rs, created['plans'])
         for arn in created['clusters']:
             try:
@@ -71,6 +98,27 @@ def test_arc_region_switch_plan_missing(emu, uid):
             except Exception:
                 pass
         emu.client('iam').delete_role(RoleName=roleName)
+
+
+def test_arc_region_switch_plan_missing_single_region_is_info(emu, uid):
+    """Without multi-Region evidence the absence of ARC is informational, not
+    a finding (informational by design: ARC Region switch only applies to
+    multi-Region workloads)."""
+    rs = emu.client('arc-region-switch')
+    rc = emu.client('route53-recovery-control-config')
+    if rs.list_plans().get('plans') or rc.list_clusters().get('Clusters'):
+        pytest.skip('emulator already has ARC plans/clusters; account-level absence cannot be staged')
+    res = runCheck(emu, 'arc', 'regionSwitchPlanMissing', 'Account')
+    msgs = [m for r in res.results.values() for k, m in r.items() if k == 'regionSwitchPlanMissing']
+    if msgs and 'multi-Region infrastructure' in msgs[0][1]:
+        pytest.skip(f'emulator already holds multi-Region evidence: {msgs[0]}')
+    assert res.statuses() and all(v == 0 for v in res.statuses().values()), (res.statuses(), msgs)
+    assert 'no multi-Region workload evidence' in msgs[0][1], msgs
+    cleanup = _latencyZone(emu, uid)
+    try:
+        assert all(v == -1 for v in runCheck(emu, 'arc', 'regionSwitchPlanMissing', 'Account').statuses().values())
+    finally:
+        cleanup()
 
 
 def test_arc_region_switch_plan_never_executed(emu, uid):

@@ -35,12 +35,18 @@ def _clients():
     return s.client('securityhub'), s.client('ssm'), s.client('events')
 
 
-def _driver(sh, standards=(), enabled=True, standardsError=None, ssm=None, ev=None):
-    detail = {'_region': 'us-east-1', '_enabled': enabled,
+def _driver(sh, standards=(), enabled=True, standardsError=None, ssm=None, ev=None,
+            aggregators=(), aggregatorsError=None, region='us-east-1'):
+    detail = {'_region': region, '_enabled': enabled,
               '_hub': {'HubArn': 'h', 'AutoEnableControls': True} if enabled else None,
               '_standards': list(standards), '_standardsError': standardsError,
-              '_aggregators': [], '_products': [], '_unprocessedFindings': 0}
-    return SecurityhubCommon(detail, sh, 'cis-aws-foundations-benchmark', ssmClient=ssm, eventsClient=ev)
+              '_aggregators': list(aggregators), '_aggregatorsError': aggregatorsError,
+              '_products': [], '_unprocessedFindings': 0}
+    d = SecurityhubCommon(detail, sh, 'cis-aws-foundations-benchmark', eventsClient=ev)
+    ## Older drivers read SSM Automation documents as evidence; keep the client
+    ## attached so these tests prove such documents no longer count.
+    d.ssmClient = ssm
+    return d
 
 
 # ---- shubFsbpStandardDisabled --------------------------------------------- #
@@ -152,56 +158,215 @@ def test_controls_pending_only_is_info():
 
 
 # ---- securityHubNoAutomationRules ----------------------------------------- #
+## Real request shapes: list_rules / list_targets_by_rule on the default bus,
+## get_administrator_account, get_finding_aggregator.
 
-def _emptyAutomation(st_sh, st_ev, st_ssm):
-    st_sh.add_response('list_automation_rules', {'AutomationRulesMetadata': []}, {'MaxResults': 100})
-    st_sh.add_response('describe_action_targets', {'ActionTargets': []}, {})
-    st_ev.add_response('list_rules', {'Rules': []}, {})
-    st_ssm.add_response('list_documents', {'DocumentIdentifiers': []}, {'Filters': [
-        {'Key': 'Owner', 'Values': ['Self']}, {'Key': 'DocumentType', 'Values': ['Automation']}]})
+SH_RULE = 'securityHubNoAutomationRules'
+TARGET = [{'Id': 't1', 'Arn': 'arn:aws:sqs:us-east-1:123456789012:soar'}]
+SSM_FILTERS = {'Filters': [{'Key': 'Owner', 'Values': ['Self']},
+                           {'Key': 'DocumentType', 'Values': ['Automation']}]}
+
+
+def _noRules(a):
+    a.add_response('list_automation_rules', {'AutomationRulesMetadata': []}, {'MaxResults': 100})
+
+
+def _ebRules(b, rules, targets=()):
+    b.add_response('list_rules', {'Rules': rules}, {'EventBusName': 'default'})
+    for name, t in targets:
+        b.add_response('list_targets_by_rule', {'Targets': list(t)} if t else {},
+                       {'Rule': name, 'EventBusName': 'default'})
+
+
+def _notMember(a):
+    a.add_response('get_administrator_account', {}, {})
+
+
+def _run(d):
+    d._checkSecurityHubNoAutomationRules()
+    return d.results[SH_RULE]
 
 
 def test_automation_flag_then_fix_eventbridge():
     sh, ssm, ev = _clients()
-    with Stubber(sh) as a, Stubber(ev) as b, Stubber(ssm) as c:
-        _emptyAutomation(a, b, c)
-        d = _driver(sh, ssm=ssm, ev=ev)
-        d._checkSecurityHubNoAutomationRules()
-        assert d.results['securityHubNoAutomationRules'][0] == -1
+    with Stubber(sh) as a, Stubber(ev) as b:
+        _noRules(a); _ebRules(b, []); _notMember(a)
+        assert _run(_driver(sh, ev=ev))[0] == -1
     with Stubber(sh) as a, Stubber(ev) as b:
         a.add_response('list_automation_rules', {'AutomationRulesMetadata': [
             {'RuleName': 'old', 'RuleStatus': 'DISABLED'}]}, {'MaxResults': 100})
-        a.add_response('describe_action_targets', {'ActionTargets': []}, {})
-        b.add_response('list_rules', {'Rules': [
-            {'Name': 'sh-to-soar', 'State': 'ENABLED',
-             'EventPattern': '{"source":["aws.securityhub"],"detail-type":["Security Hub Findings - Imported"]}'}]}, {})
-        d = _driver(sh, ssm=ssm, ev=ev)
-        d._checkSecurityHubNoAutomationRules()
-        r = d.results['securityHubNoAutomationRules']
+        _ebRules(b, [{'Name': 'sh-to-soar', 'State': 'ENABLED',
+                      'EventPattern': '{"source":["aws.securityhub"],"detail-type":["Security Hub Findings - Imported"]}'}],
+                 [('sh-to-soar', TARGET)])
+        r = _run(_driver(sh, ev=ev))
         assert r[0] == 1 and 'sh-to-soar' in r[1]
+
+
+def test_automation_enabled_rule_passes():
+    sh, _, ev = _clients()
+    with Stubber(sh) as a:
+        a.add_response('list_automation_rules', {'AutomationRulesMetadata': [
+            {'RuleName': 'suppress-low', 'RuleStatus': 'ENABLED'}]}, {'MaxResults': 100})
+        r = _run(_driver(sh, ev=ev))
+        assert r[0] == 1 and 'suppress-low' in r[1]
 
 
 def test_automation_disabled_rule_only_still_flags():
     sh, ssm, ev = _clients()
-    with Stubber(sh) as a, Stubber(ev) as b, Stubber(ssm) as c:
+    with Stubber(sh) as a, Stubber(ev) as b:
         a.add_response('list_automation_rules', {'AutomationRulesMetadata': [
             {'RuleName': 'old', 'RuleStatus': 'DISABLED'}]}, {'MaxResults': 100})
-        a.add_response('describe_action_targets', {'ActionTargets': []}, {})
-        b.add_response('list_rules', {'Rules': [
-            {'Name': 'gd', 'State': 'ENABLED', 'EventPattern': '{"source":["aws.guardduty"]}'}]}, {})
-        c.add_response('list_documents', {'DocumentIdentifiers': []})
-        d = _driver(sh, ssm=ssm, ev=ev)
-        d._checkSecurityHubNoAutomationRules()
-        assert d.results['securityHubNoAutomationRules'][0] == -1
+        _ebRules(b, [{'Name': 'gd', 'State': 'ENABLED', 'EventPattern': '{"source":["aws.guardduty"]}'}])
+        _notMember(a)
+        assert _run(_driver(sh, ev=ev))[0] == -1
+
+
+def test_unrelated_ssm_runbook_is_not_evidence():
+    """A self-owned patching runbook does not respond to findings (was a false PASS)."""
+    sh, ssm, ev = _clients()
+    with Stubber(sh) as a, Stubber(ev) as b, Stubber(ssm) as c:
+        _noRules(a)
+        _ebRules(b, [])
+        _notMember(a)
+        c.add_response('list_documents', {'DocumentIdentifiers': [
+            {'Name': 'PatchFleet', 'DocumentType': 'Automation', 'Owner': '123456789012'}]}, SSM_FILTERS)
+        r = _run(_driver(sh, ssm=ssm, ev=ev))
+        assert r[0] == -1, r
+
+
+def test_custom_action_without_rule_is_not_evidence():
+    """A custom action does nothing unless an EventBridge rule routes it (was a false PASS).
+
+    The custom action exists (describe_action_targets would list it) but the
+    driver must not read it as evidence; only the rule lookups below happen."""
+    sh, _, ev = _clients()
+    with Stubber(sh) as a, Stubber(ev) as b:
+        _noRules(a)
+        _ebRules(b, [])
+        _notMember(a)
+        r = _run(_driver(sh, ev=ev))
+        assert r[0] == -1, r
+
+
+def test_custom_action_with_routed_rule_passes():
+    sh, _, ev = _clients()
+    pattern = ('{"source":["aws.securityhub"],"detail-type":["Security Hub Findings - Custom Action"],'
+               '"resources":["arn:aws:securityhub:us-east-1:123456789012:action/custom/soar"]}')
+    with Stubber(sh) as a, Stubber(ev) as b:
+        _noRules(a)
+        _ebRules(b, [{'Name': 'soar', 'State': 'ENABLED', 'EventPattern': pattern}], [('soar', TARGET)])
+        r = _run(_driver(sh, ev=ev))
+        assert r[0] == 1 and 'soar' in r[1]
+
+
+def test_eventbridge_rule_must_match_and_have_a_target():
+    """anything-but aws.securityhub (substring match), zero targets, and CloudTrail-only
+    rules were false PASSes."""
+    sh, _, ev = _clients()
+    rules = [
+        {'Name': 'not-sh', 'State': 'ENABLED',
+         'EventPattern': '{"source":[{"anything-but":["aws.securityhub"]}],"detail-type":["x"]}'},
+        {'Name': 'no-target', 'State': 'ENABLED',
+         'EventPattern': '{"source":["aws.securityhub"],"detail-type":["Security Hub Findings - Imported"]}'},
+        {'Name': 'api-calls', 'State': 'ENABLED',
+         'EventPattern': '{"source":["aws.securityhub"],"detail-type":["AWS API Call via CloudTrail"]}'},
+        {'Name': 'off', 'State': 'DISABLED', 'EventPattern': '{"source":["aws.securityhub"]}'},
+    ]
+    with Stubber(sh) as a, Stubber(ev) as b:
+        _noRules(a)
+        _ebRules(b, rules, [('no-target', [])])
+        _notMember(a)
+        r = _run(_driver(sh, ev=ev))
+        assert r[0] == -1, r
+
+
+def test_member_account_is_info():
+    sh, _, ev = _clients()
+    with Stubber(sh) as a, Stubber(ev) as b:
+        a.add_client_error('list_automation_rules', 'AccessDeniedException', http_status_code=403)
+        _ebRules(b, [])
+        a.add_response('get_administrator_account', {'Administrator': {
+            'AccountId': '210987654321', 'InvitationId': 'i', 'MemberStatus': 'Enabled'}}, {})
+        r = _run(_driver(sh, ev=ev))
+        assert r[0] == 0 and '210987654321' in r[1], r
+
+
+def test_linked_region_is_info_and_unlinked_region_flags():
+    sh, _, ev = _clients()
+    arn = 'arn:aws:securityhub:us-east-1:123456789012:finding-aggregator/abc'
+    for mode, regions, expected in [('ALL_REGIONS', [], 0),
+                                    ('SPECIFIED_REGIONS', ['eu-west-1'], 0),
+                                    ('SPECIFIED_REGIONS', ['ap-southeast-1'], -1),
+                                    ('ALL_REGIONS_EXCEPT_SPECIFIED', ['eu-west-1'], -1)]:
+        with Stubber(sh) as a, Stubber(ev) as b:
+            _noRules(a); _ebRules(b, []); _notMember(a)
+            resp = {'FindingAggregatorArn': arn, 'FindingAggregationRegion': 'us-east-1',
+                    'RegionLinkingMode': mode}
+            if regions:
+                resp['Regions'] = regions
+            a.add_response('get_finding_aggregator', resp, {'FindingAggregatorArn': arn})
+            d = _driver(sh, ev=ev, region='eu-west-1', aggregators=[{'FindingAggregatorArn': arn}])
+            r = _run(d)
+            assert r[0] == expected, (mode, regions, r)
+
+
+def test_aggregation_region_itself_is_evaluated():
+    sh, _, ev = _clients()
+    arn = 'arn:aws:securityhub:us-east-1:123456789012:finding-aggregator/abc'
+    with Stubber(sh) as a, Stubber(ev) as b:
+        _noRules(a); _ebRules(b, []); _notMember(a)
+        a.add_response('get_finding_aggregator', {'FindingAggregatorArn': arn, 'FindingAggregationRegion': 'us-east-1',
+                                                  'RegionLinkingMode': 'ALL_REGIONS'}, {'FindingAggregatorArn': arn})
+        assert _run(_driver(sh, ev=ev, aggregators=[{'FindingAggregatorArn': arn}]))[0] == -1
+
+
+def test_membership_unreadable_without_evidence_is_info():
+    sh, _, ev = _clients()
+    with Stubber(sh) as a, Stubber(ev) as b:
+        _noRules(a); _ebRules(b, [])
+        a.add_client_error('get_administrator_account', 'AccessDeniedException', http_status_code=403)
+        r = _run(_driver(sh, ev=ev))
+        assert r[0] == 0 and r[1].startswith('Unable to evaluate (get_administrator_account: AccessDeniedException)'), r
+
+
+def test_aggregators_unreadable_without_evidence_is_info():
+    sh, _, ev = _clients()
+    with Stubber(sh) as a, Stubber(ev) as b:
+        _noRules(a); _ebRules(b, []); _notMember(a)
+        r = _run(_driver(sh, ev=ev, aggregatorsError='AccessDeniedException'))
+        assert r[0] == 0 and 'list_finding_aggregators: AccessDeniedException' in r[1], r
 
 
 def test_automation_access_denied_without_evidence_is_info():
     sh, ssm, ev = _clients()
-    with Stubber(sh) as a, Stubber(ev) as b, Stubber(ssm) as c:
+    with Stubber(sh) as a, Stubber(ev) as b:
         a.add_client_error('list_automation_rules', 'AccessDeniedException', http_status_code=403)
-        a.add_response('describe_action_targets', {'ActionTargets': []}, {})
-        b.add_response('list_rules', {'Rules': []}, {})
-        c.add_response('list_documents', {'DocumentIdentifiers': []})
-        d = _driver(sh, ssm=ssm, ev=ev)
-        d._checkSecurityHubNoAutomationRules()
-        assert d.results['securityHubNoAutomationRules'] == [0, 'Unable to evaluate (AccessDeniedException)']
+        _ebRules(b, [])
+        _notMember(a)
+        assert _run(_driver(sh, ev=ev)) == [0, 'Unable to evaluate (AccessDeniedException)']
+
+
+# ---- shubFindingAggregatorMissing: unreadable list is not "missing" ------- #
+
+def test_aggregator_list_unreadable_is_info_not_fail():
+    sh, _, _ = _clients()
+    d = _driver(sh, aggregatorsError='AccessDeniedException')
+    d._checkShubFindingAggregatorMissing()
+    assert d.results['shubFindingAggregatorMissing'] == [0, 'Unable to evaluate (AccessDeniedException)']
+    d = _driver(sh)
+    d._checkShubFindingAggregatorMissing()
+    assert d.results['shubFindingAggregatorMissing'][0] == -1
+
+
+def test_service_records_aggregator_read_error():
+    from services.securityhub.Securityhub import Securityhub
+    sh, _, _ = _clients()
+    import types
+    ## Unbound call: a real Service instance writes report files on __del__.
+    svc = types.SimpleNamespace(shClient=sh, _logClientError=lambda *a: None)
+    with Stubber(sh) as a:
+        a.add_client_error('list_finding_aggregators', 'AccessDeniedException', http_status_code=403)
+        assert Securityhub._listFindingAggregators(svc) == ([], 'AccessDeniedException')
+    with Stubber(sh) as a:
+        a.add_response('list_finding_aggregators', {'FindingAggregators': []}, {})
+        assert Securityhub._listFindingAggregators(svc) == ([], None)

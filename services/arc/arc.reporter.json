@@ -1,7 +1,7 @@
 {
     "regionSwitchPlanMissing": {
         "category": "R",
-        "^description": "{$COUNT} account(s) have no Amazon Application Recovery Controller (ARC) Region switch plan and no ARC routing control cluster. For a workload deployed across AWS Regions, ARC Region switch orchestrates the ordered failover steps (scaling, database promotion, DNS and traffic shifts) and routing control provides a highly available, data-plane-only switch for traffic. Without either, Region failover depends on ad-hoc manual runbooks that are slow and error-prone during a regional event. This is an informational DR-design signal: it is only relevant when the account hosts multi-Region workloads.",
+        "^description": "{$COUNT} account(s) have no Amazon Application Recovery Controller (ARC) Region switch plan and no ARC routing control cluster. For a workload deployed across AWS Regions, ARC Region switch orchestrates the ordered failover steps (scaling, database promotion, DNS and traffic shifts) and routing control provides a highly available, data-plane-only switch for traffic. Without either, Region failover depends on ad-hoc manual runbooks that are slow and error-prone during a regional event. It is reported only when the account shows multi-Region infrastructure: an EventBridge global endpoint, an Aurora global database or DynamoDB global table spanning Regions, or Route 53 latency or failover records that point at different Regions. Accounts without such evidence are reported as informational, not as a finding. Other multi-Region designs (for example S3 Cross-Region Replication alone) are not detected.",
         "shortDesc": "Orchestrate multi-Region failover with ARC Region switch",
         "criticality": "L",
         "downtime": 0,

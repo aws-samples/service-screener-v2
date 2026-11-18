@@ -184,3 +184,84 @@ def test_health_flag_then_fix_and_global_partial():
 def test_pattern_matching(pattern, source, expected):
     assert EventbridgeRegional.patternMatchesSource(
         pattern if isinstance(pattern, str) else json.dumps(pattern), source) is expected
+
+
+# ---- detail-type / detail evaluation (rules that never receive findings) -- #
+## A rule names a finding source but narrows to events that are not findings:
+## CloudTrail API calls (GuardDuty tamper alarms from CIS / landing-zone
+## baselines), Security Hub custom actions (fire only when a person acts) or
+## Inspector scan/coverage events. These were counted as routing findings.
+
+GD_TAMPER = {'source': ['aws.guardduty'], 'detail-type': ['AWS API Call via CloudTrail'],
+             'detail': {'eventSource': ['guardduty.amazonaws.com'],
+                        'eventName': ['DeleteDetector', 'DisassociateFromMasterAccount']}}
+
+
+@pytest.mark.parametrize('pattern,source,expected', [
+    (GD_TAMPER, 'aws.guardduty', False),
+    ({'source': [{'prefix': 'aws.'}], 'detail-type': ['AWS API Call via CloudTrail']}, 'aws.health', False),
+    ({'source': [{'prefix': 'aws.'}], 'detail-type': ['AWS API Call via CloudTrail']}, 'aws.guardduty', False),
+    ({'source': ['aws.securityhub'], 'detail-type': ['Security Hub Findings - Custom Action']},
+     'aws.securityhub', False),
+    ({'source': ['aws.inspector2'], 'detail-type': ['Inspector2 Scan', 'Inspector2 Coverage']},
+     'aws.inspector2', False),
+    ## CloudTrail-only detail field without a detail-type filter still cannot match a finding
+    ({'source': ['aws.guardduty'], 'detail': {'eventName': ['DeleteDetector']}}, 'aws.guardduty', False),
+    ({'source': ['aws.guardduty'], 'detail': {'userIdentity': {'type': ['Root']}}}, 'aws.guardduty', False),
+    ## ... but an exists:false alternative is satisfied by a finding
+    ({'source': ['aws.guardduty'], 'detail': {'eventName': [{'exists': False}]}}, 'aws.guardduty', True),
+    ## $or inside detail: one alternative can match a finding
+    ({'source': ['aws.guardduty'], 'detail': {'$or': [{'eventName': ['X']}, {'severity': [{'numeric': ['>=', 7]}]}]}},
+     'aws.guardduty', True),
+    ## Genuine finding routes keep matching
+    ({'source': ['aws.guardduty'], 'detail-type': ['GuardDuty Finding']}, 'aws.guardduty', True),
+    ({'source': ['aws.guardduty'], 'detail-type': ['GuardDuty Finding'],
+      'detail': {'severity': [{'numeric': ['>=', 7]}]}}, 'aws.guardduty', True),
+    ({'source': ['aws.securityhub'], 'detail-type': ['Security Hub Findings - Imported']}, 'aws.securityhub', True),
+    ({'source': ['aws.securityhub'], 'detail-type': ['Findings Imported V2']}, 'aws.securityhub', True),
+    ({'source': ['aws.inspector2'], 'detail-type': ['Inspector2 Finding']}, 'aws.inspector2', True),
+    ({'source': ['aws.access-analyzer'], 'detail-type': ['Access Analyzer Finding']}, 'aws.access-analyzer', True),
+    ({'source': ['aws.access-analyzer'], 'detail-type': ['Unused Access Finding for IAM entities']},
+     'aws.access-analyzer', True),
+    ({'source': ['aws.health'], 'detail-type': ['AWS Health Event']}, 'aws.health', True),
+    ({'source': ['aws.health'], 'detail-type': ['AWS Health Abuse Event']}, 'aws.health', True),
+    ({'source': ['aws.health'], 'detail-type': [{'prefix': 'AWS Health'}]}, 'aws.health', True),
+    ({'source': ['aws.guardduty'], 'detail-type': [{'anything-but': ['AWS API Call via CloudTrail']}]},
+     'aws.guardduty', True),
+    ## detail-type alone identifies the event (source is implied)
+    ({'detail-type': ['GuardDuty Finding']}, 'aws.guardduty', True),
+    ({'detail-type': ['GuardDuty Finding']}, 'aws.inspector2', False),
+    ## $or across detail-types: one finding alternative suffices
+    ({'source': ['aws.guardduty'], '$or': [{'detail-type': ['AWS API Call via CloudTrail']},
+                                           {'detail-type': ['GuardDuty Finding']}]}, 'aws.guardduty', True),
+])
+def test_pattern_matching_detail_type(pattern, source, expected):
+    assert EventbridgeRegional.patternMatchesSource(json.dumps(pattern), source) is expected
+
+
+def test_guardduty_tamper_rule_does_not_count_as_routing_findings():
+    """CIS/landing-zone GuardDuty tamper alarm with an SNS target was a false PASS."""
+    r = _routingFor('eu-west-1', [_rule('gd-tamper', GD_TAMPER)], [])
+    assert _evaluate(r, 'securityFindingsNotRouted') == -1
+    fixed = _routingFor('eu-west-1', [_rule('gd-tamper', GD_TAMPER),
+                                      _rule('gd-findings', {'source': ['aws.guardduty'],
+                                                            'detail-type': ['GuardDuty Finding']})],
+                        [('gd-findings', TARGET)])
+    assert _evaluate(fixed, 'securityFindingsNotRouted') == 1
+
+
+def test_custom_action_only_rule_does_not_count_as_routing_findings():
+    r = _routingFor('eu-west-1', [_rule('sh-ca', {'source': ['aws.securityhub'],
+                                                  'detail-type': ['Security Hub Findings - Custom Action']})], [])
+    assert _evaluate(r, 'securityFindingsNotRouted') == -1
+
+
+def test_cloudtrail_catch_all_does_not_count_as_health_routing():
+    ct = {'source': [{'prefix': 'aws.'}], 'detail-type': ['AWS API Call via CloudTrail']}
+    r = _routingFor('us-east-1', [_rule('ct-all', ct)], [])
+    assert _evaluate(r, 'healthEventsNotRouted') == -1
+    assert _evaluate(r, 'securityFindingsNotRouted') == -1
+    fixed = _routingFor('us-east-1', [_rule('ct-all', ct),
+                                      _rule('health', {'source': ['aws.health'], 'detail-type': ['AWS Health Event']})],
+                        [('health', TARGET)])
+    assert _evaluate(fixed, 'healthEventsNotRouted') == 1
