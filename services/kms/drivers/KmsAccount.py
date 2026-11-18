@@ -29,11 +29,32 @@ class KmsAccount(Evaluator):
     _NOT_AVAILABLE = ('UnsupportedOperation', 'InvalidAction', 'OptInRequired',
                       'UnrecognizedClientException', 'SubscriptionRequiredException')
 
-    def __init__(self, kmsClient, clientFactory):
+    def __init__(self, kmsClient, clientFactory, keyMetadata=None):
         super().__init__()
         self.kmsClient = kmsClient
         self.clientFactory = clientFactory
+        ## Optional {keyId: KeyMetadata or None} of every key in the region, as
+        ## already listed / described by the service class (None = not
+        ## described). When given, list_keys and describe_key are not repeated.
+        self.keyMetadata = keyMetadata
         self._resourceName = 'Account'
+
+    def _describeKey(self, keyId):
+        """KeyMetadata for keyId: from the service class when known, otherwise
+        one describe_key per key for this driver (both checks may ask)."""
+        if self.keyMetadata and self.keyMetadata.get(keyId) is not None:
+            return dict(self.keyMetadata[keyId])
+        return self._memo(('describe_key', keyId),
+                          lambda: self.kmsClient.describe_key(KeyId=keyId)).get('KeyMetadata', {})
+
+    def _listKeyIds(self):
+        if self.keyMetadata is not None:
+            return list(self.keyMetadata)
+        keyIds = []
+        paginator = self.kmsClient.get_paginator('list_keys')
+        for page in paginator.paginate():
+            keyIds.extend(k['KeyId'] for k in page.get('Keys', []) or [])
+        return keyIds
 
     @staticmethod
     def _errorCode(e):
@@ -94,13 +115,11 @@ class KmsAccount(Evaluator):
         """{storeId: count of keys not pending deletion} for the given stores."""
         counts = {}
         try:
-            paginator = self.kmsClient.get_paginator('list_keys')
-            for page in paginator.paginate():
-                for k in page.get('Keys', []) or []:
-                    md = self.kmsClient.describe_key(KeyId=k['KeyId']).get('KeyMetadata', {})
-                    sid = md.get('CustomKeyStoreId')
-                    if sid in storeIds and md.get('KeyState') not in ('PendingDeletion',):
-                        counts[sid] = counts.get(sid, 0) + 1
+            for keyId in self._listKeyIds():
+                md = self._describeKey(keyId)
+                sid = md.get('CustomKeyStoreId')
+                if sid in storeIds and md.get('KeyState') not in ('PendingDeletion',):
+                    counts[sid] = counts.get(sid, 0) + 1
         except botocore.exceptions.ClientError as e:
             return {}, self._errorCode(e)
         return counts, None
@@ -191,7 +210,7 @@ class KmsAccount(Evaluator):
             if len(services) < self.BROAD_USE_MIN_SERVICES:
                 continue
             try:
-                md = self.kmsClient.describe_key(KeyId=keyId).get('KeyMetadata', {})
+                md = self._describeKey(keyId)
             except botocore.exceptions.ClientError:
                 continue
             ## AWS managed keys are already one-per-service; only customer

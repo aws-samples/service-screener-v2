@@ -16,6 +16,9 @@ class Kms(Service):
         ssBoto = self.ssBoto
         self.kmsClient = ssBoto.client('kms', config=self.bConfig)
         self.kmsCustomerManagedKeys = []
+        ## Every listed key in list order -> describe_key KeyMetadata (None when
+        ## not described, e.g. checkpointed). Reused by KmsAccount.
+        self.kmsKeyMetadata = {}
     
     def getResources(self):
         resp = self.kmsClient.list_keys(Limit=10)
@@ -34,6 +37,7 @@ class Kms(Service):
         )}
 
         for key in keys:
+            self.kmsKeyMetadata.setdefault(key['KeyId'], None)
             if key['KeyArn'] not in pendingArns:
                 ## Already checkpointed - keep a minimal placeholder so advise() still
                 ## builds the driver; Evaluator.run() serves the cached result.
@@ -45,6 +49,7 @@ class Kms(Service):
 
             res = self.kmsClient.describe_key(KeyId = key['KeyId'])
             metadata = res.get('KeyMetadata')
+            self.kmsKeyMetadata[key['KeyId']] = dict(metadata)
             if metadata['KeyManager'] != 'AWS':
                 try:
                     rr = self.kmsClient.get_key_rotation_status(KeyId = key['KeyId'])
@@ -57,10 +62,13 @@ class Kms(Service):
                 if self.tags:
                     tags = self.kmsClient.list_resource_tags(KeyId = key['KeyId'])
                     ## Only the first page is needed for filtering; the driver
-                    ## re-reads all pages when it evaluates tags.
+                    ## re-reads all pages unless this first page is complete.
                     nTags = self.convertTagKeyTagValueIntoKeyValue(tags.get('Tags'))
                     if self.resourceHasTags(nTags) == False:
                         continue
+                    if not tags.get('Truncated'):
+                        ## Complete tag list: the driver reuses it instead of re-reading.
+                        metadata['_resourceTags'] = list(tags.get('Tags') or [])
                 
                 self.kmsCustomerManagedKeys.append(metadata)
         
@@ -83,7 +91,8 @@ class Kms(Service):
         ## Always evaluated, even when the region has no customer managed keys.
         ssBoto = self.ssBoto
         bConfig = self.bConfig
-        obj = KmsAccount(self.kmsClient, lambda name: ssBoto.client(name, config=bConfig))
+        obj = KmsAccount(self.kmsClient, lambda name: ssBoto.client(name, config=bConfig),
+                         keyMetadata=self.kmsKeyMetadata)
         obj.run(self.__class__)
         objs['KMS::Account'] = obj.getInfo()
         del obj
