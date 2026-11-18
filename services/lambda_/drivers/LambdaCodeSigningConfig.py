@@ -35,6 +35,12 @@ class LambdaCodeSigningConfig(Evaluator):
         parts = arn.split(':')
         return parts[4] if len(parts) > 4 else None
 
+    def _signingProfile(self, region, kwargs):
+        # Several configs (or several versions of one profile in a config) can
+        # trust the same profile; describe each profile once per scan.
+        key = ('signer', region, 'get_signing_profile', tuple(sorted(kwargs.items())))
+        return self._sharedMemo(key, lambda: self.signerClient.get_signing_profile(**kwargs))
+
     def _checkSignerProfileInvalid(self):
         key = 'signerProfileInvalid'
         arns = ((self.csc.get('AllowedPublishers') or {}).get('SigningProfileVersionArns')) or []
@@ -59,7 +65,7 @@ class LambdaCodeSigningConfig(Evaluator):
             if crossAccount:
                 kwargs['profileOwner'] = m.group('account')
             try:
-                prof = self.signerClient.get_signing_profile(**kwargs)
+                prof = self._signingProfile(clientRegion, kwargs)
             except botocore.exceptions.ClientError as e:
                 code = e.response['Error']['Code']
                 if code == 'ResourceNotFoundException' and not crossAccount:

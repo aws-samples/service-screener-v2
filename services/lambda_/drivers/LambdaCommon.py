@@ -117,6 +117,53 @@ class LambdaCommon(Evaluator):
         self.results = {}
         self.init()
     
+    # ------------------------------------------------------------------ #
+    # Read-once API helpers. Several checks need the same per-function data;
+    # IAM role details are shared across functions that reuse a role.
+    # ------------------------------------------------------------------ #
+    def _codeSigningConfig(self):
+        return self._memo(('get_function_code_signing_config', self.function_name),
+                          lambda: self.lambda_client.get_function_code_signing_config(FunctionName=self.function_name))
+
+    def _functionConfiguration(self):
+        return self._memo(('get_function_configuration', self.function_name),
+                          lambda: self.lambda_client.get_function_configuration(FunctionName=self.function_name))
+
+    def _functionConcurrency(self):
+        return self._memo(('get_function_concurrency', self.function_name),
+                          lambda: self.lambda_client.get_function_concurrency(FunctionName=self.function_name))
+
+    def _eventSourceMappings(self):
+        return self._memo(('list_event_source_mappings', self.function_name),
+                          lambda: self.lambda_client.list_event_source_mappings(FunctionName=self.function_name))
+
+    def _iamGetRole(self, role_name):
+        return self._sharedMemo(('iam', 'get_role', role_name),
+                                lambda: self.iam_client.get_role(RoleName=role_name))
+
+    def _iamListRolePolicies(self, role_name):
+        return self._sharedMemo(('iam', 'list_role_policies', role_name),
+                                lambda: self.iam_client.list_role_policies(RoleName=role_name))
+
+    def _iamListAttachedRolePolicies(self, role_name):
+        return self._sharedMemo(('iam', 'list_attached_role_policies', role_name),
+                                lambda: self.iam_client.list_attached_role_policies(RoleName=role_name))
+
+    def _iamGetRolePolicy(self, role_name, policy_name):
+        return self._sharedMemo(('iam', 'get_role_policy', role_name, policy_name),
+                                lambda: self.iam_client.get_role_policy(RoleName=role_name, PolicyName=policy_name))
+
+    def _sqsGetQueueUrl(self, sqs_client, queue_name):
+        region = sqs_client.meta.region_name
+        return self._sharedMemo(('sqs', region, 'get_queue_url', queue_name),
+                                lambda: sqs_client.get_queue_url(QueueName=queue_name))
+
+    def _sqsVisibilityTimeoutAttrs(self, sqs_client, queue_url):
+        region = sqs_client.meta.region_name
+        return self._sharedMemo(('sqs', region, 'get_queue_attributes', queue_url, 'VisibilityTimeout'),
+                                lambda: sqs_client.get_queue_attributes(QueueUrl=queue_url,
+                                                                        AttributeNames=['VisibilityTimeout']))
+
     @staticmethod
     def get_arn_role_name(arn):
         array = arn.split("/")
@@ -178,9 +225,7 @@ class LambdaCommon(Evaluator):
         role_name = self.get_arn_role_name(role_arn)
 
         try:
-            role = self.iam_client.get_role(
-                RoleName=role_name
-            )
+            role = self._iamGetRole(role_name)
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == 'NoSuchEntity':
                 self.results['lambdaMissingRole'] = [-1, '']
@@ -192,9 +237,7 @@ class LambdaCommon(Evaluator):
         if self.lambda_['PackageType'] != 'Zip':
             return
         try:
-            code_sign = self.lambda_client.get_function_code_signing_config(
-                FunctionName=self.function_name
-            )
+            code_sign = self._codeSigningConfig()
             if not code_sign.get('CodeSigningConfigArn'):
                 self.results['lambdaCodeSigningDisabled'] = [-1, 'Disabled']
         except botocore.exceptions.ClientError as e:
@@ -203,9 +246,7 @@ class LambdaCommon(Evaluator):
         return
 
     def _check_dead_letter_queue_disabled(self):
-        config = self.lambda_client.get_function_configuration(
-            FunctionName=self.function_name
-        )
+        config = self._functionConfiguration()
 
         if not config.get('DeadLetterConfig'):
             self.results['lambdaDeadLetterQueueDisabled'] = [-1, 'Disabled']
@@ -229,9 +270,7 @@ class LambdaCommon(Evaluator):
         return
 
     def _check_provisioned_concurrency(self):
-        concurrency = self.lambda_client.get_function_concurrency(
-            FunctionName=self.function_name
-        )
+        concurrency = self._functionConcurrency()
 
         if not concurrency.get('ReservedConcurrentExecutions'):
             self.results['lambdaReservedConcurrencyDisabled'] = [-1, 'Disabled']
@@ -347,14 +386,10 @@ class LambdaCommon(Evaluator):
         """Check if SQS visibility timeout is at least 6x function timeout"""
         try:
             # Get event source mappings
-            mappings = self.lambda_client.list_event_source_mappings(
-                FunctionName=self.function_name
-            )
+            mappings = self._eventSourceMappings()
             
             # Get function timeout
-            func_config = self.lambda_client.get_function_configuration(
-                FunctionName=self.function_name
-            )
+            func_config = self._functionConfiguration()
             function_timeout = func_config.get('Timeout', 3)
             
             # Check each SQS event source
@@ -372,14 +407,11 @@ class LambdaCommon(Evaluator):
                     
                     try:
                         # Get queue URL
-                        queue_url_response = sqs_client.get_queue_url(QueueName=queue_name)
+                        queue_url_response = self._sqsGetQueueUrl(sqs_client, queue_name)
                         queue_url = queue_url_response['QueueUrl']
                         
                         # Get queue attributes
-                        attrs = sqs_client.get_queue_attributes(
-                            QueueUrl=queue_url,
-                            AttributeNames=['VisibilityTimeout']
-                        )
+                        attrs = self._sqsVisibilityTimeoutAttrs(sqs_client, queue_url)
                         
                         visibility_timeout = int(attrs['Attributes'].get('VisibilityTimeout', 30))
                         
@@ -457,9 +489,7 @@ class LambdaCommon(Evaluator):
     def _check_partial_batch_response(self):
         """Check if partial batch response is enabled for stream sources"""
         try:
-            mappings = self.lambda_client.list_event_source_mappings(
-                FunctionName=self.function_name
-            )
+            mappings = self._eventSourceMappings()
             
             for mapping in mappings.get('EventSourceMappings', []):
                 event_source_arn = mapping.get('EventSourceArn', '')
@@ -483,9 +513,7 @@ class LambdaCommon(Evaluator):
     def _check_batching_window(self):
         """Check if batching window is configured for stream sources"""
         try:
-            mappings = self.lambda_client.list_event_source_mappings(
-                FunctionName=self.function_name
-            )
+            mappings = self._eventSourceMappings()
             
             for mapping in mappings.get('EventSourceMappings', []):
                 event_source_arn = mapping.get('EventSourceArn', '')
@@ -509,9 +537,7 @@ class LambdaCommon(Evaluator):
     def _check_iterator_age_alarm(self):
         """Check if IteratorAge alarms are configured for stream consumers"""
         try:
-            mappings = self.lambda_client.list_event_source_mappings(
-                FunctionName=self.function_name
-            )
+            mappings = self._eventSourceMappings()
             
             has_stream_source = False
             for mapping in mappings.get('EventSourceMappings', []):
@@ -734,18 +760,15 @@ class LambdaCommon(Evaluator):
             role_name = self.get_arn_role_name(role_arn)
             
             # Get role policies
-            inline_policies = self.iam_client.list_role_policies(RoleName=role_name)
-            attached_policies = self.iam_client.list_attached_role_policies(RoleName=role_name)
+            inline_policies = self._iamListRolePolicies(role_name)
+            attached_policies = self._iamListAttachedRolePolicies(role_name)
             
             has_wildcard = False
             has_aws_managed = False
             
             # Check inline policies for wildcards
             for policy_name in inline_policies.get('PolicyNames', []):
-                policy = self.iam_client.get_role_policy(
-                    RoleName=role_name,
-                    PolicyName=policy_name
-                )
+                policy = self._iamGetRolePolicy(role_name, policy_name)
                 policy_doc = policy.get('PolicyDocument', {})
                 
                 # Check for wildcard actions or resources
@@ -894,9 +917,7 @@ class LambdaCommon(Evaluator):
                 
                 if throttle_count > 0:
                     # Check if reserved concurrency is set
-                    concurrency = self.lambda_client.get_function_concurrency(
-                        FunctionName=self.function_name
-                    )
+                    concurrency = self._functionConcurrency()
                     
                     if not concurrency.get('ReservedConcurrentExecutions'):
                         self.results['lambdaNoReservedConcurrencyForThrottling'] = [
@@ -999,7 +1020,7 @@ class LambdaCommon(Evaluator):
             self.results[key] = [0, 'Code signing not applicable to container image functions']
             return
         try:
-            resp = self.lambda_client.get_function_code_signing_config(FunctionName=self.function_name)
+            resp = self._codeSigningConfig()
             cscArn = resp.get('CodeSigningConfigArn')
             if not cscArn:
                 self.results[key] = [0, 'No code signing config attached (see lambdaCodeSigningDisabled)']
