@@ -1,4 +1,3 @@
-import threading
 
 import boto3
 import botocore
@@ -20,18 +19,13 @@ class Ec2ElbClassic(Evaluator):
 
         self.init()
 
-        self._lock = threading.RLock()
-        self._attributesCache = None
-
     def _getAttributes(self):
-        """Memoized describe_load_balancer_attributes (used by several checks)."""
-        with self._lock:
-            if self._attributesCache is None:
-                results = self.elbClient.describe_load_balancer_attributes(
-                    LoadBalancerName = self.elb['LoadBalancerName']
-                )
-                self._attributesCache = results.get('LoadBalancerAttributes', {})
-            return self._attributesCache
+        """Memoized describe_load_balancer_attributes (used by several checks).
+        A failed call is cached too, so the checks do not repeat it."""
+        return self._memo(('describe_load_balancer_attributes', self.elb['LoadBalancerName']),
+                          lambda: self.elbClient.describe_load_balancer_attributes(
+                              LoadBalancerName = self.elb['LoadBalancerName']
+                          ).get('LoadBalancerAttributes', {}))
 
     def _checkClassicLoadBalancer(self):
         self.results['ELBClassicLB'] = ['-1', self.elb['LoadBalancerName']]

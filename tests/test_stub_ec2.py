@@ -1095,6 +1095,7 @@ def _snapshotFreshness(ages):
     now = _dt.datetime.now(_dt.timezone.utc)
     snaps = [{'SnapshotId': f'snap-{i}', 'VolumeId': 'vol-1', 'StartTime': now - _dt.timedelta(days=a), 'State': 'completed'}
              for i, a in enumerate(ages)]
+    Config.set('__sharedMemo', None)   # each call is a separate scan (volume snapshots are cached per scan)
     obj = Ec2EbsVolume.__new__(Ec2EbsVolume)
     obj.results = {}
     obj.ec2Client = ec2

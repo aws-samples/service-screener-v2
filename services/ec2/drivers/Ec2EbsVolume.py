@@ -7,6 +7,21 @@ from services.Service import Service
 
 from services.Evaluator import Evaluator
 
+
+def volumeSnapshots(evaluator, ec2Client, volumeId):
+    """describe_snapshots(Filters=[volume-id = volumeId]). Ec2EbsVolume and
+    Ec2Instance (root volume) ask for the same volume, so it is read once per scan."""
+    return evaluator._sharedMemo(
+        ('ec2', ec2Client.meta.region_name, 'describe_snapshots', ('volume-id', volumeId)),
+        lambda: ec2Client.describe_snapshots(
+            Filters=[
+                {
+                    'Name': 'volume-id',
+                    'Values': [volumeId]
+                }
+            ]
+        ))
+
 class Ec2EbsVolume(Evaluator):
     OLDGENBLOCK = ('gp2', 'io1')
     
@@ -134,14 +149,7 @@ class Ec2EbsVolume(Evaluator):
         return
     
     def _checkSnapshot(self):
-        filterData = [{
-            'Name': 'volume-id',
-            'Values': [self.ebsVolumeData['VolumeId']]
-        }]
-        
-        snapshotData = self.ec2Client.describe_snapshots(
-            Filters = filterData
-        )
+        snapshotData = volumeSnapshots(self, self.ec2Client, self.ebsVolumeData['VolumeId'])
         
         if len(snapshotData['Snapshots']) > 0:
             self.hasFastSnapshot(snapshotData['Snapshots'])

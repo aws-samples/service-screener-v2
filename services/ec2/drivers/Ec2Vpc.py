@@ -43,7 +43,7 @@ def _covers(dest, peer):
     return d.version == p.version and d.supernet_of(p)
 
 
-def getPeerRouteContext(ec2Client, vpcs):
+def getPeerRouteContext(ec2Client, vpcs, routeTables=None):
     """Read-only context for vpcPeeringFullRoute:
       {'error': code|None,
        'routeTables': {vpcId: [routeTable, ..]},
@@ -52,15 +52,21 @@ def getPeerRouteContext(ec2Client, vpcs):
        'tgwPeers': {(tgwId, vpcId): {'peers': {peerVpcId: [cidr, ..]}, 'note': str|None, 'error': code|None}}}
     TGW peers of a VPC are the other VPC attachments that have an active route in the
     TGW route table associated with the VPC's attachment (search_transit_gateway_routes);
-    when that association is not visible, every other VPC attachment of the same TGW."""
+    when that association is not visible, every other VPC attachment of the same TGW.
+    routeTables - every route table of the region when already read (e.g. by
+    getSubnetRouting); None to read them here."""
     ctx = {'error': None, 'routeTables': {}, 'peerings': {}, 'peeringError': None, 'tgwPeers': {}}
-    try:
-        for page in ec2Client.get_paginator('describe_route_tables').paginate():
-            for rt in page.get('RouteTables', []):
-                ctx['routeTables'].setdefault(rt.get('VpcId'), []).append(rt)
-    except Exception as e:
-        ctx['error'] = _errCode(e)
-        return ctx
+    if routeTables is not None:
+        for rt in routeTables:
+            ctx['routeTables'].setdefault(rt.get('VpcId'), []).append(rt)
+    else:
+        try:
+            for page in ec2Client.get_paginator('describe_route_tables').paginate():
+                for rt in page.get('RouteTables', []):
+                    ctx['routeTables'].setdefault(rt.get('VpcId'), []).append(rt)
+        except Exception as e:
+            ctx['error'] = _errCode(e)
+            return ctx
 
     def activeRoutes(target):
         for rts in ctx['routeTables'].values():

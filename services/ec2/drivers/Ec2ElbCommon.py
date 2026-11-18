@@ -22,30 +22,27 @@ class Ec2ElbCommon(Evaluator):
         self.init()
 
         self._lock = threading.RLock()
-        self._listenersCache = None
-        self._attributesCache = None
 
     def _getListeners(self):
         """Memoized, paginated describe_listeners - several checks need the
-        listeners of the same LB, no need to fetch more than once."""
-        with self._lock:
-            if self._listenersCache is None:
-                listeners = []
-                paginator = self.elbClient.get_paginator('describe_listeners')
-                for page in paginator.paginate(LoadBalancerArn = self.elb['LoadBalancerArn']):
-                    listeners.extend(page.get('Listeners', []))
-                self._listenersCache = listeners
-            return self._listenersCache
+        listeners of the same LB, no need to fetch more than once (a failed
+        call is cached too and re-raised to each check)."""
+        def fetch():
+            listeners = []
+            paginator = self.elbClient.get_paginator('describe_listeners')
+            for page in paginator.paginate(LoadBalancerArn = self.elb['LoadBalancerArn']):
+                listeners.extend(page.get('Listeners', []))
+            return listeners
+        return self._memo(('describe_listeners', self.elb['LoadBalancerArn']), fetch)
 
     def _getAttributes(self):
         """Memoized describe_load_balancer_attributes as {key: value}."""
-        with self._lock:
-            if self._attributesCache is None:
-                results = self.elbClient.describe_load_balancer_attributes(
-                    LoadBalancerArn = self.elb['LoadBalancerArn']
-                )
-                self._attributesCache = {a['Key']: a.get('Value') for a in results.get('Attributes', [])}
-            return self._attributesCache
+        def fetch():
+            results = self.elbClient.describe_load_balancer_attributes(
+                LoadBalancerArn = self.elb['LoadBalancerArn']
+            )
+            return {a['Key']: a.get('Value') for a in results.get('Attributes', [])}
+        return self._memo(('describe_load_balancer_attributes', self.elb['LoadBalancerArn']), fetch)
 
     def _getSslPolicyProtocols(self, policyName):
         """SslProtocols of an elbv2 security policy. The full policy table is
