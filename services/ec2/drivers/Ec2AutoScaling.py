@@ -15,6 +15,30 @@ class Ec2AutoScaling(Evaluator):
         self._resourceName = asg['AutoScalingGroupName']
 
         self.init()
+
+    def _classicLoadBalancers(self):
+        """elb describe_load_balancers() (first page, as before) - the same for
+        every ASG in the region, so read once per scan."""
+        return self._sharedMemo(('elb', self.elbClassicClient.meta.region_name, 'describe_load_balancers'),
+                                self.elbClassicClient.describe_load_balancers)
+
+    def _launchTemplateVersions(self, templateId, version):
+        """describe_launch_template_versions for one template version; ASGs
+        sharing a launch template read it once."""
+        return self._sharedMemo(('ec2', self.ec2Client.meta.region_name, 'describe_launch_template_versions',
+                                 templateId, version),
+                                lambda: self.ec2Client.describe_launch_template_versions(
+                                    LaunchTemplateId = templateId,
+                                    Versions = [version]
+                                ))
+
+    def _describeImage(self, imageId):
+        """describe_images(ImageIds=[imageId]); ASGs using the same AMI read it once
+        (a NotFound error is cached and re-raised to each caller)."""
+        return self._sharedMemo(('ec2', self.ec2Client.meta.region_name, 'describe_images', ('ImageIds', (imageId,))),
+                                lambda: self.ec2Client.describe_images(
+                                    ImageIds = [imageId]
+                                ))
         
     def  _checkELBHealthCheckWithoutAssociation(self):
         asg = self.asg
@@ -65,7 +89,7 @@ class Ec2AutoScaling(Evaluator):
         if len(asg['LoadBalancerNames']) == 0:
             return
         
-        result = self.elbClassicClient.describe_load_balancers()
+        result = self._classicLoadBalancers()
         for lb in result['LoadBalancerDescriptions']:
             if lb['LoadBalancerName'] in asg['LoadBalancerNames']:
                 return
@@ -99,10 +123,7 @@ class Ec2AutoScaling(Evaluator):
             templateId = templateInfo['LaunchTemplateId']
             tempalteVersion = templateInfo['Version']
             
-            templateResult = self.ec2Client.describe_launch_template_versions(
-                LaunchTemplateId = templateId,
-                Versions = [tempalteVersion]
-            )
+            templateResult = self._launchTemplateVersions(templateId, tempalteVersion)
             
             for version in templateResult['LaunchTemplateVersions']:
                 imageId = version.get('LaunchTemplateData').get('ImageId')
@@ -115,9 +136,7 @@ class Ec2AutoScaling(Evaluator):
             return
         
         try:
-            imgResult = self.ec2Client.describe_images(
-                ImageIds = [imageId]
-            )
+            imgResult = self._describeImage(imageId)
         except botocore.exceptions.ClientError as error:
             if error.response['Error']['Code'] == 'InvalidAMIID.NotFound':
                 self.results['ASGAMIExist'] = [-1, imageId]

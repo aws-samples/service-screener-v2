@@ -1062,7 +1062,11 @@ class Ec2(Service):
         vpcInstances = list(instancesById.values()) if self._ruleSelected('ssmVpcEndpointsMissing') else None
         peerRouting = None
         if vpcs and self._ruleSelected('vpcPeeringFullRoute'):
-            peerRouting = getPeerRouteContext(self.ec2Client, vpcs)
+            # reuse the route tables getSubnetRouting already read in this scan (for the VPC
+            # or the instance checks), when it ran and succeeded; otherwise read them here
+            routingCtx = vpcRouting or Config.get('ec2::subnetRouting::' + str(self.ec2Client.meta.region_name), None)
+            routeTables = (routingCtx or {}).get('_routeTables')
+            peerRouting = getPeerRouteContext(self.ec2Client, vpcs, routeTables)
         for vpc in vpcs:
             _pi('VPC::Virtual Private Cloud', vpc['VpcId'])
             obj = Ec2Vpc(vpc, flowLogs, self.ec2Client, vpcRouting, allEndpoints, allEndpointsErr, selfAccount,
@@ -1125,7 +1129,8 @@ class Ec2(Service):
                     obj.run(self.__class__)
                     objs[f"SSM::{instanceData['InstanceId']}"] = obj.getInfo()
         
-        if self.getChartGenCost():
-            self.setChartData({"EC2 Instance Family Pricing": self.getChartGenCost()})
+        chartGenCost = self.getChartGenCost()
+        if chartGenCost:
+            self.setChartData({"EC2 Instance Family Pricing": chartGenCost})
 
         return objs

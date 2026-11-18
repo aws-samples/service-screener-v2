@@ -5,6 +5,7 @@ from utils.Config import Config
 from services.Service import Service
 
 from services.Evaluator import Evaluator
+from services.ec2.drivers.Ec2Regional import compOptEnrollmentStatus
 
 class Ec2CompOpt(Evaluator):
     def __init__(self, compOptClient):
@@ -16,7 +17,7 @@ class Ec2CompOpt(Evaluator):
         self.init()
     
     def _checkComputeOptimizerEnabled(self):
-        result = self.compOptClient.get_enrollment_status();
+        result = compOptEnrollmentStatus(self, self.compOptClient)
         
         if result['status'] != 'Active':
             self.results['ComputeOptimizerEnabled'] = [-1,result['status']]

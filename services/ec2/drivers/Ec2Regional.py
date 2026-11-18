@@ -2,6 +2,15 @@ import boto3
 import botocore
 
 from services.Evaluator import Evaluator
+from services.ec2.drivers.Ec2EbsSnapshot import selfOwnedSnapshots
+
+
+def compOptEnrollmentStatus(evaluator, compOptClient):
+    """compute-optimizer get_enrollment_status, read once per region (shared by
+    Ec2Regional and Ec2CompOpt)."""
+    return evaluator._sharedMemo(
+        ('compute-optimizer', compOptClient.meta.region_name, 'get_enrollment_status'),
+        compOptClient.get_enrollment_status)
 
 class Ec2Regional(Evaluator):
     """Regional-level EC2 checks (not resource-specific)"""
@@ -15,6 +24,14 @@ class Ec2Regional(Evaluator):
         self._resourceName = f"EC2-Regional-{ec2Client.meta.region_name}"
         
         self.init()
+
+    def _enrollmentStatus(self):
+        return compOptEnrollmentStatus(self, self.compOptClient)
+
+    def _ec2InstancePreferences(self):
+        return self._memo(('get_recommendation_preferences', 'Ec2Instance'),
+                          lambda: self.compOptClient.get_recommendation_preferences(
+                              resourceType='Ec2Instance'))
     
     def _checkEBSEncryptionByDefault(self):
         """Check if EBS encryption by default is enabled in this region"""
@@ -47,7 +64,7 @@ class Ec2Regional(Evaluator):
             volumesResp = self.ec2Client.describe_volumes()
             volumeCount = len(volumesResp.get('Volumes', []))
             
-            snapshotsResp = self.ec2Client.describe_snapshots(OwnerIds=['self'])
+            snapshotsResp = selfOwnedSnapshots(self, self.ec2Client)
             snapshotCount = len(snapshotsResp.get('Snapshots', []))
             
             # Check against limits
@@ -100,16 +117,14 @@ class Ec2Regional(Evaluator):
         if not self.compOptClient:
             return
         try:
-            resp = self.compOptClient.get_enrollment_status()
+            resp = self._enrollmentStatus()
             status = resp.get('status', '')
             if status != 'Active':
                 return  # Compute Optimizer not active, skip this check
 
             # Check recommendation preferences for enhanced metrics
             try:
-                prefsResp = self.compOptClient.get_recommendation_preferences(
-                    resourceType='Ec2Instance'
-                )
+                prefsResp = self._ec2InstancePreferences()
                 preferences = prefsResp.get('recommendationPreferencesDetails', [])
 
                 enhancedMetricsEnabled = False
@@ -131,16 +146,14 @@ class Ec2Regional(Evaluator):
         if not self.compOptClient:
             return
         try:
-            resp = self.compOptClient.get_enrollment_status()
+            resp = self._enrollmentStatus()
             status = resp.get('status', '')
             if status != 'Active':
                 return  # Compute Optimizer not active, skip
 
             # Check recommendation preferences
             try:
-                prefsResp = self.compOptClient.get_recommendation_preferences(
-                    resourceType='Ec2Instance'
-                )
+                prefsResp = self._ec2InstancePreferences()
                 preferences = prefsResp.get('recommendationPreferencesDetails', [])
 
                 # Check if any preferences have been customized (lookBackPeriod set)
@@ -162,7 +175,7 @@ class Ec2Regional(Evaluator):
         if not self.compOptClient:
             return
         try:
-            resp = self.compOptClient.get_enrollment_status()
+            resp = self._enrollmentStatus()
             status = resp.get('status', '')
             if status != 'Active':
                 return  # Compute Optimizer not active, skip

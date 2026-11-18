@@ -10,6 +10,7 @@ from utils.Tools import aws_parseInstanceFamily, _warn
 from services.Evaluator import Evaluator
 from services.ec2.drivers.Ec2UserDataScan import decodeUserData, findSecrets
 from services.ec2.drivers.Ec2NetworkInterface import getSubnetRouting, evaluatePlacement
+from services.ec2.drivers.Ec2EbsVolume import volumeSnapshots
 
 import constants as _C
 
@@ -46,6 +47,9 @@ class Ec2Instance(Evaluator):
         return self.ec2Util
     
     def getEC2UtilizationMetrics(self, metricName, verifyDay, statistics=['Average']):
+        """Daily datapoints of one AWS/EC2 metric over verifyDay days. Memoized per
+        instance: e.g. CPUUtilization/Average/14d is used by both the low- and the
+        high-utilization check."""
         cwClient = self.cwClient
         instance = self.ec2InstanceData
         
@@ -56,17 +60,18 @@ class Ec2Instance(Evaluator):
             },
         ]
         
-        results = cwClient.get_metric_statistics(
-            Dimensions=dimensions,
-            Namespace='AWS/EC2',
-            MetricName=metricName,
-            StartTime=datetime.datetime.utcnow() - timedelta(days=verifyDay),
-            EndTime=datetime.datetime.utcnow(),
-            Period=24 * 60 * 60,
-            Statistics=statistics,
-        )
+        def fetch():
+            return cwClient.get_metric_statistics(
+                Dimensions=dimensions,
+                Namespace='AWS/EC2',
+                MetricName=metricName,
+                StartTime=datetime.datetime.utcnow() - timedelta(days=verifyDay),
+                EndTime=datetime.datetime.utcnow(),
+                Period=24 * 60 * 60,
+                Statistics=statistics,
+            )
         
-        return results
+        return self._memo(('get_metric_statistics', metricName, verifyDay, tuple(statistics)), fetch)
     
     def checkMetricsLowUsage(self, metricName, verifyDay, thresholdDay, thresholdValue):
         result = self.getEC2UtilizationMetrics(metricName, verifyDay)
@@ -161,6 +166,13 @@ class Ec2Instance(Evaluator):
         Any other exception propagates uncaught - callers keep their own
         try/except around calls to this method.
         """
+        # _memo guards the concurrent checks of this instance that ask for the
+        # same type (EBS-optimized / instance store) - without it both could
+        # miss the Config cache and call the API.
+        return self._memo(('describe_instance_types', instanceTypeStr),
+                          lambda: self._fetchInstanceTypeInfo(instanceTypeStr))
+
+    def _fetchInstanceTypeInfo(self, instanceTypeStr):
         cacheKey = 'ec2::instancetype::' + instanceTypeStr
         cached = Config.get(cacheKey, "__unset__")
         if cached != "__unset__":
@@ -697,14 +709,7 @@ class Ec2Instance(Evaluator):
         
         try:
             # Check for snapshots of this volume
-            snapshotResp = self.ec2Client.describe_snapshots(
-                Filters=[
-                    {
-                        'Name': 'volume-id',
-                        'Values': [volumeId]
-                    }
-                ]
-            )
+            snapshotResp = volumeSnapshots(self, self.ec2Client, volumeId)
             
             snapshots = snapshotResp.get('Snapshots', [])
             
