@@ -67,11 +67,48 @@ def test_cfn_plaintext_secret_params(emu, uid):
             pass
 
 
-def test_cfn_plaintext_secret_ssm_typed_param_not_flagged(emu, uid):
-    """An SSM parameter-type parameter holds a parameter NAME (ResolvedValue set)."""
+def test_cfn_plaintext_secret_ssm_typed_param_flag_fix(emu, uid):
+    """An AWS::SSM::Parameter::Value<String> parameter returns the plain-text
+    SSM value as ResolvedValue in DescribeStacks: a secret-like one FAILs.
+    Fix: drop the parameter and resolve the secret with a dynamic reference
+    instead, leaving only non-secret parameters -> PASS."""
     cfn, ssm = emu.client('cloudformation'), emu.client('ssm')
     name, pname = f'ss-cfnssm-{uid}', f'/ss-test/{uid}/token'
-    ssm.put_parameter(Name=pname, Value='x', Type='String')
+    ssm.put_parameter(Name=pname, Value='ghp-not-a-real-token-value', Type='String')
+    try:
+        def misconfigure():
+            cfn.create_stack(StackName=name, TemplateBody=json.dumps({
+                'Parameters': {'ApiToken': {'Type': 'AWS::SSM::Parameter::Value<String>'},
+                               'Env': {'Type': 'String'}},
+                'Resources': {'T': {'Type': 'AWS::SNS::Topic'}}}),
+                Parameters=[{'ParameterKey': 'ApiToken', 'ParameterValue': pname},
+                            {'ParameterKey': 'Env', 'ParameterValue': 'test'}])
+            _waitStack(cfn, name)
+            p = cfn.describe_stacks(StackName=name)['Stacks'][0]['Parameters']
+            assert any(x.get('ResolvedValue') for x in p), p
+
+        def fix():
+            cfn.update_stack(StackName=name, TemplateBody=json.dumps({
+                'Parameters': {'Env': {'Type': 'String'}},
+                'Resources': {'T': {'Type': 'AWS::SNS::Topic'}}}),
+                Parameters=[{'ParameterKey': 'Env', 'ParameterValue': 'test'}])
+            _waitStack(cfn, name)
+
+        before, _ = assertFlagFixCycle(emu, 'cloudformation', 'cfnPlaintextSecretParams',
+                                       f'Stack::{name}', misconfigure, fix)
+        assert all('ghp-not-a-real' not in json.dumps(v) for v in before.values())
+    finally:
+        try:
+            cfn.delete_stack(StackName=name)
+        finally:
+            ssm.delete_parameter(Name=pname)
+
+
+def test_cfn_plaintext_secret_ssm_typed_non_secret_value_not_flagged(emu, uid):
+    """An SSM-typed parameter whose resolved value is not secret-like stays PASS."""
+    cfn, ssm = emu.client('cloudformation'), emu.client('ssm')
+    name, pname = f'ss-cfnssm2-{uid}', f'/ss-test/{uid}/flag'
+    ssm.put_parameter(Name=pname, Value='true', Type='String')
     try:
         cfn.create_stack(StackName=name, TemplateBody=json.dumps({
             'Parameters': {'ApiToken': {'Type': 'AWS::SSM::Parameter::Value<String>'}},

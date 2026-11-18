@@ -29,7 +29,10 @@ class SsmSessionManager(Evaluator):
         SSM-SessionManagerRunShell), '_sessionPreferencesFound',
         '_dhmcSetting' (a GetServiceSetting ServiceSetting dict, or None),
         '_sessionPreferencesError' (error code when get_document failed for a
-        reason other than the document not existing, else None).
+        reason other than the document not existing, or
+        'InvalidDocumentContent' when the document exists but its Content is
+        not a JSON object with an 'inputs' object; else None). When set, every
+        preferences check reports [0, 'Unable to evaluate (<code>)'].
       ssmClient        -- boto3 ssm client (read-only calls in the checks).
       quickSetupClient -- optional boto3 ssm-quicksetup client.
 
@@ -83,6 +86,7 @@ class SsmSessionManager(Evaluator):
 
         self.addII('region', detail.get('_region', 'N/A'))
         self.addII('sessionPreferencesDocumentFound', str(self.prefsFound))
+        self.addII('sessionPreferencesError', self.prefsError or 'None')
         self.addII('kmsKeyId', self.prefs.get('kmsKeyId') or 'None')
         self.addII('cloudWatchLogGroupName',
                    self.prefs.get('cloudWatchLogGroupName') or 'None')
@@ -93,10 +97,25 @@ class SsmSessionManager(Evaluator):
         self.addII('dhmcStatus',
                    (self.dhmc or {}).get('Status', 'N/A'))
 
+    def _prefsUnreadable(self, key):
+        """
+        Record [0, 'Unable to evaluate (<code>)'] for `key` and return True
+        when the SSM-SessionManagerRunShell document could not be read or
+        parsed. That is NOT the same as the document not existing: reporting
+        it as "no preferences configured" would be a false FAIL.
+        """
+        if self.prefsError:
+            self.results[key] = [0, f"Unable to evaluate ({self.prefsError})"]
+            return True
+        return False
+
     # ------------------------------------------------------------------ #
     # 1. Session data not encrypted with a KMS key
     # ------------------------------------------------------------------ #
     def _checkSsmSessionManagerNoEncryption(self):
+        if self._prefsUnreadable('ssmSessionManagerNoEncryption'):
+            return
+
         if not self.prefsFound:
             self.results['ssmSessionManagerNoEncryption'] = [
                 -1,
@@ -128,6 +147,9 @@ class SsmSessionManager(Evaluator):
         name there is nowhere to stream to. Both are required for the session
         transcript to actually land in CloudWatch.
         """
+        if self._prefsUnreadable('ssmSessionManagerNoCloudWatchLogs'):
+            return
+
         if not self.prefsFound:
             self.results['ssmSessionManagerNoCloudWatchLogs'] = [
                 -1,
@@ -165,6 +187,9 @@ class SsmSessionManager(Evaluator):
     # 3. Session output not archived to S3
     # ------------------------------------------------------------------ #
     def _checkSsmSessionManagerNoS3Logs(self):
+        if self._prefsUnreadable('ssmSessionManagerNoS3Logs'):
+            return
+
         if not self.prefsFound:
             self.results['ssmSessionManagerNoS3Logs'] = [
                 -1,
@@ -195,6 +220,9 @@ class SsmSessionManager(Evaluator):
         share one OS identity and on-host logs cannot attribute an action to a
         person. Enabling it makes the session assume a per-user OS account.
         """
+        if self._prefsUnreadable('ssmSessionManagerRunAsDisabled'):
+            return
+
         if not self.prefsFound:
             self.results['ssmSessionManagerRunAsDisabled'] = [
                 -1,
@@ -281,10 +309,7 @@ class SsmSessionManager(Evaluator):
         time. FAIL when the idle timeout is longer than 20 minutes or no
         maximum session duration is set.
         """
-        if self.prefsError:
-            self.results['ssmSessionPrefsWeak'] = [
-                0, f"Unable to evaluate ({self.prefsError})"
-            ]
+        if self._prefsUnreadable('ssmSessionPrefsWeak'):
             return
 
         if not self.prefsFound:

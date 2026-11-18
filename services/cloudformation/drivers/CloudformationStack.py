@@ -81,14 +81,21 @@ def _looksLikeNonSecretValue(word, value):
     return False
 
 
-def plaintextSecretParams(stack):
+def plaintextSecretParamDetails(stack):
     """
-    Return the ParameterKeys of `stack` (a describe_stacks entry) whose name
-    looks like a credential AND whose value describe_stacks returns in clear
-    text. A NoEcho parameter is returned masked as '****' and is skipped; an
-    SSM parameter-type parameter (ResolvedValue present) holds a parameter
-    NAME, not the value, and is skipped; a dynamic reference, ARN, KMS alias,
-    secret path, number, very short or enum-like value is skipped.
+    Return [(ParameterKey, fromSsm)] for the parameters of `stack` (a
+    describe_stacks entry) whose name looks like a credential AND whose value
+    describe_stacks returns in clear text.
+
+    A NoEcho parameter is returned masked as '****' and is skipped; a dynamic
+    reference, ARN, KMS alias, secret path, number, very short or enum-like
+    value is skipped.
+
+    An SSM parameter-type parameter (AWS::SSM::Parameter::Value<...>) carries
+    the SSM parameter NAME in ParameterValue and the parameter's actual VALUE
+    in ResolvedValue, in clear text (SSM parameter types cannot reference a
+    SecureString). The heuristic is therefore applied to ResolvedValue, and
+    such a parameter is reported with fromSsm=True.
     """
     found = []
     for p in stack.get('Parameters') or []:
@@ -96,17 +103,24 @@ def plaintextSecretParams(stack):
         word = secretNameWord(key)
         if not word:
             continue
-        if p.get('UsePreviousValue') and 'ParameterValue' not in p:
-            continue
-        if 'ResolvedValue' in p:
-            continue
-        value = p.get('ParameterValue')
+        fromSsm = 'ResolvedValue' in p
+        if fromSsm:
+            value = p.get('ResolvedValue')
+        else:
+            if p.get('UsePreviousValue') and 'ParameterValue' not in p:
+                continue
+            value = p.get('ParameterValue')
         if not isinstance(value, str):
             continue
         if _looksLikeNonSecretValue(word, value):
             continue
-        found.append(key)
+        found.append((key, fromSsm))
     return found
+
+
+def plaintextSecretParams(stack):
+    """ParameterKeys from plaintextSecretParamDetails(stack)."""
+    return [key for key, _ in plaintextSecretParamDetails(stack)]
 
 
 class CloudformationStack(Evaluator):
@@ -399,16 +413,31 @@ class CloudformationStack(Evaluator):
         VALUE is never copied into the message, only its key.
         """
         params = self.stack.get('Parameters') or []
-        exposed = plaintextSecretParams(self.stack)
-        if exposed:
+        details = plaintextSecretParamDetails(self.stack)
+        direct = [k for k, fromSsm in details if not fromSsm]
+        viaSsm = [k for k, fromSsm in details if fromSsm]
+        if details:
+            parts = []
+            if direct:
+                parts.append(
+                    "secret-like parameter(s) " + self._joinNames(direct)
+                    + " in clear text (declare them NoEcho, or better, resolve "
+                    "the secret with a Secrets Manager or SSM SecureString "
+                    "dynamic reference)")
+            if viaSsm:
+                parts.append(
+                    "secret-like SSM parameter-type parameter(s) "
+                    + self._joinNames(viaSsm)
+                    + " resolved from a plain-text SSM String parameter, whose "
+                    "value DescribeStacks returns in clear text as ResolvedValue "
+                    "(store the secret as a SecureString or in Secrets Manager "
+                    "and use a {{resolve:ssm-secure:...}} or "
+                    "{{resolve:secretsmanager:...}} dynamic reference instead)")
             self.results['cfnPlaintextSecretParams'] = [
                 -1,
-                f"Stack '{self.name}' returns secret-like parameter(s) "
-                + self._joinNames(exposed)
-                + " in clear text — anyone allowed cloudformation:DescribeStacks "
-                "can read the value. Declare them NoEcho, or better, resolve the "
-                "secret from Secrets Manager or SSM SecureString with a dynamic "
-                "reference"
+                f"Stack '{self.name}' returns " + "; and ".join(parts)
+                + " — anyone allowed cloudformation:DescribeStacks can read the "
+                "value"
             ]
         elif params:
             self.results['cfnPlaintextSecretParams'] = [

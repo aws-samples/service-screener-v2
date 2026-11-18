@@ -137,7 +137,7 @@ def test_plaintext_secret_name_heuristics():
         {'ParameterKey': 'DbSecretArn', 'ParameterValue': 'arn:aws:secretsmanager:x'},
         {'ParameterKey': 'PasswordLength', 'ParameterValue': '16'},
         {'ParameterKey': 'SecretName', 'ParameterValue': 'prod/db'},
-        {'ParameterKey': 'TokenParam', 'ParameterValue': '/a/b', 'ResolvedValue': 'v'},
+        {'ParameterKey': 'TokenParam', 'ParameterValue': '/a/b', 'ResolvedValue': 'v'},  # too short
         {'ParameterKey': 'ClientSecret', 'ParameterValue': ''},
         {'ParameterKey': 'Environment', 'ParameterValue': 'prod'},
     ]}
@@ -195,3 +195,61 @@ def test_hooks_cloud_control_only_is_not_enabled_and_warn_is_noted():
     warn = '{"CloudFormationConfiguration":{"HookConfiguration":{"HookInvocationStatus":"ENABLED","FailureMode":"WARN","TargetOperations":["RESOURCE"]}}}'
     res = _run(CloudformationCommon(_hookPosture(warn)), '_checkCfnNoProactiveHooks')['cfnNoProactiveHooks']
     assert res[0] == 1 and 'WARN' in res[1]
+
+
+def test_plaintext_secret_ssm_typed_resolved_value_is_evaluated():
+    """Review finding: an AWS::SSM::Parameter::Value<String> parameter carries
+    the SSM NAME in ParameterValue and the plain-text VALUE in ResolvedValue,
+    which DescribeStacks returns to anyone allowed to call it. The value
+    heuristic must run on ResolvedValue (old code skipped it -> false PASS)."""
+    exposed = {'Parameters': [
+        {'ParameterKey': 'DbPassword', 'ParameterValue': '/app/db/password',
+         'ResolvedValue': 'hunter2-not-real'},
+        {'ParameterKey': 'Env', 'ParameterValue': 'prod'},
+    ]}
+    assert plaintextSecretParams(exposed) == ['DbPassword']
+    res = _run(CloudformationStack(dict(exposed, StackName='s'), None),
+               '_checkCfnPlaintextSecretParams')['cfnPlaintextSecretParams']
+    assert res[0] == -1
+    assert 'DbPassword' in res[1] and 'plain-text SSM String parameter' in res[1]
+    assert 'hunter2' not in res[1] and '/app/db/password' not in res[1]
+
+    ## Fixed: the stack resolves the secret through a dynamic reference, so no
+    ## secret-like parameter is left.
+    fixed = {'Parameters': [{'ParameterKey': 'Env', 'ParameterValue': 'prod'}]}
+    res = _run(CloudformationStack(dict(fixed, StackName='s'), None),
+               '_checkCfnPlaintextSecretParams')['cfnPlaintextSecretParams']
+    assert res[0] == 1
+
+    ## SSM-typed parameters whose resolved value is clearly not a secret stay PASS.
+    benign = {'Parameters': [
+        {'ParameterKey': 'ApiToken', 'ParameterValue': '/app/flag', 'ResolvedValue': 'true'},
+        {'ParameterKey': 'DbSecret', 'ParameterValue': '/app/arn',
+         'ResolvedValue': 'arn:aws:secretsmanager:us-east-1:111122223333:secret:db'},
+        {'ParameterKey': 'AdminPassword', 'ParameterValue': '/app/masked',
+         'ResolvedValue': '****'},
+    ]}
+    assert plaintextSecretParams(benign) == []
+
+
+def test_plaintext_secret_mixed_direct_and_ssm_message():
+    stack = {'StackName': 's', 'Parameters': [
+        {'ParameterKey': 'GitHubToken', 'ParameterValue': 'ghp_notreal'},
+        {'ParameterKey': 'DbPassword', 'ParameterValue': '/app/db/password',
+         'ResolvedValue': 'hunter2-not-real'},
+    ]}
+    res = _run(CloudformationStack(stack, None),
+               '_checkCfnPlaintextSecretParams')['cfnPlaintextSecretParams']
+    assert res[0] == -1 and 'GitHubToken' in res[1] and 'DbPassword' in res[1]
+    assert 'NoEcho' in res[1] and 'ResolvedValue' in res[1]
+
+
+def test_old_stack_with_ssm_resolved_secret_is_interesting():
+    """_isInteresting keeps an old stack whose SSM-resolved secret is exposed."""
+    svc = _svc(_client())
+    stack = {'StackName': 'old', 'StackStatus': 'CREATE_COMPLETE',
+             'DriftInformation': {'StackDriftStatus': 'NOT_CHECKED'},
+             'Parameters': [{'ParameterKey': 'DbPassword',
+                             'ParameterValue': '/app/db/password',
+                             'ResolvedValue': 'hunter2-not-real'}]}
+    assert svc._isInteresting(stack) is True

@@ -4,6 +4,7 @@ ssmSessionPrefsWeak. ssmNoAutomatedPatching needs managed instances, which the
 emulator cannot register, so it is covered in tests/test_stub_ssm.py."""
 import json
 
+import pytest
 from botocore.exceptions import ClientError
 
 from tests.emulator.conftest import assertFlagFixCycle, runCheck
@@ -102,6 +103,51 @@ def test_ssm_session_prefs_weak(emu):
         before, after = assertFlagFixCycle(emu, 'ssm', 'ssmSessionPrefsWeak',
                                            'SSM::Account', misconfigure, fix)
         assert all(s == 1 for s in after.values()), after
+    finally:
+        try:
+            ssm.delete_document(Name=SESSION_DOC)
+        except ClientError:
+            pass
+        if prior is not None:
+            ssm.create_document(Name=SESSION_DOC, DocumentType='Session',
+                                Content=prior)
+
+
+def _prefsDoc(**inputs):
+    return json.dumps({'schemaVersion': '1.0', 'description': 'prefs',
+                       'sessionType': 'Standard_Stream', 'inputs': inputs})
+
+
+@pytest.mark.parametrize('key,weak,good', [
+    ('ssmSessionManagerNoEncryption', {'kmsKeyId': ''},
+     {'kmsKeyId': 'alias/ss-session'}),
+    ('ssmSessionManagerNoCloudWatchLogs',
+     {'cloudWatchLogGroupName': '/ss/sessions', 'cloudWatchStreamingEnabled': False},
+     {'cloudWatchLogGroupName': '/ss/sessions', 'cloudWatchStreamingEnabled': True}),
+    ('ssmSessionManagerNoS3Logs', {'s3BucketName': ''},
+     {'s3BucketName': 'ss-session-archive'}),
+    ('ssmSessionManagerRunAsDisabled', {'runAsEnabled': False},
+     {'runAsEnabled': True, 'runAsDefaultUser': 'ops'}),
+])
+def test_ssm_session_manager_prefs_flag_fix(emu, key, weak, good):
+    ssm = emu.client('ssm')
+    try:
+        prior = ssm.get_document(Name=SESSION_DOC)['Content']
+    except ClientError:
+        prior = None
+    try:
+        def misconfigure():
+            if prior is not None:
+                ssm.delete_document(Name=SESSION_DOC)
+            ssm.create_document(Name=SESSION_DOC, DocumentType='Session',
+                                Content=_prefsDoc(**weak))
+
+        def fix():
+            ssm.delete_document(Name=SESSION_DOC)
+            ssm.create_document(Name=SESSION_DOC, DocumentType='Session',
+                                Content=_prefsDoc(**good))
+
+        assertFlagFixCycle(emu, 'ssm', key, 'SSM::Account', misconfigure, fix)
     finally:
         try:
             ssm.delete_document(Name=SESSION_DOC)
