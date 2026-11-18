@@ -8,6 +8,7 @@ botocore.stub.Stubber (so request/response shapes are validated against the
 service models) and then the real driver classes. Nothing leaves the process.
 """
 import datetime
+import json
 import os
 import sys
 
@@ -93,7 +94,10 @@ def _stubRole(st, attached=(), inline=None, boundary=None):
 
 
 ALLOW_ALL = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"*","Resource":"*"}]}'
-SCOPED = '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"*"}]}'
+# A genuinely least-privilege guest grant: read objects of ONE public bucket.
+# (s3:GetObject on Resource '*' would be anonymous read of every bucket.)
+SCOPED = ('{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":"s3:GetObject",'
+          '"Resource":"arn:aws:s3:::public-assets/*"}]}')
 
 
 # --------------------------------------------------------------------------- #
@@ -222,8 +226,11 @@ def test_policy_scope_rules():
     # arn:aws:s3:::* and NotResource are unscoped
     assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:*', 'Resource': 'arn:aws:s3:::*'}]}) == ["Action 's3:*'"]
     assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:*', 'NotResource': 'arn:aws:s3:::x'}]}) == ["Action 's3:*'"]
-    # partial wildcard is not broad
-    assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:Get*', 'Resource': '*'}]}) == []
+    # partial wildcard on all resources that covers data reads is broad (anonymous read of every bucket)
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:Get*', 'Resource': '*'}]}) == [
+        "Action 's3:Get*' on all resources, includes s3:GetObject"]
+    # ... but the same partial wildcard on one shared bucket is not
+    assert f({'Statement': [{'Effect': 'Allow', 'Action': 's3:Get*', 'Resource': 'arn:aws:s3:::pub/*'}]}) == []
 
 
 def test_guest_role_dynamodb_forallvalues_leading_keys_flag_then_fix(svc):
@@ -278,7 +285,7 @@ def test_guest_role_readonlyaccess_flagged(svc):
 def test_guest_role_allow_all_narrowed_by_deny_not_action(svc):
     m = '_checkCognitoIdentityPoolGuestRoleBroad'
     narrowed = ('{"Statement":[{"Effect":"Allow","Action":"*","Resource":"*"},'
-                '{"Effect":"Deny","NotAction":["mobileanalytics:PutEvents","s3:GetObject"],"Resource":"*"}]}')
+                '{"Effect":"Deny","NotAction":["mobileanalytics:PutEvents","polly:SynthesizeSpeech"],"Resource":"*"}]}')
     stillWide = ('{"Statement":[{"Effect":"Allow","Action":"*","Resource":"*"},'
                  '{"Effect":"Deny","NotAction":["s3:*"],"Resource":"*"}]}')
     conditional = ('{"Statement":[{"Effect":"Allow","Action":"*","Resource":"*"},'
@@ -290,6 +297,83 @@ def test_guest_role_allow_all_narrowed_by_deny_not_action(svc):
             _stubRole(st, inline=('p', doc))
             results.append(_run(CognitoIdentityPool(_guestPool(_unauthRole=svc._fetchRoleEvaluation(ROLE_ARN))), m)[0])
     assert results == [1, -1, -1]
+
+
+S3_READONLY = 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
+# Real AmazonS3ReadOnlyAccess v3 document
+S3_READONLY_DOC = ('{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:Get*","s3:List*",'
+                   '"s3:Describe*","s3-object-lambda:Get*","s3-object-lambda:List*"],"Resource":"*"}]}')
+DATA_READS_ON_STAR = ('{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":'
+                      '["dynamodb:Scan","secretsmanager:GetSecretValue"],"Resource":"*"}]}')
+
+
+def _guestResult(svc, **kw):
+    with Stubber(svc.iamClient) as st:
+        _stubRole(st, **kw)
+        role = svc._fetchRoleEvaluation(ROLE_ARN)
+    return _run(CognitoIdentityPool(_guestPool(_unauthRole=role)), '_checkCognitoIdentityPoolGuestRoleBroad')
+
+
+def test_guest_role_s3_readonly_and_data_reads_on_all_resources_fail_then_scoped_passes(svc):
+    """Regression (false PASS): AmazonS3ReadOnlyAccess (s3:Get*/s3:List* on '*') plus
+    dynamodb:Scan and secretsmanager:GetSecretValue on '*' let anyone on the internet
+    read every bucket, table and secret; the old code returned PASS."""
+    r = _guestResult(svc, attached=[(S3_READONLY, S3_READONLY_DOC)], inline=('data', DATA_READS_ON_STAR))
+    assert r[0] == -1, r
+    assert "AmazonS3ReadOnlyAccess: Action 's3:Get*' on all resources, includes s3:GetObject" in r[1]
+    assert "data: Action 'dynamodb:Scan' on all resources" in r[1]
+    # each grant alone is broad
+    r = _guestResult(svc, attached=[(S3_READONLY, S3_READONLY_DOC)])
+    assert r[0] == -1, r
+    for action in ('dynamodb:Scan', 'secretsmanager:GetSecretValue', 's3:GetObject', 'lambda:InvokeFunction'):
+        doc = json.dumps({'Statement': [{'Effect': 'Allow', 'Action': action, 'Resource': '*'}]})
+        r = _guestResult(svc, inline=('one', doc))
+        assert r[0] == -1 and f"Action '{action}' on all resources" in r[1], (action, r)
+    # fixed: read objects of one public bucket only
+    assert _guestResult(svc, inline=('scoped', SCOPED))[0] == 1
+
+
+def test_guest_role_every_resource_of_a_type_is_all_resources(svc):
+    """table/*, secret:* name every resource of the type; s3 '<bucket>/*' and
+    execute-api '<apiId>/*' are one shared resource."""
+    def doc(action, res):
+        return json.dumps({'Statement': [{'Effect': 'Allow', 'Action': action, 'Resource': res}]})
+    assert _guestResult(svc, inline=('p', doc('dynamodb:Scan', 'arn:aws:dynamodb:*:*:table/*')))[0] == -1
+    assert _guestResult(svc, inline=('p', doc(
+        'secretsmanager:GetSecretValue', f'arn:aws:secretsmanager:us-east-1:{ACCOUNT}:secret:*')))[0] == -1
+    assert _guestResult(svc, inline=('p', doc(
+        'dynamodb:Query', f'arn:aws:dynamodb:us-east-1:{ACCOUNT}:table/Catalog')))[0] == 1
+    assert _guestResult(svc, inline=('p', doc(
+        'execute-api:Invoke', f'arn:aws:execute-api:us-east-1:{ACCOUNT}:abc123/*')))[0] == 1
+
+
+def test_guest_role_safe_unknown_and_denied_actions(svc):
+    def doc(*stmts):
+        return json.dumps({'Version': '2012-10-17', 'Statement': list(stmts)})
+    allow = lambda a: {'Effect': 'Allow', 'Action': a, 'Resource': '*'}  # noqa: E731
+    deny = lambda a: {'Effect': 'Deny', 'Action': a, 'Resource': '*'}  # noqa: E731
+    # stateless guest actions on '*' (documented Amplify / Cognito patterns): PASS
+    r = _guestResult(svc, inline=('p', doc(allow(['mobileanalytics:PutEvents', 'polly:SynthesizeSpeech',
+                                                   'rekognition:Detect*', 'translate:TranslateText']))))
+    assert r[0] == 1 and 'no broad permissions' in r[1], r
+    # an action on '*' not known to be safe or sensitive: review, never PASS
+    r = _guestResult(svc, inline=('p', doc(allow(['mobileanalytics:PutEvents', 'iot:Connect']))))
+    assert r[0] == 0 and "iot:Connect" in r[1], r
+    # unconditional Deny of the named sensitive action removes it
+    assert _guestResult(svc, inline=('p', doc(allow('s3:GetObject'), deny('s3:GetObject'))))[0] == 1
+    assert _guestResult(svc, inline=('p', doc(allow('s3:Get*'), deny('s3:*'))))[0] == 1
+    # Allow '*' narrowed by Deny NotAction to a sensitive action on '*' stays broad
+    r = _guestResult(svc, inline=('p', doc(allow('*'), {'Effect': 'Deny', 'NotAction': [
+        'mobileanalytics:PutEvents', 's3:GetObject'], 'Resource': '*'})))
+    assert r[0] == -1 and "narrowed by Deny to 's3:GetObject'" in r[1], r
+
+
+def test_guest_role_boundary_allowing_data_reads_does_not_cap(svc):
+    bArn = f'arn:aws:iam::{ACCOUNT}:policy/guest-boundary'
+    wideBoundary = '{"Statement":[{"Effect":"Allow","Action":"s3:GetObject","Resource":"*"}]}'
+    r = _guestResult(svc, attached=[(ADMIN, ALLOW_ALL)], boundary=(bArn, wideBoundary))
+    assert r[0] == -1, r
+    assert _guestResult(svc, attached=[(ADMIN, ALLOW_ALL)], boundary=(bArn, SCOPED))[0] == 0
 
 
 def test_legacy_console_default_guest_role_message(svc):

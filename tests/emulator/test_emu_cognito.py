@@ -7,9 +7,15 @@ TRUST = json.dumps({'Version': '2012-10-17', 'Statement': [{
     'Effect': 'Allow', 'Principal': {'Federated': 'cognito-identity.amazonaws.com'},
     'Action': 'sts:AssumeRoleWithWebIdentity'}]})
 ADMIN = 'arn:aws:iam::aws:policy/AdministratorAccess'
-SCOPED = json.dumps({'Version': '2012-10-17', 'Statement': [{
-    'Effect': 'Allow', 'Action': ['mobileanalytics:PutEvents', 'cognito-sync:ListDatasets'],
-    'Resource': '*'}]})
+# Least-privilege guest role: analytics ingestion on '*' (no stored data) and
+# Cognito Sync on the caller's own identity only. (cognito-sync:ListDatasets on
+# '*' would list every identity's datasets.)
+SCOPED = json.dumps({'Version': '2012-10-17', 'Statement': [
+    {'Effect': 'Allow', 'Action': ['mobileanalytics:PutEvents'], 'Resource': '*'},
+    {'Effect': 'Allow', 'Action': ['cognito-sync:ListDatasets'],
+     'Resource': 'arn:aws:cognito-sync:us-east-1:000000000000:identitypool/'
+                 '${cognito-identity.amazonaws.com:aud}/identity/${cognito-identity.amazonaws.com:sub}/*'}]})
+S3_READONLY = 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess'
 
 
 def _silent(fn, *a, **kw):
@@ -51,6 +57,43 @@ def test_identity_pool_guest_role_admin_then_scoped(emu, uid):
         _silent(iam.detach_role_policy, RoleName=role, PolicyArn=ADMIN)
         _silent(iam.delete_role_policy, RoleName=role, PolicyName='scoped')
         _silent(iam.delete_role_policy, RoleName=role, PolicyName='broad')
+        _silent(iam.delete_role, RoleName=role)
+
+
+def test_identity_pool_guest_role_data_reads_on_all_resources_then_scoped(emu, uid):
+    """Regression (false PASS): AmazonS3ReadOnlyAccess plus dynamodb:Scan and
+    secretsmanager:GetSecretValue on '*' (anonymous read of every bucket, table and
+    secret) is flagged; object read on one public bucket is PASS."""
+    ci, iam = emu.client('cognito-identity'), emu.client('iam')
+    role = f'ss-guest5-{uid}'
+    arn = iam.create_role(RoleName=role, AssumeRolePolicyDocument=TRUST)['Role']['Arn']
+    ipid = ci.create_identity_pool(IdentityPoolName=f'ss_ip5_{uid}',
+                                   AllowUnauthenticatedIdentities=True)['IdentityPoolId']
+    try:
+        def misconfigure():
+            iam.attach_role_policy(RoleName=role, PolicyArn=S3_READONLY)
+            iam.put_role_policy(RoleName=role, PolicyName='data', PolicyDocument=json.dumps({
+                'Version': '2012-10-17', 'Statement': [{
+                    'Effect': 'Allow', 'Action': ['dynamodb:Scan', 'secretsmanager:GetSecretValue'],
+                    'Resource': '*'}]}))
+            ci.set_identity_pool_roles(IdentityPoolId=ipid, Roles={'unauthenticated': arn})
+
+        def fix():
+            iam.detach_role_policy(RoleName=role, PolicyArn=S3_READONLY)
+            iam.delete_role_policy(RoleName=role, PolicyName='data')
+            iam.put_role_policy(RoleName=role, PolicyName='scoped', PolicyDocument=json.dumps({
+                'Version': '2012-10-17', 'Statement': [{
+                    'Effect': 'Allow', 'Action': 's3:GetObject',
+                    'Resource': f'arn:aws:s3:::public-assets-{uid}/*'}]}))
+
+        before, after = assertFlagFixCycle(emu, 'cognito', 'cognitoIdentityPoolGuestRoleBroad', ipid,
+                                           misconfigure, fix)
+        assert list(after.values()) == [1]
+    finally:
+        _silent(ci.delete_identity_pool, IdentityPoolId=ipid)
+        _silent(iam.detach_role_policy, RoleName=role, PolicyArn=S3_READONLY)
+        _silent(iam.delete_role_policy, RoleName=role, PolicyName='data')
+        _silent(iam.delete_role_policy, RoleName=role, PolicyName='scoped')
         _silent(iam.delete_role, RoleName=role)
 
 
