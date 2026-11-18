@@ -461,6 +461,14 @@ class EcsTaskDefinition(Evaluator):
                 1, f"All {checked} probed secret reference(s) resolve"
             ]
 
+    def _sharedRead(self, client, op, **params):
+        """One read per (region, op, params) for the whole scan: the same secret or
+        parameter is often referenced by several containers and task definitions.
+        Only success / the raised ClientError matters, so the response (which may
+        hold a parameter value) is not kept."""
+        key = (client.meta.region_name, op, tuple(sorted(params.items())))
+        self._sharedMemo(key, lambda: getattr(client, op)(**params) and None)
+
     def _probeSecret(self, value_from):
         """
         Return 'ok' | 'broken' | 'unknown'.
@@ -480,7 +488,7 @@ class EcsTaskDefinition(Evaluator):
                 base = value_from.split(':secret:', 1)[0] + ':secret:' + \
                        value_from.split(':secret:', 1)[1].split(':', 1)[0]
                 try:
-                    self.secretsClient.describe_secret(SecretId=base)
+                    self._sharedRead(self.secretsClient, 'describe_secret', SecretId=base)
                     return 'ok'
                 except botocore.exceptions.ClientError as e:
                     code = e.response.get('Error', {}).get('Code', '')
@@ -493,7 +501,7 @@ class EcsTaskDefinition(Evaluator):
                 if not param_name.startswith('/'):
                     param_name = '/' + param_name
                 try:
-                    self.ssmClient.get_parameter(Name=param_name, WithDecryption=False)
+                    self._sharedRead(self.ssmClient, 'get_parameter', Name=param_name, WithDecryption=False)
                     return 'ok'
                 except botocore.exceptions.ClientError as e:
                     code = e.response.get('Error', {}).get('Code', '')
@@ -503,7 +511,7 @@ class EcsTaskDefinition(Evaluator):
             elif value_from.startswith('/') or not value_from.startswith('arn:'):
                 # Plain SSM parameter name
                 try:
-                    self.ssmClient.get_parameter(Name=value_from, WithDecryption=False)
+                    self._sharedRead(self.ssmClient, 'get_parameter', Name=value_from, WithDecryption=False)
                     return 'ok'
                 except botocore.exceptions.ClientError as e:
                     code = e.response.get('Error', {}).get('Code', '')

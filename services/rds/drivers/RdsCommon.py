@@ -106,10 +106,14 @@ class RdsCommon(Evaluator):
         details = Config.get(key, {})
         
         if not details:
-            versions = self.rdsClient.describe_db_engine_versions(
-                Engine=engine,
-                EngineVersion=engineVersion
-            )
+            # Only a found version is kept in Config; the read itself is shared
+            # so DBs on an unknown/deprecated version do not each re-query it.
+            versions = self._sharedMemo(
+                (self.rdsClient.meta.region_name, 'describe_db_engine_versions', engine, engineVersion),
+                lambda: self.rdsClient.describe_db_engine_versions(
+                    Engine=engine,
+                    EngineVersion=engineVersion
+                ))
             version = versions.get('DBEngineVersions')
             if not version:
                 self.results['EngineVersionMinor'] = [-1, "**DEPRECIATED**"]
@@ -122,53 +126,43 @@ class RdsCommon(Evaluator):
         self.enginePatches = details
         
     def loadParameterInfo(self):
-        arr = {}
-        
+        # Subclasses call this again from their own __init__, and many DBs
+        # share one parameter group: the collected values are read once per
+        # (region, parameter group) for the whole scan.
         if self.isCluster == False:
             paramGroupName = self.db['DBParameterGroups'][0]['DBParameterGroupName']
-            results = self.rdsClient.describe_db_parameters(
-                DBParameterGroupName = paramGroupName
-            )
-
-            for param in results.get('Parameters'):
-                if param.get('IsModifiable', True) == 1 and 'ParameterValue' in param:
-                    arr[param['ParameterName']] = param['ParameterValue']
-            
-            while results.get('Marker') is not None:
-                results = self.rdsClient.describe_db_parameters(
-                    DBParameterGroupName = paramGroupName,
-                    Marker = results.get('Marker')
-                )
-
-                for param in results.get('Parameters'):
-                    #__pr(param['ParameterName'] + ' = ' + param['ParameterValue'] + ' || ' + param['IsModifiable'])
-                    if param.get('IsModifiable', True) == 1 and 'ParameterValue' in param:
-                        arr[param['ParameterName']] = param['ParameterValue']
-            
-        else: 
+            op, nameKey = 'describe_db_parameters', 'DBParameterGroupName'
+        else:
             paramGroupName = self.db['DBClusterParameterGroup']
-            results = self.rdsClient.describe_db_cluster_parameters(
-                DBClusterParameterGroupName = paramGroupName
-            )
+            op, nameKey = 'describe_db_cluster_parameters', 'DBClusterParameterGroupName'
+
+        self.dbParams = self._sharedMemo(
+            (self.rdsClient.meta.region_name, op, paramGroupName),
+            lambda: self._collectModifiableParams(op, nameKey, paramGroupName))
+
+    def _collectModifiableParams(self, op, nameKey, paramGroupName):
+        fn = getattr(self.rdsClient, op)
+        arr = {}
+        results = fn(**{nameKey: paramGroupName})
+
+        for param in results.get('Parameters'):
+            if param.get('IsModifiable', True) == 1 and 'ParameterValue' in param:
+                arr[param['ParameterName']] = param['ParameterValue']
+
+        while results.get('Marker') is not None:
+            results = fn(**{nameKey: paramGroupName, 'Marker': results.get('Marker')})
 
             for param in results.get('Parameters'):
+                #__pr(param['ParameterName'] + ' = ' + param['ParameterValue'] + ' || ' + param['IsModifiable'])
                 if param.get('IsModifiable', True) == 1 and 'ParameterValue' in param:
                     arr[param['ParameterName']] = param['ParameterValue']
-            
-            while results.get('Marker') is not None:
-                results = self.rdsClient.describe_db_cluster_parameters(
-                    DBClusterParameterGroupName = paramGroupName,
-                    Marker = results.get('Marker')
-                )
+        return arr
 
-                for param in results.get('Parameters'):
-                    #__pr(param['ParameterName'] + ' = ' + param['ParameterValue'] + ' || ' + param['IsModifiable'])
-                    if param.get('IsModifiable', True) == 1 and 'ParameterValue' in param:
-                        arr[param['ParameterName']] = param['ParameterValue']
-            
-
-        self.dbParams = arr
-        del arr
+    # Cluster-level reads below are shared by the cluster's own driver and by
+    # every member instance driver (all carry DBClusterIdentifier), so they
+    # are fetched once per (region, cluster) for the whole scan.
+    def _clusterSharedMemo(self, op, clusterId, fn):
+        return self._sharedMemo((self.rdsClient.meta.region_name, op, clusterId), fn)
 
     ##Common Logic Belows
     ##All checks start from __check;
@@ -177,12 +171,15 @@ class RdsCommon(Evaluator):
             if self.db.get('DBClusterIdentifier', None) == None:
                 return
 
-            resp = self.rdsClient.describe_db_cluster_snapshots(
-                DBClusterIdentifier=self.db['DBClusterIdentifier'],
-                SnapshotType='public',
-                IncludePublic=True,
-                MaxRecords=20
-            )
+            clusterId = self.db['DBClusterIdentifier']
+            resp = self._clusterSharedMemo(
+                'describe_db_cluster_snapshots:public', clusterId,
+                lambda: self.rdsClient.describe_db_cluster_snapshots(
+                    DBClusterIdentifier=clusterId,
+                    SnapshotType='public',
+                    IncludePublic=True,
+                    MaxRecords=20
+                ))
             publicSnapshots = resp.get('DBClusterSnapshots')
         else:
             if self.db.get('DBInstanceIdentifier', None) == None:
@@ -355,26 +352,13 @@ class RdsCommon(Evaluator):
         
         if not instTypes:
             try:
-                results = self.rdsClient.describe_orderable_db_instance_options(
-                    # DBInstanceClass = self.db['DBInstanceClass'],
-                    Engine = self.db['Engine'],
-                    EngineVersion = self.db['EngineVersion'],
-                    MaxRecords = 20
-                )
-                
-                arr = []
-                for instClass in results.get('OrderableDBInstanceOptions'):
-                    arr.append(instClass['DBInstanceClass'])
-                
-                while results.get('Marker') is not None:
-                    results = self.rdsClient.describe_orderable_db_instance_options(
-                        Engine = self.db['Engine'],
-                        EngineVersion = self.db['EngineVersion'],
-                        Marker = results.get('Marker')
-                    )
-                    
-                    for instClass in results.get('OrderableDBInstanceOptions'):
-                        arr.append(instClass['DBInstanceClass'])
+                # Collected list shared per (region, engine, version): a failed
+                # read is not stored in Config, so without this every instance
+                # on that engine version would repeat it.
+                arr = self._sharedMemo(
+                    (self.rdsClient.meta.region_name, 'describe_orderable_db_instance_options',
+                     self.db['Engine'], self.db['EngineVersion']),
+                    self._collectOrderableInstanceClasses)
                 
                 instTypes = list(set(arr))
                 Config.set(key, instTypes)
@@ -405,6 +389,29 @@ class RdsCommon(Evaluator):
         if compressedLists[dbInstFamily] > dbInstGeneration:
             self.results['LatestInstanceGeneration'] = [-1, self.db['DBInstanceClass']]
     
+    def _collectOrderableInstanceClasses(self):
+        results = self.rdsClient.describe_orderable_db_instance_options(
+            # DBInstanceClass = self.db['DBInstanceClass'],
+            Engine = self.db['Engine'],
+            EngineVersion = self.db['EngineVersion'],
+            MaxRecords = 20
+        )
+
+        arr = []
+        for instClass in results.get('OrderableDBInstanceOptions'):
+            arr.append(instClass['DBInstanceClass'])
+
+        while results.get('Marker') is not None:
+            results = self.rdsClient.describe_orderable_db_instance_options(
+                Engine = self.db['Engine'],
+                EngineVersion = self.db['EngineVersion'],
+                Marker = results.get('Marker')
+            )
+
+            for instClass in results.get('OrderableDBInstanceOptions'):
+                arr.append(instClass['DBInstanceClass'])
+        return arr
+
     def _checkIsOpenSource(self):
         if self.isCluster == True:
             return
@@ -469,9 +476,9 @@ class RdsCommon(Evaluator):
         if 'DBClusterMembers' in self.db:
             members = self.db['DBClusterMembers']
         else:
-            resp = self.rdsClient.describe_db_clusters(
-                DBClusterIdentifier=cluster
-            )
+            resp = self._clusterSharedMemo(
+                'describe_db_clusters', cluster,
+                lambda: self.rdsClient.describe_db_clusters(DBClusterIdentifier=cluster))
             members = resp.get('DBClusters')[0].get('DBClusterMembers', [])
 
         if len(members) < 2 or len(members) > 7:
@@ -484,20 +491,25 @@ class RdsCommon(Evaluator):
     def _checkOldSnapshots(self):
         if self.db.get('DBClusterIdentifier'):
             identifier = self.db['DBClusterIdentifier']
-            result = self.rdsClient.describe_db_cluster_snapshots(
-                DBClusterIdentifier=identifier,
-                SnapshotType='manual'
-            )
-            
-            snapshots = result.get('DBClusterSnapshots')
-            while result.get('Marker') is not None:
+
+            def fetch():
                 result = self.rdsClient.describe_db_cluster_snapshots(
                     DBClusterIdentifier=identifier,
-                    SnapshotType='manual',
-                    Marker=result.get('Marker')
+                    SnapshotType='manual'
                 )
-                
-                snapshots = snapshots + result.get('DBSnapshots')
+
+                snapshots = result.get('DBClusterSnapshots')
+                while result.get('Marker') is not None:
+                    result = self.rdsClient.describe_db_cluster_snapshots(
+                        DBClusterIdentifier=identifier,
+                        SnapshotType='manual',
+                        Marker=result.get('Marker')
+                    )
+
+                    snapshots = snapshots + result.get('DBSnapshots')
+                return snapshots
+
+            snapshots = self._clusterSharedMemo('describe_db_cluster_snapshots:manual', identifier, fetch)
         else:
             identifier = self.db['DBInstanceIdentifier']
             result = self.rdsClient.describe_db_snapshots(

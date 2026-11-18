@@ -218,7 +218,7 @@ def resourcePolicyIssues(policyDoc, ownAccount):
 
 class DynamoDbCommon(Evaluator):
 
-    def __init__(self, tables, dynamoDbClient, cloudWatchClient, serviceQuotaClient, appScalingPolicyClient, backupClient, cloudTrailClient):
+    def __init__(self, tables, dynamoDbClient, cloudWatchClient, serviceQuotaClient, appScalingPolicyClient, backupClient, cloudTrailClient, tagsResp=None):
         super().__init__()
         self.tables = tables
         self.tablename = self.tables['Table']['TableName']
@@ -228,8 +228,40 @@ class DynamoDbCommon(Evaluator):
         self.appScalingPolicyClient = appScalingPolicyClient
         self.backupClient = backupClient
         self.cloudTrailClient = cloudTrailClient
+        # list_tags_of_resource(ResourceArn=...) response already fetched by
+        # Dynamodb.list_tables() when tag filtering is on; None otherwise.
+        self._tagsResp = tagsResp
 
         self._resourceName = self.tablename
+
+    # ---- read-once API helpers shared by several checks ---- #
+    def _tagsFirstPage(self, arn):
+        """list_tags_of_resource(ResourceArn=arn) - first page, fetched once."""
+        if self._tagsResp is not None and arn == self.tables['Table'].get('TableArn'):
+            return self._memo(('list_tags_of_resource', arn), lambda: self._tagsResp)
+        return self._memo(('list_tags_of_resource', arn),
+                          lambda: self.dynamoDbClient.list_tags_of_resource(ResourceArn=arn))
+
+    def _scalingPolicies(self):
+        resourceId = 'table/' + self.tables['Table']['TableName']
+        return self._memo(('describe_scaling_policies', resourceId),
+                          lambda: self.appScalingPolicyClient.describe_scaling_policies(
+                              ServiceNamespace='dynamodb', ResourceId=resourceId))
+
+    def _consumedWcu7Days(self):
+        """ConsumedWriteCapacityUnits, hourly Average over the past 7 days."""
+        def fetch():
+            return self.cloudWatchClient.get_metric_statistics(
+                Namespace='AWS/DynamoDB',
+                MetricName='ConsumedWriteCapacityUnits',
+                Dimensions=[{'Name': 'TableName', 'Value': self.tables['Table']['TableName']}],
+                StartTime=datetime.datetime.now() - datetime.timedelta(7),
+                EndTime=datetime.datetime.now(),
+                Period=3600,
+                Statistics=['Average'],
+                Unit='Count'
+            )
+        return self._memo(('get_metric_statistics', 'ConsumedWriteCapacityUnits', 3600, 'Average', 7), fetch)
 
     # logic to check delete protection    
     def _check_delete_protection(self):
@@ -248,7 +280,7 @@ class DynamoDbCommon(Evaluator):
         #print('Checking ' + self.tables['Table']['TableName'] + ' for resource tag started')
         try:
             #retrieve tags for specific table by tableARN
-            result = self.dynamoDbClient.list_tags_of_resource(ResourceArn = self.tables['Table']['TableArn'])
+            result = self._tagsFirstPage(self.tables['Table']['TableArn'])
             #check tags
             if not result['Tags']:
                 self.results['resourcesWithoutTags'] = [-1, '']
@@ -389,23 +421,7 @@ class DynamoDbCommon(Evaluator):
     def _check_capacity_mode(self):
         try:
             #Count the number active reads on the table on the GSIs
-            result = self.cloudWatchClient.get_metric_statistics(
-                Namespace = 'AWS/DynamoDB',
-                MetricName = 'ConsumedWriteCapacityUnits',
-                Dimensions = [
-                       {
-                            'Name':'TableName',
-                            'Value':self.tables['Table']['TableName']
-                        },
-                    ],
-                StartTime = datetime.datetime.now() - datetime.timedelta(7),
-                EndTime = datetime.datetime.now(),
-                Period = 3600,
-                Statistics = [
-                    'Average'
-                ], 
-                Unit = 'Count'
-            )
+            result = self._consumedWcu7Days()
         
             #Calculate % of write capacity in the given hour
             _percentageWrite = 0  
@@ -436,10 +452,7 @@ class DynamoDbCommon(Evaluator):
         try:
 
             #Check for autoscaling policy in each table
-            results = self.appScalingPolicyClient.describe_scaling_policies(
-                ServiceNamespace = 'dynamodb',
-                ResourceId = 'table/' + self.tables['Table']['TableName']
-                )
+            results = self._scalingPolicies()
             
             #If results comes back with record, autoscaling is enabled
             if len(results['ScalingPolicies']) == 0:
@@ -550,23 +563,7 @@ class DynamoDbCommon(Evaluator):
             )
             
             #Count the number active reads on the table WCU
-            wcuResult = self.cloudWatchClient.get_metric_statistics(
-                Namespace = 'AWS/DynamoDB',
-                MetricName = 'ConsumedWriteCapacityUnits',
-                Dimensions = [
-                        {
-                            'Name':'TableName',
-                            'Value':self.tables['Table']['TableName']
-                        },
-                    ],
-                StartTime = _startTime,
-                EndTime = _endTime,
-                Period = 3600,
-                Statistics = [
-                    'Average',
-                ],
-                Unit = 'Count'
-            )
+            wcuResult = self._consumedWcu7Days()
             
             _rcuLimitCount = 0
             _wcuLimitCount = 0
@@ -593,10 +590,7 @@ class DynamoDbCommon(Evaluator):
     # logic to check autoscaling aggresiveness
     def _check_autoscaling_aggresiveness(self):
         try:
-            results = self.appScalingPolicyClient.describe_scaling_policies(
-                ServiceNamespace = 'dynamodb',
-                ResourceId = 'table/' + self.tables['Table']['TableName']
-            )
+            results = self._scalingPolicies()
             
             
             if len(results['ScalingPolicies']) > 0:
@@ -851,7 +845,11 @@ class DynamoDbCommon(Evaluator):
             tags = []
             kwargs = {'ResourceArn': tableArn}
             while True:
-                resp = self.dynamoDbClient.list_tags_of_resource(**kwargs)
+                # First page is shared with _check_resources_for_tags; later pages are fetched here.
+                if 'NextToken' in kwargs:
+                    resp = self.dynamoDbClient.list_tags_of_resource(**kwargs)
+                else:
+                    resp = self._tagsFirstPage(tableArn)
                 tags.extend(resp.get('Tags', []) or [])
                 if not resp.get('NextToken'):
                     break
