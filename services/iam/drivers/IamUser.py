@@ -81,7 +81,9 @@ class IamUser(IamCommon):
                 self.results['userNotUsingGroup'] = [-1, '-']
         else:
             try:
-                resp = self.iamClient.list_groups_for_user(UserName=user)
+                # First page of the list_groups_for_user paginator (same request),
+                # shared with _userPolicyDocs().
+                resp = next(self._pages(self.iamClient, 'list_groups_for_user', UserName=user))
                 groups = resp.get('Groups')
                 if not groups:
                     self.results['userNotUsingGroup'] = [-1, '-']
@@ -102,11 +104,12 @@ class IamUser(IamCommon):
                 self.evaluateInlinePolicyFromDocs(inlinePolicies)
         else:
             try:
-                resp = self.iamClient.list_attached_user_policies(UserName=user)
+                # First pages of the paginators shared with _userPolicyDocs() (same requests).
+                resp = next(self._pages(self.iamClient, 'list_attached_user_policies', UserName=user))
                 policies = resp.get('AttachedPolicies')
                 self.evaluateManagePolicy(policies)
                 
-                resp = self.iamClient.list_user_policies(UserName=user)
+                resp = next(self._pages(self.iamClient, 'list_user_policies', UserName=user))
                 inlinePolicies = resp.get('PolicyNames')
                 self.evaluateInlinePolicy(inlinePolicies, user, 'user')
             except botocore.exceptions.ClientError as e:
@@ -351,12 +354,12 @@ class IamUser(IamCommon):
         else:
             user = self.user['user']
             try:
-                for page in self.iamClient.get_paginator('list_user_policies').paginate(UserName=user):
+                for page in self._pages(self.iamClient, 'list_user_policies', UserName=user):
                     for name in page.get('PolicyNames', []):
-                        docs.append(self.iamClient.get_user_policy(UserName=user, PolicyName=name)['PolicyDocument'])
-                for page in self.iamClient.get_paginator('list_attached_user_policies').paginate(UserName=user):
+                        docs.append(self._inlinePolicy('user', user, name)['PolicyDocument'])
+                for page in self._pages(self.iamClient, 'list_attached_user_policies', UserName=user):
                     attached.extend(page.get('AttachedPolicies', []))
-                for page in self.iamClient.get_paginator('list_groups_for_user').paginate(UserName=user):
+                for page in self._pages(self.iamClient, 'list_groups_for_user', UserName=user):
                     for g in page.get('Groups', []):
                         gname = g['GroupName']
                         for gp in self.iamClient.get_paginator('list_group_policies').paginate(GroupName=gname):
@@ -376,8 +379,8 @@ class IamUser(IamCommon):
             doc = self._policyDocumentMap.get(arn)
             if doc is None:
                 try:
-                    ver = self.iamClient.get_policy(PolicyArn=arn)['Policy']['DefaultVersionId']
-                    doc = self.iamClient.get_policy_version(PolicyArn=arn, VersionId=ver)['PolicyVersion']['Document']
+                    ver = self._iamPolicy(arn)['Policy']['DefaultVersionId']
+                    doc = self._iamPolicyVersion(arn, ver)['PolicyVersion']['Document']
                 except (botocore.exceptions.ClientError, KeyError):
                     unreadable.append(p.get('PolicyName') or arn)
                     continue

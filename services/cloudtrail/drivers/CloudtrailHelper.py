@@ -47,6 +47,20 @@ def ownedBucketNames(s3Client):
         return cached
 
 
+def trailStatus(ev, ctClient, arn):
+    """ctClient.get_trail_status(Name=arn), read once per scan: the per-trail
+    CloudtrailCommon driver and CloudtrailAccount both need it."""
+    return ev._sharedMemo(('cloudtrail.get_trail_status', ctClient.meta.region_name, arn),
+                          lambda: ctClient.get_trail_status(Name=arn))
+
+
+def trailEventSelectors(ev, ctClient, arn):
+    """ctClient.get_event_selectors(TrailName=arn), read once per scan: the
+    per-trail CloudtrailCommon driver and CloudtrailAccount both need it."""
+    return ev._sharedMemo(('cloudtrail.get_event_selectors', ctClient.meta.region_name, arn),
+                          lambda: ctClient.get_event_selectors(TrailName=arn))
+
+
 _POSITIVE_OPS = ('Equals', 'StartsWith', 'EndsWith')
 
 

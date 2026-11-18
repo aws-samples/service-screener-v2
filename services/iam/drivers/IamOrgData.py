@@ -8,6 +8,7 @@ Every getter returns (value, errorCode). errorCode is None on success, else the
 botocore error code (e.g. AccessDeniedException) so the calling check can
 record [0, ...] instead of silently passing.
 """
+import copy
 import fnmatch
 import json
 import threading
@@ -59,6 +60,23 @@ class OrgData:
         for page in self.orgClient.get_paginator(op).paginate(**kw):
             out.extend(page.get(resultKey, []))
         return out
+
+    def listChildren(self, op, resultKey, **kw):
+        """_paginate() fetched at most once per (op, args): tree(), ous() and
+        IamAccount._checkOrgOuStructureFlat list the children of the same
+        parents. A raised exception is cached and re-raised to every caller,
+        as if each had made the call itself. Each caller gets its own copy."""
+        key = ('list', op, resultKey, tuple(sorted(kw.items())))
+        with self._lock:
+            if key not in self._cache:
+                try:
+                    self._cache[key] = (True, self._paginate(op, resultKey, **kw))
+                except Exception as e:
+                    self._cache[key] = (False, e)
+            ok, value = self._cache[key]
+        if not ok:
+            raise value
+        return copy.deepcopy(value)
 
     # ------------------------------------------------------------------ #
     def organization(self):
@@ -140,10 +158,10 @@ class OrgData:
             stack = [rootId]
             while stack:
                 parent = stack.pop()
-                for ou in self._paginate('list_organizational_units_for_parent', 'OrganizationalUnits', ParentId=parent):
+                for ou in self.listChildren('list_organizational_units_for_parent', 'OrganizationalUnits', ParentId=parent):
                     nodes[ou['Id']] = {'Type': 'ORGANIZATIONAL_UNIT', 'Name': ou.get('Name', ou['Id']), 'Parent': parent}
                     stack.append(ou['Id'])
-                for acc in self._paginate('list_accounts_for_parent', 'Accounts', ParentId=parent):
+                for acc in self.listChildren('list_accounts_for_parent', 'Accounts', ParentId=parent):
                     nodes[acc['Id']] = {'Type': 'ACCOUNT', 'Name': acc.get('Name', acc['Id']), 'Parent': parent,
                                         'State': acc.get('State') or acc.get('Status')}
             return {'rootId': rootId, 'nodes': nodes}
@@ -167,7 +185,7 @@ class OrgData:
             stack = [(roots[0]['Id'], roots[0].get('Name', 'Root'))]
             while stack:
                 parent, path = stack.pop()
-                for ou in self._paginate('list_organizational_units_for_parent', 'OrganizationalUnits', ParentId=parent):
+                for ou in self.listChildren('list_organizational_units_for_parent', 'OrganizationalUnits', ParentId=parent):
                     ouPath = '{}/{}'.format(path, ou.get('Name', ou['Id']))
                     out[ou['Id']] = {'Name': ou.get('Name', ou['Id']), 'Parent': parent, 'Path': ouPath}
                     stack.append((ou['Id'], ouPath))

@@ -90,11 +90,12 @@ class IamRole(IamCommon):
                 self.evaluateInlinePolicyFromDocs(inlinePolicies)
         else:
             # Fallback to API calls
-            resp = self.iamClient.list_attached_role_policies(RoleName=role)
+            # First pages of the paginators shared with _adminLevelPolicies() (same requests).
+            resp = next(self._pages(self.iamClient, 'list_attached_role_policies', RoleName=role))
             policies = resp.get('AttachedPolicies')
             self.evaluateManagePolicy(policies)
             
-            resp = self.iamClient.list_role_policies(RoleName=role)
+            resp = next(self._pages(self.iamClient, 'list_role_policies', RoleName=role))
             inlinePolicies = resp.get('PolicyNames')
             self.evaluateInlinePolicy(inlinePolicies, role, 'role')
 
@@ -179,7 +180,7 @@ class IamRole(IamCommon):
         try:
             if attached is None:
                 attached = []
-                for page in self.iamClient.get_paginator('list_attached_role_policies').paginate(RoleName=self.role['RoleName']):
+                for page in self._pages(self.iamClient, 'list_attached_role_policies', RoleName=self.role['RoleName']):
                     attached.extend(page.get('AttachedPolicies', []))
             for p in attached:
                 if p.get('PolicyName') in self.ADMIN_MANAGED_POLICY_NAMES:
@@ -187,16 +188,15 @@ class IamRole(IamCommon):
                     continue
                 doc = self._policyDocumentMap.get(p.get('PolicyArn'))
                 if doc is None:
-                    pol = self.iamClient.get_policy(PolicyArn=p['PolicyArn'])['Policy']
-                    doc = self.iamClient.get_policy_version(PolicyArn=p['PolicyArn'],
-                                                            VersionId=pol['DefaultVersionId'])['PolicyVersion']['Document']
+                    pol = self._iamPolicy(p['PolicyArn'])['Policy']
+                    doc = self._iamPolicyVersion(p['PolicyArn'], pol['DefaultVersionId'])['PolicyVersion']['Document']
                 if isAdminLevelDocument(parseDocument(doc)):
                     found.append(p['PolicyName'])
             if inline is None:
                 inline = []
-                for page in self.iamClient.get_paginator('list_role_policies').paginate(RoleName=self.role['RoleName']):
+                for page in self._pages(self.iamClient, 'list_role_policies', RoleName=self.role['RoleName']):
                     for name in page.get('PolicyNames', []):
-                        doc = self.iamClient.get_role_policy(RoleName=self.role['RoleName'], PolicyName=name)['PolicyDocument']
+                        doc = self._inlinePolicy('role', self.role['RoleName'], name)['PolicyDocument']
                         inline.append({'PolicyName': name, 'PolicyDocument': doc})
             for p in inline:
                 if isAdminLevelDocument(parseDocument(p.get('PolicyDocument'))):

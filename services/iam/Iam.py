@@ -39,6 +39,8 @@ class Iam(Service):
         self._authDetails = None
         self._policyDocumentMap = None
         self._bedrockCredentialMap = None
+        # get_credential_report() response read by getUsers(), reused by IamAccount
+        self._credentialReport = None
 
     def _prefetchBedrockApiKeys(self):
         """List long-term Amazon Bedrock API keys (service-specific credentials) for all users in one call"""
@@ -182,6 +184,7 @@ class Iam(Service):
             print('IAM Users scan will be skip, unable to acquire IamCredentialReports')
             return []
         
+        self._credentialReport = results
         rows = results.get('Content')
         rows = rows.decode('UTF-8')
         
@@ -279,9 +282,10 @@ class Iam(Service):
 
         ## Org membership for third-party trust classification (read-only,
         ## describe_organization + list_accounts, each called once).
-        trustContext = buildTrustContext(
-            OrgData(self.awsClients['orgClient'], accountId if accountId != 'default' else None),
-            accountId if accountId != 'default' else None)
+        ## The same OrgData (cached) is handed to IamAccount, so these reads are
+        ## not repeated there.
+        orgData = OrgData(self.awsClients['orgClient'], accountId if accountId != 'default' else None)
+        trustContext = buildTrustContext(orgData, accountId if accountId != 'default' else None)
 
         for role in roles:
             _pi('IAM::Role', role['RoleName'])
@@ -316,7 +320,8 @@ class Iam(Service):
             del obj
         
         _pi('IAM:Account')
-        obj = IamAccount(None, self.awsClients, users, roles, self.ssBoto, self._authDetails, self._policyDocumentMap)
+        obj = IamAccount(None, self.awsClients, users, roles, self.ssBoto, self._authDetails, self._policyDocumentMap,
+                         orgData=orgData, credentialReport=self._credentialReport)
         obj.run(self.__class__)
         objs['Account::Config'] = obj.getInfo()
         
