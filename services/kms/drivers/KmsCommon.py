@@ -60,6 +60,90 @@ def orgConditionScopes(condition):
     return False
 
 
+# Condition keys that identify the CALLER's account (directly or through the
+# caller ARN). If any of them confines the caller to the key's own account the
+# wildcard statement cannot grant cross-account access (condition keys are AND-ed).
+_CALLER_ACCOUNT_KEYS = ('kms:calleraccount', 'aws:principalaccount')
+_CALLER_ARN_KEYS = ('aws:principalarn',)
+# Keys that identify the account of the SOURCE resource a service acts for.
+_SOURCE_ACCOUNT_KEYS = ('aws:sourceaccount', 'aws:sourceowner')
+_SOURCE_ARN_KEYS = ('aws:sourcearn',)
+
+
+def wildcardConditionAccounts(condition):
+    """Accounts named by the scoping condition of a wildcard-principal statement.
+
+    Mirrors PolicyPrincipal.conditionScopes: only positive-match operators
+    whose every value is concrete are considered (IfExists / negated /
+    ForAllValues and wildcarded values do not restrict anything).
+
+    Returns (callerSets, otherAccounts):
+      callerSets    -- list of account sets, one per caller-identity key
+                       (kms:CallerAccount, aws:PrincipalAccount, aws:PrincipalArn)
+      otherAccounts -- accounts named by source keys (aws:SourceAccount,
+                       aws:SourceOwner, aws:SourceArn)
+    """
+    callerSets, otherAccounts = [], set()
+    if not isinstance(condition, dict):
+        return callerSets, otherAccounts
+    for operator, block in condition.items():
+        if not isinstance(operator, str) or not isinstance(block, dict):
+            continue
+        op = operator.lower()
+        if op.startswith('forallvalues:'):
+            continue
+        if op.startswith('foranyvalue:'):
+            op = op[len('foranyvalue:'):]
+        if op not in PolicyPrincipal.SCOPING_OPERATORS:
+            continue
+        for key, value in block.items():
+            k = str(key).lower()
+            values = value if isinstance(value, list) else [value]
+            if not values or not all(PolicyPrincipal._valueScopes(k, v) for v in values):
+                continue
+            if k in _CALLER_ACCOUNT_KEYS or k in _SOURCE_ACCOUNT_KEYS:
+                accounts = set(values)
+            elif k in _CALLER_ARN_KEYS or k in _SOURCE_ARN_KEYS:
+                accounts = {v.split(':', 5)[4] for v in values if v.split(':', 5)[4]}
+                if len(accounts) != len(values):
+                    ## An account-less ARN (S3 bucket) does not name an account.
+                    accounts = None
+            else:
+                continue
+            if accounts is None:
+                continue
+            if k in _CALLER_ACCOUNT_KEYS or k in _CALLER_ARN_KEYS:
+                callerSets.append(accounts)
+            else:
+                otherAccounts |= accounts
+    return callerSets, otherAccounts
+
+
+def wildcardAccountScope(condition, keyAccount):
+    """Classify the account boundary of a condition-scoped wildcard principal.
+
+    Returns (external, ownOnly):
+      external -- accounts other than keyAccount named by an account-bearing
+                  scoping key (empty when the caller is confined to keyAccount)
+      ownOnly  -- True when a caller-identity key confines the caller to
+                  keyAccount, or every account named is keyAccount
+    Both empty/False means the condition names no account at all (for
+    example only aws:SourceVpce or an S3 aws:SourceArn)."""
+    callerSets, otherAccounts = wildcardConditionAccounts(condition)
+    if any(s and s <= {keyAccount} for s in callerSets):
+        return set(), True
+    named = set(otherAccounts)
+    for s in callerSets:
+        named |= s
+    external = {a for a in named if a != keyAccount}
+    return external, bool(named) and not external
+
+
+def wildcardExternalAccounts(condition, keyAccount):
+    """External accounts a condition-scoped wildcard principal is opened to."""
+    return wildcardAccountScope(condition, keyAccount)[0]
+
+
 class KmsCommon(Evaluator):
     def __init__(self, kms, kmsClient):
         self.dbParams = {}
@@ -239,6 +323,31 @@ class KmsCommon(Evaluator):
         has_put_key_policy = False
         has_schedule_key_deletion = False
         
+        undetermined_wildcards = []
+
+        def addScopedWildcard(sid, condition):
+            ## A wildcard principal scoped by kms:CallerAccount / aws:PrincipalAccount /
+            ## aws:SourceAccount (or an ARN key) to ANOTHER account is cross-account access.
+            external, ownOnly = wildcardAccountScope(condition, key_account)
+            if ownOnly:
+                return
+            orgScoped = orgConditionScopes(condition)
+            for acct in sorted(external):
+                entry = f"Statement {sid}: * (condition-scoped to account {acct})"
+                if orgScoped:
+                    org_scoped_cross_account.append(entry)
+                else:
+                    cross_account_principals.append(entry)
+            if external:
+                return
+            if orgScoped:
+                ## Open to every account in the organization.
+                org_scoped_cross_account.append(f"Statement {sid}: * (organization-scoped)")
+            else:
+                ## Scoped only by network path / account-less source ARN: the
+                ## caller's account cannot be determined from the policy.
+                undetermined_wildcards.append(f"Statement {sid}: *")
+
         if 'allow' in parseInfo:
             ## Build Admin List and perform security checks
             for sid, arr in parseInfo['allow'].items():
@@ -252,6 +361,8 @@ class KmsCommon(Evaluator):
                     if arr['Principal'] == '*':
                         if not wildcard_scoped:
                             wildcard_principals.append(f"Statement {sid}: Principal is *")
+                        else:
+                            addScopedWildcard(sid, condition)
                     elif isinstance(arr['Principal'], dict):
                         if 'AWS' in arr['Principal']:
                             aws_principals = arr['Principal']['AWS']
@@ -265,6 +376,8 @@ class KmsCommon(Evaluator):
                                 if principal == '*':
                                     if not wildcard_scoped:
                                         wildcard_principals.append(f"Statement {sid}: AWS Principal is *")
+                                    else:
+                                        addScopedWildcard(sid, condition)
                                 # Check for root access ("arn:...:root" or the bare account ID form)
                                 elif f":iam::{key_account}:root" in principal or principal == key_account:
                                     has_root_access = True
@@ -365,6 +478,8 @@ class KmsCommon(Evaluator):
         # Tier 1: New security checks
         if cross_account_principals:
             self.results['KeyPolicyCrossAccount'] = [-1, "<br>".join(cross_account_principals)]
+        elif undetermined_wildcards:
+            self.results['KeyPolicyCrossAccount'] = [0, "Unable to evaluate (wildcard principal scoped without an account condition; caller account cannot be determined): " + "<br>".join(undetermined_wildcards + org_scoped_cross_account)]
         elif org_scoped_cross_account:
             self.results['KeyPolicyCrossAccount'] = [1, "Cross-account access restricted by aws:PrincipalOrgID/aws:PrincipalOrgPaths: " + "<br>".join(org_scoped_cross_account)]
         else:
@@ -469,10 +584,14 @@ class KmsCommon(Evaluator):
                                 aws_principals = [aws_principals]
                             
                             for principal in aws_principals:
-                                if ':iam::' in principal:
+                                if principal == '*':
+                                    external_accounts |= wildcardExternalAccounts(arr.get('Condition'), key_account)
+                                elif ':iam::' in principal:
                                     principal_account = principal.split(':')[4]
                                     if principal_account != key_account:
                                         external_accounts.add(principal_account)
+                    elif arr.get('Principal') == '*':
+                        external_accounts |= wildcardExternalAccounts(arr.get('Condition'), key_account)
             
             # Check 2: Cross-account grants
             try:
