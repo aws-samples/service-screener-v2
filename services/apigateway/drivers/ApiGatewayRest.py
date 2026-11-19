@@ -18,8 +18,17 @@ class ApiGatewayRest(Evaluator):
         return
 
     ## Read-once helpers: several checks need the same API Gateway data. Each
-    ## returns the same response the inline call used to return (first page
-    ## only, as before) and re-raises the same exception to every caller.
+    ## re-raises the same exception to every caller. Collection reads
+    ## (resources, authorizers, domain names, base path mappings, usage plans)
+    ## default to 25 items per page, so they follow 'position' to the last page
+    ## and return {'items': [...all pages...]}; reading only the first page
+    ## would miss e.g. an unauthenticated method on resource #26 (false PASS).
+    def _allItems(self, operation, **kwargs):
+        items = []
+        for page in self.apiClient.get_paginator(operation).paginate(**kwargs):
+            items.extend(page.get('items', []) or [])
+        return {'items': items}
+
     def _region(self):
         return self.apiClient.meta.region_name
 
@@ -33,7 +42,7 @@ class ApiGatewayRest(Evaluator):
 
     def _resources(self):
         return self._memo(('get_resources', self.api['id']),
-                          lambda: self.apiClient.get_resources(restApiId=self.api['id']))
+                          lambda: self._allItems('get_resources', restApiId=self.api['id']))
 
     def _method(self, resourceId, httpMethod):
         return self._memo(('get_method', self.api['id'], resourceId, httpMethod),
@@ -43,20 +52,20 @@ class ApiGatewayRest(Evaluator):
 
     def _authorizers(self):
         return self._memo(('get_authorizers', self.api['id']),
-                          lambda: self.apiClient.get_authorizers(restApiId=self.api['id']))
+                          lambda: self._allItems('get_authorizers', restApiId=self.api['id']))
 
     ## Account/region-level data, identical for every REST API in the region.
     def _domainNames(self):
         return self._sharedMemo(('apigateway', self._region(), 'get_domain_names'),
-                                lambda: self.apiClient.get_domain_names())
+                                lambda: self._allItems('get_domain_names'))
 
     def _basePathMappings(self, domainName):
         return self._sharedMemo(('apigateway', self._region(), 'get_base_path_mappings', domainName),
-                                lambda: self.apiClient.get_base_path_mappings(domainName=domainName))
+                                lambda: self._allItems('get_base_path_mappings', domainName=domainName))
 
     def _usagePlans(self):
         return self._sharedMemo(('apigateway', self._region(), 'get_usage_plans'),
-                                lambda: self.apiClient.get_usage_plans())
+                                lambda: self._allItems('get_usage_plans'))
 
     def _alarmsForMetric(self, cloudwatch, metricName, apiName):
         return self._memo(('describe_alarms_for_metric', cloudwatch.meta.region_name, metricName, apiName),

@@ -54,6 +54,15 @@ class Codedeploy(Service):
             pending = set(self.registerItems('CodedeployDeploymentGroup', ids))
             toFetch = [n for n in names if f"{app}/{n}" in pending]
 
+            ## Already-checkpointed groups are not re-read, but still need a
+            ## lightweight entry so advise() builds the driver and
+            ## Evaluator.run() restores their cached results (otherwise a
+            ## resumed scan silently drops them from the report).
+            for n in names:
+                if f"{app}/{n}" not in pending:
+                    groups.append({'applicationName': app, 'deploymentGroupName': n,
+                                   '_region': self.region})
+
             for info in self._getDeploymentGroups(app, toFetch):
                 if self.tags and not info.get('_error'):
                     tags = self._getTags(app, info.get('deploymentGroupName'))
