@@ -53,10 +53,19 @@ def test_ou_structure_flat(emu, uid):
         created.append(ou['OrganizationalUnit']['Id'])
 
     try:
-        _, after = assertFlagFixCycle(emu, 'iam', 'orgOuStructureFlat', RES, misconfigure, fix)
-        # list_accounts_for_parent is NotImplemented in the emulator, so with an
-        # OU present the check must say it cannot evaluate - never a silent PASS.
-        assert after == {RES: 0}
+        misconfigure()
+        before = runCheck(emu, 'iam', 'orgOuStructureFlat', RES)
+        assert before.statuses() == {RES: -1}, before.results
+        fix()
+        # The PASS state needs list_accounts_for_parent, which the emulator
+        # does not implement (NotImplemented), so here the check must say it
+        # cannot evaluate - never a silent PASS. FAIL -> PASS with real API
+        # shapes is proven by the Stubber tests
+        # tests/test_stub_iam_org.py::TestOuStructureFlat and
+        # tests/test_stub_iam_review_fixes.py::TestOrgOuStructureFlatPass.
+        after = runCheck(emu, 'iam', 'orgOuStructureFlat', RES)
+        assert after.statuses() == {RES: 0}, after.results
+        assert after.results[RES]['orgOuStructureFlat'] == [0, 'Unable to evaluate (NotImplemented)']
     finally:
         for ouId in created:
             org.delete_organizational_unit(OrganizationalUnitId=ouId)

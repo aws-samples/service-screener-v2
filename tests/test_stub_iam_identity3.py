@@ -315,11 +315,15 @@ class TestLongTermKeyNotContained:
         assert u.results[self.K][0] == 1
 
     def test_fix_by_boundary(self):
+        # The boundary is read and must itself tie the key to a network
+        # (a boundary's presence alone contains nothing).
         arn = f'arn:aws:iam::{ACCOUNT}:policy/boundary'
+        boundaryDoc = {'Version': '2012-10-17', 'Statement': [
+            {'Effect': 'Allow', 'Action': '*', 'Resource': '*'}] + DENY_OUTSIDE['Statement']}
         u, _ = _user(_row('ci-bot'), _detail('ci-bot', attached=[{'PolicyName': 'a', 'PolicyArn': 'arn:aws:iam::aws:policy/AmazonS3FullAccess'}],
-                                           boundary=arn))
+                                           boundary=arn), policyMap={arn: boundaryDoc})
         u._checkLongTermKeyNotContained()
-        assert u.results[self.K][0] == 1
+        assert u.results[self.K][0] == 1 and 'Permissions boundary boundary' in u.results[self.K][1]
 
     def test_group_policy_counted(self):
         groups = [{'GroupName': 'devs', 'GroupPolicyList': [{'PolicyName': 'net', 'PolicyDocument': DENY_OUTSIDE}],

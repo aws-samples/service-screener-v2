@@ -1,5 +1,7 @@
 import boto3, botocore
 import datetime
+import json
+import urllib.parse
 from dateutil.tz import tzlocal
 from dateutil.parser import parse
 
@@ -396,12 +398,50 @@ class IamUser(IamCommon):
             return None, e.response['Error']['Code']
         return (user.get('PermissionsBoundary') or {}).get('PermissionsBoundaryArn'), None
 
+    @staticmethod
+    def _parseDoc(doc):
+        """Policy document as a dict (JSON / URL-encoded JSON strings
+        accepted), or None when it cannot be parsed."""
+        if isinstance(doc, dict):
+            return doc
+        if isinstance(doc, (str, bytes)):
+            if isinstance(doc, bytes):
+                doc = doc.decode('utf-8', 'replace')
+            for text in (doc, urllib.parse.unquote(doc)):
+                try:
+                    parsed = json.loads(text)
+                except (ValueError, TypeError):
+                    continue
+                if isinstance(parsed, dict):
+                    return parsed
+        return None
+
+    def _boundaryDocument(self, arn):
+        """(document, errorCode) of the permissions boundary policy."""
+        doc = self._policyDocumentMap.get(arn)
+        if doc is None:
+            try:
+                ver = self._iamPolicy(arn)['Policy']['DefaultVersionId']
+                doc = self._iamPolicyVersion(arn, ver)['PolicyVersion']['Document']
+            except botocore.exceptions.ClientError as e:
+                return None, e.response['Error']['Code']
+            except KeyError:
+                return None, 'NoDefaultVersion'
+        parsed = self._parseDoc(doc)
+        if parsed is None:
+            return None, 'unparseable document'
+        return parsed, None
+
     def _checkLongTermKeyNotContained(self):
         """A user that keeps an active access key should limit where the key
         can be used: a permissions boundary or identity policies that only
         allow requests from known networks (aws:SourceIp / aws:SourceVpc /
-        aws:SourceVpce / aws:VpcSourceIp). SCP/RCP network perimeters are not
-        visible from here."""
+        aws:SourceVpce / aws:VpcSourceIp). Effective permissions are the
+        intersection of the boundary and the identity policies, so either one
+        being network-contained contains the key. A boundary is read and
+        evaluated like the identity policies - its mere presence (e.g.
+        AdministratorAccess as boundary) contains nothing. SCP/RCP network
+        perimeters are not visible from here."""
         if not self._isCredentialReportRow():
             return
         active = self._activeAccessKeys()
@@ -412,19 +452,46 @@ class IamUser(IamCommon):
         if err:
             self.results[key] = [0, 'Unable to evaluate ({})'.format(err)]
             return
+        boundaryName = boundary.split('/')[-1] if boundary else None
+        boundaryErr, boundaryReason = None, None
         if boundary:
-            self.results[key] = [1, 'Permissions boundary {}'.format(boundary.split('/')[-1])]
-            return
+            bdoc, boundaryErr = self._boundaryDocument(boundary)
+            if bdoc is not None:
+                bContained, bReason = IamPolicyHelpers.networkContainment([bdoc])
+                if bContained:
+                    self.results[key] = [1, 'Permissions boundary {}: {}'.format(boundaryName, bReason)]
+                    return
+                if bContained is None:
+                    self.results[key] = [1, 'Active key(s) {}, but permissions boundary {} grants no permissions'.format(
+                        ', '.join(active), boundaryName)]
+                    return
+                boundaryReason = 'permissions boundary {} has no network restriction ({})'.format(boundaryName, bReason)
+
         docs, unreadable = self._userPolicyDocs()
         if docs is None:
             self.results[key] = [0, 'Unable to evaluate ({})'.format(', '.join(unreadable))]
             return
-        contained, reason = IamPolicyHelpers.networkContainment(docs)
-        if contained:
-            self.results[key] = [1, reason]
+        parsedDocs = []
+        for d in docs:
+            pd = self._parseDoc(d)
+            if pd is None:
+                unreadable.append('unparseable policy document')
+            else:
+                parsedDocs.append(pd)
+        contained, reason = IamPolicyHelpers.networkContainment(parsedDocs)
+        # A Deny guard holds whatever an unreadable policy allows; "every
+        # Allow is network-restricted" cannot be proven with one unread.
+        denyGuard = any(IamPolicyHelpers.isNetworkDenyGuard(st) for d in parsedDocs
+                        for st in IamPolicyHelpers.PolicyPrincipal.iterStatements(d))
+        if contained and (denyGuard or not unreadable):
+            self.results[key] = [1, 'Identity policies: {}'.format(reason)]
+        elif boundaryErr:
+            self.results[key] = [0, 'Unable to evaluate (permissions boundary {} not readable: {})'.format(
+                boundaryName, boundaryErr)]
         elif unreadable:
             self.results[key] = [0, 'Unable to evaluate (policy not readable: {})'.format(', '.join(unreadable))]
         elif contained is None:
-            self.results[key] = [1, 'Active key(s) {}, but {}'.format(', '.join(active), reason)]
+            self.results[key] = [1, 'Active key(s) {}, but identity policies {}'.format(', '.join(active), reason)]
         else:
-            self.results[key] = [-1, 'Active key(s) {}: no permissions boundary; {}'.format(', '.join(active), reason)]
+            self.results[key] = [-1, 'Active key(s) {}: {}; identity policies: {}'.format(
+                ', '.join(active), boundaryReason or 'no permissions boundary', reason)]
