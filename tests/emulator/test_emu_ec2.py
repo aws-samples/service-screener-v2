@@ -117,9 +117,20 @@ def test_ebs_recycle_bin_missing(emu, snapshot):
                                  RetentionPeriod={'RetentionPeriodValue': 7, 'RetentionPeriodUnit': 'DAYS'})
             created.append(r['Identifier'])
 
-        before, after = assertFlagFixCycle(emu, 'ec2', 'ebsRecycleBinMissing', REGIONAL, misconfigure, fix)
-        # an unlocked region-level rule is INFO, not PASS (it can be deleted)
-        assert list(after.values()) == [0]
+        # expectAfter=0: the fix step creates an UNLOCKED region-level rule, which is
+        # correctly INFO, not PASS - anyone with rbin:DeleteRule can remove it, so it does
+        # not protect snapshots from a compromised principal. The genuine PASS state (a
+        # LOCKED rule) cannot be driven here: the emulator implements LockRule, but a
+        # locked or pending_unlock rule rejects DeleteRule with ConflictException for the
+        # UnlockDelay (>= 7 days), so it would permanently break this test and every
+        # later ebsRecycleBinMissing run on the same emulator. FAIL -> locked PASS is
+        # proven with real API shapes in
+        # tests/test_stub_ec2.py::test_recycle_bin_flag_fix_locked_emulator_shapes.
+        before, after = assertFlagFixCycle(emu, 'ec2', 'ebsRecycleBinMissing', REGIONAL, misconfigure, fix,
+                                           expectAfter=0)
+        res = runCheck(emu, 'ec2', 'ebsRecycleBinMissing', REGIONAL)
+        assert [m for r in res.results.values() for k, m in r.items() if k == 'ebsRecycleBinMissing'] == \
+            [[0, 'EBS_SNAPSHOT: region-level rule not locked']]
     finally:
         for ident in created:
             rbin.delete_rule(Identifier=ident)

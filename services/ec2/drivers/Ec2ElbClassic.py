@@ -5,6 +5,7 @@ import botocore
 import constants as _C
 
 from utils.Config import Config
+from services.ec2.acctCache import acctKey
 from services.Evaluator import Evaluator
 
 class Ec2ElbClassic(Evaluator):
@@ -91,7 +92,7 @@ class Ec2ElbClassic(Evaluator):
         """{predefined policy name: (enabledProtocolAttrs, hasProtocolAttrs, ref)} built from
         the ELB-defined sample policies (describe_load_balancer_policies without a load
         balancer name returns them with an 'ELBSample-' prefix). Cached per region."""
-        cacheKey = 'ec2::clbSamplePolicies::' + self.elbClient.meta.region_name
+        cacheKey = acctKey('ec2::clbSamplePolicies::' + self.elbClient.meta.region_name)
         table = Config.get(cacheKey, None)
         if table is None:
             table = {}

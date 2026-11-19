@@ -35,6 +35,7 @@ from botocore.stub import Stubber, ANY
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utils.Config import Config  # noqa: E402
+from services.ec2.acctCache import acctKey  # noqa: E402
 from services.Evaluator import Evaluator  # noqa: E402
 from services.ec2.Ec2 import Ec2  # noqa: E402
 from services.ec2.drivers.Ec2EbsSnapshot import Ec2EbsSnapshot  # noqa: E402
@@ -260,8 +261,8 @@ def _instance(**extra):
 
 
 def _newInstance(ec2, cw, **extra):
-    Config.set('ec2::image::ami-1', None)           # image lookup cached: no describe_images
-    Config.set('ec2::imagestatus::ami-1', 'missing')
+    Config.set(acctKey('ec2::image::ami-1'), None)           # image lookup cached: no describe_images
+    Config.set(acctKey('ec2::imagestatus::ami-1'), 'missing')
     return Ec2Instance(_instance(**extra), ec2, cw)
 
 
@@ -361,7 +362,7 @@ def test_advise_generates_cost_chart_once():
 def test_advise_peer_routing_reuses_subnet_routing_route_tables(cached):
     rts = [{'RouteTableId': 'rtb-1', 'VpcId': 'vpc-1', 'Routes': []}]
     if cached:   # getSubnetRouting already ran in this scan (e.g. for the instance checks)
-        Config.set('ec2::subnetRouting::us-east-1', {'subnets': {}, 'subnetVpc': {}, 'error': None,
+        Config.set(acctKey('ec2::subnetRouting::us-east-1'), {'subnets': {}, 'subnetVpc': {}, 'error': None,
                                                        '_routeTables': rts})
     svc = _mockService(rules=('vpcPeeringFullRoute',))
     svc.getVpcs.return_value = [{'VpcId': 'vpc-1', 'CidrBlock': '10.0.0.0/16'}]

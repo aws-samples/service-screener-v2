@@ -68,6 +68,7 @@ from botocore.stub import Stubber, ANY
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utils.Config import Config  # noqa: E402
+from services.ec2.acctCache import acctKey  # noqa: E402
 from services.ec2.Ec2 import Ec2  # noqa: E402
 from services.ec2.drivers.Ec2Ami import Ec2Ami  # noqa: E402
 from services.ec2.drivers.Ec2EbsSnapshotSharing import Ec2EbsSnapshotSharing  # noqa: E402
@@ -140,7 +141,7 @@ SNAP = {'SnapshotId': 'snap-0123456789abcdef0', 'OwnerId': SELF, 'VolumeId': 'vo
 
 def _orgContext(mode):
     """mode: 'none' (not in org) | 'mgmt' (org accounts listable) | 'member' (ListAccounts denied)"""
-    Config.set('ec2::orgContext', None)
+    Config.set(acctKey('ec2::orgContext'), None)
     org = _client('organizations')
     with Stubber(org) as st:
         if mode == 'none':
@@ -154,7 +155,7 @@ def _orgContext(mode):
                 st.add_client_error('list_accounts', service_error_code='AccessDeniedException', http_status_code=400)
         ctx = Ec2.getOrgContext(types.SimpleNamespace(orgClient=org))
         st.assert_no_pending_responses()
-    Config.set('ec2::orgContext', None)
+    Config.set(acctKey('ec2::orgContext'), None)
     return ctx
 
 
@@ -237,6 +238,45 @@ def test_recycle_bin_flag_fix_locked():
     assert _rbinResult({})[0] == -1                                                  # no rule
     assert _rbinResult({'EBS_SNAPSHOT': [_rule('r1', lock='unlocked')]})[0] == 0     # unlocked -> INFO
     assert _rbinResult({'EBS_SNAPSHOT': [_rule('r1')]})[0] == 1                      # locked region-level
+
+
+def _emuRule(ident, lockState, exclude=None):
+    """get_rule response exactly as the AWS emulator / rbin API returns it after
+    CreateRule (+ LockRule / UnlockRule)."""
+    r = {'Identifier': ident, 'ResourceType': 'EBS_SNAPSHOT',
+         'RetentionPeriod': {'RetentionPeriodValue': 7, 'RetentionPeriodUnit': 'DAYS'},
+         'ResourceTags': [], 'Status': 'available', 'LockState': lockState,
+         'RuleArn': 'arn:aws:rbin:us-east-1:' + SELF + ':rule/' + ident,
+         'ExcludeResourceTags': exclude or []}
+    if lockState != 'unlocked':
+        r['LockConfiguration'] = {'UnlockDelay': {'UnlockDelayValue': 7, 'UnlockDelayUnit': 'DAYS'}}
+    return r
+
+
+def test_recycle_bin_flag_fix_locked_emulator_shapes():
+    """FAIL (no rule) -> INFO (CreateRule, unlocked) -> PASS (LockRule) on the same
+    region; the emulator test stops at INFO because a locked rule cannot be deleted."""
+    assert _rbinResult({})[0] == -1
+    assert _rbinResult({'EBS_SNAPSHOT': [_emuRule('00000000001', 'unlocked')]}) == \
+        [0, 'EBS_SNAPSHOT: region-level rule not locked']
+    assert _rbinResult({'EBS_SNAPSHOT': [_emuRule('00000000001', 'locked')]}) == \
+        [1, 'Locked region-level Recycle Bin rule for: EBS_SNAPSHOT']
+
+
+def test_recycle_bin_pending_unlock_is_info():
+    """UnlockRule -> pending_unlock: deletable once the unlock delay ends, so not PASS."""
+    assert _rbinResult({'EBS_SNAPSHOT': [_emuRule('00000000001', 'pending_unlock')]}) == \
+        [0, 'EBS_SNAPSHOT: region-level rule not locked']
+
+
+def test_recycle_bin_locked_rule_with_exclusion_tags_is_not_pass():
+    """A locked region-level rule with ExcludeResourceTags leaves the excluded snapshots
+    unprotected - INFO, not PASS; a second locked rule without exclusions makes it PASS."""
+    excl = [{'ResourceTagKey': 'rbin-skip', 'ResourceTagValue': 'true'}]
+    res = _rbinResult({'EBS_SNAPSHOT': [_emuRule('00000000001', 'locked', exclude=excl)]})
+    assert res[0] == 0 and 'excludes resources by tag' in res[1]
+    assert _rbinResult({'EBS_SNAPSHOT': [_emuRule('00000000001', 'locked', exclude=excl),
+                                         _emuRule('00000000002', 'locked')]})[0] == 1
 
 
 def test_recycle_bin_tag_level_only_info():
@@ -330,7 +370,7 @@ def _nlb():
 
 
 def test_nlb_tls_listener_policy_and_access_logs():
-    Config.set('ec2::elbv2SslPolicies::us-east-1', None)
+    Config.set(acctKey('ec2::elbv2SslPolicies::us-east-1'), None)
     elbv2 = _client('elbv2')
     lb = _nlb()
     listeners = {'Listeners': [{'ListenerArn': lb['LoadBalancerArn'].replace('loadbalancer', 'listener') + '/l1',
@@ -347,7 +387,7 @@ def test_nlb_tls_listener_policy_and_access_logs():
         tls = _run(d, '_checkElbTlsPolicyOutdated')['elbTlsPolicyOutdated']
         logs = _run(d, '_checkElbAccessLogsDisabled')['elbAccessLogsDisabled']
         st.assert_no_pending_responses()
-    Config.set('ec2::elbv2SslPolicies::us-east-1', None)
+    Config.set(acctKey('ec2::elbv2SslPolicies::us-east-1'), None)
     assert tls[0] == -1 and 'TLSv1.1' in tls[1]
     assert logs == [-1, 'Disabled']
 
@@ -453,9 +493,9 @@ def _instance(imageId, state='running', **extra):
 
 
 def _staleResult(imageId, imageResponse=None, error=None):
-    for k in ('ec2::image::' + imageId, 'ec2::imagestatus::' + imageId):
-        Config.set(k, '__unset__')
     Config.set('stsInfo', {'Account': SELF})
+    for k in ('ec2::image::' + imageId, 'ec2::imagestatus::' + imageId):
+        Config.set(acctKey(k), '__unset__')
     ec2 = _client('ec2')
     with Stubber(ec2) as st:
         params = {'ImageIds': [imageId], 'IncludeDeprecated': True, 'IncludeDisabled': True}
@@ -466,7 +506,7 @@ def _staleResult(imageId, imageResponse=None, error=None):
         inst = Ec2Instance(_instance(imageId), ec2, None)
         st.assert_no_pending_responses()
     for k in ('ec2::image::' + imageId, 'ec2::imagestatus::' + imageId):
-        Config.set(k, '__unset__')
+        Config.set(acctKey(k), '__unset__')
     return _run(inst, '_checkEc2AmiUntrustedOrStale').get('ec2AmiUntrustedOrStale')
 
 
@@ -504,10 +544,10 @@ def test_ami_lookup_denied_not_pass():
 
 
 def test_ami_stale_only_running_instances():
-    Config.set('ec2::image::ami-0eee', _img('ami-0eee', State='disabled'))
-    Config.set('ec2::imagestatus::ami-0eee', 'found')
+    Config.set(acctKey('ec2::image::ami-0eee'), _img('ami-0eee', State='disabled'))
+    Config.set(acctKey('ec2::imagestatus::ami-0eee'), 'found')
     inst = Ec2Instance(_instance('ami-0eee', state='stopped'), _client('ec2'), None)
-    Config.set('ec2::image::ami-0eee', '__unset__')
+    Config.set(acctKey('ec2::image::ami-0eee'), '__unset__')
     assert _run(inst, '_checkEc2AmiUntrustedOrStale') == {}
 
 
@@ -560,7 +600,7 @@ _ROUTING_KEY = 'ec2::subnetRouting::us-east-1'
 
 
 def _routing(routeTables, subnets, error=None):
-    Config.set(_ROUTING_KEY, None)
+    Config.set(acctKey(_ROUTING_KEY), None)
     ec2 = _client('ec2')
     with Stubber(ec2) as st:
         if error:
@@ -570,7 +610,7 @@ def _routing(routeTables, subnets, error=None):
             st.add_response('describe_subnets', {'Subnets': subnets})
         ctx = getSubnetRouting(ec2)
         st.assert_no_pending_responses()
-    Config.set(_ROUTING_KEY, None)
+    Config.set(acctKey(_ROUTING_KEY), None)
     return ctx
 
 
@@ -852,7 +892,7 @@ def _alb(scheme='internal'):
 
 
 def _mtlsResult(mutualAuth, scheme='internal', trustStore=None, tsError=None):
-    Config.set('ec2::elbv2TrustStores::us-east-1', None)
+    Config.set(acctKey('ec2::elbv2TrustStores::us-east-1'), None)
     elbv2 = _client('elbv2')
     listener = {'ListenerArn': 'arn:l', 'Protocol': 'HTTPS', 'Port': 443}
     if mutualAuth is not None:
@@ -865,7 +905,7 @@ def _mtlsResult(mutualAuth, scheme='internal', trustStore=None, tsError=None):
             st.add_client_error('describe_trust_stores', service_error_code=tsError, http_status_code=400)
         res = _run(Ec2ElbCommon(_alb(scheme), [], elbv2, None), '_checkAlbMtlsOff').get('albMtlsOff')
         st.assert_no_pending_responses()
-    Config.set('ec2::elbv2TrustStores::us-east-1', None)
+    Config.set(acctKey('ec2::elbv2TrustStores::us-east-1'), None)
     return res
 
 

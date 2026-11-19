@@ -6,6 +6,7 @@ import botocore
 import constants as _C
 
 from utils.Config import Config
+from services.ec2.acctCache import acctKey
 from services.Evaluator import Evaluator
 from services.ec2.drivers.Ec2SecGroup import Ec2SecGroup
 
@@ -48,7 +49,7 @@ class Ec2ElbCommon(Evaluator):
         """SslProtocols of an elbv2 security policy. The full policy table is
         fetched once per region and cached; unknown names are looked up directly.
         Returns None if the policy cannot be resolved."""
-        cacheKey = 'ec2::elbv2SslPolicies::' + self.elbClient.meta.region_name
+        cacheKey = acctKey('ec2::elbv2SslPolicies::' + self.elbClient.meta.region_name)
         table = Config.get(cacheKey, None)
         if table is None:
             table = {}
@@ -230,7 +231,7 @@ class Ec2ElbCommon(Evaluator):
     def _getTrustStore(self, arn):
         """describe_trust_stores for one trust store, memoized per region.
         Returns the TrustStore dict, or {'_error': code}."""
-        cacheKey = 'ec2::elbv2TrustStores::' + self.elbClient.meta.region_name
+        cacheKey = acctKey('ec2::elbv2TrustStores::' + self.elbClient.meta.region_name)
         with self._lock:
             table = Config.get(cacheKey, None)
             if table is None:

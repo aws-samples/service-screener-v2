@@ -13,6 +13,7 @@ from utils.Tools import _pi
 from utils.Tools import _warn
 
 from utils.Config import Config
+from services.ec2.acctCache import acctKey
 from services.Service import Service
 from services.ec2.drivers.Ec2Instance import Ec2Instance
 from services.ec2.drivers.Ec2CompOpt import Ec2CompOpt
@@ -161,7 +162,7 @@ class Ec2(Service):
         of each doing its own describe_security_groups(GroupIds=...) call.
         Real fleets share a small number of SGs across many instances/ELBs -
         this call should scale with unique-SG count, not instance/ELB count."""
-        cacheKey = 'ec2::allsgs::' + self.region
+        cacheKey = acctKey('ec2::allsgs::' + self.region)
         cached = Config.get(cacheKey, None)
         if cached is not None:
             return cached
@@ -497,7 +498,7 @@ class Ec2(Service):
         inOrg: True / False / None (unknown). accounts: set of member account IDs, or
         None when not listable (only the management or a delegated admin account can
         call organizations:ListAccounts)."""
-        cacheKey = 'ec2::orgContext'
+        cacheKey = acctKey('ec2::orgContext')
         cached = Config.get(cacheKey, None)
         if cached is not None:
             return cached
@@ -799,7 +800,7 @@ class Ec2(Service):
         objs['EC2::Regional'] = obj.getInfo()
         
         # compute optimizer checks
-        hasRunComputeOpt = Config.get('EC2_HasRunComputeOpt', False)
+        hasRunComputeOpt = Config.get(acctKey('EC2_HasRunComputeOpt'), False)
         if hasRunComputeOpt == False:
             try:
                 compOptPath = "/aws/service/global-infrastructure/regions/" + self.region + "/services/compute-optimizer";
@@ -812,7 +813,7 @@ class Ec2(Service):
                     obj = Ec2CompOpt(self.compOptClient)
                     obj.run(self.__class__)
                     objs['ComputeOptimizer'] = obj.getInfo()
-                    Config.set('EC2_HasRunComputeOpt', True)
+                    Config.set(acctKey('EC2_HasRunComputeOpt'), True)
                     
             except botocore.exceptions.ClientError as e:
                 ecode = e.response['Error']['Code']
@@ -824,14 +825,14 @@ class Ec2(Service):
             
         
         #EC2 Cost Explorer checks
-        hasRunRISP = Config.get('EC2_HasRunRISP', False)
+        hasRunRISP = Config.get(acctKey('EC2_HasRunRISP'), False)
         if hasRunRISP == False:
             _pi('Cost Explorer Recommendations')
             obj = Ec2CostExplorerRecs(self.ceClient)
             obj.run(self.__class__)
     
             objs['CostExplorer'] = obj.getInfo()
-            Config.set('EC2_HasRunRISP', True)
+            Config.set(acctKey('EC2_HasRunRISP'), True)
         
         # EC2 instance checks
         instances = self.getResources()
@@ -1064,7 +1065,7 @@ class Ec2(Service):
         if vpcs and self._ruleSelected('vpcPeeringFullRoute'):
             # reuse the route tables getSubnetRouting already read in this scan (for the VPC
             # or the instance checks), when it ran and succeeded; otherwise read them here
-            routingCtx = vpcRouting or Config.get('ec2::subnetRouting::' + str(self.ec2Client.meta.region_name), None)
+            routingCtx = vpcRouting or Config.get(acctKey('ec2::subnetRouting::' + str(self.ec2Client.meta.region_name)), None)
             routeTables = (routingCtx or {}).get('_routeTables')
             peerRouting = getPeerRouteContext(self.ec2Client, vpcs, routeTables)
         for vpc in vpcs:
