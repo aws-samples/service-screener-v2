@@ -12,6 +12,7 @@ import os
 import sys
 
 import boto3
+import pytest
 from botocore.stub import Stubber
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -121,3 +122,60 @@ def test_batching_splits_at_batch_size():
         st.assert_no_pending_responses()
     assert [o['deploymentGroupName'] for o in out] == names
     assert all(_status(o)[0] == -1 for o in out)
+
+
+# --------------------------------------------------------------------------- #
+# Checkpoint resume: groups already marked done must still be reported
+# --------------------------------------------------------------------------- #
+@pytest.fixture
+def isolatedCheckpoint(tmp_path, monkeypatch):
+    from utils.Checkpoint import Checkpoint
+    monkeypatch.setattr(Checkpoint, 'CHECKPOINT_DIR', str(tmp_path / 'checkpoint'))
+    monkeypatch.setattr(Checkpoint, '_cache', {})
+    return Checkpoint
+
+
+def _resumeSvc(client):
+    ## Same class name as the real scanner (checkpoint key / rule prefix),
+    ## without Service.__init__/__del__ side effects.
+    cls = type('Codedeploy', (Codedeploy,), {'__del__': lambda self: None})
+    s = cls.__new__(cls)
+    s.cdClient = client
+    s.region = 'us-east-1'
+    s.tags = []
+    return s
+
+
+def test_resumed_scan_restores_checkpointed_group(isolatedCheckpoint):
+    from utils.Config import Config
+    saved = {k: Config.get(k, None) for k in ('stsInfo', 'CURRENT_REGION', 'Codedeploy::rules',
+                                              'scanned_codedeploy')}
+    Config.set('stsInfo', {'Account': '111122223333'})
+    Config.set('CURRENT_REGION', 'us-east-1')
+    Config.set('Codedeploy::rules', [])
+    Config.set('scanned_codedeploy', {'resources': 0, 'rules': 0, 'exceptions': 0})
+    try:
+        ## First (interrupted) pass already evaluated app/g1 as a FAIL.
+        isolatedCheckpoint.markDone('111122223333', 'Codedeploy', 'us-east-1',
+                                    'CodedeployDeploymentGroup', 'app/g1',
+                                    {KEY: [-1, 'no rollback']}, {'region': 'us-east-1'})
+        cd = _client()
+        st = Stubber(cd)
+        st.add_response('list_applications', {'applications': ['app']}, {})
+        st.add_response('list_deployment_groups', {'deploymentGroups': ['g1', 'g2']},
+                        {'applicationName': 'app'})
+        ## Only the pending group is re-read.
+        st.add_response('batch_get_deployment_groups',
+                        {'deploymentGroupsInfo': [_info('g2', {'enabled': True,
+                                                               'events': ['DEPLOYMENT_FAILURE']})]},
+                        {'applicationName': 'app', 'deploymentGroupNames': ['g2']})
+        with st:
+            objs = _resumeSvc(cd).advise()
+            st.assert_no_pending_responses()
+    finally:
+        for k, v in saved.items():
+            Config.set(k, v)
+
+    assert set(objs) == {'CodeDeploy DeploymentGroup::app/g1', 'CodeDeploy DeploymentGroup::app/g2'}
+    assert objs['CodeDeploy DeploymentGroup::app/g1']['results'][KEY] == [-1, 'no rollback']
+    assert objs['CodeDeploy DeploymentGroup::app/g2']['results'][KEY][0] == 1

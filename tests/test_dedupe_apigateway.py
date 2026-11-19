@@ -83,6 +83,20 @@ def _apiClient(apiId, fail=None):
                                                   'mutualTlsAuthentication': {'truststoreUri': 's3://t'}}]}
     c.get_base_path_mappings.side_effect = lambda domainName: {'items': [{'restApiId': 'api1'}, {'restApiId': 'api2'}]}
     c.get_usage_plans.return_value = {'items': [{'id': 'u', 'name': 'plan', 'apiStages': [{'apiId': 'api1'}]}]}
+    ## The driver reads collections through get_paginator(op).paginate(); route
+    ## each page through the per-operation mock (following 'position') so call
+    ## counts and failure injection still apply to get_resources & co.
+    def getPaginator(op):
+        def paginate(**kwargs):
+            pos = None
+            while True:
+                page = getattr(c, op)(**kwargs, **({'position': pos} if pos else {}))
+                yield page
+                pos = page.get('position')
+                if not pos:
+                    return
+        return mock.Mock(paginate=paginate)
+    c.get_paginator.side_effect = getPaginator
     if fail:
         getattr(c, fail).side_effect = botocore.exceptions.ClientError(
             {'Error': {'Code': 'AccessDeniedException', 'Message': 'no'}}, fail)
