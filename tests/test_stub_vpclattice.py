@@ -268,3 +268,32 @@ def test_service_logs_unreadable_is_not_evaluable():
         ('list_service_network_service_associations', _assoc(SN2_ARN), {'serviceIdentifier': SVC_ARN}),
         ('list_access_log_subscriptions', ('AccessDeniedException', 403), {'resourceIdentifier': SN2_ARN})], LOGS)
     assert r[KEY_LOGS][0] == 0
+
+
+def test_auth_none_update_service_in_place_flag_then_pass():
+    """In-place remediation of the SAME service (UpdateService / PutAuthPolicy are
+    NotImplemented in the emulator): authType NONE -> FAIL; UpdateService(authType=AWS_IAM) and
+    PutAuthPolicy with an org-scoped policy; the re-scan reads GetService (AWS_IAM) and
+    GetAuthPolicy -> PASS."""
+    flagged = _run(VpclatticeService, _svc('NONE'), [], AUTH)
+    assert flagged[KEY_AUTH][0] == -1
+
+    client = _client()
+    pol = _policy(ORG_STMT)
+    with Stubber(client) as st:
+        st.add_response('update_service', {'id': _svc()['id'], 'arn': SVC_ARN, 'name': 'orders',
+                                           'authType': 'AWS_IAM'},
+                        {'serviceIdentifier': SVC_ARN, 'authType': 'AWS_IAM'})
+        st.add_response('put_auth_policy', {'policy': pol, 'state': 'Active'},
+                        {'resourceIdentifier': SVC_ARN, 'policy': pol})
+        st.add_response('get_service', _svc('AWS_IAM'), {'serviceIdentifier': SVC_ARN})
+        client.update_service(serviceIdentifier=SVC_ARN, authType='AWS_IAM')
+        client.put_auth_policy(resourceIdentifier=SVC_ARN, policy=pol)
+        rescanned = client.get_service(serviceIdentifier=SVC_ARN)
+        st.assert_no_pending_responses()
+    rescanned.pop('ResponseMetadata', None)
+    assert rescanned['authType'] == 'AWS_IAM'
+
+    fixed = _run(VpclatticeService, rescanned, [
+        ('get_auth_policy', {'policy': pol, 'state': 'Active'}, {'resourceIdentifier': SVC_ARN})], AUTH)
+    assert fixed[KEY_AUTH] == [1, 'AWS_IAM is enforced with an auth policy that does not allow anonymous callers']

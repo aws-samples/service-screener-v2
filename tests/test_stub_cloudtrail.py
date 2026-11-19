@@ -394,3 +394,29 @@ def test_console_lookup_denied_is_not_pass():
     d._checkManualConsoleWritesDetected()
     r = d.results['manualConsoleWritesDetected']
     assert r[0] == 0 and 'Unable to evaluate' in r[1]
+
+
+def test_update_trail_to_log_archive_bucket_flag_then_pass():
+    """In-place remediation of the SAME trail (needs a second account, so the emulator cannot
+    do it): the trail writes to a bucket this account owns -> FAIL; after UpdateTrail points it
+    at the log archive account's bucket (not in this account's ListBuckets), the re-scan reads
+    the updated trail -> PASS."""
+    c = Clients()
+    _sameAcctStubs(c, [_trail('main', bucket='my-logs')], ['my-logs'])
+    r = _runSame(c)
+    assert r[0] == -1 and 'trail main -> my-logs' in r[1]
+
+    ct = _client('cloudtrail')
+    archive = 'org-log-archive-999988887777'
+    with Stubber(ct) as st:
+        updated = dict(_trail('main', bucket=archive))
+        st.add_response('update_trail', {'Name': 'main', 'S3BucketName': archive,
+                                         'TrailARN': updated['TrailARN'], 'IsMultiRegionTrail': True},
+                        {'Name': 'main', 'S3BucketName': archive})
+        resp = ct.update_trail(Name='main', S3BucketName=archive)
+        st.assert_no_pending_responses()
+    assert resp['S3BucketName'] == archive
+
+    c = Clients()
+    _sameAcctStubs(c, [updated], ['my-logs'])
+    assert _runSame(c) == [1, 'Logs are delivered to buckets outside this account']

@@ -2,7 +2,7 @@
 import json
 import time
 
-from tests.emulator.conftest import assertFlagFixCycle
+from tests.emulator.conftest import assertFlagFixCycle, runCheck
 
 TRUST = json.dumps({'Version': '2012-10-17', 'Statement': [{
     'Effect': 'Allow', 'Principal': {'Service': 'ecs-tasks.amazonaws.com'}, 'Action': 'sts:AssumeRole'}]})
@@ -85,33 +85,48 @@ def test_ecs_exec_enabled_services(emu, uid):
 def test_ecs_container_agent_outdated(emu, uid):
     """The emulator registers EC2 instances launched with ECS_CLUSTER user data as container
     instances running agent 1.89.x, while the public AL2023 recommended parameter reports a newer
-    agent (1.97.x) - more than the 2-minor-release tolerance, so the cluster is flagged. Fix =
-    retire the outdated instance (deregister + terminate), as a rolling AMI replacement would."""
+    agent (1.97.x) - more than the 2-minor-release tolerance, so the cluster is flagged.
+
+    The emulator cannot produce an up-to-date agent: every ECS-optimized AMI (AL2/AL2023,
+    x86/arm64/GPU) registers 1.89.3, UpdateContainerAgent raises NoUpdateAvailableException and
+    RegisterContainerInstance rejects any identity document. FAIL -> PASS on the same instance
+    (UpdateContainerAgent -> agentUpdateStatus UPDATED, agent 1.97.0) is therefore proven with
+    real API shapes by tests/test_stub_ecs.py::test_agent_update_in_place_flag_then_pass.
+
+    Here the outdated instance is retired (deregister + terminate). The cluster then has no
+    EC2 capacity left, which is INFO (nothing to evaluate), never PASS. assertFlagFixCycle
+    requires PASS after the fix, so the cycle is written out."""
     ecs, ec2, ssm = emu.client('ecs'), emu.client('ec2'), emu.client('ssm')
     cluster = f'ss-cl-{uid}'
+    key = 'ecsContainerAgentOutdated'
     ecs.create_cluster(clusterName=cluster)
     ami = json.loads(ssm.get_parameter(
         Name='/aws/service/ecs/optimized-ami/amazon-linux-2023/recommended')['Parameter']['Value'])['image_id']
     state = {}
     try:
-        def misconfigure():
-            r = ec2.run_instances(ImageId=ami, MinCount=1, MaxCount=1, InstanceType='t3.micro',
-                                  UserData=f'#!/bin/bash\necho ECS_CLUSTER={cluster} >> /etc/ecs/ecs.config\n')
-            state['iid'] = r['Instances'][0]['InstanceId']
-            for _ in range(30):
-                arns = ecs.list_container_instances(cluster=cluster)['containerInstanceArns']
-                if arns:
-                    state['ci'] = arns
-                    return
-                time.sleep(1)
+        r = ec2.run_instances(ImageId=ami, MinCount=1, MaxCount=1, InstanceType='t3.micro',
+                              UserData=f'#!/bin/bash\necho ECS_CLUSTER={cluster} >> /etc/ecs/ecs.config\n')
+        state['iid'] = r['Instances'][0]['InstanceId']
+        for _ in range(30):
+            arns = ecs.list_container_instances(cluster=cluster)['containerInstanceArns']
+            if arns:
+                state['ci'] = arns
+                break
+            time.sleep(1)
+        else:
             raise AssertionError('container instance never registered')
 
-        def fix():
-            for a in state.get('ci', []):
-                ecs.deregister_container_instance(cluster=cluster, containerInstance=a, force=True)
-            ec2.terminate_instances(InstanceIds=[state['iid']])
+        before = runCheck(emu, 'ecs', key, f'Cluster::{cluster}').statuses()
+        assert before and all(v == -1 for v in before.values()), before
 
-        assertFlagFixCycle(emu, 'ecs', 'ecsContainerAgentOutdated', f'Cluster::{cluster}', misconfigure, fix)
+        for a in state['ci']:
+            ecs.deregister_container_instance(cluster=cluster, containerInstance=a, force=True)
+        ec2.terminate_instances(InstanceIds=[state['iid']])
+
+        res = runCheck(emu, 'ecs', key, f'Cluster::{cluster}')
+        msgs = [m for rr in res.results.values() for k, m in rr.items() if k.lower() == key.lower()]
+        assert msgs and all(m == [0, 'No EC2/external container instances registered (Fargate-only or empty)']
+                            for m in msgs), msgs
     finally:
         for a in state.get('ci', []):
             try:

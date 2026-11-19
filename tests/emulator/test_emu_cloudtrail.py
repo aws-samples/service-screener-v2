@@ -1,7 +1,7 @@
 """Flag -> fix -> re-run tests for the CloudTrail WAFS2027 checks against the local AWS Emulator."""
 import json
 
-from tests.emulator.conftest import assertFlagFixCycle
+from tests.emulator.conftest import assertFlagFixCycle, runCheck
 
 ALL_MGMT = [{'ReadWriteType': 'All', 'IncludeManagementEvents': True}]
 NO_KMS = [{'ReadWriteType': 'All', 'IncludeManagementEvents': True,
@@ -120,16 +120,30 @@ def test_has_management_events_captured_selector_list(emu, uid):
 
 def test_trail_bucket_same_account(emu, uid):
     """The emulator account is an AWS Organizations management account, so the
-    org gating passes. A trail delivering to a bucket in this account is flagged;
-    removing it (logs then come only from a log archive account) clears the finding."""
+    org gating passes. A trail delivering to a bucket in this account is flagged.
+
+    The real fix (point the trail at a bucket in a dedicated log archive account) needs a
+    second account, which the emulator does not have: it is a single account and CreateTrail /
+    UpdateTrail reject a bucket that does not exist in it (S3BucketDoesNotExistException).
+    FAIL -> PASS on the same trail is therefore proven with real API shapes by
+    tests/test_stub_cloudtrail.py::test_update_trail_to_log_archive_bucket_flag_then_pass.
+
+    Here, after the trail is removed the Region has no trail and no Config channel: that is
+    INFO (nothing to evaluate), never PASS - removing the audit trail is not a remediation.
+    assertFlagFixCycle requires PASS after the fix, so the cycle is written out."""
     bucket, trail = f'ss-ct-{uid}', f'ss-ct-{uid}'
+    key = 'trailBucketSameAccount'
     _trailBucket(emu, bucket)
     try:
-        assertFlagFixCycle(
-            emu, 'cloudtrail', 'trailBucketSameAccount', 'General',
-            lambda: _newTrail(emu, trail, bucket),
-            lambda: _dropTrail(emu, trail))
+        _newTrail(emu, trail, bucket)
+        before = runCheck(emu, 'cloudtrail', key, 'General')
+        msgs = [m for r in before.results.values() for k, m in r.items() if k.lower() == key.lower()]
+        assert msgs and all(m[0] == -1 and f'trail {trail} -> {bucket}' in m[1] for m in msgs), msgs
+
+        _dropTrail(emu, trail)
+        after = runCheck(emu, 'cloudtrail', key, 'General')
+        msgs = [m for r in after.results.values() for k, m in r.items() if k.lower() == key.lower()]
+        assert msgs and all(m == [0, 'No trail or AWS Config delivery channel in this Region'] for m in msgs), msgs
     finally:
         _dropTrail(emu, trail)
         _dropBucket(emu, bucket)
-
