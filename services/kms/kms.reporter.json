@@ -113,7 +113,7 @@
 	},
 	"KeyPolicyCrossAccount": {
 		"category": "S",
-		"^description": "{$COUNT} KMS key grants cross-account access in its key policy without an aws:PrincipalOrgID or aws:PrincipalOrgPaths condition. Review cross-account principals to ensure they are intentional and necessary, and constrain them to your AWS Organization where possible. Unintended cross-account access can lead to security risks.",
+		"^description": "{$COUNT} KMS key grants cross-account access in its key policy without an aws:PrincipalOrgID or aws:PrincipalOrgPaths condition, either to an external principal or to a wildcard principal whose kms:CallerAccount, aws:PrincipalAccount, aws:SourceAccount or aws:PrincipalArn condition names another account. Review cross-account principals to ensure they are intentional and necessary, and constrain them to your AWS Organization where possible. Unintended cross-account access can lead to security risks.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
