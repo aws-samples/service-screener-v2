@@ -1,3 +1,6 @@
+import functools
+import re
+
 from services.Evaluator import Evaluator
 
 
@@ -159,16 +162,46 @@ class CognitoIdentityPool(Evaluator):
                     return True
         return False
 
-    @staticmethod
-    def _isUnscopedResource(r):
-        """'*' or an ARN whose resource part is only '*' (e.g. arn:aws:s3:::*)."""
+    # (service, resource type) pairs whose ARN resource part '<type>/*' or
+    # '<type>:*' names EVERY resource of that type in the account (e.g.
+    # arn:aws:dynamodb:*:*:table/*). Restricted to known types: in other ARNs
+    # (s3 'bucket/*', execute-api 'apiId/*') the first segment is a resource
+    # name, and '<name>/*' is one shared resource, not all of them.
+    ALL_OF_TYPE = {
+        'dynamodb': ('table',), 'secretsmanager': ('secret',), 'lambda': ('function',),
+        'kms': ('key', 'alias'), 'ssm': ('parameter', 'document'), 'kinesis': ('stream',),
+        'firehose': ('deliverystream',), 'logs': ('log-group',),
+        'iot': ('topic', 'topicfilter', 'client', 'thing'), 'appsync': ('apis',),
+        'ecr': ('repository',), 'cognito-idp': ('userpool',), 'cognito-identity': ('identitypool',),
+        'cognito-sync': ('identitypool',), 'states': ('statemachine', 'stateMachine'),
+        'es': ('domain',), 'ec2': ('instance',), 'rekognition': ('collection',),
+        'events': ('event-bus',), 'mobiletargeting': ('apps',), 'rds-db': ('dbuser',),
+        'bedrock': ('knowledge-base', 'agent-alias', 'foundation-model'),
+        'elasticfilesystem': ('file-system',),
+    }
+
+    @classmethod
+    def _isUnscopedResource(cls, r):
+        """'*', an ARN whose resource part is only '*' (e.g. arn:aws:s3:::*), or
+        an ARN naming every resource of a known type (e.g. table/*, secret:*)."""
         if not isinstance(r, str):
             return True
         r = r.strip()
         if r == '*':
             return True
         parts = r.split(':', 5)
-        return len(parts) == 6 and parts[5] in ('*', '*/*')
+        if len(parts) != 6:
+            return False
+        if parts[5] in ('*', '*/*'):
+            return True
+        svc = parts[2].lower()
+        for t in cls.ALL_OF_TYPE.get(svc, ()):
+            for sep in ('/', ':'):
+                head = t + sep
+                if parts[5].startswith(head) and parts[5][len(head):] and \
+                        set(parts[5][len(head):]) <= {'*', '/', ':'}:
+                    return True
+        return False
 
     @classmethod
     def resourceScope(cls, stmt):
@@ -217,12 +250,14 @@ class CognitoIdentityPool(Evaluator):
     def denyLimits(cls, docs):
         """Collect unconditional Deny statements on Resource '*' across a role's policies.
 
-        Returns {'all': bool, 'services': {svc}, 'notActionCaps': [[action, ...], ...]}:
+        Returns {'all': bool, 'services': {svc}, 'notActionCaps': [[action, ...], ...],
+                 'denied': [pattern, ...]}:
           all            -- Deny Action '*' (nothing is allowed)
           services       -- Deny '<svc>:*' (that service is not allowed)
           notActionCaps  -- Deny NotAction [...]: only those actions remain allowed
+          denied         -- every denied Action pattern (lower-cased)
         Conditional or resource-scoped Deny statements are ignored (conservative)."""
-        out = {'all': False, 'services': set(), 'notActionCaps': []}
+        out = {'all': False, 'services': set(), 'notActionCaps': [], 'denied': []}
         for doc in docs:
             if not isinstance(doc, dict):
                 continue
@@ -240,6 +275,7 @@ class CognitoIdentityPool(Evaluator):
                     if not isinstance(a, str):
                         continue
                     a = a.strip().lower()
+                    out['denied'].append(a)
                     if a == '*':
                         out['all'] = True
                     elif a.endswith(':*') and a.count(':') == 1:
@@ -268,24 +304,203 @@ class CognitoIdentityPool(Evaluator):
                 return False
         return True
 
-    @classmethod
-    def policyBroadReasons(cls, doc, limits=None):
-        """Return a list of reasons a policy document grants broad access to
-        every guest: an Allow statement with Action '*' or '<service>:*', or an
-        Allow statement using NotAction, on resources that are not confined to
-        the caller's own identity.
+    # Concrete actions that, granted to anonymous callers on every resource of
+    # their type, read or change customer data, run code, send on the account's
+    # behalf, or escalate privileges. A granted action or partial wildcard
+    # (e.g. 's3:Get*') that matches any of these on all resources is broad.
+    SENSITIVE_ACTIONS = {a.lower(): a for a in (
+        # S3 object data and bucket control
+        's3:GetObject', 's3:GetObjectVersion', 's3:GetObjectAcl', 's3:ListBucket', 's3:ListBucketVersions',
+        's3:PutObject', 's3:PutObjectAcl', 's3:DeleteObject', 's3:DeleteObjectVersion', 's3:RestoreObject',
+        's3:PutBucketPolicy', 's3:PutBucketAcl', 's3:DeleteBucket', 's3:DeleteBucketPolicy',
+        's3-object-lambda:GetObject', 's3-object-lambda:ListBucket', 's3-object-lambda:PutObject',
+        # DynamoDB item data and tables
+        'dynamodb:GetItem', 'dynamodb:BatchGetItem', 'dynamodb:Query', 'dynamodb:Scan',
+        'dynamodb:PutItem', 'dynamodb:UpdateItem', 'dynamodb:DeleteItem', 'dynamodb:BatchWriteItem',
+        'dynamodb:PartiQLSelect', 'dynamodb:PartiQLInsert', 'dynamodb:PartiQLUpdate', 'dynamodb:PartiQLDelete',
+        'dynamodb:TransactGetItems', 'dynamodb:TransactWriteItems', 'dynamodb:DeleteTable',
+        'dynamodb:UpdateTable', 'dynamodb:ExportTableToPointInTime', 'dynamodb:GetRecords',
+        # Secrets, parameters, keys
+        'secretsmanager:GetSecretValue', 'secretsmanager:BatchGetSecretValue', 'secretsmanager:PutSecretValue',
+        'secretsmanager:UpdateSecret', 'secretsmanager:DeleteSecret', 'secretsmanager:PutResourcePolicy',
+        'ssm:GetParameter', 'ssm:GetParameters', 'ssm:GetParametersByPath', 'ssm:GetParameterHistory',
+        'ssm:PutParameter', 'ssm:DeleteParameter', 'ssm:SendCommand', 'ssm:StartSession',
+        'kms:Decrypt', 'kms:GenerateDataKey', 'kms:Sign', 'kms:CreateGrant', 'kms:PutKeyPolicy',
+        'kms:ScheduleKeyDeletion', 'kms:DisableKey',
+        # Code execution and messaging on the account's behalf
+        'lambda:InvokeFunction', 'lambda:InvokeFunctionUrl', 'lambda:GetFunction', 'lambda:UpdateFunctionCode',
+        'lambda:UpdateFunctionConfiguration', 'lambda:AddPermission', 'lambda:CreateFunction',
+        'lambda:DeleteFunction',
+        'states:StartExecution', 'states:StartSyncExecution',
+        'sqs:SendMessage', 'sqs:ReceiveMessage', 'sqs:DeleteMessage', 'sqs:PurgeQueue',
+        'sqs:SetQueueAttributes', 'sqs:DeleteQueue',
+        'sns:Publish', 'sns:Subscribe', 'sns:SetTopicAttributes', 'sns:DeleteTopic',
+        'ses:SendEmail', 'ses:SendRawEmail', 'ses:SendTemplatedEmail', 'ses:SendBulkTemplatedEmail',
+        'ses:SendBulkEmail',
+        'mobiletargeting:SendMessages', 'mobiletargeting:SendUsersMessages', 'mobiletargeting:GetEndpoint',
+        'mobiletargeting:GetUserEndpoints', 'mobiletargeting:DeleteEndpoint',
+        'events:PutEvents', 'execute-api:Invoke', 'execute-api:ManageConnections', 'appsync:GraphQL',
+        # Streams and logs
+        'kinesis:GetRecords', 'kinesis:GetShardIterator', 'kinesis:PutRecord', 'kinesis:PutRecords',
+        'kinesis:DeleteStream', 'firehose:PutRecord', 'firehose:PutRecordBatch',
+        'kinesisvideo:GetMedia', 'kinesisvideo:GetClip',
+        'logs:GetLogEvents', 'logs:FilterLogEvents', 'logs:StartQuery', 'logs:PutLogEvents',
+        'logs:DeleteLogGroup',
+        'iot:Publish', 'iot:Subscribe', 'iot:Receive', 'iot:GetThingShadow', 'iot:UpdateThingShadow',
+        'iot:DeleteThingShadow', 'iot:GetRetainedMessage',
+        # Databases, search, files, repositories, models
+        'rds-db:connect', 'rds-data:ExecuteStatement', 'rds-data:BatchExecuteStatement',
+        'redshift-data:ExecuteStatement', 'athena:StartQueryExecution', 'athena:GetQueryResults',
+        'es:ESHttpGet', 'es:ESHttpPost', 'es:ESHttpPut', 'es:ESHttpDelete', 'aoss:APIAccessAll',
+        'elasticfilesystem:ClientMount', 'elasticfilesystem:ClientWrite', 'elasticfilesystem:ClientRootAccess',
+        'ecr:GetDownloadUrlForLayer', 'ecr:BatchGetImage', 'ecr:PutImage',
+        'codecommit:GitPull', 'codecommit:GitPush', 'codecommit:GetFile', 'codecommit:GetBlob',
+        'rekognition:SearchFaces', 'rekognition:SearchFacesByImage', 'rekognition:IndexFaces',
+        'rekognition:ListFaces', 'rekognition:DeleteFaces', 'rekognition:DeleteCollection',
+        'polly:PutLexicon', 'polly:DeleteLexicon',
+        'bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream', 'bedrock:InvokeAgent',
+        'bedrock:Retrieve', 'bedrock:RetrieveAndGenerate',
+        # Identity: other users' identities and data, privilege escalation
+        'cognito-identity:GetOpenIdTokenForDeveloperIdentity', 'cognito-identity:LookupDeveloperIdentity',
+        'cognito-identity:MergeDeveloperIdentities', 'cognito-identity:UnlinkDeveloperIdentity',
+        'cognito-identity:DeleteIdentities', 'cognito-identity:SetIdentityPoolRoles',
+        'cognito-identity:UpdateIdentityPool',
+        'cognito-sync:ListRecords', 'cognito-sync:UpdateRecords', 'cognito-sync:ListDatasets',
+        'cognito-sync:DescribeDataset', 'cognito-sync:DeleteDataset', 'cognito-sync:BulkPublish',
+        'cognito-sync:SetCognitoEvents', 'cognito-sync:SetIdentityPoolConfiguration',
+        'cognito-idp:ListUsers', 'cognito-idp:AdminGetUser', 'cognito-idp:AdminCreateUser',
+        'cognito-idp:AdminDeleteUser', 'cognito-idp:AdminSetUserPassword', 'cognito-idp:AdminResetUserPassword',
+        'cognito-idp:AdminUpdateUserAttributes', 'cognito-idp:AdminAddUserToGroup',
+        'cognito-idp:AdminInitiateAuth', 'cognito-idp:AdminConfirmSignUp',
+        'iam:PassRole', 'iam:CreateUser', 'iam:CreateAccessKey', 'iam:CreateLoginProfile',
+        'iam:UpdateLoginProfile', 'iam:CreateRole', 'iam:UpdateAssumeRolePolicy', 'iam:AttachRolePolicy',
+        'iam:PutRolePolicy', 'iam:AttachUserPolicy', 'iam:PutUserPolicy', 'iam:CreatePolicyVersion',
+        'iam:SetDefaultPolicyVersion', 'sts:AssumeRole',
+        'ec2:RunInstances', 'ec2:TerminateInstances', 'ec2:GetPasswordData', 'ec2:ModifyInstanceAttribute',
+        'ec2:AuthorizeSecurityGroupIngress', 'ec2:CreateKeyPair', 'ec2:ImportKeyPair',
+    )}
 
-        - Partial wildcards (e.g. 's3:Get*') are not treated as broad.
+    # Actions commonly granted to guests on Resource '*' that act only on the
+    # caller's own request (stateless inference, analytics ingestion, the
+    # caller's own identity) and expose no stored data. A trailing '*' covers
+    # every action starting with the prefix. Anything on all resources that is
+    # neither sensitive nor listed here is reported for review (0), not PASS.
+    GUEST_SAFE_ACTIONS = tuple(a.lower() for a in (
+        'mobileanalytics:PutEvents', 'mobiletargeting:PutEvents',
+        'polly:SynthesizeSpeech', 'polly:DescribeVoices', 'polly:StartSpeechSynthesisStream',
+        'rekognition:Detect*', 'rekognition:RecognizeCelebrities', 'rekognition:CompareFaces',
+        'rekognition:GetCelebrityInfo',
+        'translate:TranslateText', 'translate:TranslateDocument',
+        'comprehend:Detect*', 'comprehend:BatchDetect*',
+        'textract:DetectDocumentText', 'textract:AnalyzeDocument', 'textract:AnalyzeExpense',
+        'textract:AnalyzeID',
+        'transcribe:StartStreamTranscription', 'transcribe:StartStreamTranscriptionWebSocket',
+        'cognito-identity:GetId', 'cognito-identity:GetCredentialsForIdentity', 'cognito-identity:GetOpenIdToken',
+        'geo:SearchPlaceIndexFor*', 'geo:GetPlace', 'geo:GetMap*', 'geo:CalculateRoute*',
+    ))
+
+    @staticmethod
+    @functools.lru_cache(maxsize=4096)
+    def _globRegex(pattern):
+        return re.compile(''.join('.*' if c == '*' else '.' if c == '?' else re.escape(c)
+                                  for c in pattern.lower()))
+
+    @classmethod
+    def _globMatch(cls, action, pattern):
+        """IAM action matching: case-insensitive, '*' any run, '?' one char."""
+        return cls._globRegex(pattern).fullmatch(action.lower()) is not None
+
+    @classmethod
+    def _covers(cls, outer, inner):
+        """Does action pattern `outer` match every action `inner` can match?
+        Exact for concrete `inner`; for wildcard `inner`, only a literal-prefix
+        `outer` ('svc:Prefix*' / '*') is recognised (otherwise False)."""
+        o, i = outer.strip().lower(), inner.strip().lower()
+        if o == i:
+            return True
+        if not any(c in i for c in '*?'):
+            return cls._globMatch(i, o)
+        if o.endswith('*') and not any(c in o[:-1] for c in '*?'):
+            return i.startswith(o[:-1])
+        return False
+
+    @classmethod
+    def _mayOverlap(cls, a, b):
+        """Conservative: could patterns a and b match a common action?"""
+        a, b = a.strip().lower(), b.strip().lower()
+        if cls._covers(a, b) or cls._covers(b, a):
+            return True
+        if not any(c in a + b for c in '*?'):
+            return False
+        sa, sb = cls._actionService(a), cls._actionService(b)
+        return sa is None or sb is None or sa == sb
+
+    @classmethod
+    def _effectiveActions(cls, action, limits):
+        """Patterns of `action` still allowed after the role's unconditional
+        Deny statements on Resource '*' (Deny '*', Deny '<svc>:*', Deny named
+        actions, Deny NotAction caps)."""
+        if limits['all']:
+            return []
+        current = [action.strip()]
+        for cap in limits['notActionCaps']:
+            nxt = []
+            for p in current:
+                for c in cap:
+                    if cls._covers(c, p):
+                        nxt.append(p)
+                    elif cls._covers(p, c):
+                        nxt.append(c.strip())
+                    elif cls._mayOverlap(p, c):
+                        nxt.append(p)
+            current = list(dict.fromkeys(nxt))
+        out = []
+        for p in current:
+            svc = cls._actionService(p)
+            if svc and svc in limits['services']:
+                continue
+            if any(cls._covers(d, p) for d in limits.get('denied', ())):
+                continue
+            out.append(p)
+        return out
+
+    @classmethod
+    def classifyAction(cls, pattern):
+        """('sensitive', example) | ('safe', None) | ('unknown', None) for an
+        action pattern granted on all resources."""
+        p = pattern.strip().lower()
+        hits = sorted(a for a in cls.SENSITIVE_ACTIONS if cls._globMatch(a, p))
+        if hits:
+            return 'sensitive', cls.SENSITIVE_ACTIONS[hits[0]]
+        if any(cls._covers(s, p) for s in cls.GUEST_SAFE_ACTIONS):
+            return 'safe', None
+        return 'unknown', None
+
+    @classmethod
+    def policyFindings(cls, doc, limits=None):
+        """(reasons, review) for one policy document granted to every guest.
+
+        reasons -- broad grants (FAIL):
+          - an Allow with Action '*' / '<service>:*' or NotAction on resources
+            not confined to the caller's own identity (on all resources, or on
+            specific resources shared by every guest, reported with the resource);
+          - on all resources (Resource '*', arn:...:*, NotResource, or every
+            resource of a type such as table/*): any action or partial wildcard
+            (e.g. 's3:Get*') matching a data-access / execution / privilege
+            action in SENSITIVE_ACTIONS.
+        review  -- actions on all resources that are neither sensitive nor known
+          guest-safe (GUEST_SAFE_ACTIONS); reported for review, not PASS.
+
         - Wildcards on resources (or conditions) keyed on
           ${cognito-identity.amazonaws.com:sub} are the documented per-identity
           pattern (e.g. cognito-sync:* on .../identity/${...:sub}/*) and are skipped.
-        - Wildcards on specific resources shared by all guests are reported with
-          the resource, because any anonymous caller gets every action on them.
+        - Named actions and partial wildcards on specific shared resources
+          (e.g. s3:GetObject on one public bucket) are not reported.
         - Unconditional Deny statements on Resource '*' (limits) narrow the allows."""
-        reasons = []
+        reasons, review = [], []
         if not isinstance(doc, dict):
-            return reasons
-        limits = limits or {'all': False, 'services': set(), 'notActionCaps': []}
+            return reasons, review
+        limits = limits or {'all': False, 'services': set(), 'notActionCaps': [], 'denied': []}
         for stmt in cls._asList(doc.get('Statement')):
             if not isinstance(stmt, dict) or stmt.get('Effect') != 'Allow':
                 continue
@@ -300,19 +515,40 @@ class CognitoIdentityPool(Evaluator):
             if 'NotAction' in stmt:
                 if cls._stillBroad('*', limits):
                     reasons.append('Allow with NotAction' + suffix)
+                elif scope == 'unscoped':
+                    cls._classifyInto('*', 'Allow with NotAction', limits, reasons, review)
                 continue
             for a in cls._asList(stmt.get('Action')):
-                if not cls._isServiceWildcard(a):
+                if not isinstance(a, str) or not a.strip():
                     continue
                 a = a.strip()
-                if cls._stillBroad(a, limits):
+                if cls._isServiceWildcard(a) and cls._stillBroad(a, limits):
                     reasons.append(f"Action '{a}'" + suffix)
-        return reasons
+                    continue
+                if scope == 'unscoped':
+                    cls._classifyInto(a, f"Action '{a}'", limits, reasons, review)
+        return reasons, review
 
     @classmethod
-    def roleBroadReasons(cls, role):
-        """Return the list of reasons a role evaluation dict grants broad access."""
-        reasons = []
+    def _classifyInto(cls, action, label, limits, reasons, review):
+        for eff in cls._effectiveActions(action, limits):
+            kind, example = cls.classifyAction(eff)
+            narrowed = '' if eff.lower() == action.lower() else f" (narrowed by Deny to '{eff}')"
+            if kind == 'sensitive':
+                inc = '' if example.lower() == eff.lower() else f", includes {example}"
+                reasons.append(f"{label}{narrowed} on all resources{inc}")
+            elif kind == 'unknown':
+                review.append(f"{label}{narrowed} on all resources")
+
+    @classmethod
+    def policyBroadReasons(cls, doc, limits=None):
+        """Broad-grant reasons of policyFindings (see there)."""
+        return cls.policyFindings(doc, limits)[0]
+
+    @classmethod
+    def roleFindings(cls, role):
+        """(reasons, review) for a role evaluation dict (see policyFindings)."""
+        reasons, review = [], []
         pols = role.get('policies') or []
         limits = cls.denyLimits([p.get('document') for p in pols])
         for pol in pols:
@@ -322,9 +558,15 @@ class CognitoIdentityPool(Evaluator):
                 if not limits['all']:
                     reasons.append(f"AWS managed policy {name}")
                 continue
-            for r in cls.policyBroadReasons(pol.get('document'), limits):
-                reasons.append(f"{name}: {r}")
-        return reasons
+            rs, rv = cls.policyFindings(pol.get('document'), limits)
+            reasons.extend(f"{name}: {r}" for r in rs)
+            review.extend(f"{name}: {r}" for r in rv)
+        return reasons, review
+
+    @classmethod
+    def roleBroadReasons(cls, role):
+        """Return the list of reasons a role evaluation dict grants broad access."""
+        return cls.roleFindings(role)[0]
 
     @classmethod
     def isLegacyDefaultGuestRole(cls, role):
@@ -375,13 +617,22 @@ class CognitoIdentityPool(Evaluator):
             self.results[key] = [0, f"Unable to evaluate ({role['error']})"]
             return
 
-        reasons = self.roleBroadReasons(role)
+        reasons, review = self.roleFindings(role)
         if not reasons and role.get('policyErrors'):
             self.results[key] = [0, f"Unable to evaluate ({role['policyErrors'][0]})"]
             return
+        if not reasons and review:
+            more = f" (+{len(review) - 3} more)" if len(review) > 3 else ""
+            self.results[key] = [
+                0, f"Guest role {roleName} grants actions on all resources that are not known to be "
+                   f"guest-safe ({'; '.join(review[:3])}{more}); review that anonymous callers "
+                   "cannot read or change data with them"
+            ]
+            return
         if not reasons:
             self.results[key] = [
-                1, f"Guest role {roleName} has no wildcard / full-access permissions"
+                1, f"Guest role {roleName} has no broad permissions (no wildcard, full-access, or "
+                   "data-access actions on all resources)"
             ]
             return
 
