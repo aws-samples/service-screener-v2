@@ -1475,7 +1475,7 @@
 	},
 	"ebsRecycleBinMissing": {
 		"category": "S",
-		"^description": "Recycle Bin not protecting backups: in {$COUNT} region(s) there is no Recycle Bin retention rule for EBS snapshots and/or AMIs, so deleted snapshots/AMIs cannot be recovered. Create region-level retention rules and lock them so they cannot be removed by a compromised principal.",
+		"^description": "Recycle Bin not protecting backups: in {$COUNT} region(s) there is no Recycle Bin retention rule for EBS snapshots and/or AMIs, so deleted snapshots/AMIs cannot be recovered. Create region-level retention rules (without exclusion tags, which leave the excluded resources unprotected) and lock them so they cannot be removed by a compromised principal.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 1,
