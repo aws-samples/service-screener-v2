@@ -386,6 +386,29 @@ class TestComplianceRequiresEvaluatedPass:
         fw._hookPostItemsLoop()
         assert t.state['securely-operate']['SelectedChoices'] == ['user-picked', 'sec-accounts']
 
+    def test_pass_on_one_resource_does_not_cover_unreadable_resource(self, tmp_path):
+        # hasOrganization passed on one resource but could not be read on
+        # another: the check is not evaluated, so the BP is not compliant.
+        _writeRaw(tmp_path, {'iam': {'GLOBAL': {
+            'Account': {'hasOrganization': [1, 'ok']},
+            'Account2': {'hasOrganization': [0, 'Unable to evaluate (AccessDenied)']}}}})
+        t = _tools()
+        fw, comp, rows = _runFramework({'iam': {'summary': {}}}, t)
+        assert comp['SEC01-BP01'] == 0
+        row = [r for r in rows if r[1].startswith('SEC01-BP01 ')][0]
+        assert 'Unable to evaluate' in row[3]
+        fw._hookPostItemsLoop()
+        assert 'sec-accounts' not in t.state['securely-operate']['SelectedChoices']
+
+    def test_informational_zero_does_not_block_pass(self, tmp_path):
+        # A status 0 that is informational (not an unreadable-data message)
+        # next to a real pass keeps the check passing.
+        _writeRaw(tmp_path, {'iam': {'GLOBAL': {
+            'Account': {'hasOrganization': [1, 'ok']},
+            'Account2': {'hasOrganization': [0, 'Shared from account 111122223333']}}}})
+        _, comp, _ = _runFramework({'iam': {'summary': {}}})
+        assert comp['SEC01-BP01'] == 1
+
     def test_failure_in_summary_is_minus_one(self, tmp_path):
         _writeRaw(tmp_path, {'iam': {'GLOBAL': {'Account': {'hasOrganization': [-1, 'no org']}}}})
         _, comp, _ = _runFramework({'iam': {'summary': _summary('hasOrganization')}})

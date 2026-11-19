@@ -52,7 +52,7 @@ frameworks run) and gives each best practice one status:
 | Status | When |
 |---|---|
 | Need attention (-1) | At least one mapped check failed |
-| Compliant (1) | At least one mapped check ran and passed, and no mapped check failed or was suppressed |
+| Compliant (1) | At least one mapped check ran and passed, and no mapped check failed or was suppressed. A check counts as passed only if no resource returned an unreadable-data result (`Unable to evaluate`, `Not evaluable`, `Unable to check`, `Could not parse`) |
 | Not available (0) | Nothing mapped could be evaluated: the service was not scanned or had no resources, the check returned `Unable to evaluate` / informational, it errored, a failure was suppressed, or the practice needs manual review |
 
 If `api-raw.json` cannot be read, no best practice is reported as compliant.

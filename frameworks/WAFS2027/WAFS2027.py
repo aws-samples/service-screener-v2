@@ -14,6 +14,11 @@ CHECK_SUPPRESSED = 'suppressed'  # failed (-1) but every failure is suppressed
 CHECK_NOT_RUN = 'notRun'         # service not scanned, no resources, or the check errored
 CHECK_EVIDENCE = 'evidence'      # <service>.$length entries: resource-count context only
 
+# Status 0 results whose message says the data could not be read. Any such
+# result makes the whole check "not evaluated", even if other resources passed.
+UNREADABLE = 'unreadable'
+UNREADABLE_PREFIXES = ('unable to evaluate', 'not evaluable', 'unable to check', 'could not parse')
+
 # Standard WA Tool pillar IDs. A title shared by several BPs in the map is
 # matched only inside the pillar its BP ID belongs to; FND (Cloud
 # Foundations) practices only outside the standard pillars.
@@ -113,8 +118,18 @@ class WAFS2027(Framework):
                             status = int(res[0])
                         except (TypeError, ValueError, IndexError, KeyError):
                             continue
+                        if status == 0 and WAFS2027._isUnreadable(res):
+                            status = UNREADABLE
                         checks.setdefault(check, set()).add(status)
         return out
+
+    @staticmethod
+    def _isUnreadable(res):
+        try:
+            msg = str(res[1] or '')
+        except (IndexError, KeyError, TypeError):
+            return False
+        return msg.strip().lower().startswith(UNREADABLE_PREFIXES)
 
     def _checkOutcome(self, serv, check):
         if serv in self.data and check in (self.data[serv].get('summary') or {}):
@@ -126,6 +141,10 @@ class WAFS2027(Framework):
             return CHECK_NOT_RUN
         if -1 in statuses:
             return CHECK_SUPPRESSED
+        # A pass on some resources does not cover resources whose data could
+        # not be read: the check as a whole is not evaluated.
+        if UNREADABLE in statuses:
+            return CHECK_NOT_EVALUATED
         if 1 in statuses:
             return CHECK_PASS
         return CHECK_NOT_EVALUATED
