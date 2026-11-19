@@ -784,3 +784,414 @@ def test_audit_framework_unreadable_and_no_plans(clients):
     r = _run(_drv(clients), m, key)
     assert r[0] == 0 and 'Unable to evaluate' in r[1]
     assert _run(_drv(clients, _account(plans=[])), m, key)[0] == 0
+
+
+# --------------------------------------------------------------------------- #
+# Discovery accuracy: unreadable listings and protection-level mismatches.
+# Driven through the real Backup discovery methods with Stubbed clients so the
+# request/response shapes are the real API model.
+# --------------------------------------------------------------------------- #
+class _NoDelBackup:
+    """Backup subclass instance without Service.__init__/__del__ side effects."""
+
+    def __new__(cls, region=REGION, partitionFallback='aws'):
+        from services.backup.Backup import Backup
+
+        class _B(Backup):
+            def __del__(self):
+                pass
+
+        svc = _B.__new__(_B)
+        svc.region = region
+        svc._vaultsError = svc._plansError = None
+        svc._vaultIndex, svc._remoteVaultCache, svc._remoteBackupClients = {}, {}, {}
+        svc.ssBoto = type('_Sess', (), {'get_partition_for_region':
+                                        staticmethod(lambda r: partitionFallback)})()
+        for name in ('backup', 'rds', 'dynamodb', 'efs', 'ec2', 'events', 'cloudwatch', 'kms'):
+            setattr(svc, f'{name}Client', _rawClient(name))
+        return svc
+
+
+@pytest.fixture
+def stsInfo():
+    """Set Config['stsInfo'] for a test and restore it afterwards."""
+    from utils.Config import Config
+    saved = Config.get('stsInfo', None)
+
+    def setter(info):
+        Config.set('stsInfo', info)
+    yield setter
+    Config.set('stsInfo', saved)
+
+
+def _stubAccountDiscovery(svc, protected=(), protectedErr=None, dbInstances=(), dbClusters=(),
+                          clustersErr=None, tables=(), filesystems=(), volumes=(), volumeFilter=None):
+    """Queue the responses Backup._discoverAccount needs; return the Stubbers."""
+    st = {n: Stubber(getattr(svc, f'{n}Client')) for n in ('backup', 'rds', 'dynamodb', 'efs', 'ec2')}
+    _err(st['backup'], 'describe_global_settings', 'InvalidRequestException', {})
+    st['backup'].add_response('describe_region_settings', {}, {})
+    if protectedErr:
+        _err(st['backup'], 'list_protected_resources', protectedErr, {})
+    else:
+        st['backup'].add_response('list_protected_resources', {'Results': [
+            {'ResourceArn': a} for a in protected]}, {})
+    st['rds'].add_response('describe_db_instances', {'DBInstances': list(dbInstances)}, {})
+    if clustersErr:
+        _err(st['rds'], 'describe_db_clusters', clustersErr, {})
+    else:
+        st['rds'].add_response('describe_db_clusters', {'DBClusters': list(dbClusters)}, {})
+    st['dynamodb'].add_response('list_tables', {'TableNames': [t['TableName'] for t in tables]}, {})
+    for t in tables:
+        st['dynamodb'].add_response('describe_table', {'Table': t}, {'TableName': t['TableName']})
+    st['efs'].add_response('describe_file_systems', {'FileSystems': list(filesystems)}, {})
+    if volumeFilter is not False:
+        st['ec2'].add_response('describe_volumes', {'Volumes': list(volumes)},
+                               {'Filters': volumeFilter or [{'Name': 'status', 'Values': ['in-use']}]})
+    return st
+
+
+def _discover(svc, st):
+    for s in st.values():
+        s.activate()
+    try:
+        acct = svc._discoverAccount([], [{'_id': 'p1', '_name': 'plan1', '_rules': []}])
+    finally:
+        for s in st.values():
+            s.deactivate()
+    for s in st.values():
+        s.assert_no_pending_responses()
+    return acct
+
+
+def _critical(acct):
+    d = BackupAccount(acct, _client('backup'))
+    d._checkBackupCriticalResourcesUnprotected()
+    return d.results['backupCriticalResourcesUnprotected']
+
+
+def _dbInstance(name, cluster=None, region=REGION, partition='aws'):
+    db = {'DBInstanceIdentifier': name, 'DBInstanceArn': f'arn:{partition}:rds:{region}:{ACCT}:db:{name}'}
+    if cluster:
+        db['DBClusterIdentifier'] = cluster
+    return db
+
+
+def _cluster(name, region=REGION, partition='aws'):
+    return {'DBClusterIdentifier': name, 'DBClusterArn': f'arn:{partition}:rds:{region}:{ACCT}:cluster:{name}'}
+
+
+def _volume(vid, instance=None):
+    v = {'VolumeId': vid, 'State': 'in-use'}
+    if instance:
+        v['Attachments'] = [{'VolumeId': vid, 'InstanceId': instance, 'State': 'attached'}]
+    return v
+
+
+def test_critical_resources_cluster_and_instance_level_protection(stsInfo):
+    """Aurora / DocumentDB / Neptune members are protected through their
+    cluster ARN, and an attached EBS volume through its EC2 instance ARN.
+    Old code compared member-instance and volume ARNs and FAILed a fully
+    protected account."""
+    stsInfo({'Account': ACCT, 'Arn': f'arn:aws:iam::{ACCT}:user/scanner'})
+    svc = _NoDelBackup()
+    kw = dict(
+        dbInstances=[_dbInstance('aurora-1-instance-1', 'aurora-1'), _dbInstance('aurora-1-instance-2', 'aurora-1'),
+                     _dbInstance('docdb-1-a', 'docdb-1'), _dbInstance('standalone')],
+        dbClusters=[_cluster('aurora-1'), _cluster('docdb-1')],
+        volumes=[_volume('vol-1', 'i-1'), _volume('vol-2', 'i-1')])
+    protected = [_cluster('aurora-1')['DBClusterArn'], _cluster('docdb-1')['DBClusterArn'],
+                 _dbInstance('standalone')['DBInstanceArn'], f'arn:aws:ec2:{REGION}:{ACCT}:instance/i-1']
+    # Fixed state: every cluster, the standalone instance and the EC2 instance
+    # are protected -> PASS (5 candidates: 2 clusters, 1 instance, 2 volumes).
+    r = _critical(_discover(svc, _stubAccountDiscovery(svc, protected=protected, **kw)))
+    assert r[0] == 1 and 'All 5 candidate' in r[1], r
+    # Misconfigured: the DocumentDB cluster is not in any plan -> FAIL naming
+    # the cluster (not its member instance).
+    r = _critical(_discover(svc, _stubAccountDiscovery(svc, protected=protected[:1] + protected[2:], **kw)))
+    assert r[0] == -1 and r[1].startswith('1/5') and 'RDS:docdb-1' in r[1] and 'docdb-1-a' not in r[1], r
+
+
+def test_critical_resources_volume_protected_by_itself_or_unprotected(stsInfo):
+    stsInfo({'Account': ACCT, 'Arn': f'arn:aws:iam::{ACCT}:user/scanner'})
+    svc = _NoDelBackup()
+    vols = [_volume('vol-1', 'i-1'), _volume('vol-2', 'i-2')]
+    r = _critical(_discover(svc, _stubAccountDiscovery(svc, volumes=vols, protected=[
+        f'arn:aws:ec2:{REGION}:{ACCT}:volume/vol-1'])))
+    assert r[0] == -1 and r[1].startswith('1/2') and 'EBS:vol-2' in r[1], r
+    r = _critical(_discover(svc, _stubAccountDiscovery(svc, volumes=vols, protected=[
+        f'arn:aws:ec2:{REGION}:{ACCT}:volume/vol-1', f'arn:aws:ec2:{REGION}:{ACCT}:instance/i-2'])))
+    assert r[0] == 1, r
+
+
+def test_critical_resources_ebs_arn_uses_account_partition(stsInfo):
+    """GovCloud / China: list_protected_resources returns arn:aws-us-gov:... -
+    the built EBS ARN must use the same partition (old code hard-coded 'aws'
+    and FAILed every protected volume)."""
+    region = 'us-gov-west-1'
+    stsInfo({'Account': ACCT, 'Arn': f'arn:aws-us-gov:iam::{ACCT}:user/scanner'})
+    svc = _NoDelBackup(region=region, partitionFallback='aws')
+    st = _stubAccountDiscovery(svc, volumes=[_volume('vol-1', 'i-1')], protected=[
+        f'arn:aws-us-gov:ec2:{region}:{ACCT}:volume/vol-1'])
+    r = _critical(_discover(svc, st))
+    assert r[0] == 1, r
+    # No caller ARN: partition comes from the region.
+    stsInfo({'Account': ACCT})
+    svc = _NoDelBackup(region='cn-north-1', partitionFallback='aws-cn')
+    st = _stubAccountDiscovery(svc, volumes=[_volume('vol-1')], protected=[
+        f'arn:aws-cn:ec2:cn-north-1:{ACCT}:volume/vol-1'])
+    assert _critical(_discover(svc, st))[0] == 1
+
+
+def test_critical_resources_unknown_account_is_not_fail(stsInfo):
+    """Without the account id no volume ARN can be built. Old code appended
+    the bare volume id, which never matches, and FAILed."""
+    stsInfo({})
+    svc = _NoDelBackup()
+    st = _stubAccountDiscovery(svc, volumeFilter=False)   # describe_volumes must not be called
+    acct = _discover(svc, st)
+    r = _critical(acct)
+    assert r[0] == 0 and 'Unable to evaluate' in r[1] and 'ec2.describe_volumes' in r[1], r
+
+
+def test_critical_resources_protected_list_unreadable_is_not_fail(stsInfo):
+    """list_protected_resources AccessDenied -> 'Unable to evaluate', not a
+    High FAIL listing every resource (old code)."""
+    stsInfo({'Account': ACCT, 'Arn': f'arn:aws:iam::{ACCT}:user/scanner'})
+    svc = _NoDelBackup()
+    st = _stubAccountDiscovery(svc, protectedErr='AccessDeniedException',
+                               dbInstances=[_dbInstance('standalone')], volumes=[_volume('vol-1', 'i-1')])
+    r = _critical(_discover(svc, st))
+    assert r == [0, 'Unable to evaluate (AccessDeniedException) - list_protected_resources failed'], r
+
+
+def test_critical_resources_enumeration_error_blocks_pass(stsInfo):
+    """A service that could not be enumerated must not let the check PASS;
+    a proven unprotected resource still FAILs."""
+    stsInfo({'Account': ACCT, 'Arn': f'arn:aws:iam::{ACCT}:user/scanner'})
+    svc = _NoDelBackup()
+    standalone = _dbInstance('standalone')
+    st = _stubAccountDiscovery(svc, clustersErr='AccessDenied', dbInstances=[standalone],
+                               protected=[standalone['DBInstanceArn']])
+    r = _critical(_discover(svc, st))
+    assert r[0] == 0 and 'rds.describe_db_clusters:AccessDenied' in r[1], r
+    st = _stubAccountDiscovery(svc, clustersErr='AccessDenied', dbInstances=[standalone])
+    r = _critical(_discover(svc, st))
+    assert r[0] == -1 and 'RDS:standalone' in r[1] and 'could not enumerate' in r[1], r
+
+
+def test_critical_resources_unattached_volumes_not_candidates(stsInfo):
+    """Only in-use volumes are enumerated (the request filter is pinned by the
+    Stubber's expected params)."""
+    stsInfo({'Account': ACCT, 'Arn': f'arn:aws:iam::{ACCT}:user/scanner'})
+    svc = _NoDelBackup()
+    acct = _discover(svc, _stubAccountDiscovery(svc))
+    assert acct['_candidateResources']['EBS'] == [] and _critical(acct)[0] == 0
+
+
+# --------------------------------------------------------------------------- #
+# backupNoPlanExists / dependent account checks: list_backup_plans unreadable
+# --------------------------------------------------------------------------- #
+def _discoverPlansWith(respOrErr):
+    svc = _NoDelBackup()
+    svc.registerItems = lambda objType, items, idFn=None: list(items)
+    stub = Stubber(svc.backupClient)
+    if isinstance(respOrErr, str):
+        _err(stub, 'list_backup_plans', respOrErr, {})
+    else:
+        stub.add_response('list_backup_plans', {'BackupPlansList': respOrErr}, {})
+    with stub:
+        plans = svc._discoverPlans()
+    stub.assert_no_pending_responses()
+    return plans, svc._plansError
+
+
+def test_no_plan_exists_list_unreadable_is_not_fail(clients):
+    plans, err = _discoverPlansWith('AccessDeniedException')
+    assert plans == [] and err == 'AccessDeniedException'
+    acct = _account(plans=plans)
+    acct['_plansError'] = err
+    d = _drv(clients, acct)
+    for m, key in (('_checkBackupNoPlanExists', 'backupNoPlanExists'),
+                   ('_checkBackupNoRestoreTestingPlan', 'backupNoRestoreTestingPlan'),
+                   ('_checkBackupAuditFrameworkMissing', 'backupAuditFrameworkMissing'),
+                   ('_checkBackupPlanNoCrossAccountCopy', 'backupPlanNoCrossAccountCopy')):
+        r = _run(d, m, key)
+        assert r[0] == 0 and 'Unable to evaluate (AccessDeniedException)' in r[1], (key, r)
+
+
+def test_no_plan_exists_flag_fix_stub(clients):
+    plans, err = _discoverPlansWith([])
+    assert plans == [] and err is None
+    r = _run(_drv(clients, _account(plans=plans)), '_checkBackupNoPlanExists', 'backupNoPlanExists')
+    assert r[0] == -1, r
+    acct = _account(plans=[{'_id': 'p1', '_name': 'plan1', '_rules': []}])
+    acct['_plansError'] = 'ThrottlingException'   # partial list: plans still exist
+    r = _run(_drv(clients, acct), '_checkBackupNoPlanExists', 'backupNoPlanExists')
+    assert r[0] == 1, r
+
+
+def test_cross_account_copy_partial_plan_list_is_not_fail(clients):
+    acct = _account(plans=[{'_id': 'p1', '_name': 'plan1', '_rules': [
+        {'RuleName': 'r', 'TargetBackupVaultName': 'v1'}]}])
+    acct['_plansError'] = 'ThrottlingException'
+    r = _run(_drv(clients, acct), '_checkBackupPlanNoCrossAccountCopy', 'backupPlanNoCrossAccountCopy')
+    assert r[0] == 0 and 'list_backup_plans failed after 1 plan(s)' in r[1], r
+    # With the full list the same plan is a proven FAIL.
+    acct['_plansError'] = None
+    r = _run(_drv(clients, acct), '_checkBackupPlanNoCrossAccountCopy', 'backupPlanNoCrossAccountCopy')
+    assert r[0] == -1, r
+
+
+def test_air_gapped_vault_partial_vault_list_is_not_fail(clients):
+    acct = _account(vaults=[{'_name': 'v1', '_vaultType': 'BACKUP_VAULT'}])
+    acct['_vaultsError'] = 'ThrottlingException'
+    r = _run(_drv(clients, acct), '_checkBackupNoLogicallyAirGappedVault', 'backupNoLogicallyAirGappedVault')
+    assert r[0] == 0 and 'Unable to evaluate' in r[1], r
+    acct['_vaultsError'] = None
+    r = _run(_drv(clients, acct), '_checkBackupNoLogicallyAirGappedVault', 'backupNoLogicallyAirGappedVault')
+    assert r[0] == -1, r
+
+
+# --------------------------------------------------------------------------- #
+# backupPlanNotAssigned: list_backup_selections unreadable
+# --------------------------------------------------------------------------- #
+def _describePlanWith(selectionsRespOrErr):
+    svc = _NoDelBackup()
+    stub = Stubber(svc.backupClient)
+    stub.add_response('get_backup_plan', {'BackupPlanId': 'p1', 'BackupPlan': {
+        'BackupPlanName': 'plan1', 'Rules': [{'RuleName': 'r', 'TargetBackupVaultName': 'v1'}]}},
+        {'BackupPlanId': 'p1'})
+    if isinstance(selectionsRespOrErr, str):
+        _err(stub, 'list_backup_selections', selectionsRespOrErr, {'BackupPlanId': 'p1'})
+    else:
+        stub.add_response('list_backup_selections', {'BackupSelectionsList': selectionsRespOrErr},
+                          {'BackupPlanId': 'p1'})
+        for s in selectionsRespOrErr:
+            stub.add_response('get_backup_selection', {'BackupSelection': {
+                'SelectionName': s['SelectionName'], 'IamRoleArn': s['IamRoleArn'],
+                'Resources': ['arn:aws:dynamodb:us-east-1:111111111111:table/t']}},
+                {'BackupPlanId': 'p1', 'SelectionId': s['SelectionId']})
+    with stub:
+        detail = svc._describePlan('p1', {'BackupPlanId': 'p1', 'BackupPlanName': 'plan1'})
+    stub.assert_no_pending_responses()
+    d = BackupPlan(detail, _client('backup'))
+    d._checkBackupPlanNotAssigned()
+    d._checkBackupMalwareScanDisabled()
+    return detail, d.results
+
+
+def test_plan_not_assigned_selections_unreadable_is_not_fail():
+    detail, res = _describePlanWith('AccessDeniedException')
+    assert detail['_selectionsError'] == 'AccessDeniedException'
+    assert res['backupPlanNotAssigned'] == [
+        0, 'Unable to evaluate (AccessDeniedException) - list_backup_selections failed'], res
+    assert res['backupMalwareScanDisabled'][0] == 0 and 'Unable to evaluate' in res['backupMalwareScanDisabled'][1]
+
+
+def test_plan_not_assigned_flag_fix_stub():
+    _, res = _describePlanWith([])
+    assert res['backupPlanNotAssigned'][0] == -1, res
+    _, res = _describePlanWith([{'SelectionId': 's1', 'SelectionName': 'sel',
+                                 'IamRoleArn': f'arn:aws:iam::{ACCT}:role/b'}])
+    assert res['backupPlanNotAssigned'][0] == 1, res
+
+
+# --------------------------------------------------------------------------- #
+# backupVaultDefaultEncryption / backupRecoveryPointNoCMK: AWS-managed key
+# --------------------------------------------------------------------------- #
+def _keyArn():
+    import uuid
+    # Unique per call: kms.describe_key answers are cached for the whole scan.
+    return f'arn:aws:kms:{REGION}:{ACCT}:key/{uuid.uuid4()}'
+
+
+def _kms(answers):
+    """kms client whose describe_key returns KeyManager per key ARN, or an
+    error for 'ERR:<code>' values. Answers are queued in call order."""
+    c = _rawClient('kms')
+    st = Stubber(c)
+    for arn, v in answers:
+        if v.startswith('ERR:'):
+            _err(st, 'describe_key', v[4:], {'KeyId': arn})
+        else:
+            st.add_response('describe_key', {'KeyMetadata': {'KeyId': arn.split('/')[-1], 'Arn': arn,
+                                                             'KeyManager': v}}, {'KeyId': arn})
+    st.activate()
+    _ACTIVE_STUBS.append(st)
+    return c, st
+
+
+def _vaultEnc(keyArn, keyType=None, kms=None, rps=None):
+    v = {'_name': 'v1', '_arn': _vaultArn('v1'), '_encryptionKeyArn': keyArn,
+         '_encryptionKeyType': keyType, '_recoveryPoints': rps or []}
+    return BackupVault(v, _client('backup'), kmsClient=kms)
+
+
+def test_vault_aws_managed_backup_key_is_fail_flag_fix():
+    """describe_backup_vault returns the aws/backup key as key/<uuid> with
+    EncryptionKeyType CUSTOMER_MANAGED_KMS_KEY (it lives in the account).
+    Old code PASSed it as 'Customer-managed KMS key'."""
+    key = 'backupVaultDefaultEncryption'
+    awsManaged, cmk = _keyArn(), _keyArn()
+    kms, st = _kms([(awsManaged, 'AWS'), (cmk, 'CUSTOMER')])
+    d = _vaultEnc(awsManaged, 'CUSTOMER_MANAGED_KMS_KEY', kms)
+    d._checkBackupVaultDefaultEncryption()
+    assert d.results[key][0] == -1 and 'AWS-managed KMS key aws/backup' in d.results[key][1], d.results
+    d = _vaultEnc(cmk, 'CUSTOMER_MANAGED_KMS_KEY', kms)
+    d._checkBackupVaultDefaultEncryption()
+    assert d.results[key][0] == 1, d.results
+    st.assert_no_pending_responses()
+
+
+def test_vault_encryption_aws_owned_and_unresolvable():
+    key = 'backupVaultDefaultEncryption'
+    # AWS-owned key type: FAIL without any KMS call.
+    kms, st = _kms([])
+    d = _vaultEnc('arn:aws:kms:us-east-1:999999999999:key/abc', 'AWS_OWNED_KMS_KEY', kms)
+    d._checkBackupVaultDefaultEncryption()
+    assert d.results[key][0] == -1
+    # Alias ARN of the AWS-managed key: FAIL without a call.
+    d = _vaultEnc(f'arn:aws:kms:{REGION}:{ACCT}:alias/aws/backup', None, kms)
+    d._checkBackupVaultDefaultEncryption()
+    assert d.results[key][0] == -1
+    # describe_key denied -> Unable to evaluate, never PASS.
+    denied = _keyArn()
+    kms, st = _kms([(denied, 'ERR:AccessDeniedException')])
+    d = _vaultEnc(denied, 'CUSTOMER_MANAGED_KMS_KEY', kms)
+    d._checkBackupVaultDefaultEncryption()
+    assert d.results[key][0] == 0 and 'AccessDeniedException' in d.results[key][1], d.results
+    # No kms client -> Unable to evaluate.
+    d = _vaultEnc(_keyArn(), None, None)
+    d._checkBackupVaultDefaultEncryption()
+    assert d.results[key][0] == 0
+
+
+def test_recovery_point_no_cmk_aws_managed_key_flag_fix():
+    key = 'backupRecoveryPointNoCMK'
+    ebsKey, cmk = _keyArn(), _keyArn()
+    kms, st = _kms([(ebsKey, 'AWS'), (cmk, 'CUSTOMER')])
+
+    def rp(arn, k, enc=True):
+        return {'RecoveryPointArn': f'arn:aws:ec2:{REGION}::snapshot/{arn}', 'EncryptionKeyArn': k,
+                'EncryptionKeyType': 'CUSTOMER_MANAGED_KMS_KEY', 'IsEncrypted': enc}
+    d = _vaultEnc(cmk, None, kms, rps=[rp('snap-1', ebsKey), rp('snap-2', cmk)])
+    d._checkBackupRecoveryPointNoCMK()
+    assert d.results[key][0] == -1 and 'snap-1' in d.results[key][1] and 'snap-2' not in d.results[key][1]
+    # Fixed: every point on the CMK (describe_key for cmk is cached - no call).
+    d = _vaultEnc(cmk, None, kms, rps=[rp('snap-2', cmk), rp('snap-3', cmk)])
+    d._checkBackupRecoveryPointNoCMK()
+    assert d.results[key][0] == 1, d.results
+    st.assert_no_pending_responses()
+
+
+def test_recovery_point_no_cmk_missing_key_is_not_pass():
+    """A point without EncryptionKeyArn was PASSed as 'customer-managed' by
+    old code. Unencrypted -> FAIL; encrypted with unknown key -> INFO."""
+    key = 'backupRecoveryPointNoCMK'
+    d = _vaultEnc(None, None, None, rps=[{'RecoveryPointArn': 'arn:aws:backup:x:y:recovery-point:rp1',
+                                          'IsEncrypted': False}])
+    d._checkBackupRecoveryPointNoCMK()
+    assert d.results[key][0] == -1 and 'not encrypted' in d.results[key][1], d.results
+    d = _vaultEnc(None, None, None, rps=[{'RecoveryPointArn': 'arn:aws:backup:x:y:recovery-point:rp1'}])
+    d._checkBackupRecoveryPointNoCMK()
+    assert d.results[key][0] == 0, d.results

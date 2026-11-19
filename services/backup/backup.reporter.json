@@ -18,7 +18,7 @@
 	},
 	"backupVaultDefaultEncryption": {
 		"category": "S",
-		"^description": "{$COUNT} AWS Backup vault(s) are encrypted with an AWS-owned KMS key (EncryptionKeyType=AWS_OWNED_KMS_KEY) rather than a customer-managed KMS key (CMK). AWS-owned keys do not permit key-policy control, cross-account grant auditing, or custom rotation policies. Regulated workloads should use a CMK.",
+		"^description": "{$COUNT} AWS Backup vault(s) are encrypted with an AWS-owned KMS key (EncryptionKeyType=AWS_OWNED_KMS_KEY) or with the AWS-managed key aws/backup (KMS KeyManager=AWS, resolved with kms:DescribeKey) rather than a customer-managed KMS key (CMK). These keys do not permit key-policy control, cross-account grant auditing, or custom rotation policies. Regulated workloads should use a CMK.",
 		"shortDesc": "Encrypt backup vaults with a customer-managed KMS key",
 		"criticality": "M",
 		"downtime": 0,
@@ -308,7 +308,7 @@
 	},
 	"backupCriticalResourcesUnprotected": {
 		"category": "R",
-		"^description": "{$COUNT} production resource(s) (RDS instances, DynamoDB tables, EFS filesystems, EBS volumes) are not protected by AWS Backup in this region. Cross-referenced against list_protected_resources — resources that appear in the account but not in the protected set have zero recovery-point coverage.",
+		"^description": "{$COUNT} production resource(s) (RDS DB instances and DB clusters, DynamoDB tables, EFS filesystems, in-use EBS volumes) are not protected by AWS Backup in this region. Cross-referenced against list_protected_resources: Aurora, DocumentDB, Neptune and Multi-AZ DB cluster members are matched at cluster level, and an EBS volume also counts as protected when the EC2 instance it is attached to is protected. Resources that appear in the account but not in the protected set have zero recovery-point coverage. When list_protected_resources or a resource listing cannot be read, the check reports 'Unable to evaluate' instead of a result.",
 		"shortDesc": "Assign every production resource to a backup plan",
 		"criticality": "H",
 		"downtime": 0,
@@ -325,7 +325,7 @@
 	},
 	"backupRecoveryPointNoCMK": {
 		"category": "S",
-		"^description": "{$COUNT} AWS Backup vault(s) contain recovery point(s) with EncryptionKeyType=AWS_OWNED_KMS_KEY. Similar to the vault-level check, but at the recovery-point level — AWS-owned keys do not allow cross-account sharing or custom rotation policies. Often redundant with backupVaultDefaultEncryption; useful for older points created before a vault migration.",
+		"^description": "{$COUNT} AWS Backup vault(s) contain recovery point(s) that are not on a customer-managed KMS key: EncryptionKeyType=AWS_OWNED_KMS_KEY, an AWS-managed key such as aws/backup, aws/ebs or aws/rds (KMS KeyManager=AWS, resolved with kms:DescribeKey), or no encryption at all. Similar to the vault-level check, but at the recovery-point level; AWS-owned and AWS-managed keys do not allow cross-account sharing or custom rotation policies. Often redundant with backupVaultDefaultEncryption; useful for older points created before a vault migration and for points whose encryption is inherited from the source resource.",
 		"shortDesc": "Re-encrypt recovery points onto a customer-managed KMS key",
 		"criticality": "L",
 		"downtime": 0,

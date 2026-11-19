@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+import botocore
+
 from services.Evaluator import Evaluator
 from utils import PolicyPrincipal
 
@@ -9,7 +11,7 @@ class BackupVault(Evaluator):
     Per-vault checks. Nine checks in total:
 
       - backupVaultNoLock              (S/H)   Vault Lock disabled
-      - backupVaultDefaultEncryption   (S/M)   AWS-owned KMS key
+      - backupVaultDefaultEncryption   (S/M)   AWS-owned / AWS-managed (aws/backup) KMS key
       - backupVaultNoAccessPolicy      (S/H)   No policy or open policy
       - airGappedVaultNoMpa            (S/L)   LAG vault without MPA team
       - backupVaultEmpty               (R/L)   Zero recovery points > 7 days old
@@ -17,20 +19,28 @@ class BackupVault(Evaluator):
       - backupRecoveryPointNotEncrypted (S/M)  IsEncrypted=false on any point
       - backupRecoveryPointNeverRestored (R/M) LastRestoreTime null for all
       - backupRecoveryPointExpiredLifecycle (C/L) Status=EXPIRED on any point
-      - backupRecoveryPointNoCMK       (S/L)   AWS_OWNED_KMS_KEY on any point
+      - backupRecoveryPointNoCMK       (S/L)   Any point not on a customer-managed KMS key
       - backupRetentionBelowDetectionWindow (S/M) Vault Lock MinRetentionDays < 35
 
     Input:
       vault -- dict produced by Backup.py._describeVault.
       backupClient -- boto3 backup client (retained for future extension).
+      kmsClient    -- optional boto3 kms client. kms:DescribeKey (read-only)
+                      resolves KeyManager, the only reliable way to tell a
+                      customer-managed key from the AWS-managed aws/backup
+                      key: describe_backup_vault returns both as a plain
+                      key/<uuid> ARN, and EncryptionKeyType only separates
+                      AWS-owned keys from keys in the customer's account.
 
     Recovery-point checks operate on a sample of up to
     Backup.RECOVERY_POINT_SAMPLE_LIMIT points.
     """
 
-    # AWS Backup's service-owned key aliases / ARN fragments.
+    # Alias ARN fragment of AWS-managed keys (alias/aws/backup, alias/aws/ebs,
+    # ...). Only matches when the API returns an alias ARN; key/<uuid> ARNs
+    # are resolved with kms:DescribeKey.
     AWS_OWNED_KMS_ALIASES = (
-        'aws/backup',    # standard service-managed alias
+        ':alias/aws/',
     )
     AWS_OWNED_KMS_TYPE = 'AWS_OWNED_KMS_KEY'
 
@@ -50,10 +60,11 @@ class BackupVault(Evaluator):
         'aws/dynamodb/',                  # DynamoDB service-managed
     )
 
-    def __init__(self, vault, backupClient):
+    def __init__(self, vault, backupClient, kmsClient=None):
         super().__init__()
         self.vault = vault
         self.backupClient = backupClient
+        self.kmsClient = kmsClient
 
         self._resourceName = vault.get('_name', 'unknown')
         self.recovery_points = vault.get('_recoveryPoints') or []
@@ -91,8 +102,9 @@ class BackupVault(Evaluator):
     # 2. Default (AWS-owned) encryption key
     # ------------------------------------------------------------------ #
     def _checkBackupVaultDefaultEncryption(self):
+        key = 'backupVaultDefaultEncryption'
         if self._isServiceDefaultVault():
-            self.results['backupVaultDefaultEncryption'] = [
+            self.results[key] = [
                 0, "Service-managed default vault uses AWS-managed key by design"
             ]
             return
@@ -100,20 +112,32 @@ class BackupVault(Evaluator):
         keyType = self.vault.get('_encryptionKeyType')
         keyArn = self.vault.get('_encryptionKeyArn') or ''
 
-        if keyType == self.AWS_OWNED_KMS_TYPE or self._keyArnIsAwsOwned(keyArn):
-            self.results['backupVaultDefaultEncryption'] = [
+        if keyType == self.AWS_OWNED_KMS_TYPE:
+            self.results[key] = [
                 -1,
-                f"Encrypted with AWS-owned key ({keyArn or 'default'}); prefer a customer-managed KMS key"
+                f"Encrypted with an AWS-owned KMS key ({keyArn or 'default'}); prefer a customer-managed KMS key"
             ]
-        elif not keyArn:
+            return
+        if not keyArn:
             # AWS Backup always encrypts, but we cannot confirm the key type
             # in this response — flag as INFO rather than PASS.
-            self.results['backupVaultDefaultEncryption'] = [
+            self.results[key] = [
                 0, "EncryptionKeyArn not returned by API — cannot determine"
             ]
+            return
+
+        manager, err = self._keyManager(keyArn)
+        if manager == 'CUSTOMER':
+            self.results[key] = [1, f"Customer-managed KMS key: {keyArn}"]
+        elif manager == 'AWS':
+            self.results[key] = [
+                -1,
+                f"Encrypted with the AWS-managed KMS key aws/backup ({keyArn}); "
+                "prefer a customer-managed KMS key"
+            ]
         else:
-            self.results['backupVaultDefaultEncryption'] = [
-                1, f"Customer-managed KMS key: {keyArn}"
+            self.results[key] = [
+                0, f"Unable to evaluate ({err}) - KMS key manager of {keyArn} could not be read"
             ]
 
     # ------------------------------------------------------------------ #
@@ -356,31 +380,57 @@ class BackupVault(Evaluator):
     # 9. Recovery points using AWS-owned key
     # ------------------------------------------------------------------ #
     def _checkBackupRecoveryPointNoCMK(self):
+        key = 'backupRecoveryPointNoCMK'
         if not self.recovery_points:
-            self.results['backupRecoveryPointNoCMK'] = [
+            self.results[key] = [
                 0, "No recovery points sampled in this vault"
             ]
             return
 
-        aws_owned = []
+        nonCmk, unencrypted, unknown = [], [], []
         for rp in self.recovery_points:
             keyType = rp.get('EncryptionKeyType')
             keyArn = rp.get('EncryptionKeyArn') or ''
-            if keyType == self.AWS_OWNED_KMS_TYPE or (
-                keyArn and self._keyArnIsAwsOwned(keyArn)
-            ):
-                aws_owned.append(rp)
+            if keyType == self.AWS_OWNED_KMS_TYPE:
+                nonCmk.append(rp)
+                continue
+            if not keyArn:
+                # No key reported: unencrypted points are certainly not on a
+                # CMK; otherwise the key cannot be determined.
+                (unencrypted if rp.get('IsEncrypted') is False else unknown).append(
+                    (rp, 'EncryptionKeyArn not returned'))
+                continue
+            manager, err = self._keyManager(keyArn)
+            if manager == 'CUSTOMER':
+                continue
+            if manager == 'AWS':
+                nonCmk.append(rp)
+            else:
+                unknown.append((rp, err))
 
-        if aws_owned:
-            names = [self._rpShortId(rp) for rp in aws_owned[:5]]
-            more = f" (+{len(aws_owned) - 5} more)" if len(aws_owned) > 5 else ""
-            self.results['backupRecoveryPointNoCMK'] = [
-                -1,
-                f"Recovery point(s) encrypted with AWS-owned key: {', '.join(names)}{more}"
+        if nonCmk or unencrypted:
+            parts = []
+            if nonCmk:
+                names = [self._rpShortId(rp) for rp in nonCmk[:5]]
+                more = f" (+{len(nonCmk) - 5} more)" if len(nonCmk) > 5 else ""
+                parts.append(f"encrypted with an AWS-owned or AWS-managed key: {', '.join(names)}{more}")
+            if unencrypted:
+                names = [self._rpShortId(rp) for rp, _ in unencrypted[:5]]
+                more = f" (+{len(unencrypted) - 5} more)" if len(unencrypted) > 5 else ""
+                parts.append(f"not encrypted: {', '.join(names)}{more}")
+            self.results[key] = [
+                -1, f"Recovery point(s) not on a customer-managed KMS key - {'; '.join(parts)}"
+                + (f"; {len(unknown)} point(s) could not be evaluated" if unknown else "")
+            ]
+        elif unknown:
+            reasons = sorted({str(r) for _, r in unknown})
+            self.results[key] = [
+                0, f"Unable to evaluate ({', '.join(reasons[:3])}) for {len(unknown)} of "
+                   f"{len(self.recovery_points)} sampled recovery point(s)"
             ]
         else:
-            self.results['backupRecoveryPointNoCMK'] = [
-                1, "All sampled recovery points use a customer-managed KMS key"
+            self.results[key] = [
+                1, f"All {len(self.recovery_points)} sampled recovery points use a customer-managed KMS key"
             ]
 
     # ------------------------------------------------------------------ #
@@ -397,10 +447,34 @@ class BackupVault(Evaluator):
 
     @classmethod
     def _keyArnIsAwsOwned(cls, keyArn):
+        """True for an alias ARN of an AWS-managed key (alias/aws/...)."""
         if not keyArn:
             return False
         lower = keyArn.lower()
         return any(alias in lower for alias in cls.AWS_OWNED_KMS_ALIASES)
+
+    def _keyManager(self, keyArn):
+        """Return (KeyManager, None) - 'CUSTOMER' or 'AWS' - or (None, reason)
+        when it cannot be determined. AWS-managed alias ARNs are recognised
+        without an API call; everything else is resolved with kms:DescribeKey
+        (read-only), cached for the whole scan because many vaults and
+        recovery points share one key."""
+        if self._keyArnIsAwsOwned(keyArn):
+            return 'AWS', None
+        if self.kmsClient is None:
+            return None, 'kms client unavailable'
+
+        def fetch():
+            return (self.kmsClient.describe_key(KeyId=keyArn).get('KeyMetadata') or {}).get('KeyManager')
+        try:
+            manager = self._sharedMemo(('kms.describe_key', keyArn), fetch)
+        except botocore.exceptions.ClientError as e:
+            return None, e.response.get('Error', {}).get('Code') or 'ClientError'
+        except botocore.exceptions.BotoCoreError as e:
+            return None, type(e).__name__
+        if manager in ('CUSTOMER', 'AWS'):
+            return manager, None
+        return None, f"KeyManager={manager}"
 
     @staticmethod
     def _asDatetime(value):

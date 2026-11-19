@@ -9,6 +9,8 @@ or a false FAIL when the data is unreadable.
 import json
 import time
 
+import pytest
+
 from tests.emulator.conftest import assertFlagFixCycle, runCheck
 
 ROLE = 'arn:aws:iam::000000000000:role/ss-backup-test'
@@ -497,3 +499,66 @@ def test_audit_framework_missing(emu, uid):
         _retry(lambda: b.delete_framework(FrameworkName=fw))
         _deletePlan(b, planId)
         _deleteVault(b, vault)
+
+
+# --------------------------------------------------------------------------- #
+# backupVaultDefaultEncryption: a vault created without EncryptionKeyArn uses
+# the AWS-managed aws/backup key, returned as a plain key/<uuid> ARN. Only
+# kms:DescribeKey (KeyManager) tells it apart from a customer-managed key.
+# A vault's key cannot be changed, so the fix recreates the vault with a CMK.
+# --------------------------------------------------------------------------- #
+def test_vault_default_encryption_aws_managed_key(emu, uid):
+    b, kms = emu.client('backup'), emu.client('kms')
+    vault = f'ss-enc-{uid}'
+    cmk = kms.create_key(Description=f'ss-backup-test-{uid}')['KeyMetadata']['Arn']
+    try:
+        def misconfigure():
+            b.create_backup_vault(BackupVaultName=vault)
+            keyArn = b.describe_backup_vault(BackupVaultName=vault)['EncryptionKeyArn']
+            assert ':key/' in keyArn and 'alias' not in keyArn, keyArn
+            assert kms.describe_key(KeyId=keyArn)['KeyMetadata']['KeyManager'] == 'AWS'
+
+        def fix():
+            _deleteVault(b, vault)
+            b.create_backup_vault(BackupVaultName=vault, EncryptionKeyArn=cmk)
+
+        assertFlagFixCycle(emu, 'backup', 'backupVaultDefaultEncryption', f'Vault::{vault}',
+                           misconfigure, fix)
+    finally:
+        _deleteVault(b, vault)
+        try:
+            kms.schedule_key_deletion(KeyId=cmk, PendingWindowInDays=7)
+        except Exception:
+            pass
+
+
+# --------------------------------------------------------------------------- #
+# backupCriticalResourcesUnprotected: list_protected_resources is
+# NotImplemented in the emulator - exactly the 'protected set unreadable'
+# case. With an unprotected-looking candidate present the check must report
+# 'Unable to evaluate', never FAIL every resource. The PASS / FAIL paths
+# (cluster-level and instance-level protection, partitions) are in
+# tests/test_stub_backup.py.
+# --------------------------------------------------------------------------- #
+def test_critical_resources_protected_list_unreadable(emu, uid):
+    ddb = emu.client('dynamodb')
+    table = f'ss-crit-{uid}'
+    ddb.create_table(TableName=table, BillingMode='PAY_PER_REQUEST',
+                     AttributeDefinitions=[{'AttributeName': 'k', 'AttributeType': 'S'}],
+                     KeySchema=[{'AttributeName': 'k', 'KeyType': 'HASH'}])
+    try:
+        try:
+            emu.client('backup').list_protected_resources()
+            pytest.skip('emulator now implements list_protected_resources')
+        except Exception as e:
+            assert getattr(e, 'response', {}).get('Error', {}).get('Code') == 'NotImplemented', e
+        res = runCheck(emu, 'backup', 'backupCriticalResourcesUnprotected', 'Account::us-east-1')
+        assert res.statuses() and all(s == 0 for s in res.statuses().values()), res.results
+        msgs = [m for r in res.results.values() for k, m in r.items()
+                if k.lower() == 'backupcriticalresourcesunprotected']
+        assert any('Unable to evaluate (NotImplemented)' in str(m) for m in msgs), msgs
+    finally:
+        try:
+            ddb.delete_table(TableName=table)
+        except Exception:
+            pass

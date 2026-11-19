@@ -77,7 +77,13 @@ class BackupAccount(Evaluator):
     # ------------------------------------------------------------------ #
     def _checkBackupNoPlanExists(self):
         plans = self.account.get('_plans') or []
-        if plans:
+        err = self.account.get('_plansError')
+        if err and not plans:
+            # list_backup_plans failed: plans may well exist.
+            self.results['backupNoPlanExists'] = [
+                0, f"Unable to evaluate ({err}) - list_backup_plans failed"
+            ]
+        elif plans:
             self.results['backupNoPlanExists'] = [
                 1, f"{len(plans)} backup plan(s) present"
             ]
@@ -202,52 +208,72 @@ class BackupAccount(Evaluator):
     # 5. Critical resources without backup coverage
     # ------------------------------------------------------------------ #
     def _checkBackupCriticalResourcesUnprotected(self):
+        key = 'backupCriticalResourcesUnprotected'
+        protectedErr = self.account.get('_protectedArnsError')
+        if protectedErr:
+            # list_protected_resources failed: the protected set is empty or
+            # partial, so "not in it" proves nothing.
+            self.results[key] = [
+                0, f"Unable to evaluate ({protectedErr}) - list_protected_resources failed"
+            ]
+            return
         protected = self.account.get('_protectedArns') or set()
         candidates = self.account.get('_candidateResources') or {}
+        enumErrors = list(self.account.get('_candidateErrors') or [])
 
-        # Flatten candidates into (service, arn) pairs.
+        # Flatten candidates into (service, candidate) pairs. A candidate is
+        # {'arn', 'protectedBy'} (Backup._candidate); a bare ARN string is
+        # protected only by itself.
         flat = []
-        for svc, arns in candidates.items():
-            for arn in arns or []:
-                flat.append((svc, arn))
+        for svc, items in candidates.items():
+            for c in items or []:
+                if isinstance(c, str):
+                    c = {'arn': c, 'protectedBy': [c]}
+                flat.append((svc, c))
 
-        if not flat:
-            self.results['backupCriticalResourcesUnprotected'] = [
+        unprotected = [(svc, c['arn']) for svc, c in flat
+                       if not any(a in protected for a in (c.get('protectedBy') or [c['arn']]))]
+        errNote = ((f"; could not enumerate: {', '.join(enumErrors[:3])}"
+                    + (f" (+{len(enumErrors) - 3} more)" if len(enumErrors) > 3 else ""))
+                   if enumErrors else "")
+
+        if unprotected:
+            # Truncate output for readability but keep the count accurate.
+            preview = [f"{svc}:{self._shortArn(arn)}" for svc, arn in unprotected[:5]]
+            more = f" (+{len(unprotected) - 5} more)" if len(unprotected) > 5 else ""
+            self.results[key] = [
+                -1,
+                f"{len(unprotected)}/{len(flat)} candidate resource(s) unprotected: "
+                f"{', '.join(preview)}{more}{errNote}"
+            ]
+        elif enumErrors:
+            # Nothing unprotected among what could be read, but some services
+            # could not be enumerated - not a proven PASS.
+            self.results[key] = [
                 0,
-                "No candidate resources discovered across RDS/DynamoDB/EFS/EBS"
+                f"Unable to evaluate ({', '.join(enumErrors[:3])}"
+                + (f" +{len(enumErrors) - 3} more" if len(enumErrors) > 3 else "")
+                + f"); {len(flat)} enumerated candidate resource(s) are protected"
             ]
-            return
-
-        unprotected = []
-        for svc, arn in flat:
-            if arn not in protected:
-                unprotected.append((svc, arn))
-
-        if not unprotected:
-            self.results['backupCriticalResourcesUnprotected'] = [
-                1,
-                f"All {len(flat)} candidate resource(s) are protected by AWS Backup"
+        elif not flat:
+            self.results[key] = [
+                0, "No candidate resources discovered across RDS/DynamoDB/EFS/EBS"
             ]
-            return
-
-        # Truncate output for readability but keep the count accurate.
-        preview = [f"{svc}:{arn.split('/')[-1] if '/' in arn else arn.split(':')[-1]}"
-                   for svc, arn in unprotected[:5]]
-        more = f" (+{len(unprotected) - 5} more)" if len(unprotected) > 5 else ""
-        self.results['backupCriticalResourcesUnprotected'] = [
-            -1,
-            f"{len(unprotected)}/{len(flat)} candidate resource(s) unprotected: "
-            f"{', '.join(preview)}{more}"
-        ]
+        else:
+            self.results[key] = [
+                1, f"All {len(flat)} candidate resource(s) are protected by AWS Backup"
+            ]
 
     # ------------------------------------------------------------------ #
     # 6. No logically air-gapped vault
     # ------------------------------------------------------------------ #
     def _checkBackupNoLogicallyAirGappedVault(self):
         vaults = self.account.get('_vaults') or []
+        vaultsErr = self.account.get('_vaultsError')
         if not vaults:
             self.results['backupNoLogicallyAirGappedVault'] = [
-                0, "No backup vaults exist in this region"
+                0, (f"Unable to evaluate ({vaultsErr}) - list_backup_vaults failed" if vaultsErr
+                    else "No backup vaults exist in this region")
             ]
             return
 
@@ -259,6 +285,12 @@ class BackupAccount(Evaluator):
         if has_air_gapped:
             self.results['backupNoLogicallyAirGappedVault'] = [
                 1, "At least one logically air-gapped vault exists"
+            ]
+        elif vaultsErr:
+            # Vault listing was cut short: an air-gapped vault may be unlisted.
+            self.results['backupNoLogicallyAirGappedVault'] = [
+                0, f"Unable to evaluate ({vaultsErr}) - list_backup_vaults failed after "
+                   f"{len(vaults)} vault(s)"
             ]
         else:
             self.results['backupNoLogicallyAirGappedVault'] = [
@@ -363,8 +395,9 @@ class BackupAccount(Evaluator):
     def _checkBackupPlanNoCrossAccountCopy(self):
         key = 'backupPlanNoCrossAccountCopy'
         plans = self.account.get('_plans') or []
+        plansErr = self.account.get('_plansError')
         if not plans:
-            self.results[key] = [0, "No backup plans in this region - see backupNoPlanExists"]
+            self.results[key] = [0, self._noPlansMessage()]
             return
 
         own = self.account.get('_accountId')
@@ -410,6 +443,12 @@ class BackupAccount(Evaluator):
                 f"{', '.join(sorted(set(airGapped))[:5])} store backups in a logically air-gapped vault "
                 "(AWS-managed account isolation)"
             ]
+        elif plansErr:
+            # Only part of the plan list was read; an unlisted plan may copy.
+            self.results[key] = [
+                0, f"Unable to evaluate ({plansErr}) - list_backup_plans failed after "
+                   f"{len(plans)} plan(s)"
+            ]
         elif unreadable:
             self.results[key] = [
                 0, f"Unable to evaluate (get_backup_plan failed for {', '.join(unreadable[:5])})"
@@ -441,10 +480,16 @@ class BackupAccount(Evaluator):
         vaults = self.account.get('_vaults') or []
         plans = self.account.get('_plans') or []
         if not vaults and not plans:
-            self.results[key] = [0, "AWS Backup not in use in this region (no vaults or plans)"]
+            errs = [f"{op}:{c}" for op, c in (('list_backup_vaults', self.account.get('_vaultsError')),
+                                             ('list_backup_plans', self.account.get('_plansError'))) if c]
+            self.results[key] = [0, (f"Unable to evaluate ({', '.join(errs)})" if errs
+                                     else "AWS Backup not in use in this region (no vaults or plans)")]
             return
 
         evidence, unknown = [], []
+        if self.account.get('_vaultsError'):
+            # Vaults beyond the failed page cannot be checked for notifications.
+            unknown.append(f"list_backup_vaults:{self.account['_vaultsError']}")
 
         # a) Enabled EventBridge rule matching failed aws.backup job events
         if self.eventsClient is not None:
@@ -523,7 +568,10 @@ class BackupAccount(Evaluator):
 
     def _ruleTargetVaultNames(self):
         """Names of vaults that backup rules write to, or None when any plan's
-        rules are unknown (checkpointed / unreadable) - then all vaults count."""
+        rules are unknown (checkpointed / unreadable / plan list incomplete) -
+        then all vaults count."""
+        if self.account.get('_plansError'):
+            return None
         names = set()
         for plan in self.account.get('_plans') or []:
             rules = plan.get('_rules')
@@ -540,7 +588,7 @@ class BackupAccount(Evaluator):
     def _checkBackupNoRestoreTestingPlan(self):
         key = 'backupNoRestoreTestingPlan'
         if not (self.account.get('_plans') or []):
-            self.results[key] = [0, "No backup plans in this region - see backupNoPlanExists"]
+            self.results[key] = [0, self._noPlansMessage()]
             return
         empty, ok = [], []
         try:
@@ -581,7 +629,7 @@ class BackupAccount(Evaluator):
     def _checkBackupAuditFrameworkMissing(self):
         key = 'backupAuditFrameworkMissing'
         if not (self.account.get('_plans') or []):
-            self.results[key] = [0, "No backup plans in this region - see backupNoPlanExists"]
+            self.results[key] = [0, self._noPlansMessage()]
             return
         try:
             frameworks = self._listAllTokens('list_frameworks', 'Frameworks')
@@ -617,6 +665,12 @@ class BackupAccount(Evaluator):
     # ------------------------------------------------------------------ #
     # Helpers
     # ------------------------------------------------------------------ #
+    def _noPlansMessage(self):
+        err = self.account.get('_plansError')
+        if err:
+            return f"Unable to evaluate ({err}) - list_backup_plans failed"
+        return "No backup plans in this region - see backupNoPlanExists"
+
     def _listAllTokens(self, op, listKey, **kwargs):
         """List every item of a NextToken-paginated backup API that has no
         boto3 paginator (list_frameworks, list_report_plans)."""
@@ -682,6 +736,8 @@ class BackupAccount(Evaluator):
             for v in localVaults:
                 if v.get('_name') == name:
                     return (v.get('_vaultType') or '').upper() == self.LOGICALLY_AIR_GAPPED, None
+            if self.account.get('_vaultsError'):
+                return False, 'vault list incomplete'
             # Not in this Region's vault list (deleted / renamed): a copy to
             # it cannot be isolating anything.
             return False, None

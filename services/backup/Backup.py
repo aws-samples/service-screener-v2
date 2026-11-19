@@ -61,6 +61,9 @@ class Backup(Service):
         self.dynamodbClient = ssBoto.client('dynamodb', config=self.bConfig)
         self.efsClient = ssBoto.client('efs', config=self.bConfig)
         self.ec2Client = ssBoto.client('ec2', config=self.bConfig)
+        # kms:DescribeKey (read-only) tells a customer-managed key apart from
+        # the AWS-managed aws/backup key, which EncryptionKeyType does not.
+        self.kmsClient = ssBoto.client('kms', config=self.bConfig)
         # Alerting evidence for backupNoFailureAlerting (read-only calls).
         self.eventsClient = ssBoto.client('events', config=self.bConfig)
         self.cloudwatchClient = ssBoto.client('cloudwatch', config=self.bConfig)
@@ -72,6 +75,10 @@ class Backup(Service):
         # other Regions of this account: {vaultArn: summary|None}.
         self._remoteVaultCache = {}
         self._remoteBackupClients = {}
+        # Error codes of failed list calls. A failed listing must read as
+        # 'Unable to evaluate', never as 'nothing exists'.
+        self._vaultsError = None
+        self._plansError = None
 
     # ------------------------------------------------------------------ #
     # Discovery
@@ -120,8 +127,10 @@ class Backup(Service):
                     _pi('Backup', f"Vault: {name}")
                     vaults.append(detail)
         except botocore.exceptions.ClientError as e:
+            self._vaultsError = self._errCode(e)
             self._logClientError('list_backup_vaults', e)
         except botocore.exceptions.EndpointConnectionError as e:
+            self._vaultsError = 'EndpointConnectionError'
             print(f"AWS Backup not available in region {self.region}: {e}")
         return vaults
 
@@ -247,9 +256,12 @@ class Backup(Service):
                     _pi('Backup', f"Plan: {detail.get('_name', plan_id)}")
                     plans.append(detail)
         except botocore.exceptions.ClientError as e:
+            # Recorded so backupNoPlanExists reports 'Unable to evaluate'
+            # instead of 'No backup plans exist' (the list may be partial).
+            self._plansError = self._errCode(e)
             self._logClientError('list_backup_plans', e)
         except botocore.exceptions.EndpointConnectionError:
-            pass
+            self._plansError = 'EndpointConnectionError'
         return plans
 
     def _describePlan(self, planId, summary):
@@ -260,7 +272,7 @@ class Backup(Service):
             return None
 
         plan_body = resp.get('BackupPlan') or {}
-        selections = self._listSelections(planId)
+        selections, selectionsError = self._listSelections(planId)
 
         detail = {
             '_id': planId,
@@ -268,6 +280,9 @@ class Backup(Service):
             '_arn': resp.get('BackupPlanArn') or summary.get('BackupPlanArn'),
             '_rules': plan_body.get('Rules') or [],
             '_selections': selections,
+            # Error code when list_backup_selections failed (the list may be
+            # empty or partial) - backupPlanNotAssigned must not FAIL on it.
+            '_selectionsError': selectionsError,
             '_scanSettings': plan_body.get('ScanSettings') or [],
             '_creationDate': resp.get('CreationDate') or summary.get('CreationDate'),
         }
@@ -276,7 +291,10 @@ class Backup(Service):
     def _listSelections(self, planId):
         """Return every BackupSelection attached to a plan, hydrated with the
         Resources / ListOfTags / Conditions fields (which list_backup_selections
-        does not include — those require get_backup_selection)."""
+        does not include — those require get_backup_selection).
+
+        Returns (selections, errorCode); errorCode is None when the whole
+        listing was read."""
         selections = []
         try:
             paginator = self.backupClient.get_paginator('list_backup_selections')
@@ -290,7 +308,8 @@ class Backup(Service):
                     selections.append(detail)
         except botocore.exceptions.ClientError as e:
             self._logClientError(f'list_backup_selections({planId})', e)
-        return selections
+            return selections, self._errCode(e)
+        return selections, None
 
     def _getSelectionDetail(self, planId, selectionId, summary):
         """Merge get_backup_selection's BackupSelection body (Resources,
@@ -318,19 +337,23 @@ class Backup(Service):
     def _discoverAccount(self, vaults, plans):
         global_settings = self._describeGlobalSettings()
         region_settings = self._describeRegionSettings()
-        protected_arns = self._listProtectedResources()
-        candidate_resources = self._enumerateBackupCandidates()
+        protected_arns, protected_error = self._listProtectedResources()
+        candidate_resources, candidate_errors = self._enumerateBackupCandidates()
 
         return {
             '_name': self.region,
             '_region': self.region,
             '_accountId': self._callerAccountId(),
             '_vaults': vaults,
+            '_vaultsError': self._vaultsError,
             '_plans': plans,
+            '_plansError': self._plansError,
             '_globalSettings': global_settings,
             '_regionSettings': region_settings,
             '_protectedArns': protected_arns,
+            '_protectedArnsError': protected_error,
             '_candidateResources': candidate_resources,
+            '_candidateErrors': candidate_errors,
             '_criticalServicesOptIn': self.CRITICAL_SERVICES_OPT_IN,
             '_managedServices': self.MANAGED_SERVICES,
         }
@@ -377,9 +400,11 @@ class Backup(Service):
             }
 
     def _listProtectedResources(self):
-        """Return a set of ARNs for every resource that AWS Backup has taken
-        at least one recovery point of. Used by
-        backupCriticalResourcesUnprotected as the 'protected' set."""
+        """Return (arns, errorCode): the ARNs of every resource that AWS Backup
+        has taken at least one recovery point of, used by
+        backupCriticalResourcesUnprotected as the 'protected' set. errorCode is
+        set when the listing failed - the set is then empty or partial and the
+        check must not treat its absence as 'unprotected'."""
         arns = set()
         try:
             paginator = self.backupClient.get_paginator('list_protected_resources')
@@ -390,98 +415,157 @@ class Backup(Service):
                         arns.add(arn)
         except botocore.exceptions.ClientError as e:
             self._logClientError('list_protected_resources', e)
-        return arns
+            return arns, self._errCode(e)
+        except botocore.exceptions.EndpointConnectionError:
+            return arns, 'EndpointConnectionError'
+        return arns, None
 
     def _enumerateBackupCandidates(self):
         """Enumerate resources across RDS/DynamoDB/EFS/EC2 that ought to be
-        backed up. Returns a dict of {service: [arn, ...]}. Every call is
-        wrapped in its own try/except so a single service failing does not
-        block the others; the check reports what it could enumerate."""
-        return {
-            'RDS': self._enumRdsInstances(),
-            'DynamoDB': self._enumDynamoTables(),
-            'EFS': self._enumEfsFilesystems(),
-            'EBS': self._enumEbsVolumes(),
-        }
+        backed up. Returns ({service: [candidate, ...]}, [error, ...]).
+
+        A candidate is a dict {'arn': <ARN shown in the report>, 'protectedBy':
+        [ARNs any one of which, when in list_protected_resources, protects it]}.
+        AWS Backup protects some resources at a different level than the one
+        they are listed at: Aurora / DocumentDB / Neptune per cluster, and EBS
+        volumes also through a backup of the EC2 instance they are attached to.
+
+        Every service is enumerated independently so one failing does not
+        block the others; errors are returned (as 'service.operation:code')
+        so the check reports 'Unable to evaluate' instead of a PASS that
+        silently skipped a service."""
+        errors = []
+        out = {}
+        for svc, fn in (('RDS', self._enumRdsInstances), ('DynamoDB', self._enumDynamoTables),
+                        ('EFS', self._enumEfsFilesystems), ('EBS', self._enumEbsVolumes)):
+            items, errs = fn()
+            out[svc] = items
+            errors.extend(errs)
+        return out, errors
+
+    @staticmethod
+    def _candidate(arn, protectedBy=None):
+        return {'arn': arn, 'protectedBy': list(protectedBy or [arn])}
 
     def _enumRdsInstances(self):
-        arns = []
+        """RDS DB instances and DB clusters. Instances that belong to a cluster
+        (Aurora, DocumentDB, Neptune, Multi-AZ DB clusters) are backed up by
+        AWS Backup per cluster, so list_protected_resources reports the
+        cluster ARN (arn:<p>:rds:<r>:<acct>:cluster:<id>), never the member
+        instance ARN. Those instances are folded into one cluster candidate;
+        clusters with no instances are added from describe_db_clusters."""
+        items, errors = [], []
+        clusterArns = {}
         try:
             paginator = self.rdsClient.get_paginator('describe_db_instances')
             for page in paginator.paginate():
                 for db in page.get('DBInstances', []) or []:
                     arn = db.get('DBInstanceArn')
-                    if arn:
-                        arns.append(arn)
+                    if not arn:
+                        continue
+                    clusterId = db.get('DBClusterIdentifier')
+                    if clusterId and ':db:' in arn:
+                        clusterArns.setdefault(
+                            f"{arn.rsplit(':db:', 1)[0]}:cluster:{clusterId}", True)
+                        continue
+                    items.append(self._candidate(arn))
         except botocore.exceptions.ClientError as e:
             self._logClientError('rds.describe_db_instances', e)
+            errors.append(f"rds.describe_db_instances:{self._errCode(e)}")
         except botocore.exceptions.EndpointConnectionError:
-            pass
-        return arns
+            errors.append('rds.describe_db_instances:EndpointConnectionError')
+        try:
+            paginator = self.rdsClient.get_paginator('describe_db_clusters')
+            for page in paginator.paginate():
+                for cl in page.get('DBClusters', []) or []:
+                    arn = cl.get('DBClusterArn')
+                    if arn:
+                        clusterArns.setdefault(arn, True)
+        except botocore.exceptions.ClientError as e:
+            self._logClientError('rds.describe_db_clusters', e)
+            errors.append(f"rds.describe_db_clusters:{self._errCode(e)}")
+        except botocore.exceptions.EndpointConnectionError:
+            errors.append('rds.describe_db_clusters:EndpointConnectionError')
+        items.extend(self._candidate(a) for a in clusterArns)
+        return items, errors
 
     def _enumDynamoTables(self):
-        arns = []
+        items, errors = [], []
         try:
             paginator = self.dynamodbClient.get_paginator('list_tables')
             for page in paginator.paginate():
                 for name in page.get('TableNames', []) or []:
-                    # Cheaper than describe_table: build the ARN from account
-                    # + region + name. Match backup's list_protected_resources
-                    # response format.
+                    # describe_table returns the TableArn in the exact format
+                    # list_protected_resources uses (partition included).
                     try:
                         d = self.dynamodbClient.describe_table(TableName=name)
                         arn = (d.get('Table') or {}).get('TableArn')
                         if arn:
-                            arns.append(arn)
-                    except botocore.exceptions.ClientError:
-                        continue
+                            items.append(self._candidate(arn))
+                    except botocore.exceptions.ClientError as e:
+                        errors.append(f"dynamodb.describe_table({name}):{self._errCode(e)}")
         except botocore.exceptions.ClientError as e:
             self._logClientError('dynamodb.list_tables', e)
+            errors.append(f"dynamodb.list_tables:{self._errCode(e)}")
         except botocore.exceptions.EndpointConnectionError:
-            pass
-        return arns
+            errors.append('dynamodb.list_tables:EndpointConnectionError')
+        return items, errors
 
     def _enumEfsFilesystems(self):
-        arns = []
+        items, errors = [], []
         try:
             paginator = self.efsClient.get_paginator('describe_file_systems')
             for page in paginator.paginate():
                 for fs in page.get('FileSystems', []) or []:
                     arn = fs.get('FileSystemArn')
                     if arn:
-                        arns.append(arn)
+                        items.append(self._candidate(arn))
         except botocore.exceptions.ClientError as e:
             self._logClientError('efs.describe_file_systems', e)
+            errors.append(f"efs.describe_file_systems:{self._errCode(e)}")
         except botocore.exceptions.EndpointConnectionError:
-            pass
-        return arns
+            errors.append('efs.describe_file_systems:EndpointConnectionError')
+        return items, errors
 
     def _enumEbsVolumes(self):
-        """EBS volumes are backed up per-volume. Only enumerate 'in-use'
-        volumes to avoid flagging root-of-terminated-instance snapshots or
-        transient volumes. AWS Backup ARNs for EBS use the format
-        arn:aws:ec2:region:account:volume/vol-xxxxx."""
-        arns = []
-        from utils.Config import Config
-        acct = (Config.get('stsInfo', {}) or {}).get('Account')
+        """In-use EBS volumes. Unattached ('available') volumes are not
+        enumerated, to avoid flagging leftovers of terminated instances.
+
+        describe_volumes returns no ARN, so it is built as
+        arn:<partition>:ec2:<region>:<account>:volume/<id> - the format
+        list_protected_resources uses. The partition comes from the caller
+        ARN (aws, aws-cn, aws-us-gov, ...). A volume counts as protected when
+        either the volume itself or an instance it is attached to is in the
+        protected set (EC2 backups are listed per instance). Without a known
+        account id no ARN can be built: reported as an error, never as a bare
+        volume id that could never match."""
+        items, errors = [], []
+        acct = self._callerAccountId()
+        partition = self._partition()
+        if not acct or not partition:
+            return items, ['ec2.describe_volumes:caller account/partition unknown']
+        prefix = f"arn:{partition}:ec2:{self.region}:{acct}"
         try:
             paginator = self.ec2Client.get_paginator('describe_volumes')
             for page in paginator.paginate(
-                Filters=[{'Name': 'status', 'Values': ['in-use', 'available']}]
+                Filters=[{'Name': 'status', 'Values': ['in-use']}]
             ):
                 for vol in page.get('Volumes', []) or []:
                     vol_id = vol.get('VolumeId')
                     if not vol_id:
                         continue
-                    if acct:
-                        arns.append(f"arn:aws:ec2:{self.region}:{acct}:volume/{vol_id}")
-                    else:
-                        arns.append(vol_id)
+                    arn = f"{prefix}:volume/{vol_id}"
+                    via = [arn]
+                    for att in vol.get('Attachments') or []:
+                        if att.get('InstanceId'):
+                            via.append(f"{prefix}:instance/{att['InstanceId']}")
+                    items.append(self._candidate(arn, via))
         except botocore.exceptions.ClientError as e:
             self._logClientError('ec2.describe_volumes', e)
+            errors.append(f"ec2.describe_volumes:{self._errCode(e)}")
         except botocore.exceptions.EndpointConnectionError:
-            pass
-        return arns
+            errors.append('ec2.describe_volumes:EndpointConnectionError')
+        return items, errors
 
     # ------------------------------------------------------------------ #
     # Advise
@@ -499,7 +583,7 @@ class Backup(Service):
             try:
                 name = vault.get('_name', 'unknown')
                 _pi('Backup', f"Analyzing vault: {name}")
-                obj = BackupVault(vault, self.backupClient)
+                obj = BackupVault(vault, self.backupClient, kmsClient=self.kmsClient)
                 obj.run(self.__class__)
                 objs[f"Backup::Vault::{name}"] = obj.getInfo()
                 del obj
@@ -545,6 +629,23 @@ class Backup(Service):
     def _callerAccountId(self):
         from utils.Config import Config
         return (Config.get('stsInfo', {}) or {}).get('Account')
+
+    def _partition(self):
+        """ARN partition of the scanned account: from the caller ARN, else
+        from the region (botocore endpoint data). None when unknown."""
+        from utils.Config import Config
+        arn = (Config.get('stsInfo', {}) or {}).get('Arn') or ''
+        parts = arn.split(':')
+        if len(parts) > 2 and parts[0] == 'arn' and parts[1]:
+            return parts[1]
+        try:
+            return self.ssBoto.get_partition_for_region(self.region)
+        except Exception:
+            return None
+
+    @staticmethod
+    def _errCode(e):
+        return e.response.get('Error', {}).get('Code') or 'ClientError'
 
     def _lookupVault(self, vaultArn):
         """Resolve a backup vault ARN (in this account) to a vault summary
