@@ -503,7 +503,7 @@
 		"category": "S",
 		"^description": "You have {$COUNT} S3 Glacier vaults whose vault access policy grants access to a wildcard principal without a condition that restricts the caller to known accounts, organizations or networks. Anyone could read, delete or upload archives depending on the allowed actions. Restrict the policy to specific principals.",
 		"shortDesc": "Restrict public Glacier vault access policies",
-		"criticality": "L",
+		"criticality": "H",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
