@@ -530,6 +530,57 @@ class TestComplianceRequiresEvaluatedPass:
         assert comp['SEC01-BP01'] == 0
         assert fw._checkOutcome('iam', 'hasOrganization') == wafs2027_module.CHECK_UNREADABLE
 
+    def test_raised_lambda_check_in_keyword_folder_blocks_pass(self, tmp_path, monkeypatch):
+        # Review (high): the traceback frame is services/lambda_/drivers/...
+        # but map.json / api-raw use 'lambda'. Old code keyed errors by
+        # 'lambda_' and never matched them: SEC06-BP04 comp 1 (false PASS).
+        self._writeErrorTxt(tmp_path, monkeypatch, [
+            ('services/lambda_/drivers/LambdaCommon.py', '_checkLambdaCodeSigningWarnOnly')])
+        _writeRaw(tmp_path, {'lambda': {'us-east-1': {'fn1': {'lambdaCodeSigningDisabled': [1, 'ok']}}}})
+        fw, comp, rows = _runFramework({'lambda': {'summary': {}}})
+        assert 'lambda' in fw.checkErrors and 'lambda_' not in fw.checkErrors
+        # The method body was found through the keyword folder (literal key).
+        assert 'lambdaCodeSigningWarnOnly' in fw.checkErrors['lambda']['LambdaCodeSigningWarnOnly']
+        assert fw._checkOutcome('lambda', 'lambdaCodeSigningWarnOnly') == wafs2027_module.CHECK_UNREADABLE
+        assert comp['SEC06-BP04'] == 0
+        row = [r for r in rows if r[1].startswith('SEC06-BP04 ')][0]
+        assert '[lambdaCodeSigningWarnOnly] - Unable to evaluate' in row[3]
+        # A different, attributable lambda check is unaffected.
+        assert fw._checkOutcome('lambda', 'lambdaCodeSigningDisabled') == wafs2027_module.CHECK_PASS
+
+    def test_folder_service_name_mapping_both_ways(self):
+        W = wafs2027_module.WAFS2027
+        assert W._folderToService('lambda_') == 'lambda'
+        assert W._folderToService('iam') == 'iam'
+        assert W._serviceToFolder('lambda') == 'lambda_'
+        assert W._serviceToFolder('s3') == 's3'
+
+    def test_raised_snake_case_lambda_check_matches_key(self, tmp_path, monkeypatch):
+        # _check_code_signing_disabled writes lambdaCodeSigningDisabled.
+        self._writeErrorTxt(tmp_path, monkeypatch, [
+            ('services/lambda_/drivers/LambdaCommon.py', '_check_code_signing_disabled')])
+        _writeRaw(tmp_path, {'lambda': {'us-east-1': {'fn1': {'lambdaCodeSigningWarnOnly': [1, 'ok']}}}})
+        fw, comp, _ = _runFramework({'lambda': {'summary': {}}})
+        assert fw._checkOutcome('lambda', 'lambdaCodeSigningDisabled') == wafs2027_module.CHECK_UNREADABLE
+        assert comp['SEC06-BP04'] == 0
+
+    def test_raised_check_attributed_to_keys_written_by_helper(self, tmp_path, monkeypatch):
+        # Review (low): _checkPasswordPolicy calls self.passwordPolicyScoring,
+        # which writes passwordPolicyLength / passwordPolicyReuse. Old code
+        # only read literals of the _check method itself, so those keys of the
+        # raised method stayed PASS.
+        self._writeErrorTxt(tmp_path, monkeypatch, [
+            ('services/iam/drivers/IamAccount.py', '_checkPasswordPolicy')])
+        _writeRaw(tmp_path, {'iam': {'GLOBAL': {'Account': {
+            'passwordPolicyLength': [1, 'ok'], 'passwordPolicyReuse': [1, 'ok'],
+            'hasOrganization': [1, 'ok']}}}})
+        fw, _, _ = _runFramework({'iam': {'summary': {}}})
+        lits = fw.checkErrors['iam']['PasswordPolicy']
+        assert {'passwordPolicyLength', 'passwordPolicyReuse', 'passwordPolicyWeak'} <= lits
+        assert fw._checkOutcome('iam', 'passwordPolicyLength') == wafs2027_module.CHECK_UNREADABLE
+        assert fw._checkOutcome('iam', 'passwordPolicyReuse') == wafs2027_module.CHECK_UNREADABLE
+        assert fw._checkOutcome('iam', 'hasOrganization') == wafs2027_module.CHECK_PASS
+
     def test_raised_check_in_other_service_does_not_block(self, tmp_path, monkeypatch):
         self._writeErrorTxt(tmp_path, monkeypatch, [
             ('services/acm/drivers/AcmCommon.py', '_checkCertExpired')])

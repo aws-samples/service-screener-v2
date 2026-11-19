@@ -174,29 +174,61 @@ class WAFS2027(Framework):
             return out
         for block in text.split('Traceback (most recent call last):'):
             for m in _CHECK_FRAME.finditer(block):
-                serv, method = m.group(2).lower(), m.group(3)
+                folder, method = m.group(2), m.group(3)
+                serv = WAFS2027._folderToService(folder)
                 methods = out.setdefault(serv, {})
                 if method not in methods:
-                    methods[method] = WAFS2027._methodLiterals(serv, m.group(1), method)
+                    methods[method] = WAFS2027._methodLiterals(folder, m.group(1), method)
         return out
 
     @staticmethod
-    def _methodLiterals(serv, tracePath, method):
-        """String constants in the body of _check<method> (result keys are
-        often assigned through a variable, e.g. key = 'orgMgmt...')."""
+    def _folderToService(folder):
+        """services/<folder> -> service name used by map.json, api-raw.json
+        and the Reporter. Screener loads a Python keyword service from
+        '<service>_' (Config.KEYWORD_SERVICES, e.g. lambda -> lambda_)."""
+        folder = folder.lower()
+        if folder.endswith('_') and folder[:-1] in Config.KEYWORD_SERVICES:
+            return folder[:-1]
+        return folder
+
+    @staticmethod
+    def _serviceToFolder(serv):
+        """Inverse of _folderToService (same rule as Screener)."""
+        serv = serv.lower()
+        return serv + '_' if serv in Config.KEYWORD_SERVICES else serv
+
+    @staticmethod
+    def _methodLiterals(folder, tracePath, method):
+        """String constants in the body of _check<method> and of the self.<helper>()
+        methods it calls in the same driver file, transitively (result keys
+        are often assigned through a variable, e.g. key = 'orgMgmt...', or by
+        a helper, e.g. _checkPasswordPolicy -> passwordPolicyScoring writes
+        passwordPolicyLength)."""
         fname = re.split(r'[/\\]', tracePath)[-1]
-        path = os.path.join(_C.SERVICE_DIR, serv, 'drivers', fname)
+        path = os.path.join(_C.SERVICE_DIR, WAFS2027._serviceToFolder(WAFS2027._folderToService(folder)),
+                            'drivers', fname)
         try:
             with open(path) as f:
                 tree = ast.parse(f.read())
         except (OSError, SyntaxError, ValueError):
             return set()
-        lits = set()
+        funcs = {}
         for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == '_check' + method:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                funcs.setdefault(node.name, []).append(node)
+        lits, seen, todo = set(), set(), ['_check' + method]
+        while todo:
+            name = todo.pop()
+            if name in seen:
+                continue
+            seen.add(name)
+            for node in funcs.get(name, []):
                 for sub in ast.walk(node):
                     if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
                         lits.add(sub.value)
+                    elif (isinstance(sub, ast.Call) and isinstance(sub.func, ast.Attribute)
+                          and isinstance(sub.func.value, ast.Name) and sub.func.value.id == 'self'):
+                        todo.append(sub.func.attr)
         return lits
 
     @staticmethod
@@ -208,7 +240,8 @@ class WAFS2027(Framework):
         suffix (either way), or the key appears as a literal in the method."""
         if key in literals:
             return True
-        m, k = method.lower(), key.lower()
+        # Underscores ignored: _check_code_signing_disabled vs lambdaCodeSigningDisabled.
+        m, k = method.lower().replace('_', ''), key.lower().replace('_', '')
         if m == k:
             return True
         return (len(m) >= 4 and k.endswith(m)) or (len(k) >= 4 and m.endswith(k))
@@ -229,7 +262,7 @@ class WAFS2027(Framework):
         service's mapped or recorded result keys cannot be attributed, so it
         makes every mapped check of that service unreadable (never a false
         PASS)."""
-        methods = self.checkErrors.get(serv.lower())
+        methods = self.checkErrors.get(self._folderToService(serv))
         if not methods:
             return False
         cache = self._raisedCache.get(serv)
