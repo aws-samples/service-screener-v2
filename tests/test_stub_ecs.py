@@ -152,3 +152,27 @@ def test_exec_enabled_production_tag():
     d = _svc(enableExecuteCommand=False)
     d._checkEcsExecEnabledServices()
     assert d.results['ecsExecEnabledServices'][0] == 1
+
+
+def test_agent_update_in_place_flag_then_pass():
+    """In-place remediation of the SAME container instance (the emulator raises
+    NoUpdateAvailableException, so it cannot do this): agent 1.89.3 vs latest 1.97.0 -> FAIL;
+    UpdateContainerAgent starts the update; once DescribeContainerInstances reports
+    agentUpdateStatus UPDATED and agent 1.97.0 the re-scan -> PASS. While the update is still
+    in progress (UPDATING, old version) the instance stays flagged."""
+    old = _ci('a', '1.89.3')
+    r = _runAgent([old])
+    assert r[0] == -1 and 'i-a (1.89.3)' in r[1]
+
+    ecs = boto3.client('ecs', **KW)
+    with Stubber(ecs) as st:
+        st.add_response('update_container_agent',
+                        {'containerInstance': dict(old, agentUpdateStatus='PENDING')},
+                        {'cluster': CL_ARN, 'containerInstance': old['containerInstanceArn']})
+        resp = ecs.update_container_agent(cluster=CL_ARN, containerInstance=old['containerInstanceArn'])
+        st.assert_no_pending_responses()
+    assert resp['containerInstance']['agentUpdateStatus'] == 'PENDING'
+
+    assert _runAgent([_ci('a', '1.89.3', upd='UPDATING')])[0] == -1
+    assert _runAgent([_ci('a', '1.97.0', upd='UPDATED')]) == \
+        [1, 'All 1 container instance(s) within 2 minor releases of agent 1.97.0']
