@@ -130,11 +130,14 @@ def wildcardAccountScope(condition, keyAccount):
     Both empty/False means the condition names no account at all (for
     example only aws:SourceVpce or an S3 aws:SourceArn)."""
     callerSets, otherAccounts = wildcardConditionAccounts(condition)
-    if any(s and s <= {keyAccount} for s in callerSets):
-        return set(), True
     named = set(otherAccounts)
-    for s in callerSets:
-        named |= s
+    if callerSets:
+        ## Caller-identity keys are AND-ed: the caller's account must be in
+        ## every set. An empty intersection matches no caller at all.
+        caller = set.intersection(*callerSets)
+        if caller <= {keyAccount}:
+            return set(), True
+        named |= caller
     external = {a for a in named if a != keyAccount}
     return external, bool(named) and not external
 

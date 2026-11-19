@@ -109,3 +109,18 @@ def test_wildcard_scoped_to_own_account_passes(condition):
 def test_unscoped_wildcard_still_flagged_as_wildcard_principal():
     r = _run(_wild({'StringEqualsIfExists': {'kms:CallerAccount': EXTERNAL}}))
     assert r['KeyPolicyWildcardPrincipal'] == [-1, 'Statement Wild: AWS Principal is *']
+
+
+def test_caller_account_keys_are_intersected():
+    ## kms:CallerAccount and aws:PrincipalAccount are AND-ed: only EXTERNAL satisfies both.
+    other = '222222222222'
+    cond = {'StringEquals': {'kms:CallerAccount': [other, EXTERNAL],
+                             'aws:PrincipalAccount': [ACCOUNT, EXTERNAL]}}
+    r = _run(_wild(cond))
+    assert r['KeyPolicyCrossAccount'] == [-1, f'Statement Wild: * (condition-scoped to account {EXTERNAL})']
+
+
+def test_contradictory_caller_accounts_match_no_caller():
+    cond = {'StringEquals': {'kms:CallerAccount': EXTERNAL, 'aws:PrincipalAccount': ACCOUNT}}
+    r = _run(_wild(cond))
+    assert r['KeyPolicyCrossAccount'] == [1, 'No cross-account principals in key policy']
