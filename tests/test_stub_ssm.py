@@ -11,6 +11,7 @@ against the real API shapes. Error-path tests for the other new checks
 (Unable to evaluate, never PASS) are here too. No network calls are made:
 Stubber intercepts every request before it is sent.
 """
+import json
 import os
 import sys
 
@@ -303,3 +304,118 @@ def test_session_prefs_unreadable_is_unable_to_evaluate():
     drv = SsmSessionManager(detail, None)
     drv._checkSsmSessionPrefsWeak()
     assert drv.results['ssmSessionPrefsWeak'] == [0, 'Unable to evaluate (AccessDeniedException)']
+
+
+# ---------------------------------------------------------------------- #
+# Review finding: an unreadable SSM-SessionManagerRunShell document must be
+# "Unable to evaluate" in EVERY preferences check, never the false FAIL
+# "No SSM-SessionManagerRunShell document exists in this region".
+# ---------------------------------------------------------------------- #
+PREFS_CHECKS = [
+    ('_checkSsmSessionManagerNoEncryption', 'ssmSessionManagerNoEncryption'),
+    ('_checkSsmSessionManagerNoCloudWatchLogs', 'ssmSessionManagerNoCloudWatchLogs'),
+    ('_checkSsmSessionManagerNoS3Logs', 'ssmSessionManagerNoS3Logs'),
+    ('_checkSsmSessionManagerRunAsDisabled', 'ssmSessionManagerRunAsDisabled'),
+    ('_checkSsmSessionPrefsWeak', 'ssmSessionPrefsWeak'),
+]
+
+GOOD_PREFS = {'kmsKeyId': 'alias/session', 'cloudWatchLogGroupName': '/ssm/sessions',
+              'cloudWatchStreamingEnabled': True, 's3BucketName': 'session-archive',
+              'runAsEnabled': True, 'runAsDefaultUser': 'ops',
+              'idleSessionTimeout': '15', 'maxSessionDuration': '120'}
+WEAK_PREFS = {'kmsKeyId': '', 'cloudWatchLogGroupName': '', 's3BucketName': '',
+              'runAsEnabled': False, 'idleSessionTimeout': '60',
+              'maxSessionDuration': ''}
+
+
+@pytest.mark.parametrize('method,key', PREFS_CHECKS)
+@pytest.mark.parametrize('code', ['AccessDeniedException', 'ThrottlingException',
+                                  'EndpointConnectionError', 'InvalidDocumentContent'])
+def test_prefs_unreadable_is_unable_to_evaluate_in_every_check(method, key, code):
+    detail = dict(DETAIL, _sessionPreferencesError=code)
+    drv = SsmSessionManager(detail, None)
+    getattr(drv, method)()
+    assert drv.results[key] == [0, f'Unable to evaluate ({code})']
+
+
+@pytest.mark.parametrize('method,key', PREFS_CHECKS)
+def test_prefs_flag_fix(method, key):
+    """Missing document and weak preferences FAIL; good preferences PASS."""
+    for prefs, found, expected in ((None, False, -1), (WEAK_PREFS, True, -1),
+                                   (GOOD_PREFS, True, 1)):
+        detail = dict(DETAIL, _sessionPreferences=prefs or {},
+                      _sessionPreferencesFound=found)
+        drv = SsmSessionManager(detail, None)
+        getattr(drv, method)()
+        assert drv.results[key][0] == expected, (prefs, drv.results[key])
+
+
+def _loader(ssm):
+    from services.ssm.Ssm import Ssm
+
+    class _BareSsm(Ssm):
+        """Skips Service.__init__ (no Config bootstrap) and __del__ reporting."""
+        def __del__(self):
+            pass
+    svc = _BareSsm.__new__(_BareSsm)
+    svc.ssmClient = ssm
+    svc._logClientError = lambda *a, **k: None
+    return svc
+
+
+def _content(inputs, raw=None):
+    if raw is not None:
+        return raw
+    return json.dumps({'schemaVersion': '1.0', 'sessionType': 'Standard_Stream',
+                       'inputs': inputs})
+
+
+@pytest.mark.parametrize('setup,found,error', [
+    (lambda s: s.add_client_error('get_document', 'InvalidDocument'), False, None),
+    (lambda s: s.add_client_error('get_document', 'AccessDeniedException'),
+     False, 'AccessDeniedException'),
+    (lambda s: s.add_client_error('get_document', 'ThrottlingException'),
+     False, 'ThrottlingException'),
+    (lambda s: s.add_response('get_document', {'Name': 'SSM-SessionManagerRunShell',
+                                               'Content': 'not json {'}),
+     False, 'InvalidDocumentContent'),
+    (lambda s: s.add_response('get_document', {'Name': 'SSM-SessionManagerRunShell',
+                                               'Content': '{"schemaVersion": "1.0"}'}),
+     False, 'InvalidDocumentContent'),
+    (lambda s: s.add_response('get_document', {'Name': 'SSM-SessionManagerRunShell',
+                                               'Content': '[1, 2]'}),
+     False, 'InvalidDocumentContent'),
+    (lambda s: s.add_response('get_document', {'Name': 'SSM-SessionManagerRunShell',
+                                               'Content': _content(GOOD_PREFS)},
+                              {'Name': 'SSM-SessionManagerRunShell',
+                               'DocumentFormat': 'JSON'}),
+     True, None),
+])
+def test_session_preferences_loader(setup, found, error):
+    ssm, _ = _clients()
+    svc = _loader(ssm)
+    with Stubber(ssm) as s:
+        setup(s)
+        prefs = svc._getSessionPreferences()
+        s.assert_no_pending_responses()
+    assert svc._sessionPreferencesFound is found
+    assert svc._sessionPreferencesError == error
+    assert prefs == (GOOD_PREFS if found else {})
+
+
+def test_unparseable_document_end_to_end_not_a_false_fail():
+    """Loader + all five checks: a document that exists but cannot be parsed
+    must not be reported as 'no document exists' (old behaviour: 5 FAILs)."""
+    ssm, _ = _clients()
+    svc = _loader(ssm)
+    with Stubber(ssm) as s:
+        s.add_response('get_document', {'Name': 'SSM-SessionManagerRunShell',
+                                        'Content': 'not json {'})
+        prefs = svc._getSessionPreferences()
+    detail = dict(DETAIL, _sessionPreferences=prefs,
+                  _sessionPreferencesFound=svc._sessionPreferencesFound,
+                  _sessionPreferencesError=svc._sessionPreferencesError)
+    for method, key in PREFS_CHECKS:
+        drv = SsmSessionManager(detail, None)
+        getattr(drv, method)()
+        assert drv.results[key] == [0, 'Unable to evaluate (InvalidDocumentContent)']

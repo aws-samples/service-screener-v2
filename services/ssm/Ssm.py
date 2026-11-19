@@ -241,8 +241,10 @@ class Ssm(Service):
         self._sessionPreferencesFound = False
         self._sessionPreferencesError = None
         try:
+            ## JSON is GetDocument's documented default; requested explicitly so
+            ## a document authored in YAML is always returned as parseable JSON.
             resp = self.ssmClient.get_document(
-                Name=self.SESSION_PREFERENCES_DOCUMENT)
+                Name=self.SESSION_PREFERENCES_DOCUMENT, DocumentFormat='JSON')
         except botocore.exceptions.ClientError as e:
             code = e.response.get('Error', {}).get('Code', '')
             if code not in ('InvalidDocument', 'InvalidDocumentVersion'):
@@ -254,13 +256,18 @@ class Ssm(Service):
             self._sessionPreferencesError = 'EndpointConnectionError'
             return {}
 
+        ## The document EXISTS from here on. Content that cannot be read as a
+        ## JSON object with an 'inputs' object is "could not evaluate", never
+        ## "no preferences configured" (that would be a false FAIL).
         try:
-            content = json.loads(resp.get('Content') or '{}')
+            content = json.loads(resp.get('Content') or '')
         except (ValueError, TypeError):
+            self._sessionPreferencesError = 'InvalidDocumentContent'
             return {}
 
-        inputs = content.get('inputs')
+        inputs = content.get('inputs') if isinstance(content, dict) else None
         if not isinstance(inputs, dict):
+            self._sessionPreferencesError = 'InvalidDocumentContent'
             return {}
 
         self._sessionPreferencesFound = True
