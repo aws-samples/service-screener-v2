@@ -141,14 +141,20 @@ class IamAccount(IamCommon):
                 score += 1
                 continue
 
-            if policy == 'PasswordReusePrevention' and value >= 6:
-                score += 1
-                self.results['passwordPolicyReuse'] = [-1, value]
+            if policy == 'PasswordReusePrevention':
+                if value >= 6:
+                    score += 1
+                else:
+                    self.results['passwordPolicyReuse'] = [-1, value]
                 continue
             
             if not value is None and value > 0:
                 score += 1
-                
+
+        # IAM omits PasswordReusePrevention when reuse prevention is off.
+        if 'PasswordReusePrevention' not in policies:
+            self.results['passwordPolicyReuse'] = [-1, 'Not configured']
+
         return score
     
     def _checkPasswordPolicy(self):
