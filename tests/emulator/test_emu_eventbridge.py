@@ -75,3 +75,20 @@ def test_eb_health_events_not_routed(emu, uid):
         assertFlagFixCycle(emu, 'eventbridge', 'healthEventsNotRouted', RESOURCE, misconfigure, fix)
     finally:
         cleanup()
+
+
+def test_eb_cloudtrail_only_rule_does_not_route_findings(emu, uid):
+    """A GuardDuty tamper alarm (source aws.guardduty, detail-type 'AWS API Call
+    via CloudTrail') with a target never receives a finding: still flagged.
+    Adding a 'GuardDuty Finding' rule with a target fixes it."""
+    tamper = {'source': ['aws.guardduty'], 'detail-type': ['AWS API Call via CloudTrail'],
+              'detail': {'eventSource': ['guardduty.amazonaws.com'], 'eventName': ['DeleteDetector']}}
+    mis1, fix1, clean1 = _routingRule(emu, uid, f'ss-tamper-{uid}', tamper)
+    mis2, fix2, clean2 = _routingRule(emu, uid + 'b', f'ss-gdf-{uid}',
+                                      {'source': ['aws.guardduty'], 'detail-type': ['GuardDuty Finding']})
+    try:
+        assertFlagFixCycle(emu, 'eventbridge', 'securityFindingsNotRouted', RESOURCE,
+                           lambda: (mis1(), fix1()), lambda: (mis2(), fix2()))
+    finally:
+        clean1()
+        clean2()

@@ -29,12 +29,10 @@ class SecurityhubCommon(Evaluator):
     ## controls and PENDING is mid-enable, so both count as enabled.
     ACTIVE_STANDARD_STATES = ('READY', 'INCOMPLETE', 'PENDING')
 
-    def __init__(self, detail, shClient, cisArnFragment, ssmClient=None,
-                 eventsClient=None):
+    def __init__(self, detail, shClient, cisArnFragment, eventsClient=None):
         super().__init__()
         self.detail = detail
         self.shClient = shClient
-        self.ssmClient = ssmClient
         self.eventsClient = eventsClient
         self.cisArnFragment = cisArnFragment
         self.standardsError = detail.get('_standardsError')
@@ -44,6 +42,7 @@ class SecurityhubCommon(Evaluator):
         self.hub = detail.get('_hub') or {}
         self.standards = detail.get('_standards') or []
         self.aggregators = detail.get('_aggregators') or []
+        self.aggregatorsError = detail.get('_aggregatorsError')
         self.products = detail.get('_products') or []
         self.unprocessed = detail.get('_unprocessedFindings')
         self.findingsCapped = bool(detail.get('_findingsCapped'))
@@ -155,6 +154,10 @@ class SecurityhubCommon(Evaluator):
     def _checkShubFindingAggregatorMissing(self):
         if not self.enabled:
             return self._na('shubFindingAggregatorMissing')
+        if self.aggregatorsError and not self.aggregators:
+            self.results['shubFindingAggregatorMissing'] = [
+                0, f"Unable to evaluate ({self.aggregatorsError})"]
+            return
         if self.aggregators:
             self.results['shubFindingAggregatorMissing'] = [
                 1, "A finding aggregator provides a cross-region view"
@@ -331,8 +334,25 @@ class SecurityhubCommon(Evaluator):
             self.results[key] = [1, msg]
 
     # 12. No automated response wired to Security Hub findings
+    ## detail-type values of Security Hub events a response can be wired to.
+    ## Imported findings (CSPM and the new Security Hub) fire automatically;
+    ## custom-action / insight events start a wired response on demand from
+    ## the console. All are delivered to the default bus only.
+    SH_RESPONSE_DETAIL_TYPES = (
+        'Security Hub Findings - Imported', 'Findings Imported V2',
+        'Security Hub Findings - Custom Action', 'Security Hub Insight Results',
+    )
+    EB_ENABLED_STATES = ('ENABLED', 'ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS')
+
     def _automationEvidence(self):
-        """Returns (evidence list, error codes). Stops at the first evidence."""
+        """
+        Returns (evidence, error codes). Evidence is the first ENABLED Security
+        Hub automation rule, or the first ENABLED default-bus EventBridge rule
+        that matches Security Hub finding events (source AND detail-type) and
+        has at least one target. A custom action without a rule, or an SSM
+        document nothing invokes, responds to nothing and is not evidence.
+        """
+        from services.eventbridge.drivers.EventbridgeRegional import EventbridgeRegional
         errors = []
 
         def _first(fn):
@@ -354,47 +374,91 @@ class SecurityhubCommon(Evaluator):
                     kw['NextToken'] = token
                 r = self.shClient.list_automation_rules(**kw)
                 for m in r.get('AutomationRulesMetadata', []) or []:
-                    if (m.get('RuleStatus') or 'ENABLED') == 'ENABLED':
+                    if (m.get('RuleStatus') or '') == 'ENABLED':
                         return f"automation rule {m.get('RuleName', '')}".strip()
                 token = r.get('NextToken')
                 if not token:
                     return None
 
-        def actions():
-            pag = self.shClient.get_paginator('describe_action_targets')
-            for page in pag.paginate():
-                for t in page.get('ActionTargets', []) or []:
-                    return f"custom action {t.get('Name', '')}".strip()
-            return None
-
         def eventRules():
             if self.eventsClient is None:
+                errors.append('EventBridge client unavailable')
                 return None
+            candidates = []
             pag = self.eventsClient.get_paginator('list_rules')
-            for page in pag.paginate():
+            for page in pag.paginate(EventBusName='default'):
                 for r in page.get('Rules', []) or []:
-                    if (r.get('State') or '') == 'DISABLED':
+                    if (r.get('State') or '') not in self.EB_ENABLED_STATES:
                         continue
-                    if 'aws.securityhub' in (r.get('EventPattern') or ''):
-                        return f"EventBridge rule {r.get('Name', '')}".strip()
+                    pattern = r.get('EventPattern')
+                    if pattern and r.get('Name') and EventbridgeRegional.patternMatchesSource(
+                            pattern, 'aws.securityhub', self.SH_RESPONSE_DETAIL_TYPES):
+                        candidates.append(r['Name'])
+            for name in candidates:
+                try:
+                    tpag = self.eventsClient.get_paginator('list_targets_by_rule')
+                    for tpage in tpag.paginate(Rule=name, EventBusName='default'):
+                        if tpage.get('Targets'):
+                            return f"EventBridge rule {name}"
+                except botocore.exceptions.ClientError as e:
+                    ## Rule deleted between the two calls.
+                    if self._errCode(e) != 'ResourceNotFoundException':
+                        raise
             return None
 
-        def runbooks():
-            if self.ssmClient is None:
-                return None
-            pag = self.ssmClient.get_paginator('list_documents')
-            for page in pag.paginate(Filters=[
-                    {'Key': 'Owner', 'Values': ['Self']},
-                    {'Key': 'DocumentType', 'Values': ['Automation']}]):
-                for d in page.get('DocumentIdentifiers', []) or []:
-                    return f"SSM Automation runbook {d.get('Name', '')}".strip()
-            return None
-
-        for fn in (rules, actions, eventRules, runbooks):
+        for fn in (rules, eventRules):
             ev = _first(fn)
             if ev:
                 return ev, errors
         return None, errors
+
+    def _centralisedElsewhere(self):
+        """
+        (reason, errorCode). reason is set when automation for this Region's
+        findings is owned elsewhere: the account is an active Security Hub
+        member (automation rules can only be created by the administrator), or
+        cross-Region aggregation links this Region into another aggregation
+        Region (automation rules apply in the aggregation Region). errorCode is
+        set when this could not be determined.
+        """
+        firstErr = None
+        try:
+            admin = self.shClient.get_administrator_account().get('Administrator') or {}
+            if admin.get('AccountId') and \
+                    str(admin.get('MemberStatus', '')).lower() in ('enabled', 'associated'):
+                return (f"this account is a member of Security Hub administrator "
+                        f"{admin['AccountId']}, which owns automation rules"), None
+        except botocore.exceptions.ClientError as e:
+            firstErr = f"get_administrator_account: {self._errCode(e)}"
+        except botocore.exceptions.BotoCoreError as e:
+            firstErr = f"get_administrator_account: {type(e).__name__}"
+
+        if self.aggregatorsError:
+            return None, firstErr or f"list_finding_aggregators: {self.aggregatorsError}"
+        region = self.detail.get('_region')
+        for a in self.aggregators:
+            arn = a.get('FindingAggregatorArn')
+            if not arn:
+                continue
+            try:
+                agg = self.shClient.get_finding_aggregator(FindingAggregatorArn=arn)
+            except botocore.exceptions.ClientError as e:
+                firstErr = firstErr or f"get_finding_aggregator: {self._errCode(e)}"
+                continue
+            except botocore.exceptions.BotoCoreError as e:
+                firstErr = firstErr or f"get_finding_aggregator: {type(e).__name__}"
+                continue
+            aggRegion = agg.get('FindingAggregationRegion')
+            if not aggRegion or aggRegion == region:
+                continue
+            mode = agg.get('RegionLinkingMode')
+            regions = agg.get('Regions') or []
+            if (mode == 'ALL_REGIONS'
+                    or (mode == 'ALL_REGIONS_EXCEPT_SPECIFIED' and region not in regions)
+                    or (mode == 'SPECIFIED_REGIONS' and region in regions)):
+                return (f"Security Hub aggregates this Region's findings into {aggRegion}, "
+                        "where automation rules for them are evaluated"), None
+        return None, firstErr
 
     def _checkSecurityHubNoAutomationRules(self):
         key = 'securityHubNoAutomationRules'
@@ -405,13 +469,29 @@ class SecurityhubCommon(Evaluator):
             self.results[key] = [
                 1, f"Response automation found ({evidence})"
             ]
-        elif errors:
-            self.results[key] = [0, f"Unable to evaluate ({errors[0]})"]
-        else:
+            return
+        central, centralErr = self._centralisedElsewhere()
+        if central:
             self.results[key] = [
-                -1,
-                "No Security Hub automation rule, custom action, EventBridge "
-                "rule matching aws.securityhub, or self-owned SSM Automation "
-                "runbook was found — findings appear to be handled entirely by "
-                "hand"
+                0,
+                "No local automation rule or EventBridge rule responds to Security Hub "
+                f"findings, but {central} — evaluate finding response there"
             ]
+            return
+        if errors:
+            self.results[key] = [0, f"Unable to evaluate ({errors[0]})"]
+            return
+        if centralErr:
+            self.results[key] = [
+                0,
+                f"Unable to evaluate ({centralErr}) — no local response automation found, "
+                "but it could not be determined whether a Security Hub administrator "
+                "account or aggregation Region owns finding response"
+            ]
+            return
+        self.results[key] = [
+            -1,
+            "No ENABLED Security Hub automation rule and no ENABLED EventBridge rule with a "
+            "target matching Security Hub finding events on the default bus — findings appear "
+            "to be handled entirely by hand"
+        ]

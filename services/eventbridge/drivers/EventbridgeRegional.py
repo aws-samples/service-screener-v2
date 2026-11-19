@@ -45,6 +45,33 @@ class EventbridgeRegional(Evaluator):
     ## pattern that filters only on these (no 'source') matches every source.
     SOURCE_NEUTRAL_FIELDS = frozenset(['account', 'region'])
 
+    ## detail-type values of the events that carry findings / Health events for
+    ## each source. A rule whose detail-type filter matches none of these (for
+    ## example 'AWS API Call via CloudTrail' on source aws.guardduty, or
+    ## 'Security Hub Findings - Custom Action', which only fires when a person
+    ## invokes the action) never receives a finding and does not count as
+    ## routing it.
+    FINDING_DETAIL_TYPES = {
+        'aws.guardduty': ('GuardDuty Finding',),
+        'aws.securityhub': ('Security Hub Findings - Imported', 'Findings Imported V2'),
+        'aws.inspector2': ('Inspector2 Finding',),
+        'aws.access-analyzer': ('Access Analyzer Finding', 'Unused Access Finding for IAM entities'),
+        'aws.health': ('AWS Health Event', 'AWS Health Abuse Event'),
+    }
+
+    ## Top-level 'detail' fields that exist only on CloudTrail API-call events
+    ## ('AWS API Call via CloudTrail'). Finding and Health event details never
+    ## carry them, so a pattern that requires one of them cannot match a
+    ## finding even when it names the finding source.
+    CLOUDTRAIL_ONLY_DETAIL_FIELDS = frozenset([
+        'eventName', 'eventSource', 'eventType', 'eventCategory', 'eventVersion',
+        'eventID', 'eventTime', 'userIdentity', 'userAgent', 'sourceIPAddress',
+        'requestParameters', 'responseElements', 'requestID', 'errorCode',
+        'errorMessage', 'readOnly', 'managementEvent', 'recipientAccountId',
+        'awsRegion', 'apiVersion', 'additionalEventData', 'tlsDetails',
+        'sessionCredentialFromConsole', 'vpcEndpointId',
+    ])
+
     def __init__(self, detail, ebClient):
         super().__init__()
         self.detail = detail
@@ -294,8 +321,9 @@ class EventbridgeRegional(Evaluator):
 
         self.results[key] = [
             -1,
-            "No ENABLED rule with a target on the default event bus matches findings from "
-            "GuardDuty, Security Hub, Inspector or IAM Access Analyzer — " + perSource
+            "No ENABLED rule with a target on the default event bus matches finding events "
+            "(source and detail-type) from GuardDuty, Security Hub, Inspector or IAM Access "
+            "Analyzer — " + perSource
         ]
 
     # ------------------------------------------------------------------ #
@@ -342,7 +370,8 @@ class EventbridgeRegional(Evaluator):
 
         self.results[key] = [
             -1,
-            f"No ENABLED rule with a target matches source aws.health on the default bus in {region}"
+            f"No ENABLED rule with a target matches AWS Health events (source aws.health, detail-type "
+            f"'AWS Health Event') on the default bus in {region}"
             + ("" if region == 'us-east-1' else " or us-east-1")
             + " — service events and scheduled changes affecting this account reach no responder"
         ]
@@ -364,12 +393,22 @@ class EventbridgeRegional(Evaluator):
         return out
 
     @classmethod
-    def patternMatchesSource(cls, pattern, source):
+    def patternMatchesSource(cls, pattern, source, detailTypes=None):
         """
-        True when an EventBridge EventPattern (JSON string or dict) can match an
-        event whose 'source' is `source`. Understands top-level $or, exact
-        values and the prefix / suffix / wildcard / equals-ignore-case /
-        anything-but / exists content filters. Unparseable patterns never match.
+        True when an EventBridge EventPattern (JSON string or dict) can match a
+        finding / Health event published by `source`.
+
+        The event is identified by its 'source' AND its 'detail-type': a rule
+        on source aws.guardduty limited to detail-type 'AWS API Call via
+        CloudTrail' never sees a GuardDuty finding. `detailTypes` lists the
+        detail-type values of the events of interest; when omitted it defaults
+        to FINDING_DETAIL_TYPES[source] (no detail-type constraint for a source
+        not in that map). A 'detail' filter that requires a CloudTrail-only
+        field (eventName, eventSource, userIdentity, ...) also cannot match.
+
+        Understands $or (top level and inside 'detail'), exact values and the
+        prefix / suffix / wildcard / equals-ignore-case / anything-but / exists
+        content filters. Unparseable patterns never match.
         """
         if isinstance(pattern, str):
             try:
@@ -378,7 +417,9 @@ class EventbridgeRegional(Evaluator):
                 return False
         if not isinstance(pattern, dict):
             return False
-        return any(cls._alternativeMatches(alt, source) for alt in cls._expandOr(pattern))
+        if detailTypes is None:
+            detailTypes = cls.FINDING_DETAIL_TYPES.get(source)
+        return any(cls._alternativeMatches(alt, source, detailTypes) for alt in cls._expandOr(pattern))
 
     @classmethod
     def _expandOr(cls, pattern, depth=0):
@@ -393,16 +434,52 @@ class EventbridgeRegional(Evaluator):
                 alts += cls._expandOr(merged, depth + 1)
         return alts
 
+    @staticmethod
+    def _asList(values):
+        return values if isinstance(values, list) else [values]
+
     @classmethod
-    def _alternativeMatches(cls, pattern, source):
-        if 'source' not in pattern:
-            ## No source filter: matches every source only when nothing else in
-            ## the pattern narrows the event type.
+    def _alternativeMatches(cls, pattern, source, detailTypes=None):
+        if 'source' in pattern:
+            if not any(cls._valueMatches(v, source) for v in cls._asList(pattern.get('source'))):
+                return False
+
+        if 'detail-type' in pattern and detailTypes:
+            matchers = cls._asList(pattern.get('detail-type'))
+            if not any(cls._valueMatches(m, dt) for m in matchers for dt in detailTypes):
+                return False
+
+        if 'detail' in pattern and cls._detailRequiresCloudTrailField(pattern.get('detail')):
+            return False
+
+        if 'source' not in pattern and not ('detail-type' in pattern and detailTypes):
+            ## No source filter and no detail-type that identifies the event:
+            ## matches every source only when nothing else in the pattern
+            ## narrows the event type.
             return set(pattern.keys()) <= cls.SOURCE_NEUTRAL_FIELDS
-        values = pattern.get('source')
-        if not isinstance(values, list):
-            values = [values]
-        return any(cls._valueMatches(v, source) for v in values)
+        return True
+
+    @classmethod
+    def _detailRequiresCloudTrailField(cls, detail):
+        """True when every $or alternative of a 'detail' filter requires a
+        field that only CloudTrail API-call events carry."""
+        if not isinstance(detail, dict):
+            return False
+        alts = cls._expandOr(detail)
+        if not alts:
+            return False
+        return all(cls._requiresCloudTrailField(alt) for alt in alts)
+
+    @classmethod
+    def _requiresCloudTrailField(cls, detail):
+        for field in cls.CLOUDTRAIL_ONLY_DETAIL_FIELDS & set(detail.keys()):
+            matcher = detail[field]
+            if isinstance(matcher, dict):
+                return True  ## nested filter: the field must be present
+            ## A {"exists": false} alternative is satisfied when the field is absent.
+            if not any(isinstance(m, dict) and m.get('exists') is False for m in cls._asList(matcher)):
+                return True
+        return False
 
     @classmethod
     def _valueMatches(cls, matcher, source):

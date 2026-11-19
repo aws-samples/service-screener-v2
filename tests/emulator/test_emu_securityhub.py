@@ -12,7 +12,16 @@ rejects disabling a control without a DisabledReason, and
 BatchUpdateStandardsControlAssociations is NotImplemented, so only the PASS
 path (control disabled with a reason) is exercised here; the FAIL path is in
 the Stubber test.
+
+securityHubNoAutomationRules: with no local response automation the check
+asks get_administrator_account whether a Security Hub administrator owns
+finding response. That operation is NotImplemented in the emulator, so the
+unautomated state is correctly reported as INFO 'Unable to evaluate' here
+rather than FAIL; the FAIL -> PASS cycle with real API shapes (non-member,
+member, linked Region) is in tests/test_stub_securityhub.py. These tests
+prove the PASS side and that unwired evidence does not PASS.
 """
+import json
 import time
 
 import pytest
@@ -100,23 +109,36 @@ def test_shub_controls_disabled_with_reason_passes(emu):
         _disable(sh)
 
 
+def _automationResult(emu):
+    res = runCheck(emu, 'securityhub', 'securityHubNoAutomationRules', RES)
+    msgs = [m for r in res.results.values() for k, m in r.items() if k == 'securityHubNoAutomationRules']
+    assert msgs, res.errors[:1]
+    return msgs[0]
+
+
+def _assertNotPassedUnwired(emu):
+    """No response automation: never PASS. FAIL needs the membership lookup,
+    which the emulator does not implement, so it reports Unable to evaluate."""
+    r = _automationResult(emu)
+    assert r[0] != 1, r
+    if r[0] == 0:
+        assert r[1].startswith('Unable to evaluate (get_administrator_account: NotImplemented)'), r
+
+
 def test_security_hub_no_automation_rules(emu, uid):
     sh = emu.client('securityhub')
     _enable(sh)
     created = {}
     try:
-        def misconfigure():
-            pass  # fresh hub: no automation rules, action targets, EventBridge rules or runbooks
-
-        def fix():
-            r = sh.create_automation_rule(
-                RuleName=f'ss-test-{uid}', RuleOrder=1, Description='suppress low',
-                Criteria={'SeverityLabel': [{'Value': 'LOW', 'Comparison': 'EQUALS'}]},
-                Actions=[{'Type': 'FINDING_FIELDS_UPDATE',
-                          'FindingFieldsUpdate': {'Workflow': {'Status': 'SUPPRESSED'}}}])
-            created['rule'] = r['RuleArn']
-
-        assertFlagFixCycle(emu, 'securityhub', 'securityHubNoAutomationRules', RES, misconfigure, fix)
+        _assertNotPassedUnwired(emu)  # fresh hub: no automation rule, no EventBridge rule
+        r = sh.create_automation_rule(
+            RuleName=f'ss-test-{uid}', RuleOrder=1, Description='suppress low',
+            Criteria={'SeverityLabel': [{'Value': 'LOW', 'Comparison': 'EQUALS'}]},
+            Actions=[{'Type': 'FINDING_FIELDS_UPDATE',
+                      'FindingFieldsUpdate': {'Workflow': {'Status': 'SUPPRESSED'}}}])
+        created['rule'] = r['RuleArn']
+        after = _automationResult(emu)
+        assert after[0] == 1 and f'ss-test-{uid}' in after[1], after
     finally:
         if created.get('rule'):
             try:
@@ -126,18 +148,42 @@ def test_security_hub_no_automation_rules(emu, uid):
         _disable(sh)
 
 
-def test_security_hub_custom_action_counts_as_automation(emu, uid):
+def test_security_hub_custom_action_needs_a_routed_rule(emu, uid):
+    """A custom action alone responds to nothing; it counts once an enabled
+    EventBridge rule with a target routes its events."""
     sh = emu.client('securityhub')
+    ev = emu.client('events')
+    sqs = emu.client('sqs')
     _enable(sh)
-    arn = None
+    arn, ruleName, url = None, f'ss-sh-ca-{uid}', None
     try:
-        def fix():
-            nonlocal arn
-            arn = sh.create_action_target(Name='Send to SOAR', Description='d',
-                                          Id=f'ss{uid}')['ActionTargetArn']
+        arn = sh.create_action_target(Name='Send to SOAR', Description='d', Id=f'ss{uid}')['ActionTargetArn']
+        _assertNotPassedUnwired(emu)
 
-        assertFlagFixCycle(emu, 'securityhub', 'securityHubNoAutomationRules', RES, lambda: None, fix)
+        ev.put_rule(Name=ruleName, State='ENABLED', EventPattern=json.dumps({
+            'source': ['aws.securityhub'], 'detail-type': ['Security Hub Findings - Custom Action'],
+            'resources': [arn]}))
+        _assertNotPassedUnwired(emu)  # rule without a target delivers nothing
+
+        url = sqs.create_queue(QueueName=f'ss-sh-ca-{uid}')['QueueUrl']
+        qarn = sqs.get_queue_attributes(QueueUrl=url, AttributeNames=['QueueArn'])['Attributes']['QueueArn']
+        ev.put_targets(Rule=ruleName, Targets=[{'Id': 't1', 'Arn': qarn}])
+        after = _automationResult(emu)
+        assert after[0] == 1 and ruleName in after[1], after
     finally:
+        try:
+            ev.remove_targets(Rule=ruleName, Ids=['t1'])
+        except ClientError:
+            pass
+        try:
+            ev.delete_rule(Name=ruleName)
+        except ClientError:
+            pass
+        if url:
+            try:
+                sqs.delete_queue(QueueUrl=url)
+            except ClientError:
+                pass
         if arn:
             try:
                 sh.delete_action_target(ActionTargetArn=arn)

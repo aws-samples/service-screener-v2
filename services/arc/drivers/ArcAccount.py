@@ -8,7 +8,12 @@ class ArcAccount(Evaluator):
     Input detail (services/arc/Arc.py getResources):
       '_plans' / '_planError'       -- arc-region-switch list_plans
       '_clusters' / '_clusterError' -- route53-recovery-control-config list_clusters
+      '_multiRegion' -- {'evidence', 'errors', 'incomplete'} from
+                        Arc._multiRegionEvidence (only when both lists are empty)
     A list is None when it could not be read; the matching *Error holds the code.
+
+    The absence of ARC is a gap only for a multi-Region workload: FAIL needs
+    multi-Region evidence; without it the result is INFO.
 
     Status contract: -1 FAIL, 1 PASS, 0 INFO / not evaluable.
     """
@@ -49,9 +54,36 @@ class ArcAccount(Evaluator):
             self.results[key] = [0, f"Unable to evaluate ({'; '.join(errs)})"]
             return
 
+        mr = self.detail.get('_multiRegion')
+        if not isinstance(mr, dict):
+            self.results[key] = [0, "Unable to evaluate (multi-Region workload evidence not collected)"]
+            return
+
+        if mr.get('evidence'):
+            self.results[key] = [
+                -1,
+                "No ARC Region switch plan and no ARC routing control cluster exist, although this "
+                "account runs multi-Region infrastructure (" + '; '.join(mr['evidence']) + ") — "
+                "Region failover is not orchestrated by ARC and depends on ad-hoc manual steps"
+            ]
+            return
+
+        if mr.get('errors'):
+            self.results[key] = [
+                0,
+                f"Unable to evaluate ({'; '.join(mr['errors'])}) — no ARC Region switch plan or routing "
+                "control cluster exists, and whether this account runs a multi-Region workload "
+                "could not be fully determined"
+            ]
+            return
+
+        checked = ("EventBridge global endpoints, Aurora global databases, DynamoDB global "
+                   f"tables in {self.detail.get('_region', 'the scanning Region')}, and Route 53 "
+                   "latency/failover records")
+        partial = (" Partially checked: " + '; '.join(mr['incomplete']) + ".") if mr.get('incomplete') else ""
         self.results[key] = [
-            -1,
-            "No ARC Region switch plan and no ARC routing control cluster exist in this account. "
-            "If any workload here is deployed across Regions, Region failover is not orchestrated "
-            "by ARC and depends on ad-hoc manual steps"
+            0,
+            "No ARC Region switch plan or routing control cluster exists, and no multi-Region "
+            f"workload evidence was found (checked {checked}). ARC Region switch is only needed "
+            "for workloads deployed across Regions." + partial
         ]
