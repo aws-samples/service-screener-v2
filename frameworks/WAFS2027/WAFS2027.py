@@ -1,4 +1,4 @@
-import json, os, traceback
+import json, os, re, traceback
 
 import constants as _C
 from utils.Config import Config
@@ -9,15 +9,33 @@ from frameworks.WAFS2027.WATools2027 import WATools2027, normalizeTitle
 # Per-check outcome, derived from the full scan results (api-raw.json).
 CHECK_FAIL = 'fail'              # in the Reporter summary (status -1, not suppressed)
 CHECK_PASS = 'pass'              # ran with status 1 on at least one resource, never -1
-CHECK_NOT_EVALUATED = 'notEvaluated'  # ran, but only with status 0 (unable to evaluate / informational)
+CHECK_NOT_EVALUATED = 'notEvaluated'  # ran, but only with informational status 0 results
+CHECK_UNREADABLE = 'unreadable'  # data could not be read on at least one resource, or the check raised
 CHECK_SUPPRESSED = 'suppressed'  # failed (-1) but every failure is suppressed
 CHECK_NOT_RUN = 'notRun'         # service not scanned, no resources, or the check errored
 CHECK_EVIDENCE = 'evidence'      # <service>.$length entries: resource-count context only
 
-# Status 0 results whose message says the data could not be read. Any such
-# result makes the whole check "not evaluated", even if other resources passed.
+# Status 0 results whose message says the data could not be read (or the
+# value could not be interpreted). Any such result on any resource makes the
+# check CHECK_UNREADABLE, and any unreadable mapped check keeps its best
+# practice at 0 (never selected in the WA Tool). Matching is on markers
+# anywhere in the message, not just the prefix, so wrapped messages such as
+# "Error: ThrottlingException", "Unknown mode: X" or "Source server s-1:
+# Unable to evaluate (...)" are caught. Other status 0 results (not
+# applicable, no resources, advisory notes) are informational.
 UNREADABLE = 'unreadable'
-UNREADABLE_PREFIXES = ('unable to evaluate', 'not evaluable', 'unable to check', 'could not parse')
+UNREADABLE_PATTERN = re.compile(
+    r"unable to|not evaluable|could not|cannot |can't|\berror\b|\bexception:|"
+    r"unknown|unparseable|not parseable|unreadable|not readable|unavailable|"
+    r"client not available|not returned|not reported|not collected|not retrieved|"
+    r"\bfailed\b|access ?denied|throttl|timed out|timeout|still in progress|"
+    r"still being established|not yet in",
+    re.IGNORECASE)
+
+# Traceback frame of a driver check method in error.txt
+# (services/Evaluator.py writes every exception a check raised there).
+_CHECK_FRAME = re.compile(
+    r'File "[^"]*[/\\]services[/\\]([A-Za-z0-9_]+)[/\\]drivers[/\\][^"]+", line \d+, in _check(\w+)')
 
 # Standard WA Tool pillar IDs. A title shared by several BPs in the map is
 # matched only inside the pillar its BP ID belongs to; FND (Cloud
@@ -41,11 +59,12 @@ class WAFS2027(Framework):
     Compliance per best practice (the base Framework treats every check that
     is absent from the failure summary as compliant; WAFS2027 does not):
         -1  at least one mapped check failed
-         1  at least one mapped check ran and passed, and none failed or
-            were suppressed
-         0  nothing mapped was evaluated (service not scanned, check returned
-            "Unable to evaluate" / informational, errored, or suppressed),
-            or the practice needs manual review
+         1  at least one mapped check ran and passed, and none failed,
+            were suppressed, or were unreadable (checks that did not run or
+            were informational only do not block)
+         0  no mapped check passed, or any mapped check could not read its
+            data / raised on any resource, or a failure was suppressed, or
+            the practice needs manual review
     Only 1 is ever written to the WA Tool as a selected choice.
     """
 
@@ -61,6 +80,7 @@ class WAFS2027(Framework):
         self.choiceResults = {}
         self._mapDupTitles = None
         self.rawStatus = self._loadRawStatus()
+        self.checkErrors = self._loadCheckErrors()
 
         cliParams = Config.get('_SS_PARAMS') or {}
         tmpParams = {}
@@ -129,7 +149,27 @@ class WAFS2027(Framework):
             msg = str(res[1] or '')
         except (IndexError, KeyError, TypeError):
             return False
-        return msg.strip().lower().startswith(UNREADABLE_PREFIXES)
+        return bool(UNREADABLE_PATTERN.search(msg))
+
+    @staticmethod
+    def _loadCheckErrors():
+        """{service: {check}} for driver check methods that raised during
+        this scan. Evaluator records no result for a check that raised, only
+        a traceback in __fork/error.txt, so a pass on another resource would
+        otherwise hide the error. Check names are the method name without
+        '_check' (the usual result key)."""
+        path = os.path.join(_C.FORK_DIR, 'error.txt')
+        out = {}
+        try:
+            with open(path, errors='replace') as f:
+                text = f.read()
+        except OSError:
+            return out
+        for block in text.split('Traceback (most recent call last):'):
+            m = _CHECK_FRAME.search(block)
+            if m:
+                out.setdefault(m.group(1).lower(), set()).add(m.group(2))
+        return out
 
     def _checkOutcome(self, serv, check):
         if serv in self.data and check in (self.data[serv].get('summary') or {}):
@@ -142,9 +182,9 @@ class WAFS2027(Framework):
         if -1 in statuses:
             return CHECK_SUPPRESSED
         # A pass on some resources does not cover resources whose data could
-        # not be read: the check as a whole is not evaluated.
-        if UNREADABLE in statuses:
-            return CHECK_NOT_EVALUATED
+        # not be read, or on which the check raised.
+        if UNREADABLE in statuses or check in self.checkErrors.get(serv.lower(), ()):
+            return CHECK_UNREADABLE
         if 1 in statuses:
             return CHECK_PASS
         return CHECK_NOT_EVALUATED
@@ -167,7 +207,8 @@ class WAFS2027(Framework):
         return {"c": check, "o": outcome}
 
     _OUTCOME_LABEL = {
-        CHECK_NOT_EVALUATED: 'Unable to evaluate',
+        CHECK_NOT_EVALUATED: 'Informational only',
+        CHECK_UNREADABLE: 'Unable to evaluate',
         CHECK_SUPPRESSED: 'Failed, suppressed',
         CHECK_NOT_RUN: 'Not run',
     }
@@ -202,7 +243,11 @@ class WAFS2027(Framework):
 
         if CHECK_FAIL in outcomes:
             comp = -1
-        elif CHECK_PASS in outcomes and CHECK_SUPPRESSED not in outcomes:
+        elif CHECK_UNREADABLE in outcomes or CHECK_SUPPRESSED in outcomes:
+            # Data that could not be read (or a suppressed failure) on any
+            # mapped check may hide a failure: never report the BP as met.
+            comp = 0
+        elif CHECK_PASS in outcomes:
             comp = 1
         else:
             comp = 0

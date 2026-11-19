@@ -309,6 +309,14 @@ def _restoreConfig():
             cache[k] = v
 
 
+@pytest.fixture(autouse=True)
+def _emptyForkDir(tmp_path, monkeypatch):
+    # Never read a real __fork/error.txt left by a local scan.
+    d = tmp_path / '_emptyfork'
+    d.mkdir()
+    monkeypatch.setattr(wafs2027_module._C, 'FORK_DIR', str(d))
+
+
 def _writeRaw(tmp_path, results):
     """Write api-raw.json the way Screener.generateScreenerOutput does:
     {service: {'results': {region: {identifier: {check: [status, msg]}}}}}"""
@@ -376,15 +384,107 @@ class TestComplianceRequiresEvaluatedPass:
         fw._hookPostItemsLoop()
         assert 'sec-accounts' not in t.state['securely-operate']['SelectedChoices']
 
-    def test_evaluated_pass_is_compliant_and_selected(self, tmp_path):
+    def test_member_account_unreadable_checks_block_pass(self, tmp_path):
+        # Member account: 5 of 6 SEC01-BP01 checks are "Not evaluable from
+        # member account" and 1 passes. The unreadable checks may hide a
+        # failure, so the BP is not met and the choice is not selected.
+        # Old code: comp 1 and 'sec-accounts' selected.
         res = {c: [0, 'Not evaluable from member account'] for c in SEC01_BP01_CHECKS}
         res['hasOrganization'] = [1, 'ok']
         _writeRaw(tmp_path, {'iam': {'GLOBAL': {'Account': res}}})
+        t = _tools()
+        fw, comp, rows = _runFramework({'iam': {'summary': {}}}, t)
+        assert comp['SEC01-BP01'] == 0
+        row = [r for r in rows if r[1].startswith('SEC01-BP01 ')][0]
+        assert 'Unable to evaluate' in row[3]
+        fw._hookPostItemsLoop()
+        assert 'sec-accounts' not in t.state['securely-operate']['SelectedChoices']
+
+    def test_unreadable_check_blocks_pass_of_another_check_in_bp(self, tmp_path):
+        # Old code: comp 1 (pass on hasOrganization hid the AccessDenied).
+        _writeRaw(tmp_path, {'iam': {'GLOBAL': {'Account': {
+            'hasOrganization': [1, 'ok'],
+            'orgMgmtAccountHostsWorkloads': [0, 'Unable to evaluate (AccessDenied)']}}}})
+        t = _tools()
+        fw, comp, _ = _runFramework({'iam': {'summary': {}}}, t)
+        assert comp['SEC01-BP01'] == 0
+        fw._hookPostItemsLoop()
+        assert 'sec-accounts' not in t.state['securely-operate']['SelectedChoices']
+
+    def test_evaluated_pass_with_unrun_checks_is_compliant_and_selected(self, tmp_path):
+        # Checks that did not run (no resources / not scanned) do not block a
+        # pass from a check that did run.
+        _writeRaw(tmp_path, {'iam': {'GLOBAL': {'Account': {'hasOrganization': [1, 'ok']}}}})
         t = _tools()
         fw, comp, _ = _runFramework({'iam': {'summary': {}}}, t)
         assert comp['SEC01-BP01'] == 1
         fw._hookPostItemsLoop()
         assert t.state['securely-operate']['SelectedChoices'] == ['user-picked', 'sec-accounts']
+
+    def test_informational_only_check_does_not_block_pass(self, tmp_path):
+        _writeRaw(tmp_path, {'iam': {'GLOBAL': {'Account': {
+            'hasOrganization': [1, 'ok'],
+            'enableCostBudget': [0, 'Not applicable: account is not part of AWS Organizations']}}}})
+        _, comp, rows = _runFramework({'iam': {'summary': {}}})
+        assert comp['SEC01-BP01'] == 1
+        row = [r for r in rows if r[1].startswith('SEC01-BP01 ')][0]
+        assert 'Informational only' in row[3]
+
+    @pytest.mark.parametrize('msg', ['Error: ThrottlingException', 'Error: An error occurred (AccessDenied)',
+                                     'Unknown mode: SSE-FOO'])
+    def test_error_results_on_one_region_block_glue_pass(self, tmp_path, msg):
+        # glue.PublicAccessibility passes in us-east-1 and returns
+        # [0, 'Error: ...'] in eu-west-1. Old code: SEC03-BP03 = SEC08-BP04 = 1.
+        _writeRaw(tmp_path, {'glue': {
+            'us-east-1': {'Catalog': {'PublicAccessibility': [1, 'ok']}},
+            'eu-west-1': {'Catalog': {'PublicAccessibility': [0, msg]}}}})
+        _, comp, _ = _runFramework({'glue': {'summary': {}}})
+        assert comp['SEC03-BP03'] == 0
+        assert comp['SEC08-BP04'] == 0
+
+    def test_glue_pass_in_all_regions_is_compliant(self, tmp_path):
+        _writeRaw(tmp_path, {'glue': {
+            'us-east-1': {'Catalog': {'PublicAccessibility': [1, 'ok']}},
+            'eu-west-1': {'Catalog': {'PublicAccessibility': [1, 'ok']}}}})
+        _, comp, _ = _runFramework({'glue': {'summary': {}}})
+        assert comp['SEC03-BP03'] == 1
+
+    def test_check_that_raised_on_one_resource_blocks_pass(self, tmp_path, monkeypatch):
+        # Evaluator records no result for a check that raised, only a
+        # traceback in __fork/error.txt. Old code: comp 1.
+        forkDir = tmp_path / 'fork'
+        forkDir.mkdir()
+        (forkDir / 'error.txt').write_text(
+            'Traceback (most recent call last):\n'
+            '  File "/repo/services/Evaluator.py", line 85, in runSingleCheck\n'
+            '    getattr(obj, method_name)()\n'
+            '  File "/repo/services/glue/drivers/GlueCatalog.py", line 40, in _checkPublicAccessibility\n'
+            '    policy = json.loads(resp["PolicyInJson"])\n'
+            'KeyError: \'PolicyInJson\'\n')
+        monkeypatch.setattr(wafs2027_module._C, 'FORK_DIR', str(forkDir))
+        _writeRaw(tmp_path, {'glue': {'us-east-1': {'Catalog': {'PublicAccessibility': [1, 'ok']}}}})
+        _, comp, rows = _runFramework({'glue': {'summary': {}}})
+        assert comp['SEC03-BP03'] == 0
+        row = [r for r in rows if r[1].startswith('SEC03-BP03 ')][0]
+        assert 'Unable to evaluate' in row[3]
+
+    @pytest.mark.parametrize('msg,unreadable', [
+        ('Unable to evaluate (AccessDenied)', True),
+        ('Not evaluable from member account', True),
+        ('Error: ThrottlingException', True),
+        ('Unknown mode: X', True),
+        ('Unknown option: X', True),
+        ('Source server s-1: Unable to evaluate (replication state X)', True),
+        ('Aggregator index in us-east-1: unable to read state (AccessDenied)', True),
+        ('Vault access policy present but not parseable', True),
+        ('CloudTrail client not available', True),
+        ('Not applicable: account is not part of AWS Organizations', False),
+        ('No user pools in this region', False),
+        ('Shared from account 111122223333; evaluate in the owner account', False),
+        ('Exception recorded by tag ss-exception=true (x, active key(s) y)', False),
+    ])
+    def test_unreadable_message_classification(self, msg, unreadable):
+        assert wafs2027_module.WAFS2027._isUnreadable([0, msg]) is unreadable
 
     def test_pass_on_one_resource_does_not_cover_unreadable_resource(self, tmp_path):
         # hasOrganization passed on one resource but could not be read on
