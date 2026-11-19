@@ -82,7 +82,7 @@
 	},
 	"cloudfrontViewerMinTlsOld": {
 		"category": "S",
-		"^description": "{$COUNT} CloudFront distribution(s) allow TLS versions older than TLS 1.2: either the viewer security policy (MinimumProtocolVersion) on a custom certificate is below TLSv1.2_2021, or an HTTPS custom origin permits TLSv1/TLSv1.1. These protocol versions and their cipher suites are deprecated and weaken encryption in transit.",
+		"^description": "{$COUNT} CloudFront distribution(s) allow TLS versions older than TLS 1.2: either the viewer security policy (MinimumProtocolVersion) on a custom certificate is below TLSv1.2_2021, or an HTTPS custom origin permits TLSv1/TLSv1.1. These protocol versions and their cipher suites are deprecated and weaken encryption in transit. Distributions on the default *.cloudfront.net certificate are reported as informational: CloudFront fixes their viewer security policy at TLSv1 (TLS 1.0/1.1 accepted) and it can only be raised by switching to a custom certificate.",
 		"shortDesc": "Set the viewer security policy to TLSv1.2_2021 or later and remove TLSv1/TLSv1.1 from origin SSL protocols.",
 		"criticality": "M",
 		"downtime": 0,

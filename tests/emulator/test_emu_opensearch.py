@@ -87,3 +87,36 @@ def test_opensearch_access_policy_public_list_principal_org_fix(emu, uid):
             osc.delete_domain(DomainName=name)
         except Exception:
             pass
+
+
+def test_opensearch_fgac_open_policy_is_info(emu, uid):
+    """Open es:ESHttp* policy is -1 without FGAC; with FGAC (anonymous auth disabled) every
+    request must authenticate, so it is INFO (network exposure only), never PASS or High FAIL."""
+    osc = emu.client('opensearch')
+    name = f'ss-os3-{uid}'
+    openPolicy = _policy(name, {'Action': 'es:ESHttp*'})
+    _createDomain(osc, name, openPolicy)
+    fgacName = f'ss-os4-{uid}'
+    try:
+        st = runCheck(emu, 'opensearch', 'AccessPolicyPublic', name).statuses()
+        assert st and all(s == -1 for s in st.values()), st
+
+        osc.create_domain(DomainName=fgacName, EngineVersion='OpenSearch_2.11',
+                          ClusterConfig={'InstanceType': 'r6g.large.search', 'InstanceCount': 1},
+                          EBSOptions={'EBSEnabled': True, 'VolumeType': 'gp3', 'VolumeSize': 10},
+                          NodeToNodeEncryptionOptions={'Enabled': True},
+                          EncryptionAtRestOptions={'Enabled': True},
+                          DomainEndpointOptions={'EnforceHTTPS': True},
+                          AdvancedSecurityOptions={'Enabled': True, 'InternalUserDatabaseEnabled': True,
+                                                   'MasterUserOptions': {'MasterUserName': 'admin',
+                                                                         'MasterUserPassword': 'Passw0rd!Passw0rd'}},
+                          AccessPolicies=_policy(fgacName, {'Action': 'es:ESHttp*'}))
+        _waitIdle(osc, fgacName)
+        st = runCheck(emu, 'opensearch', 'AccessPolicyPublic', fgacName).statuses()
+        assert st and all(s == 0 for s in st.values()), st
+    finally:
+        for n in (name, fgacName):
+            try:
+                osc.delete_domain(DomainName=n)
+            except Exception:
+                pass

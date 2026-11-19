@@ -370,7 +370,7 @@
 	},
 	"AccessPolicyPublic": {
 		"category": "S",
-		"^description": "{$COUNT} OpenSearch domain(s) use a public endpoint and have an access policy that allows any principal (\"*\") to call the OpenSearch HTTP APIs without an aws:SourceIp, aws:SourceVpce or aws:PrincipalOrgID restriction. Anyone who can reach the endpoint can read, write or delete data. Fine-grained access control with an internal user database does not remove this network exposure.",
+		"^description": "{$COUNT} OpenSearch domain(s) use a public endpoint and have an access policy that allows any principal (\"*\") to call the OpenSearch HTTP APIs without an aws:SourceIp, aws:SourceVpce or aws:PrincipalOrgID restriction. Without fine-grained access control (FGAC), anyone who can reach the endpoint can read, write or delete data; with FGAC anonymous authentication enabled, unauthenticated requests are accepted with the permissions of the FGAC anonymous role. Public domains that use this open policy with FGAC enabled and anonymous authentication disabled (the AWS-documented FGAC setup) are reported as informational instead: every request must still authenticate through FGAC, but the endpoint remains reachable from the internet.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,

@@ -2,7 +2,7 @@
 
 The emulator flag/fix cycle lives in tests/emulator/test_emu_opensearch.py. These
 cases cover inputs the emulator cannot produce (a VPC domain with real VPCOptions,
-an unparseable AccessPolicies string, FGAC-enabled domains). The check reads only
+an unparseable AccessPolicies string, FGAC anonymous-auth domains). The check reads only
 the DomainStatus returned by describe_domain, so the driver is built without its
 constructor (which makes unrelated list_versions / describe_domain_config calls).
 """
@@ -42,10 +42,31 @@ def test_public_wildcard_flagged_then_ip_scoped_passes():
     assert _run({'AccessPolicies': _pol(Condition={'IpAddress': {'aws:SourceIp': ['10.0.0.0/8']}})})[0] == 1
 
 
-def test_list_form_principal_and_fgac_still_flagged():
+def test_list_form_principal_without_fgac_flagged():
     r = _run({'AccessPolicies': _pol(Principal={'AWS': ['*']}),
-              'AdvancedSecurityOptions': {'Enabled': True, 'InternalUserDatabaseEnabled': True}})
-    assert r[0] == -1 and 'fine-grained' in r[1]
+              'AdvancedSecurityOptions': {'Enabled': False}})
+    assert r[0] == -1 and 'not enabled' in r[1]
+    # AdvancedSecurityOptions absent -> no FGAC -> still flagged.
+    assert _run({'AccessPolicies': _pol(Principal={'AWS': ['*']})})[0] == -1
+
+
+def test_fgac_open_policy_is_info_not_high_fail():
+    """AWS's documented FGAC setup (open es:ESHttp* policy + FGAC, anonymous auth off):
+    every request authenticates, so it is not 'anyone can read/write/delete' (-1/H).
+    Network exposure is still surfaced as INFO, never PASS."""
+    for aso in ({'Enabled': True, 'InternalUserDatabaseEnabled': True, 'AnonymousAuthEnabled': False},
+                {'Enabled': True, 'InternalUserDatabaseEnabled': False}):
+        r = _run({'AccessPolicies': _pol(Principal={'AWS': '*'}, Action='es:ESHttp*'),
+                  'AdvancedSecurityOptions': aso})
+        assert r[0] == 0, r
+        assert 'authentication' in r[1] and 'reachable from the internet' in r[1]
+
+
+def test_fgac_with_anonymous_auth_still_flagged():
+    r = _run({'AccessPolicies': _pol(Action='es:ESHttp*'),
+              'AdvancedSecurityOptions': {'Enabled': True, 'InternalUserDatabaseEnabled': True,
+                                          'AnonymousAuthEnabled': True}})
+    assert r[0] == -1 and 'anonymous authentication enabled' in r[1]
 
 
 def test_slash_zero_and_negated_ip_not_restrictive():
