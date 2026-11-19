@@ -468,6 +468,75 @@ class TestComplianceRequiresEvaluatedPass:
         row = [r for r in rows if r[1].startswith('SEC03-BP03 ')][0]
         assert 'Unable to evaluate' in row[3]
 
+    @staticmethod
+    def _writeErrorTxt(tmp_path, monkeypatch, frames):
+        forkDir = tmp_path / 'fork'
+        forkDir.mkdir()
+        text = ''
+        for path, method in frames:
+            text += ('Traceback (most recent call last):\n'
+                     '  File "/repo/services/Evaluator.py", line 85, in runSingleCheck\n'
+                     '    getattr(obj, method_name)()\n'
+                     f'  File "/repo/{path}", line 900, in {method}\n'
+                     '    x = resp["Missing"]\n'
+                     "KeyError: 'Missing'\n\n")
+        (forkDir / 'error.txt').write_text(text)
+        monkeypatch.setattr(wafs2027_module._C, 'FORK_DIR', str(forkDir))
+
+    def test_check_that_raised_everywhere_blocks_pass_of_other_check(self, tmp_path, monkeypatch):
+        # Review round 2, cause 1: _checkOrgMgmtAccountHostsWorkloads raised on
+        # every resource (no raw result), hasOrganization passed. Old code
+        # returned 'Not run' before looking at errors: SEC01-BP01 comp 1.
+        self._writeErrorTxt(tmp_path, monkeypatch, [
+            ('services/iam/drivers/IamAccount.py', '_checkOrgMgmtAccountHostsWorkloads')])
+        _writeRaw(tmp_path, {'iam': {'GLOBAL': {'Account': {'hasOrganization': [1, 'ok']}}}})
+        t = _tools()
+        fw, comp, rows = _runFramework({'iam': {'summary': {}}}, t)
+        assert comp['SEC01-BP01'] == 0
+        row = [r for r in rows if r[1].startswith('SEC01-BP01 ')][0]
+        assert '[orgMgmtAccountHostsWorkloads] - Unable to evaluate' in row[3]
+        fw._hookPostItemsLoop()
+        assert 'sec-accounts' not in t.state['securely-operate']['SelectedChoices']
+
+    def test_raised_check_matched_to_lower_camel_key(self, tmp_path, monkeypatch):
+        # Review round 2, cause 2: the result key is lowerCamel
+        # ('orgMgmtAccountHostsWorkloads'), not the method name. Old code
+        # compared case-sensitively: SEC01-BP01 comp 1.
+        self._writeErrorTxt(tmp_path, monkeypatch, [
+            ('services/iam/drivers/IamAccount.py', '_checkOrgMgmtAccountHostsWorkloads')])
+        _writeRaw(tmp_path, {'iam': {'GLOBAL': {
+            'Account': {'hasOrganization': [1, 'ok'], 'orgMgmtAccountHostsWorkloads': [1, 'ok']}}}})
+        fw, comp, _ = _runFramework({'iam': {'summary': {}}})
+        assert comp['SEC01-BP01'] == 0
+        assert fw._checkOutcome('iam', 'orgMgmtAccountHostsWorkloads') == wafs2027_module.CHECK_UNREADABLE
+        # Unrelated iam checks are not affected by an attributable error.
+        assert fw._checkOutcome('iam', 'hasOrganization') == wafs2027_module.CHECK_PASS
+
+    def test_raised_check_matched_by_key_suffix(self, tmp_path, monkeypatch):
+        # AcmCommon._checkCertExpired writes 'acmCertExpired'.
+        self._writeErrorTxt(tmp_path, monkeypatch, [
+            ('services/acm/drivers/AcmCommon.py', '_checkCertExpired')])
+        _writeRaw(tmp_path, {'acm': {'us-east-1': {'c1': {'acmCertExpired': [1, 'ok']}}}})
+        fw, _, _ = _runFramework({'acm': {'summary': {}}})
+        assert fw._checkOutcome('acm', 'acmCertExpired') == wafs2027_module.CHECK_UNREADABLE
+
+    def test_unattributable_raised_check_blocks_whole_service(self, tmp_path, monkeypatch):
+        # A raised method whose result key cannot be identified makes every
+        # mapped check of that service unreadable (never a false PASS).
+        self._writeErrorTxt(tmp_path, monkeypatch, [
+            ('services/iam/drivers/IamAccount.py', '_checkZzNoSuchThing')])
+        _writeRaw(tmp_path, {'iam': {'GLOBAL': {'Account': {'hasOrganization': [1, 'ok']}}}})
+        fw, comp, _ = _runFramework({'iam': {'summary': {}}})
+        assert comp['SEC01-BP01'] == 0
+        assert fw._checkOutcome('iam', 'hasOrganization') == wafs2027_module.CHECK_UNREADABLE
+
+    def test_raised_check_in_other_service_does_not_block(self, tmp_path, monkeypatch):
+        self._writeErrorTxt(tmp_path, monkeypatch, [
+            ('services/acm/drivers/AcmCommon.py', '_checkCertExpired')])
+        _writeRaw(tmp_path, {'iam': {'GLOBAL': {'Account': {'hasOrganization': [1, 'ok']}}}})
+        _, comp, _ = _runFramework({'iam': {'summary': {}}})
+        assert comp['SEC01-BP01'] == 1
+
     @pytest.mark.parametrize('msg,unreadable', [
         ('Unable to evaluate (AccessDenied)', True),
         ('Not evaluable from member account', True),

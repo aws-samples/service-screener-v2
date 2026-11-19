@@ -53,7 +53,7 @@ frameworks run) and gives each best practice one status:
 |---|---|
 | Need attention (-1) | At least one mapped check failed |
 | Compliant (1) | At least one mapped check ran and passed, and no mapped check failed, was suppressed, or was unreadable. Mapped checks that did not run (service not scanned, no resources) or returned only informational results (`Not applicable`, `No ... in this region`) do not block a pass |
-| Not available (0) | No mapped check passed, or any mapped check was unreadable on any resource: a status 0 result whose message says the data could not be read or interpreted (`Unable to evaluate`, `Not evaluable`, `Error: ...`, `Unknown mode: ...`, `could not`, `unparseable`, `not returned`, ...), or the check raised an exception (traceback in `error.txt`). Also when a failure was suppressed or the practice needs manual review |
+| Not available (0) | No mapped check passed, or any mapped check was unreadable on any resource: a status 0 result whose message says the data could not be read or interpreted (`Unable to evaluate`, `Not evaluable`, `Error: ...`, `Unknown mode: ...`, `could not`, `unparseable`, `not returned`, ...), or the check raised an exception on any resource (traceback in `error.txt`), even when it recorded no result at all. A raised `_check<Name>` method is matched to result keys case-insensitively by name or suffix (`_checkCertExpired` -> `acmCertExpired`) or by the key literals in the method body; when it matches no known key of its service, every mapped check of that service is treated as unreadable. Also when a failure was suppressed or the practice needs manual review |
 
 If `api-raw.json` cannot be read, no best practice is reported as compliant.
 

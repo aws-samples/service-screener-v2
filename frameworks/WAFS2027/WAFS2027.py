@@ -1,4 +1,4 @@
-import json, os, re, traceback
+import ast, json, os, re, traceback
 
 import constants as _C
 from utils.Config import Config
@@ -12,7 +12,7 @@ CHECK_PASS = 'pass'              # ran with status 1 on at least one resource, n
 CHECK_NOT_EVALUATED = 'notEvaluated'  # ran, but only with informational status 0 results
 CHECK_UNREADABLE = 'unreadable'  # data could not be read on at least one resource, or the check raised
 CHECK_SUPPRESSED = 'suppressed'  # failed (-1) but every failure is suppressed
-CHECK_NOT_RUN = 'notRun'         # service not scanned, no resources, or the check errored
+CHECK_NOT_RUN = 'notRun'         # service not scanned or no resources (a check that raised is unreadable)
 CHECK_EVIDENCE = 'evidence'      # <service>.$length entries: resource-count context only
 
 # Status 0 results whose message says the data could not be read (or the
@@ -23,6 +23,9 @@ CHECK_EVIDENCE = 'evidence'      # <service>.$length entries: resource-count con
 # "Error: ThrottlingException", "Unknown mode: X" or "Source server s-1:
 # Unable to evaluate (...)" are caught. Other status 0 results (not
 # applicable, no resources, advisory notes) are informational.
+# The pattern is deliberately broad: a misclassified informational message
+# can only give a false 0 (manual review), never a false PASS. Keep new
+# informational status 0 messages free of these markers.
 UNREADABLE = 'unreadable'
 UNREADABLE_PATTERN = re.compile(
     r"unable to|not evaluable|could not|cannot |can't|\berror\b|\bexception:|"
@@ -35,7 +38,7 @@ UNREADABLE_PATTERN = re.compile(
 # Traceback frame of a driver check method in error.txt
 # (services/Evaluator.py writes every exception a check raised there).
 _CHECK_FRAME = re.compile(
-    r'File "[^"]*[/\\]services[/\\]([A-Za-z0-9_]+)[/\\]drivers[/\\][^"]+", line \d+, in _check(\w+)')
+    r'File "([^"]*[/\\]services[/\\]([A-Za-z0-9_]+)[/\\]drivers[/\\][^"]+)", line \d+, in _check(\w+)')
 
 # Standard WA Tool pillar IDs. A title shared by several BPs in the map is
 # matched only inside the pillar its BP ID belongs to; FND (Cloud
@@ -63,7 +66,10 @@ class WAFS2027(Framework):
             were suppressed, or were unreadable (checks that did not run or
             were informational only do not block)
          0  no mapped check passed, or any mapped check could not read its
-            data / raised on any resource, or a failure was suppressed, or
+            data on any resource, or raised (traceback in error.txt; matched
+            to result keys by name/suffix case-insensitively or by key
+            literals in the method; an unattributable error blocks every
+            mapped check of its service), or a failure was suppressed, or
             the practice needs manual review
     Only 1 is ever written to the WA Tool as a selected choice.
     """
@@ -81,6 +87,7 @@ class WAFS2027(Framework):
         self._mapDupTitles = None
         self.rawStatus = self._loadRawStatus()
         self.checkErrors = self._loadCheckErrors()
+        self._raisedCache = {}
 
         cliParams = Config.get('_SS_PARAMS') or {}
         tmpParams = {}
@@ -153,11 +160,11 @@ class WAFS2027(Framework):
 
     @staticmethod
     def _loadCheckErrors():
-        """{service: {check}} for driver check methods that raised during
-        this scan. Evaluator records no result for a check that raised, only
-        a traceback in __fork/error.txt, so a pass on another resource would
-        otherwise hide the error. Check names are the method name without
-        '_check' (the usual result key)."""
+        """{service: {methodName: set(string literals in the method)}} for
+        driver check methods (_check<Name>) that raised during this scan.
+        Evaluator records no result for a check that raised, only a traceback
+        in __fork/error.txt, so a pass on another resource (or a pass from
+        another mapped check) would otherwise hide the error."""
         path = os.path.join(_C.FORK_DIR, 'error.txt')
         out = {}
         try:
@@ -166,14 +173,90 @@ class WAFS2027(Framework):
         except OSError:
             return out
         for block in text.split('Traceback (most recent call last):'):
-            m = _CHECK_FRAME.search(block)
-            if m:
-                out.setdefault(m.group(1).lower(), set()).add(m.group(2))
+            for m in _CHECK_FRAME.finditer(block):
+                serv, method = m.group(2).lower(), m.group(3)
+                methods = out.setdefault(serv, {})
+                if method not in methods:
+                    methods[method] = WAFS2027._methodLiterals(serv, m.group(1), method)
         return out
+
+    @staticmethod
+    def _methodLiterals(serv, tracePath, method):
+        """String constants in the body of _check<method> (result keys are
+        often assigned through a variable, e.g. key = 'orgMgmt...')."""
+        fname = re.split(r'[/\\]', tracePath)[-1]
+        path = os.path.join(_C.SERVICE_DIR, serv, 'drivers', fname)
+        try:
+            with open(path) as f:
+                tree = ast.parse(f.read())
+        except (OSError, SyntaxError, ValueError):
+            return set()
+        lits = set()
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == '_check' + method:
+                for sub in ast.walk(node):
+                    if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+                        lits.add(sub.value)
+        return lits
+
+    @staticmethod
+    def _methodMatchesKey(method, literals, key):
+        """Whether result key `key` may be written by _check<method>. Result
+        keys do not follow one convention: _checkOrgMgmtAccountHostsWorkloads
+        writes 'orgMgmtAccountHostsWorkloads', AcmCommon._checkCertExpired
+        writes 'acmCertExpired'. Matching is case-insensitive on equality or
+        suffix (either way), or the key appears as a literal in the method."""
+        if key in literals:
+            return True
+        m, k = method.lower(), key.lower()
+        if m == k:
+            return True
+        return (len(m) >= 4 and k.endswith(m)) or (len(k) >= 4 and m.endswith(k))
+
+    def _mappedKeys(self, serv):
+        keys = set()
+        for sections in (getattr(self, 'map', None) or {}).get('mapping', {}).values():
+            for maps in sections.values():
+                for _m in maps or []:
+                    s, _, c = str(_m).partition('.')
+                    if s == serv and c and c != '$length':
+                        keys.add(c)
+        return keys
+
+    def _checkRaised(self, serv, check):
+        """True when a check method of `serv` that raised may have produced
+        result key `check`. A raised method that matches none of the
+        service's mapped or recorded result keys cannot be attributed, so it
+        makes every mapped check of that service unreadable (never a false
+        PASS)."""
+        methods = self.checkErrors.get(serv.lower())
+        if not methods:
+            return False
+        cache = self._raisedCache.get(serv)
+        if cache is None:
+            known = self._mappedKeys(serv) | set((self.rawStatus or {}).get(serv, {}).keys())
+            matched, unattributed = set(), False
+            for method, lits in methods.items():
+                hits = {k for k in known if self._methodMatchesKey(method, lits, k)}
+                if not hits:
+                    unattributed = True
+                matched |= hits
+            cache = self._raisedCache[serv] = (matched, unattributed)
+        matched, unattributed = cache
+        if unattributed:
+            return True
+        if check in matched:
+            return True
+        # Keys not known up front (not mapped, not in raw) still get matched.
+        return any(self._methodMatchesKey(m, l, check) for m, l in methods.items())
 
     def _checkOutcome(self, serv, check):
         if serv in self.data and check in (self.data[serv].get('summary') or {}):
             return CHECK_FAIL
+        # A check that raised (on any resource) is unreadable, even when it
+        # recorded no result at all: it must block a pass from another check.
+        if self._checkRaised(serv, check):
+            return CHECK_UNREADABLE
         if self.rawStatus is None:
             return CHECK_NOT_RUN
         statuses = self.rawStatus.get(serv, {}).get(check)
@@ -182,8 +265,8 @@ class WAFS2027(Framework):
         if -1 in statuses:
             return CHECK_SUPPRESSED
         # A pass on some resources does not cover resources whose data could
-        # not be read, or on which the check raised.
-        if UNREADABLE in statuses or check in self.checkErrors.get(serv.lower(), ()):
+        # not be read.
+        if UNREADABLE in statuses:
             return CHECK_UNREADABLE
         if 1 in statuses:
             return CHECK_PASS
