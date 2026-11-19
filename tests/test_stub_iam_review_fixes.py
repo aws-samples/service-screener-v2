@@ -221,6 +221,7 @@ class TestOrgConditionMustNameOwnOrg:
     @pytest.mark.parametrize('cond', [
         {'StringEquals': {'aws:PrincipalOrgID': ORG_ID}},
         {'StringLike': {'aws:PrincipalOrgID': ORG_ID}},
+        {'ForAnyValue:StringEquals': {'aws:PrincipalOrgID': ORG_ID}},
         {'ForAnyValue:StringLike': {'aws:PrincipalOrgPaths': f'{ORG_ID}/r-ab12/*'}},
         {'StringEquals': {'aws:PrincipalOrgPaths': f'{ORG_ID}/r-ab12/{OU_ID}/'}},
     ])

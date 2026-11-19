@@ -158,9 +158,10 @@ def orgConditionScope(stmt, orgId):
         if k not in ORG_CONDITION_KEYS or not vals:
             continue
         prefix, _, base = op.rpartition(':')
+        # IfExists and ForAllValues are true when the key is absent (principal
+        # in no organization). ForAnyValue is false for an absent key, so it
+        # enforces the condition for both keys.
         if base.endswith('ifexists') or prefix == 'forallvalues':
-            continue
-        if prefix == 'foranyvalue' and k != 'aws:principalorgpaths':
             continue
         if base not in ('stringequals', 'stringlike', 'stringequalsignorecase'):
             continue
