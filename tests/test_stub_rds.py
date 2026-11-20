@@ -61,8 +61,27 @@ def _runShared(values, orgAccounts=None, error=None, coveredInstances=None):
 
 
 def test_instance_snapshot_shared_flag_fix():
-    assert _runShared([OTHER, ACCT])[0] == -1            # misconfigured: restorable by another account
-    assert _runShared([])[0] == 1                        # fixed: share removed
+    # Organization membership readable (management account): OTHER is outside.
+    assert _runShared([OTHER, ACCT], orgAccounts={ACCT})[0] == -1   # misconfigured
+    assert _runShared([], orgAccounts={ACCT})[0] == 1               # fixed: share removed
+    # Account not in an organization: every other account is external.
+    res = _runShared([OTHER], orgAccounts=set())
+    assert res[0] == -1 and 'not in an AWS Organization' in res[1]
+
+
+def test_instance_snapshot_shared_member_account_org_unreadable_is_info():
+    # Member account (organizations:ListAccounts denied): a share to a sibling
+    # org account such as a central backup account cannot be told apart from
+    # an external one -> not evaluable, never a FAIL.
+    res = _runShared([OTHER])
+    assert res[0] == 0 and 'Unable to evaluate' in res[1] and OTHER in res[1]
+    # Public access is still a FAIL there when SnapshotRDSIsPublic did not report it.
+    res = _runShared(['all', OTHER])
+    assert res[0] == -1 and 'Public' in res[1]
+    # ... and points to SnapshotRDSIsPublic when it did.
+    res = _runShared(['all', OTHER], coveredInstances={'db1'})
+    assert res[0] == 0 and 'SnapshotRDSIsPublic' in res[1]
+    assert _runShared([])[0] == 1
 
 
 def test_instance_snapshot_shared_inside_org_not_flagged():
@@ -177,10 +196,16 @@ def test_get_org_accounts_cached_per_account():
         assert svc.getOrgAccounts(ACCT) == {ACCT, OTHER}    # second region: no API call
         st.assert_no_pending_responses()
     with Stubber(org) as st:
-        st.add_client_error('list_accounts', service_error_code='AWSOrganizationsNotInUseException')
+        st.add_client_error('list_accounts', service_error_code='AccessDeniedException')
         svc = _rdsService(None, org)
         assert svc.getOrgAccounts(OTHER) is None
         assert svc.getOrgAccounts(OTHER) is None            # failure cached too
+        st.assert_no_pending_responses()
+    with Stubber(org) as st:
+        # Standalone account: no organization -> empty membership, not unknown.
+        st.add_client_error('list_accounts', service_error_code='AWSOrganizationsNotInUseException')
+        svc = _rdsService(None, org)
+        assert svc.getOrgAccounts('333333333333') == set()
         st.assert_no_pending_responses()
 
 
@@ -344,3 +369,40 @@ def test_force_ssl_unset_uses_documented_engine_default():
     # SQL Server unset: not evaluable, never a silent PASS
     assert _forceSsl(RdsMssql, 'sqlserver', '16.00.4135.4.v1', {})[0] == 0
     assert _forceSsl(RdsMssql, 'sqlserver', '16.00.4135.4.v1', {'rds.force_ssl': '0'})[0] == -1
+
+
+def test_cluster_manual_snapshot_pagination_concatenates_cluster_snapshots():
+    """More than one page of cluster manual snapshots: the second page is in
+    DBClusterSnapshots (regression: list + None raised TypeError and the
+    ManualSnapshotTooMany / TooOld results were silently missing)."""
+    import datetime as _dt
+    old = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=400)
+
+    def snaps(n, start):
+        return [{'DBClusterSnapshotIdentifier': f'cs{i}', 'DBClusterIdentifier': 'apg',
+                 'SnapshotCreateTime': old} for i in range(start, start + n)]
+    rds = _client()
+    with Stubber(rds) as st:
+        st.add_response('describe_db_cluster_snapshots', {'DBClusterSnapshots': snaps(4, 0), 'Marker': 'm1'},
+                        {'DBClusterIdentifier': 'apg', 'SnapshotType': 'manual'})
+        st.add_response('describe_db_cluster_snapshots', {'DBClusterSnapshots': snaps(3, 4)},
+                        {'DBClusterIdentifier': 'apg', 'SnapshotType': 'manual', 'Marker': 'm1'})
+        d = _driver(RdsPostgres, 'aurora-postgresql', {'DBInstanceIdentifier': 'apg1', 'DBClusterIdentifier': 'apg',
+                                                       'Engine': 'aurora-postgresql'}, rds)
+        d._checkOldSnapshots()
+        st.assert_no_pending_responses()
+    assert d.results['ManualSnapshotTooMany'] == [-1, 7]
+    assert d.results['ManualSnapshotTooOld'][0] == -1
+
+
+def test_instance_manual_snapshot_pagination_empty_page():
+    rds = _client()
+    with Stubber(rds) as st:
+        st.add_response('describe_db_snapshots', {'DBSnapshots': [], 'Marker': 'm1'},
+                        {'DBInstanceIdentifier': 'pg1', 'SnapshotType': 'manual'})
+        st.add_response('describe_db_snapshots', {},
+                        {'DBInstanceIdentifier': 'pg1', 'SnapshotType': 'manual', 'Marker': 'm1'})
+        d = _driver(RdsPostgres, 'postgres', {'DBInstanceIdentifier': 'pg1', 'Engine': 'postgres'}, rds)
+        d._checkOldSnapshots()
+        st.assert_no_pending_responses()
+    assert 'ManualSnapshotTooMany' not in d.results

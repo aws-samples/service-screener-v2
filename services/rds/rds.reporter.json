@@ -1426,7 +1426,7 @@
 	},
 	"rdsSnapshotSharedExternally": {
 		"category": "S",
-		"^description": "[RDS Snapshot] {$COUNT} manual RDS DB/cluster snapshot(s) can be restored by other AWS accounts: the restore attribute lists account IDs outside your AWS Organization (or, when organization membership cannot be read from this account, any other account), or is 'all' (public) for a snapshot whose source DB instance / Aurora cluster is not evaluated by SnapshotRDSIsPublic - for example because the source has been deleted, or it is a Multi-AZ DB cluster snapshot. Public snapshots of live sources are reported once, under SnapshotRDSIsPublic. Anyone in those accounts can restore a full copy of the database. Remove public access and review the shared accounts, removing those that are not required.",
+		"^description": "[RDS Snapshot] {$COUNT} manual RDS DB/cluster snapshot(s) can be restored by other AWS accounts: the restore attribute lists account IDs outside your AWS Organization, or is 'all' (public) for a snapshot whose source DB instance / Aurora cluster is not reported by SnapshotRDSIsPublic - for example because the source has been deleted, it is a Multi-AZ DB cluster snapshot, or the SnapshotRDSIsPublic lookup failed. Public snapshots of live sources that SnapshotRDSIsPublic reports are reported once, there. When organization membership cannot be read (member accounts without organizations:ListAccounts), snapshots shared only with specific accounts are reported as not evaluable instead. Anyone in those accounts can restore a full copy of the database. Remove public access and review the shared accounts, removing those that are not required.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,

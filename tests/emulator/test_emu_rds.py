@@ -181,7 +181,19 @@ def test_rds_snapshot_unencrypted_cluster(emu, uid, sg):
 
 
 # ---------------- rdsSnapshotSharedExternally ----------------
-def test_rds_cluster_snapshot_shared_externally(emu, uid, sg):
+@pytest.fixture
+def orgReadable(emu, monkeypatch):
+    # The emulator does not implement organizations:ListAccounts, which makes
+    # organization membership unreadable (-> 'Unable to evaluate' for specific
+    # account shares). Simulate the management account, where it is readable
+    # and the organization holds only the scanned account.
+    from services.rds.Rds import Rds
+    acct = emu.client('sts').get_caller_identity()['Account']
+    monkeypatch.setattr(Rds, 'getOrgAccounts', lambda self, accountId=None: {acct})
+    return acct
+
+
+def test_rds_cluster_snapshot_shared_externally(emu, uid, sg, orgReadable):
     rds = emu.client('rds')
     cl = f'ss-rdsshdb-{uid}'
     snap = f'ss-rdsshsnap-{uid}'
@@ -231,7 +243,7 @@ def test_rds_public_cluster_snapshot_after_source_deleted(emu, uid, sg):
         _deleteCluster(rds, cl)
 
 
-def test_rds_public_cluster_snapshot_of_live_cluster_reported_once(emu, uid, sg):
+def test_rds_public_cluster_snapshot_of_live_cluster_reported_once(emu, uid, sg, orgReadable):
     # No duplicate finding: while the source Aurora cluster exists, a public
     # snapshot is reported by SnapshotRDSIsPublic (on the cluster) only, and
     # rdsSnapshotSharedExternally points to it instead of failing again. A
@@ -309,4 +321,56 @@ def test_aurora_no_global_database(emu, uid, sg):
         if 'v' in arn:
             _quiet(rds.remove_from_global_cluster, GlobalClusterIdentifier=gc, DbClusterIdentifier=arn['v'])
         _quiet(rds.delete_global_cluster, GlobalClusterIdentifier=gc)
+        _deleteCluster(rds, cl)
+
+
+def test_rds_public_cluster_snapshot_reported_when_public_check_fails(emu, uid, sg, monkeypatch):
+    # Regression: a live Aurora source counted as 'covered by
+    # SnapshotRDSIsPublic' as soon as its driver ran, so when that lookup
+    # failed (throttling, rds:DescribeDBClusterSnapshots denied) the public
+    # snapshot was reported nowhere. Now it is FAILed here unless
+    # SnapshotRDSIsPublic actually reported it.
+    import botocore.exceptions
+    from services.rds.drivers.RdsCommon import RdsCommon
+
+    def denied(self):
+        raise botocore.exceptions.ClientError({'Error': {'Code': 'ThrottlingException', 'Message': 'x'}},
+                                              'DescribeDBClusterSnapshots')
+    rds = emu.client('rds')
+    cl = f'ss-rdspubf-{uid}'
+    snap = f'ss-rdspubfsnap-{uid}'
+    try:
+        _createCluster(rds, cl, sg)
+        rds.create_db_cluster_snapshot(DBClusterIdentifier=cl, DBClusterSnapshotIdentifier=snap)
+        rds.get_waiter('db_cluster_snapshot_available').wait(DBClusterSnapshotIdentifier=snap, WaiterConfig=WAIT)
+        rds.modify_db_cluster_snapshot_attribute(DBClusterSnapshotIdentifier=snap, AttributeName='restore',
+                                                 ValuesToAdd=['all'])
+        with monkeypatch.context() as m:
+            m.setattr(RdsCommon, '_checkPublicSnapshot', denied)
+            res = runCheck(emu, 'rds', None).results
+        clusterRes = [r for rid, r in res.items() if rid.endswith('Cluster=' + cl)]
+        assert clusterRes and 'SnapshotRDSIsPublic' not in clusterRes[0], clusterRes
+        r = res['ClusterSnapshot::' + snap]['rdsSnapshotSharedExternally']
+        assert r[0] == -1 and 'Public' in r[1], r
+    finally:
+        _quiet(rds.delete_db_cluster_snapshot, DBClusterSnapshotIdentifier=snap)
+        _deleteCluster(rds, cl)
+
+
+def test_rds_cluster_snapshot_shared_org_unreadable_is_info(emu, uid, sg):
+    # Without the orgReadable simulation the emulator behaves like a member
+    # account (ListAccounts unavailable): a specific-account share is not a FAIL.
+    rds = emu.client('rds')
+    cl = f'ss-rdsshm-{uid}'
+    snap = f'ss-rdsshmsnap-{uid}'
+    try:
+        _createCluster(rds, cl, sg)
+        rds.create_db_cluster_snapshot(DBClusterIdentifier=cl, DBClusterSnapshotIdentifier=snap)
+        rds.get_waiter('db_cluster_snapshot_available').wait(DBClusterSnapshotIdentifier=snap, WaiterConfig=WAIT)
+        rds.modify_db_cluster_snapshot_attribute(DBClusterSnapshotIdentifier=snap, AttributeName='restore',
+                                                 ValuesToAdd=['111122223333'])
+        r = runCheck(emu, 'rds', 'rdsSnapshotSharedExternally', snap).results['ClusterSnapshot::' + snap]
+        assert r['rdsSnapshotSharedExternally'][0] == 0 and '111122223333' in r['rdsSnapshotSharedExternally'][1]
+    finally:
+        _quiet(rds.delete_db_cluster_snapshot, DBClusterSnapshotIdentifier=snap)
         _deleteCluster(rds, cl)

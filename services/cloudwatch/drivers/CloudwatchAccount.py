@@ -12,7 +12,7 @@ import threading
 
 import botocore
 
-from services.Evaluator import Evaluator
+from services.Evaluator import Evaluator, _isTransient
 from utils.Config import Config
 from utils.PolicyPrincipal import iterStatements, statementIsPublic
 
@@ -159,6 +159,7 @@ class CloudwatchAccount(Evaluator):
 
         self._lock = threading.RLock()
         self._cache = {}
+        self._keyLocks = {}
 
         self._resourceName = f'Account::{region}'
         return
@@ -174,13 +175,27 @@ class CloudwatchAccount(Evaluator):
             return self._clients[(name, region)]
 
     def _cached(self, key, fn):
+        """(value, errorCode). fn() runs under a per-key lock, so concurrent
+        checks loading different keys do not wait on each other. Transient
+        errors (throttling, 5xx, timeouts) are returned but not cached, so a
+        later check retries instead of reusing the failure."""
         with self._lock:
-            if key not in self._cache:
-                try:
-                    self._cache[key] = (fn(), None)
-                except Exception as e:
-                    self._cache[key] = (None, _errCode(e))
-            return self._cache[key]
+            if key in self._cache:
+                return self._cache[key]
+            keyLock = self._keyLocks.setdefault(key, threading.RLock())
+        with keyLock:
+            with self._lock:
+                if key in self._cache:
+                    return self._cache[key]
+            try:
+                val = (fn(), None)
+            except Exception as e:
+                val = (None, _errCode(e))
+                if _isTransient(e):
+                    return val
+            with self._lock:
+                self._cache[key] = val
+            return val
 
     def _paginate(self, service, op, key, **kwargs):
         out = []
@@ -201,6 +216,8 @@ class CloudwatchAccount(Evaluator):
             except botocore.exceptions.ClientError as e:
                 if _errCode(e) == 'AWSOrganizationsNotInUseException':
                     return False, None
+                if _isTransient(e):
+                    raise  # not cached: a later check retries
                 return None, None
         val, err = self._cached('org', load)
         return val if val else (None, None)
@@ -380,7 +397,9 @@ class CloudwatchAccount(Evaluator):
         events = self._client('events')
         rules = self._paginate('events', 'list_rules', 'Rules')
         for rule in rules:
-            if rule.get('State') != 'ENABLED' or not rule.get('EventPattern'):
+            ## RuleState is ENABLED, DISABLED or ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS;
+            ## the last one is enabled too and still matches write events.
+            if not str(rule.get('State') or '').startswith('ENABLED') or not rule.get('EventPattern'):
                 continue
             try:
                 pattern = json.loads(rule['EventPattern'])
@@ -466,7 +485,10 @@ class CloudwatchAccount(Evaluator):
 
     def _metricFilterCoverage(self):
         errors = []
-        alarmed = self._alarmedMetrics(self.alarms, self._alarmMetrics)
+        ## Local alarms notify directly or through a composite alarm with actions.
+        alarmed = set()
+        for a in self._notifyingAlarms():
+            alarmed |= self._alarmMetrics(a)
         covered = set()
         for name in self._trailLogGroups():
             filters, err = self._metricFilters(name)
@@ -546,6 +568,25 @@ class CloudwatchAccount(Evaluator):
             self.results[key] = [1, f'{len(policies)} account-level resource policy(ies); none allow any principal '
                                     '(log-group-scoped resource policies are not evaluated)']
 
+    def _centralizationScopeIncludes(self, scope):
+        """Whether a centralization rule Source.Scope covers this account.
+        True / False, or None when the expression cannot be decided here
+        (organizational units, negations, unknown account)."""
+        scope = (scope or '').strip()
+        if not scope:
+            return True
+        if re.search(r'\bNOT\b|!=|<>', scope, re.I) or not self.accountId:
+            return None
+        terms = {t.lower() for t in re.findall(r'\b(AccountId|OrganizationalUnitId|OrganizationId)\b', scope, re.I)}
+        listed = self.accountId in set(re.findall(r'\b\d{12}\b', scope))
+        if terms == {'organizationid'}:
+            return True
+        if terms == {'accountid'}:
+            return listed
+        if listed and not re.search(r'\bAND\b', scope, re.I):
+            return True
+        return None
+
     def _checkCentralizationRule(self):
         key = 'cwLogsCentralizationRuleMissing'
         inOrg, mgmt = self._orgInfo()
@@ -569,7 +610,8 @@ class CloudwatchAccount(Evaluator):
         ## Summaries do not say whether a rule centralizes logs (rules can be
         ## metrics-only) or which source regions it covers, so read each rule
         ## from the region it was created in.
-        covering, logsRules, unreadable = [], [], []
+        covering, logsRules, unreadable, unhealthy, pending = [], [], [], [], []
+        outOfScope = []
         for r in rules:
             ident = r.get('RuleArn') or r.get('RuleName')
             try:
@@ -581,14 +623,36 @@ class CloudwatchAccount(Evaluator):
             source = (detail.get('CentralizationRule') or {}).get('Source') or {}
             if not source.get('SourceLogsConfiguration'):
                 continue
-            logsRules.append(r.get('RuleName', '?'))
-            if self.region in (source.get('Regions') or []):
-                covering.append(r.get('RuleName', '?'))
+            name = r.get('RuleName', '?')
+            logsRules.append(name)
+            if self.region not in (source.get('Regions') or []):
+                continue
+            inScope = self._centralizationScopeIncludes(source.get('Scope'))
+            if inScope is False:
+                outOfScope.append(name)
+                continue
+            if inScope is None:
+                pending.append(f'{name}: scope {source.get("Scope")!r} not evaluable')
+                continue
+            health = detail.get('RuleHealth') or r.get('RuleHealth')
+            if health == 'Unhealthy':
+                unhealthy.append(f'{name} ({detail.get("FailureReason") or r.get("FailureReason") or "no reason"})')
+            elif health == 'Provisioning':
+                ## Configured and being set up: not a missing rule.
+                covering.append(f'{name} (provisioning)')
+            else:
+                covering.append(name)
 
         if covering:
             self.results[key] = [1, f'Logs in {self.region} centralized by rule(s): {", ".join(sorted(covering))}']
-        elif unreadable:
-            self.results[key] = [0, f'Unable to evaluate ({"; ".join(unreadable)})']
+        elif unreadable or pending:
+            self.results[key] = [0, f'Unable to evaluate ({"; ".join(unreadable + pending)})']
+        elif unhealthy:
+            self.results[key] = [-1, f'Logs centralization rule(s) covering {self.region} are Unhealthy: {", ".join(sorted(unhealthy))}']
+        elif outOfScope:
+            ## The organization does centralize this region, only not this account.
+            self.results[key] = [0, f'Logs centralization rule(s) for {self.region} exist but their scope excludes '
+                                    f'account {self.accountId}: {", ".join(sorted(outOfScope))}']
         elif logsRules:
             self.results[key] = [-1, f'{len(logsRules)} logs centralization rule(s) exist but none include {self.region} as a source region']
         else:

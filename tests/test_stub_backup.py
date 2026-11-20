@@ -1195,3 +1195,41 @@ def test_recovery_point_no_cmk_missing_key_is_not_pass():
     d = _vaultEnc(None, None, None, rps=[{'RecoveryPointArn': 'arn:aws:backup:x:y:recovery-point:rp1'}])
     d._checkBackupRecoveryPointNoCMK()
     assert d.results[key][0] == 0, d.results
+
+
+# --------------------------------------------------------------------------- #
+# backupPlanInfrequentSchedule - cron field expansion (no API calls)
+# --------------------------------------------------------------------------- #
+def _schedule(*exprs):
+    plan = {'_name': 'p', '_id': 'p', '_rules': [{'RuleName': f'r{i}', 'ScheduleExpression': e}
+                                                 for i, e in enumerate(exprs)]}
+    d = BackupPlan(plan, None)
+    d._checkBackupPlanInfrequentSchedule()
+    return d.results['backupPlanInfrequentSchedule']
+
+
+@pytest.mark.parametrize('expr', [
+    'cron(0 5 ? * * *)', 'cron(0 5 ? * 1-7 *)', 'cron(0 5 ? * MON-SUN *)', 'cron(0 5 ? * SUN-SAT *)',
+    'cron(0 5 ? * 1,2,3,4,5,6,7 *)', 'cron(0 5 1-31 * ? *)', 'cron(0 5 */1 * ? *)',
+    'cron(0 5 ? JAN-DEC * *)', 'cron(0 */4 ? 1-12 * *)', 'rate(12 hours)'])
+def test_schedule_full_range_is_daily(expr):
+    """Full-range day-of-week / day-of-month / month fields still fire every
+    day (regression: '1-7' and 'MON-SUN' were flagged as less than daily)."""
+    assert _schedule(expr)[0] == 1
+
+
+@pytest.mark.parametrize('expr', [
+    'cron(0 5 ? * MON-FRI *)', 'cron(0 5 ? * 1 *)', 'cron(0 5 1 * ? *)', 'cron(0 5 */2 * ? *)',
+    'cron(0 5 L * ? *)', 'cron(0 5 15W * ? *)', 'cron(0 5 ? * 6L *)', 'cron(0 5 ? * MON#2 *)',
+    'cron(0 5 ? JUL * *)', 'cron(0 5 ? 1-6 * *)', 'rate(7 days)'])
+def test_schedule_restricted_is_less_than_daily(expr):
+    assert _schedule(expr)[0] == -1
+
+
+@pytest.mark.parametrize('expr', ['cron(0 5 ? * FOO *)', 'not-a-schedule', ''])
+def test_schedule_unparseable_is_not_pass(expr):
+    """Unparseable or missing schedule: frequency unknown -> INFO, not PASS."""
+    r = _schedule('cron(0 5 ? * * *)', expr)
+    assert r[0] == 0 and 'Unable to evaluate' in r[1]
+    ## A real FAIL still wins over an unknown one.
+    assert _schedule('cron(0 5 1 * ? *)', expr)[0] == -1

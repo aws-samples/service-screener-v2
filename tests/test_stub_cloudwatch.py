@@ -637,3 +637,159 @@ def test_telemetry_rules_mgmt_denied_or_account_unreadable(clients):
     d = _driver(clients)
     d._checkTelemetryRules()
     assert d.results['telemetryRulesNotConfigured'][0] == 0
+
+
+# --------------------------------------------------------------------------- #
+# Low-severity review fixes (mix1)
+# --------------------------------------------------------------------------- #
+def _gdOnlyNoOthers(clients):
+    _gdEnabled(clients)
+    clients.stub('securityhub').add_client_error('describe_hub', service_error_code='InvalidAccessException')
+    clients.stub('accessanalyzer').add_response('list_analyzers', {'analyzers': []})
+
+
+def test_detection_rule_state_all_management_events_is_enabled(clients):
+    """RuleState ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS is an enabled
+    rule; it used to be skipped, giving a false FAIL. DISABLED is still skipped."""
+    pattern = json.dumps({'source': ['aws.guardduty'], 'detail': {'eventName': ['DeleteDetector']}})
+    for state, expected in (('ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS', 1), ('DISABLED', -1)):
+        _gdOnlyNoOthers(clients)
+        clients.stub('events').add_response('list_rules', {'Rules': [
+            {'Name': 'r', 'State': state, 'EventPattern': pattern}]})
+        if expected == 1:
+            clients.stub('events').add_response('list_targets_by_rule', {'Targets': [{'Id': '1', 'Arn': SNS}]},
+                                                {'Rule': 'r'})
+        _noShadowTrails(clients)
+        d = _driver(clients)
+        d._checkDetectionDisableAlarm()
+        assert d.results['detectionDisableNoAlarm'][0] == expected, d.results
+        clients.stub('events').assert_no_pending_responses()
+
+
+def test_detection_metric_filter_alarm_notifying_via_composite_is_credited(clients):
+    """An alarmed metric filter whose alarm notifies only through a composite
+    alarm (with actions) covers the detection service; without the composite
+    it does not."""
+    lg = 'trail-lg'
+    ctLogs = [['arn:aws:cloudtrail:us-east-1:111122223333:trail/t',
+               f'arn:aws:logs:{REGION}:{ACCT}:log-group:{lg}:*', lg]]
+    mf = {'filterName': 'gd', 'logGroupName': lg,
+          'filterPattern': '{ ($.eventSource = guardduty.amazonaws.com) && ($.eventName = DeleteDetector) }',
+          'metricTransformations': [{'metricName': 'GDDeleted', 'metricNamespace': 'CloudTrailMetrics',
+                                     'metricValue': '1'}]}
+    alarm = {'AlarmName': 'gd-deleted', 'Namespace': 'CloudTrailMetrics', 'MetricName': 'GDDeleted',
+             'ActionsEnabled': True, 'AlarmActions': []}
+    composite = {'AlarmName': 'sec', 'ActionsEnabled': True, 'AlarmActions': [SNS],
+                 'AlarmRule': 'ALARM("gd-deleted") OR ALARM("other")'}
+    for composites, expected in (([], -1), ([composite], 1)):
+        _gdOnlyNoOthers(clients)
+        clients.stub('events').add_response('list_rules', {'Rules': []})
+        clients.stub('logs').add_response('describe_metric_filters', {'metricFilters': [mf]}, {'logGroupName': lg})
+        _noShadowTrails(clients)
+        d = CloudwatchAccount(REGION, clients, ctLogs, [{'logGroupName': lg}], [alarm], composites)
+        d._checkDetectionDisableAlarm()
+        assert d.results['detectionDisableNoAlarm'][0] == expected, d.results
+        clients.stub('logs').assert_no_pending_responses()
+
+
+def _centralRule(clients, health='Healthy', scope=None, failure=None):
+    _org(clients, ACCT)
+    clients.stub('observabilityadmin').add_response('list_centralization_rules_for_organization',
+                                                    {'CentralizationRuleSummaries': [_rule('r1', REGION)]},
+                                                    {'AllRegions': True})
+    source = {'Regions': [REGION], 'SourceLogsConfiguration': {'EncryptedLogGroupStrategy': 'SKIP'}}
+    if scope is not None:
+        source['Scope'] = scope
+    resp = {'RuleName': 'r1', 'RuleHealth': health,
+            'CentralizationRule': {'Source': source, 'Destination': {'Region': REGION}}}
+    if failure:
+        resp['FailureReason'] = failure
+    clients.stub('observabilityadmin').add_response('get_centralization_rule_for_organization', resp)
+    d = _driver(clients)
+    d._checkCentralizationRule()
+    clients.stub('observabilityadmin').assert_no_pending_responses()
+    return d.results['cwLogsCentralizationRuleMissing']
+
+
+def test_centralization_rule_health_and_scope(clients):
+    ## Healthy / still provisioning / org-wide scope / account listed -> PASS
+    assert _centralRule(clients)[0] == 1
+    r = _centralRule(clients, health='Provisioning')
+    assert r[0] == 1 and 'provisioning' in r[1]
+    assert _centralRule(clients, scope="OrganizationId = 'o-abc1234567'")[0] == 1
+    assert _centralRule(clients, scope=f"AccountId IN ('{ACCT}', '{MGMT}')")[0] == 1
+    ## Unhealthy rule does not centralize -> FAIL naming the reason
+    r = _centralRule(clients, health='Unhealthy', failure='TRUSTED_ACCESS_NOT_ENABLED')
+    assert r[0] == -1 and 'TRUSTED_ACCESS_NOT_ENABLED' in r[1]
+    ## Scope excludes the scanned account -> not a PASS (rule exists, so INFO)
+    r = _centralRule(clients, scope=f"AccountId IN ('{MGMT}')")
+    assert r[0] == 0 and ACCT in r[1]
+    ## OU scope / negation cannot be decided here -> not evaluable
+    r = _centralRule(clients, scope="OrganizationalUnitId = 'ou-ab12-cdef3456'")
+    assert r[0] == 0 and 'Unable to evaluate' in r[1]
+    assert _centralRule(clients, scope=f"AccountId NOT IN ('{MGMT}')")[0] == 0
+
+
+def test_cached_transient_error_not_cached_and_keys_load_concurrently(clients):
+    import threading
+    from botocore.exceptions import ClientError
+    d = _driver(clients)
+    calls = []
+
+    def throttled():
+        calls.append(1)
+        if len(calls) == 1:
+            raise ClientError({'Error': {'Code': 'ThrottlingException', 'Message': 'slow down'},
+                               'ResponseMetadata': {'HTTPStatusCode': 400}}, 'Op')
+        return 'ok'
+    assert d._cached('k', throttled) == (None, 'ThrottlingException')
+    assert d._cached('k', throttled) == ('ok', None)       # retried, not the cached error
+    assert d._cached('k', throttled) == ('ok', None) and len(calls) == 2
+
+    def denied():
+        calls.append(1)
+        raise ClientError({'Error': {'Code': 'AccessDeniedException', 'Message': 'no'},
+                           'ResponseMetadata': {'HTTPStatusCode': 400}}, 'Op')
+    n = len(calls)
+    assert d._cached('d', denied) == (None, 'AccessDeniedException')
+    assert d._cached('d', denied) == (None, 'AccessDeniedException') and len(calls) == n + 1
+
+    ## Loading key A must not block loading key B: A waits for B to start.
+    bStarted = threading.Event()
+    out = {}
+
+    def loadA():
+        return 'a' if bStarted.wait(5) else 'blocked'
+
+    def loadB():
+        bStarted.set()
+        return 'b'
+    t = threading.Thread(target=lambda: out.setdefault('a', d._cached('A', loadA)))
+    t.start()
+    import time
+    time.sleep(0.2)
+    out['b'] = d._cached('B', loadB)
+    t.join(10)
+    assert out == {'a': ('a', None), 'b': ('b', None)}
+
+
+def test_alarm_insufficient_data_event_driven_aws_metric_is_info(clients):
+    """An AWS/Lambda alarm on a rarely invoked function sits in
+    INSUFFICIENT_DATA and list_metrics returns nothing after 14 idle days; that
+    is indistinguishable from a deleted function, so INFO, not FAIL. Custom
+    namespaces and continuously published AWS metrics still FAIL."""
+    old = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=30)
+    for ns, mn, dims, expected in (
+            ('AWS/Lambda', 'Errors', [{'Name': 'FunctionName', 'Value': 'monthly-job'}], 0),
+            ('AWS/SNS', 'NumberOfNotificationsFailed', [{'Name': 'TopicName', 'Value': 't'}], 0),
+            ('MyApp', 'Orders', [], -1),
+            ('AWS/RDS', 'CPUUtilization', [{'Name': 'DBInstanceIdentifier', 'Value': 'gone'}], -1)):
+        alarm = {'AlarmName': 'a1', 'ActionsEnabled': True, 'AlarmActions': [SNS], 'Namespace': ns,
+                 'MetricName': mn, 'Dimensions': dims, 'StateValue': 'INSUFFICIENT_DATA',
+                 'StateUpdatedTimestamp': old, 'StateTransitionedTimestamp': old}
+        clients.stub('cloudwatch').add_response('list_metrics', {'Metrics': []},
+                                                {'Namespace': ns, 'MetricName': mn, 'Dimensions': dims})
+        r = _runAlarm(clients, alarm)
+        assert r[0] == expected, (ns, r)
+        if expected == 0:
+            assert 'idle or deleted' in r[1]
