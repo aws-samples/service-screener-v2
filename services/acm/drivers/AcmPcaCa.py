@@ -73,10 +73,10 @@ class AcmPcaCa(Evaluator):
             self.results[key] = [1, 'Short-lived certificate mode CA; revocation not required']
             return
 
-        rev = self.ca.get('RevocationConfiguration')
-        if rev is None:
-            self.results[key] = [0, 'Unable to evaluate (RevocationConfiguration not returned)']
-            return
+        ## self.ca comes from a successful describe/list of an ACTIVE CA (Status was
+        ## read above). RevocationConfiguration is optional in the API: when it is
+        ## absent, revocation was never configured, i.e. neither CRL nor OCSP is on.
+        rev = self.ca.get('RevocationConfiguration') or {}
 
         crl = bool((rev.get('CrlConfiguration') or {}).get('Enabled'))
         ocsp = bool((rev.get('OcspConfiguration') or {}).get('Enabled'))

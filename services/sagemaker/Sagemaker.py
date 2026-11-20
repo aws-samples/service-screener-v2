@@ -93,14 +93,16 @@ class Sagemaker(Service):
                   f"{'; plus ' + str(len(extraNames)) + ' in use by endpoints' if extraNames else ''}). "
                   f"Raise with --others '{{\"sagemakerHistoryLimit\": N}}'.")
 
+        extras = [{nameKey: n} for n in extraNames]
         pending = {x[nameKey] for x in self.registerItems(
-            driverName, summaries + [{nameKey: n} for n in extraNames],
+            driverName, summaries + extras,
             idFn=lambda x: f"{idPrefix}::{x[nameKey]}")}
 
         resources = []
-        # Already checkpointed: keep the summary so advise() still builds the
-        # driver and Evaluator.run() serves the cached result.
-        resources.extend(x for x in summaries if x[nameKey] not in pending)
+        # Already checkpointed: keep the summary (or a name stub for in-use items
+        # older than the cap) so advise() still builds the driver and
+        # Evaluator.run() serves the cached result.
+        resources.extend(x for x in summaries + extras if x[nameKey] not in pending)
         names = [n for n in [x[nameKey] for x in summaries] + extraNames if n in pending]
 
         def _one(name):
@@ -124,6 +126,30 @@ class Sagemaker(Service):
                         resources.append(detail)
         return resources
 
+    def _fieldValues(self, items, nameKey, field, describe):
+        """Return {name: item[field]} for items, describing (in parallel) the ones that
+        lack the field - e.g. checkpointed list summaries, which carry no
+        EndpointConfigName / ProductionVariants. Undescribable items are skipped."""
+        values, missing = {}, []
+        for x in items:
+            if field in x:
+                values[x[nameKey]] = x.get(field)
+            elif x.get(nameKey):
+                missing.append(x[nameKey])
+
+        def _one(name):
+            try:
+                return describe(name).get(field)
+            except botocore.exceptions.ClientError:
+                return None
+
+        if missing:
+            with cf.ThreadPoolExecutor(max_workers=min(self.DESCRIBE_WORKERS, len(missing))) as ex:
+                for name, val in zip(missing, ex.map(_one, missing)):
+                    if val is not None:
+                        values[name] = val
+        return values
+
     ## method to get resources for the services
     ## return the array of the resources
     def getResources(self):
@@ -139,16 +165,22 @@ class Sagemaker(Service):
             lambda n: sm.describe_notebook_instance(NotebookInstanceName=n), 'NotebookDriver', 'Notebook')
 
         # Endpoint configs: those used by live endpoints, plus the most recent.
-        inUseConfigs = sorted({e.get('EndpointConfigName') for e in endpoints if e.get('EndpointConfigName')})
+        inUseConfigs = sorted({c for c in self._fieldValues(
+            endpoints, 'EndpointName', 'EndpointConfigName',
+            lambda n: sm.describe_endpoint(EndpointName=n)).values() if c})
         endpointConfigs = self._collect(
             'Endpoint Config', 'list_endpoint_configs', 'EndpointConfigs', 'EndpointConfigName', 'EndpointConfigArn',
             lambda n: sm.describe_endpoint_config(EndpointConfigName=n), 'EndpointConfigDriver', 'EndpointConfig',
             limit=limit, mustInclude=inUseConfigs)
 
         # Models: those referenced by in-use endpoint configs, plus the most recent.
+        inUseSet = set(inUseConfigs)
+        variants = self._fieldValues(
+            [c for c in endpointConfigs if c.get('EndpointConfigName') in inUseSet],
+            'EndpointConfigName', 'ProductionVariants',
+            lambda n: sm.describe_endpoint_config(EndpointConfigName=n))
         inUseModels = sorted({v.get('ModelName')
-                              for c in endpointConfigs if c.get('EndpointConfigName') in set(inUseConfigs)
-                              for v in c.get('ProductionVariants', []) or [] if v.get('ModelName')})
+                              for vs in variants.values() for v in vs or [] if v.get('ModelName')})
         models = self._collect(
             'Model', 'list_models', 'Models', 'ModelName', 'ModelArn',
             lambda n: sm.describe_model(ModelName=n), 'ModelDriver', 'Model',

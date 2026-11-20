@@ -61,7 +61,7 @@ def test_custom_certificate_modern_policy_passes():
 
 def test_custom_certificate_old_policy_fails():
     r = _run(dict(CUSTOM_OK, MinimumProtocolVersion='TLSv1.2_2019'), [S3_ORIGIN])
-    assert r == [-1, 'viewer MinimumProtocolVersion TLSv1.2_2019']
+    assert r == [-1, 'viewer MinimumProtocolVersion TLSv1.2_2019 (TLS 1.2 minimum, but legacy cipher suites allowed)']
 
 
 def test_custom_certificate_missing_policy_is_unable_to_evaluate():

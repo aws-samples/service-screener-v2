@@ -40,6 +40,7 @@ class InspectorCommon(Evaluator):
     BROAD_FILTER_KEYS = frozenset((
         'severity', 'resourceType', 'findingType', 'findingStatus',
         'vendorSeverity', 'inspectorScore', 'epssScore',
+        'fixAvailable', 'exploitAvailable', 'componentType', 'vulnerabilitySource',
     ))
 
     ## Member relationship states that do not represent a coverage gap.

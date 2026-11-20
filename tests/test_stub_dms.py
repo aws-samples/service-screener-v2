@@ -79,7 +79,14 @@ def test_not_applicable_or_unknown_is_info(engine):
         assert _evaluate(client, stub, _ep(EngineName=engine, SslMode='none')) == 0
 
 
-def test_kafka_missing_protocol_is_info():
+def test_kafka_missing_protocol_is_plaintext_fail():
+    # A Kafka endpoint with a Broker but no SecurityProtocol uses the plaintext default.
     client = _client()
     with Stubber(client) as stub:
-        assert _evaluate(client, stub, _ep(EngineName='kafka', KafkaSettings={'Broker': 'b:9092'})) == 0
+        assert _evaluate(client, stub, _ep(EngineName='kafka', KafkaSettings={'Broker': 'b:9092'})) == -1
+
+
+def test_kafka_settings_missing_is_info():
+    client = _client()
+    with Stubber(client) as stub:
+        assert _evaluate(client, stub, _ep(EngineName='kafka')) == 0

@@ -70,8 +70,10 @@ class Drs(Service):
                     if job.get('initiatedBy') == 'START_DRILL' and job.get('type', 'LAUNCH') == 'LAUNCH':
                         jobs.append(job)
                 pages += 1
-                if pages >= self.JOB_PAGE_CAP:
-                    break
+                if pages >= self.JOB_PAGE_CAP and page.get('nextToken'):
+                    ## Older jobs were not read: a server missing from `jobs` may still
+                    ## have been drilled, so the caller must not report it as undrilled.
+                    return jobs, 'PageCapReached'
         except botocore.exceptions.ClientError as e:
             self._logClientError('describe_jobs', e)
             return None, self._errCode(e)

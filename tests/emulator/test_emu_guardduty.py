@@ -201,3 +201,29 @@ def test_guardduty_s3_malware_protection_off(emu, uid):
             iam.delete_role_policy(RoleName=role, PolicyName='p')
             iam.delete_role(RoleName=role)
             s3.delete_bucket(Bucket=bucket)
+
+
+def test_guardduty_s3_malware_protection_no_buckets_in_region_is_info(emu, uid):
+    """No plan and no S3 bucket in the Region -> not applicable (INFO), not a FAIL.
+    A bucket in another Region does not count; a bucket in this Region flips it to FAIL."""
+    gd, s3 = emu.client('guardduty'), emu.client('s3')
+    if gd.list_malware_protection_plans()['MalwareProtectionPlans']:
+        pytest.skip('emulator account already has Malware Protection plans; not deleting them')
+    if s3.list_buckets(BucketRegion='us-east-1', MaxBuckets=1).get('Buckets'):
+        pytest.skip('emulator account already has buckets in us-east-1; not deleting them')
+    other, local = f'ss-gd-mp-eu-{uid}', f'ss-gd-mp-{uid}'
+    s3eu = emu.client('s3', region_name='eu-west-1')
+    assert s3eu.meta.endpoint_url.startswith('https://127.0.0.1:')
+    s3eu.create_bucket(Bucket=other, CreateBucketConfiguration={'LocationConstraint': 'eu-west-1'})
+    created = [(s3eu, other)]
+    with detector(gd) as did:
+        try:
+            st = runCheck(emu, 'guardduty', 'guarddutyS3MalwareProtectionOff', did).statuses()
+            assert st and all(s == 0 for s in st.values()), st
+            s3.create_bucket(Bucket=local)
+            created.append((s3, local))
+            st = runCheck(emu, 'guardduty', 'guarddutyS3MalwareProtectionOff', did).statuses()
+            assert st and all(s == -1 for s in st.values()), st
+        finally:
+            for c, b in created:
+                c.delete_bucket(Bucket=b)

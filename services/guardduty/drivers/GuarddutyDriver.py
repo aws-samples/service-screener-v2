@@ -5,7 +5,8 @@ from utils.Config import Config
 from datetime import datetime, timezone
     
 class GuarddutyDriver(Evaluator):
-    def __init__(self, detector_id, guardduty_client, region, bedrock_client=None, cloudtrail_client=None, detective_client=None):
+    def __init__(self, detector_id, guardduty_client, region, bedrock_client=None, cloudtrail_client=None, detective_client=None,
+                 s3_client=None):
         super().__init__()
         
         self.results = {}
@@ -18,6 +19,7 @@ class GuarddutyDriver(Evaluator):
         self.bedrock_client = bedrock_client
         self.cloudtrail_client = cloudtrail_client
         self.detective_client = detective_client
+        self.s3_client = s3_client
 
         self._resourceName = detector_id
 
@@ -699,9 +701,22 @@ class GuarddutyDriver(Evaluator):
             return
 
         if not plans:
+            ## Without a bucket in this Region there is nothing to protect, so a missing
+            ## plan is not a finding (one FAIL per empty Region would be noise).
+            if self.s3_client is not None:
+                try:
+                    resp = self.s3_client.list_buckets(BucketRegion=self.region, MaxBuckets=1)
+                except ClientError as e:
+                    self.results[key] = [0, f"Unable to evaluate ({self._errCode(e)})"]
+                    return
+                if not resp.get('Buckets'):
+                    self.results[key] = [
+                        0, "No S3 buckets in this region; Malware Protection for S3 not applicable"
+                    ]
+                    return
             self.results[key] = [
                 -1, "No GuardDuty Malware Protection plan for S3 in this region; objects uploaded "
-                    "to buckets are not scanned for malware"
+                    "to buckets in this region are not scanned for malware"
             ]
             return
 

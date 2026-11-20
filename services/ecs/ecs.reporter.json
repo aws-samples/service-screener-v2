@@ -682,7 +682,7 @@
 	},
 	"ecsTaskRoleOverprivileged": {
 		"category": "S",
-		"^description": "{$COUNT} ECS task definition(s) use a task role (taskRoleArn) that grants administrator access, full wildcard ('*' / '*:*') actions, service-wide wildcard actions ('<service>:*'), Allow+NotAction statements, or AWS managed '*FullAccess' policies. Every container in the task receives these credentials, so a compromised container or dependency can act far beyond what the application needs.",
+		"^description": "{$COUNT} ECS task definition(s) use a task role (taskRoleArn) that grants administrator access, full wildcard ('*' / '*:*') actions, service-wide wildcard actions ('<service>:*') on all resources (or on IAM, STS or Organizations, which allow privilege escalation on any resource), Allow+NotAction statements, or AWS managed '*FullAccess' policies. Service-wide wildcards limited to specific resources (for example s3:* on one bucket) are reported as informational for review, not as this finding. Every container in the task receives these credentials, so a compromised container or dependency can act far beyond what the application needs.",
 		"shortDesc": "Scope ECS task roles to the least privilege the application needs",
 		"criticality": "H",
 		"downtime": 0,

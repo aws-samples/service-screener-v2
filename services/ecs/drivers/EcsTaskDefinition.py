@@ -616,7 +616,7 @@ class EcsTaskDefinition(Evaluator):
         roleName = _roleNameFromArn(roleArn)
         if roleName not in self.roleCache:
             self.roleCache[roleName] = _inspectTaskRole(self.iamClient, roleName)
-        findings, errCode = self.roleCache[roleName]
+        findings, scopedFindings, errCode = self.roleCache[roleName]
 
         if findings:
             msg = f"Task role {roleName} is overprivileged: " + "; ".join(findings[:5])
@@ -625,6 +625,12 @@ class EcsTaskDefinition(Evaluator):
             self.results[key] = [-1, msg]
         elif errCode:
             self.results[key] = [0, f"Unable to evaluate ({errCode})"]
+        elif scopedFindings:
+            ## '<svc>:*' limited to named resources is not admin-level; report it for
+            ## review rather than as a high-criticality finding.
+            self.results[key] = [
+                0, f"Task role {roleName} has no admin-level grants, but grants service-wide "
+                   f"wildcard actions on specific resources (review): " + "; ".join(scopedFindings[:5])]
         else:
             self.results[key] = [1, f"Task role {roleName} has no admin, service-wide wildcard or *FullAccess policies"]
 
@@ -642,20 +648,62 @@ def _roleNameFromArn(arn):
     return arn.rsplit('/', 1)[-1]
 
 
+## Service-wide wildcards on these services allow privilege escalation (granting the
+## role itself more permissions, or assuming other roles) even when Resource is scoped.
+_ESCALATION_SERVICES = ('iam', 'sts', 'organizations')
+## Resource part of an ARN that names no specific resource: '*', '*/*', or a
+## resource-type-wide wildcard such as 'table/*' or 'log-group:*'.
+_UNSCOPED_RESOURCE_RE = re.compile(r'^(?:[A-Za-z0-9-]+[/:])?[*/]+$')
+
+
+def _isUnscopedResource(res):
+    if not isinstance(res, str):
+        return True
+    res = res.strip()
+    if res == '*':
+        return True
+    parts = res.split(':', 5)
+    if len(parts) < 6 or parts[0] != 'arn':
+        return True
+    if parts[2] in ('', '*'):
+        return True
+    resPart = parts[5]
+    if parts[2] == 's3':
+        ## S3 ARNs have no resource type: 'arn:aws:s3:::*' / ':::*/*' are every bucket.
+        return bool(re.fullmatch(r'[*/]+', resPart))
+    return bool(_UNSCOPED_RESOURCE_RE.match(resPart))
+
+
+def _resourcesUnscoped(st):
+    """True when the statement applies to all resources of the service (or all of AWS)."""
+    if 'NotResource' in st or 'Resource' not in st:
+        return True
+    res = st.get('Resource')
+    if isinstance(res, str):
+        res = [res]
+    if not res:
+        return True
+    return any(_isUnscopedResource(r) for r in res)
+
+
 def _broadStatements(doc):
-    """Return a sorted list of broad grants in a policy document:
-    '*' / '*:*' (full admin), '<svc>:*' (service-wide wildcard), or Allow+NotAction."""
+    """Return (broad, scoped) sorted lists of grants in a policy document.
+
+    broad: '*' / '*:*' (full admin), Allow+NotAction, '<svc>:*' on all resources, or
+    '<svc>:*' for privilege-escalation services (iam/sts/organizations) on any resource.
+    scoped: '<svc>:*' whose Resource names specific resources, e.g.
+    's3:* on arn:aws:s3:::app-bucket/*' - still wider than needed, but not admin-level."""
     if isinstance(doc, str):
         try:
             doc = json.loads(doc)
         except (ValueError, TypeError):
-            return []
+            return [], []
     if not isinstance(doc, dict):
-        return []
+        return [], []
     stmts = doc.get('Statement', [])
     if isinstance(stmts, dict):
         stmts = [stmts]
-    found = set()
+    found, scoped = set(), set()
     for st in stmts or []:
         if not isinstance(st, dict) or st.get('Effect') != 'Allow':
             continue
@@ -665,6 +713,7 @@ def _broadStatements(doc):
         actions = st.get('Action', [])
         if isinstance(actions, str):
             actions = [actions]
+        unscoped = _resourcesUnscoped(st)
         for a in actions or []:
             if not isinstance(a, str):
                 continue
@@ -672,14 +721,23 @@ def _broadStatements(doc):
             if a in ('*', '*:*'):
                 found.add('*')
             elif a.endswith(':*'):
-                found.add(a.lower())
-    return sorted(found)
+                a = a.lower()
+                if unscoped or a.split(':', 1)[0] in _ESCALATION_SERVICES:
+                    found.add(a)
+                else:
+                    res = st.get('Resource')
+                    res = [res] if isinstance(res, str) else list(res or [])
+                    shown = ', '.join(str(r) for r in res[:3]) + (' ...' if len(res) > 3 else '')
+                    scoped.add(f"{a} on {shown}")
+    return sorted(found), sorted(scoped)
 
 
 def _inspectTaskRole(iamClient, roleName):
-    """Return (findings, errorCode). errorCode is set when any part of the role
-    could not be read, so the caller never reports PASS on partial data."""
-    findings = []
+    """Return (findings, scopedFindings, errorCode). findings are admin-level grants;
+    scopedFindings are service-wide wildcards limited to named resources. errorCode is
+    set when any part of the role could not be read, so the caller never reports PASS
+    on partial data."""
+    findings, scopedFindings = [], []
     errCode = None
     try:
         attached = []
@@ -689,7 +747,7 @@ def _inspectTaskRole(iamClient, roleName):
         for page in iamClient.get_paginator('list_role_policies').paginate(RoleName=roleName):
             inline.extend(page.get('PolicyNames', []) or [])
     except botocore.exceptions.ClientError as e:
-        return [], e.response.get('Error', {}).get('Code', 'Unknown')
+        return [], [], e.response.get('Error', {}).get('Code', 'Unknown')
 
     for p in attached:
         arn = p.get('PolicyArn', '') or ''
@@ -708,19 +766,23 @@ def _inspectTaskRole(iamClient, roleName):
                 errCode = errCode or 'NoDefaultVersion'
                 continue
             doc = iamClient.get_policy_version(PolicyArn=arn, VersionId=ver).get('PolicyVersion', {}).get('Document')
-            broad = _broadStatements(doc)
+            broad, scoped = _broadStatements(doc)
             if broad:
                 findings.append(f"managed:{name} ({', '.join(broad)})")
+            if scoped:
+                scopedFindings.append(f"managed:{name} ({'; '.join(scoped)})")
         except botocore.exceptions.ClientError as e:
             errCode = errCode or e.response.get('Error', {}).get('Code', 'Unknown')
 
     for pname in inline:
         try:
             doc = iamClient.get_role_policy(RoleName=roleName, PolicyName=pname).get('PolicyDocument')
-            broad = _broadStatements(doc)
+            broad, scoped = _broadStatements(doc)
             if broad:
                 findings.append(f"inline:{pname} ({', '.join(broad)})")
+            if scoped:
+                scopedFindings.append(f"inline:{pname} ({'; '.join(scoped)})")
         except botocore.exceptions.ClientError as e:
             errCode = errCode or e.response.get('Error', {}).get('Code', 'Unknown')
 
-    return findings, errCode
+    return findings, scopedFindings, errCode
