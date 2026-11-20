@@ -37,12 +37,23 @@ def test_emulator_session_strips_real_credentials(monkeypatch, tmp_path):
         monkeypatch.setenv(v, 'real')
     for v in ('AWS_ENDPOINT_URL', 'AWS_SHARED_CREDENTIALS_FILE', 'AWS_CONFIG_FILE', 'AWS_CA_BUNDLE',
               'AWS_REGION', 'AWS_DEFAULT_REGION', 'AWS_EC2_METADATA_DISABLED', 'AWS_DISABLE_HOST_PREFIX_INJECTION'):
-        monkeypatch.delenv(v, raising=False)
+        # setenv first so monkeypatch records the original value (or absence) and
+        # undoes emulatorSession's direct os.environ writes at teardown; delenv on an
+        # unset variable alone records nothing to restore.
+        monkeypatch.setenv(v, 'placeholder')
+        monkeypatch.delenv(v)
     sess = emulatorSession(port=59998)
     for v in ('AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_SESSION_TOKEN', 'AWS_PROFILE'):
         assert v not in os.environ
     assertEmulatorOnly(sess)
     assert sess.get_credentials().access_key == 'emu'
+
+
+def test_emulator_session_test_does_not_leak_env():
+    """Runs after test_emulator_session_strips_real_credentials (file order): the fake
+    59998 emulator endpoint and its tmp CA bundle must not survive that test."""
+    for v in ('AWS_ENDPOINT_URL', 'AWS_SHARED_CREDENTIALS_FILE', 'AWS_CONFIG_FILE', 'AWS_CA_BUNDLE'):
+        assert '59998' not in os.environ.get(v, ''), (v, os.environ.get(v))
 
 
 def test_check_result_statuses():

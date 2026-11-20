@@ -96,30 +96,58 @@ def _isDataAdvanced(sel):
     return False
 
 
+def _readWriteOfBasic(es):
+    """(reads, writes) recorded by a basic event selector (ReadWriteType, default All)."""
+    rw = es.get('ReadWriteType') or 'All'
+    return rw in ('All', 'ReadOnly'), rw in ('All', 'WriteOnly')
+
+
+def _readWriteOfAdvanced(sel):
+    """(reads, writes) recorded by an advanced selector: a readOnly field selector
+    limits it to read-only ('true') or write-only ('false') events."""
+    reads = writes = True
+    for fs in sel.get('FieldSelectors', []) or []:
+        if fs.get('Field') == 'readOnly':
+            reads = reads and _matchesValue(fs, 'true')
+            writes = writes and _matchesValue(fs, 'false')
+    return reads, writes
+
+
 def selectorCoverage(selectors):
     """Summarise get_event_selectors output.
 
-    Returns dict(management=bool, kms=bool, data=bool):
+    Returns dict(management=bool, kms=bool, kmsRead=bool, kmsWrite=bool, data=bool,
+    kmsAmbiguous=bool):
       management - trail captures management events
-      kms        - trail captures management events from kms.amazonaws.com
+      kmsRead    - trail captures read-only KMS management events (Decrypt, Encrypt,
+                   GenerateDataKey, ...)
+      kmsWrite   - trail captures write KMS management events (DisableKey,
+                   ScheduleKeyDeletion, PutKeyPolicy, ...)
+      kms        - kmsRead and kmsWrite (all KMS management events are recorded)
       data       - trail captures data events
       kmsAmbiguous - an advanced management selector combines several positive
                      operators (Equals/StartsWith/EndsWith) on eventSource; CloudTrail
                      does not document how those combine, so a "KMS excluded" verdict
                      from such a selector is not trusted (callers report INFO).
     """
-    out = {'management': False, 'kms': False, 'data': False, 'kmsAmbiguous': False}
+    out = {'management': False, 'kms': False, 'kmsRead': False, 'kmsWrite': False,
+           'data': False, 'kmsAmbiguous': False}
     selectors = selectors or {}
     for es in selectors.get('EventSelectors') or []:
         if es.get('IncludeManagementEvents') is True:
             out['management'] = True
             if KMS_SOURCE not in (es.get('ExcludeManagementEventSources') or []):
-                out['kms'] = True
+                reads, writes = _readWriteOfBasic(es)
+                out['kmsRead'] = out['kmsRead'] or reads
+                out['kmsWrite'] = out['kmsWrite'] or writes
         if es.get('DataResources'):
             out['data'] = True
 
     for sel in selectors.get('AdvancedEventSelectors') or []:
         if _isManagementAdvanced(sel):
+            reads, writes = _readWriteOfAdvanced(sel)
+            if not (reads or writes):
+                continue  # contradictory readOnly filter: the selector matches nothing
             out['management'] = True
             kmsOk = True
             for fs in sel.get('FieldSelectors', []) or []:
@@ -128,7 +156,9 @@ def selectorCoverage(selectors):
                     if sum(1 for op in _POSITIVE_OPS if op in fs) > 1:
                         out['kmsAmbiguous'] = True
             if kmsOk:
-                out['kms'] = True
+                out['kmsRead'] = out['kmsRead'] or reads
+                out['kmsWrite'] = out['kmsWrite'] or writes
         if _isDataAdvanced(sel):
             out['data'] = True
+    out['kms'] = out['kmsRead'] and out['kmsWrite']
     return out

@@ -1,7 +1,7 @@
 {
   "codecommitNoApprovalRule": {
     "category": "S",
-    "^description": "{$COUNT} CodeCommit repository(ies) have no associated approval rule template that requires at least one approval for pull requests into the default branch. Without an approval rule, any principal with codecommit:MergePullRequest* can merge their own change unreviewed, so a single compromised or careless identity can introduce vulnerable or malicious code into the main line. Create an approval rule template that requires one or more approvals (optionally from a defined approval pool) for the default branch and associate it with the repository.",
+    "^description": "{$COUNT} CodeCommit repository(ies) have no associated approval rule template that requires at least one approval for pull requests into the default branch. Without an approval rule, any principal with codecommit:MergePullRequest* can merge their own change unreviewed, so a single compromised or careless identity can introduce vulnerable or malicious code into the main line. Create an approval rule template that requires one or more approvals (optionally from a defined approval pool) for the default branch and associate it with the repository. Approval rules only gate merging pull requests: a principal with codecommit:GitPush, PutFile or MergeBranches* can still change the default branch directly, so also deny those actions on the default branch with an IAM policy using the codecommit:References condition key.",
     "shortDesc": "Require pull request approvals with an approval rule template",
     "criticality": "L",
     "downtime": 0,

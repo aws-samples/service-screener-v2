@@ -90,3 +90,72 @@ def test_pagination_of_associated_templates():
                         {'approvalRuleTemplateNames': ['t1']}, {'repositoryName': 'r1', 'nextToken': 'n1'})
         st.add_response('get_approval_rule_template', _tpl('t1', one), {'approvalRuleTemplateName': 't1'})
         assert _run(cc, {'repositoryName': 'r1', 'defaultBranch': 'main'})[0] == 1
+
+
+DEV_ONLY = json.dumps({'Version': '2018-11-08', 'DestinationReferences': ['refs/heads/dev'],
+                       'Statements': [{'Type': 'Approvers', 'NumberOfApprovalsNeeded': 1}]})
+UNSCOPED = json.dumps({'Version': '2018-11-08',
+                       'Statements': [{'Type': 'Approvers', 'NumberOfApprovalsNeeded': 1}]})
+
+
+def _service(cc):
+    from services.codecommit.Codecommit import Codecommit
+
+    class Quiet(Codecommit):
+        def __del__(self):  # skip Service reporting side effects
+            pass
+
+    svc = Quiet.__new__(Quiet)
+    svc.ccClient, svc.tags = cc, None
+    return svc
+
+
+def _oneTemplate(st, content):
+    st.add_response('list_associated_approval_rule_templates_for_repository',
+                    {'approvalRuleTemplateNames': ['t1']}, {'repositoryName': 'r1'})
+    st.add_response('get_approval_rule_template', _tpl('t1', content), {'approvalRuleTemplateName': 't1'})
+
+
+def test_batch_get_failure_marks_metadata_unknown():
+    cc = _client()
+    with Stubber(cc) as st:
+        st.add_response('list_repositories', {'repositories': [{'repositoryName': 'r1', 'repositoryId': 'i'}]})
+        st.add_client_error('batch_get_repositories', service_error_code='AccessDeniedException',
+                            http_status_code=400, expected_params={'repositoryNames': ['r1']})
+        repos = _service(cc).getResources()
+    assert repos == [{'repositoryName': 'r1', '_metadataError': 'AccessDeniedException'}]
+
+
+def test_unknown_default_branch_from_read_error_is_not_pass():
+    """batch_get_repositories denied -> no defaultBranch. A dev-only template must not
+    count as protecting the (unknown) default branch."""
+    cc = _client()
+    with Stubber(cc) as st:
+        _oneTemplate(st, DEV_ONLY)
+        r = _run(cc, {'repositoryName': 'r1', '_metadataError': 'AccessDeniedException'})
+    assert r[0] == 0 and 'Unable to evaluate (AccessDeniedException)' in r[1], r
+    # an unscoped template covers every branch whatever the default is
+    with Stubber(cc) as st:
+        _oneTemplate(st, UNSCOPED)
+        r = _run(cc, {'repositoryName': 'r1', '_metadataError': 'AccessDeniedException'})
+    assert r[0] == 1 and 'every branch' in r[1], r
+
+
+def test_empty_repository_branch_scoped_template_still_passes():
+    """Readable metadata without defaultBranch = empty repository: unchanged behaviour."""
+    cc = _client()
+    with Stubber(cc) as st:
+        _oneTemplate(st, DEV_ONLY)
+        r = _run(cc, {'repositoryName': 'r1'})
+    assert r[0] == 1 and 'default branch not yet set' in r[1], r
+
+
+def test_pass_message_and_description_mention_direct_push_bypass():
+    cc = _client()
+    with Stubber(cc) as st:
+        _oneTemplate(st, UNSCOPED)
+        r = _run(cc, {'repositoryName': 'r1', 'defaultBranch': 'main'})
+    assert r[0] == 1 and 'GitPush' in r[1] and 'codecommit:References' in r[1]
+    with open(os.path.join(ROOT, 'services', 'codecommit', 'codecommit.reporter.json')) as f:
+        desc = json.load(f)[KEY]['^description']
+    assert 'GitPush' in desc and 'codecommit:References' in desc

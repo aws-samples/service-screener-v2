@@ -265,3 +265,124 @@ def test_cloudtrail_catch_all_does_not_count_as_health_routing():
                                       _rule('health', {'source': ['aws.health'], 'detail-type': ['AWS Health Event']})],
                         [('health', TARGET)])
     assert _evaluate(fixed, 'healthEventsNotRouted') == 1
+
+
+# ---------------- partition-aware global Health Region ----------------
+@pytest.mark.parametrize('region,expected', [
+    ('eu-west-1', 'us-east-1'), ('us-east-1', 'us-east-1'), ('us-gov-east-1', 'us-gov-west-1'),
+    ('us-gov-west-1', 'us-gov-west-1'), ('cn-northwest-1', 'cn-north-1'), ('cn-north-1', 'cn-north-1'),
+    ('us-iso-east-1', None), ('us-isob-east-1', None),
+])
+def test_health_global_region_by_partition(region, expected):
+    assert Eventbridge.healthGlobalRegion(region) == expected
+
+
+def _routingPartition(region, globalRegion, localRules, globalRules):
+    ev = _client('events', region)
+    gd = _client('guardduty', region)
+    sh = _client('securityhub', region)
+    clients = {'events': ev, 'guardduty': gd, 'securityhub': sh}
+    stubs = [Stubber(ev), Stubber(gd), Stubber(sh)]
+    _stubRules(stubs[0], *localRules)
+    if globalRegion != region:
+        evg = _client('events', globalRegion)
+        clients[('events', globalRegion)] = evg
+        sg = Stubber(evg)
+        _stubRules(sg, *globalRules)
+        stubs.append(sg)
+    stubs[1].add_response('list_detectors', {'DetectorIds': []})
+    _securityHubStubs(stubs[2])
+    for s in stubs:
+        s.activate()
+    routing = _service(region, clients)._getRoutingDetail()
+    for s in stubs:
+        s.assert_no_pending_responses()
+    return routing
+
+
+def test_health_govcloud_reads_us_gov_west_1():
+    """us-gov-east-1 without a local aws.health rule: the global lookup goes to
+    us-gov-west-1 (not us-east-1, where GovCloud credentials are rejected)."""
+    bad = _routingPartition('us-gov-east-1', 'us-gov-west-1', ([], []), ([], []))
+    obj = EventbridgeRegional({'_routing': bad}, None)
+    obj._checkHealthEventsNotRouted()
+    r = obj.results['healthEventsNotRouted']
+    assert r[0] == -1 and 'us-gov-west-1' in r[1] and 'us-east-1' not in r[1]
+    partial = _routingPartition('us-gov-east-1', 'us-gov-west-1', ([], []),
+                                ([_rule('g', {'source': ['aws.health']})], [('g', TARGET)]))
+    obj = EventbridgeRegional({'_routing': partial}, None)
+    obj._checkHealthEventsNotRouted()
+    r = obj.results['healthEventsNotRouted']
+    assert r[0] == 0 and 'routed in us-gov-west-1' in r[1]
+
+
+def test_health_china_global_region_itself_is_not_partial():
+    """In cn-north-1 (the China global-event Region) no second lookup is made."""
+    r = _routingPartition('cn-north-1', 'cn-north-1', ([], []), None)
+    assert r['_globalRegion'] == 'cn-north-1'
+    assert _evaluate(r, 'healthEventsNotRouted') == -1
+    obj = EventbridgeRegional({'_routing': r}, None)
+    obj._checkHealthEventsNotRouted()
+    assert ' or ' not in obj.results['healthEventsNotRouted'][1]
+
+
+def test_health_unknown_partition_is_not_fail():
+    r = _routingPartition('us-iso-east-1', 'us-iso-east-1', ([], []), None)
+    assert r['globalError'] == 'UnknownPartition'
+    assert _evaluate(r, 'healthEventsNotRouted') == 0
+
+
+# ---------------- enrichment failures must not become FAIL ----------------
+def _routingEnrich(gdErr=None, shAdminErr=None, describeHubErr=None, aggErr=None):
+    region = 'us-east-1'
+    ev, gd, sh = _client('events', region), _client('guardduty', region), _client('securityhub', region)
+    stubs = [Stubber(ev), Stubber(gd), Stubber(sh)]
+    _stubRules(stubs[0], [], [])
+    if gdErr:
+        stubs[1].add_client_error('list_detectors', gdErr)
+    else:
+        stubs[1].add_response('list_detectors', {'DetectorIds': []})
+    if shAdminErr:
+        stubs[2].add_client_error('get_administrator_account', shAdminErr)
+        if shAdminErr != 'InvalidAccessException':
+            if describeHubErr:
+                stubs[2].add_client_error('describe_hub', describeHubErr)
+            else:
+                stubs[2].add_response('describe_hub', {'HubArn': 'arn:aws:securityhub:us-east-1:111111111111:hub/default'})
+    else:
+        stubs[2].add_response('get_administrator_account', {})
+    if aggErr:
+        stubs[2].add_client_error('list_finding_aggregators', aggErr)
+    else:
+        stubs[2].add_response('list_finding_aggregators', {'FindingAggregators': []})
+    for s in stubs:
+        s.activate()
+    routing = _service(region, {'events': ev, 'guardduty': gd, 'securityhub': sh})._getRoutingDetail()
+    for s in stubs:
+        s.assert_no_pending_responses()
+    return routing
+
+
+def test_security_enrichment_denied_is_info_not_fail():
+    r = _routingEnrich(gdErr='AccessDeniedException')
+    obj = EventbridgeRegional({'_routing': r}, None)
+    obj._checkSecurityFindingsNotRouted()
+    res = obj.results['securityFindingsNotRouted']
+    assert res[0] == 0 and 'guardduty: AccessDeniedException' in res[1]
+    # Security Hub enabled but GetAdministratorAccount denied
+    r = _routingEnrich(shAdminErr='AccessDeniedException')
+    assert _evaluate(r, 'securityFindingsNotRouted') == 0
+    r = _routingEnrich(aggErr='AccessDeniedException')
+    assert _evaluate(r, 'securityFindingsNotRouted') == 0
+
+
+def test_security_hub_not_enabled_is_conclusive_fail():
+    """Security Hub not subscribed (InvalidAccessException) means no membership and no
+    aggregation, so a missing route is still FAIL."""
+    r = _routingEnrich(shAdminErr='InvalidAccessException', aggErr='InvalidAccessException')
+    assert r['enrichmentErrors'] == []
+    assert _evaluate(r, 'securityFindingsNotRouted') == -1
+    # get_administrator_account unavailable, describe_hub proves the hub is off
+    r = _routingEnrich(shAdminErr='NotImplemented', describeHubErr='InvalidAccessException',
+                       aggErr='InvalidAccessException')
+    assert _evaluate(r, 'securityFindingsNotRouted') == -1

@@ -239,7 +239,7 @@
   },
   "securityFindingsNotRouted": {
     "category": "S",
-    "^description": "{$COUNT} region(s) have no enabled EventBridge rule with a target that matches the finding events of Amazon GuardDuty, AWS Security Hub, Amazon Inspector or IAM Access Analyzer on the default event bus (both source and detail-type are evaluated: a rule limited to 'AWS API Call via CloudTrail' events or to Security Hub custom actions does not receive findings), and the account is not a GuardDuty/Security Hub member nor aggregating Security Hub findings into another Region. Findings are then only visible to someone who opens the console, so a compromised credential or exposed resource can go unnoticed for days. Route findings to a responder (ticketing, chat, on-call paging or automated remediation) so every finding is triaged.",
+    "^description": "{$COUNT} region(s) have no enabled EventBridge rule with a target that matches the finding events of Amazon GuardDuty, AWS Security Hub, Amazon Inspector or IAM Access Analyzer on the default event bus (both source and detail-type are evaluated: a rule limited to 'AWS API Call via CloudTrail' events or to Security Hub custom actions does not receive findings), and the account is not a GuardDuty/Security Hub member nor aggregating Security Hub findings into another Region. When membership or aggregation cannot be read (for example AccessDenied on guardduty:GetAdministratorAccount or securityhub:GetAdministratorAccount), the Region is reported as INFO rather than flagged. Findings are then only visible to someone who opens the console, so a compromised credential or exposed resource can go unnoticed for days. Route findings to a responder (ticketing, chat, on-call paging or automated remediation) so every finding is triaged.",
     "shortDesc": "Route security findings to a responder with an EventBridge rule",
     "criticality": "M",
     "downtime": 0,
@@ -258,7 +258,7 @@
   },
   "healthEventsNotRouted": {
     "category": "O",
-    "^description": "{$COUNT} region(s) have no enabled EventBridge rule with a target that matches AWS Health events (source aws.health, detail-type 'AWS Health Event' or 'AWS Health Abuse Event') on the default event bus (in the Region or, for global events, in us-east-1). AWS Health service issues, scheduled maintenance and security notifications about the account's resources then reach no team automatically and are only seen when someone opens the AWS Health Dashboard. If AWS Health events are centralised with the organizational view in another account, confirm routing there.",
+    "^description": "{$COUNT} region(s) have no enabled EventBridge rule with a target that matches AWS Health events (source aws.health, detail-type 'AWS Health Event' or 'AWS Health Abuse Event') on the default event bus (in the Region or, for global events, in the partition's global-event Region: us-east-1, us-gov-west-1 in AWS GovCloud (US), cn-north-1 in China). AWS Health service issues, scheduled maintenance and security notifications about the account's resources then reach no team automatically and are only seen when someone opens the AWS Health Dashboard. If AWS Health events are centralised with the organizational view in another account, confirm routing there.",
     "shortDesc": "Route AWS Health events to an operations responder",
     "criticality": "L",
     "downtime": 0,

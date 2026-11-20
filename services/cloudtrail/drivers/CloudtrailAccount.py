@@ -34,19 +34,42 @@ class CloudtrailAccount(Evaluator):
         if Config.get('CloudTrail_hasGlobalServEnabled') == False:
             self.results['HasCoverGlobalServices'] = [-1, '']
             
-        if Config.get('CloudTrail_hasManagementEventsCaptured') == False:
-            self.results['HasManagementEventsCaptured'] = [-1, '']
-        else:
-            self.results['HasManagementEventsCaptured'] = [1, '']
-        
-        if Config.get('CloudTrail_hasDataEventsCaptured') == False:
-            self.results['HasDataEventsCaptured'] = [-1, '']
-        else:
-            self.results['HasDataEventsCaptured'] = [1, '']
+        self._eventCaptureResult('HasManagementEventsCaptured', 'management', 'management events')
+        self._eventCaptureResult('HasDataEventsCaptured', 'data', 'data events')
             
         lists = Config.get('CloudTrail_listGlobalServEnabled')
         if len(lists) > 1:
             self.results['DuplicateGlobalTrail'] = [-1, '<br>'.join(lists)]
+
+    def _eventCaptureResult(self, key, field, label):
+        """PASS only when a trail that applies to this Region (own single-Region trail,
+        multi-Region or organization trail) is logging and its selectors capture
+        `field` events. A stopped trail, or a single-Region trail of another Region,
+        records nothing here. Unreadable trail status/selectors -> INFO."""
+        trails, code = self._regionTrails()
+        if trails is None:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(code)]
+            return
+        unknown, stopped = [], []
+        for t in trails:
+            name = t['trail'].get('Name') or t['trail'].get('TrailARN')
+            if t['coverage'] is None or t['logging'] is None:
+                if t['coverage'] is None or t['coverage'][field]:
+                    unknown.append('{} ({})'.format(name, t['error']))
+                continue
+            if not t['coverage'][field]:
+                continue
+            if t['logging']:
+                self.results[key] = [1, 'Trail {} is logging {} in this Region'.format(name, label)]
+                return
+            stopped.append(name)
+        if unknown:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(', '.join(unknown))]
+            return
+        msg = 'No logging trail captures {} in this Region'.format(label)
+        if stopped:
+            msg += '; trail(s) {} would capture them but logging is stopped'.format(', '.join(stopped))
+        self.results[key] = [-1, msg]
 
     def _checkGuardDutyIntegration(self):
         """
@@ -287,6 +310,7 @@ class CloudtrailAccount(Evaluator):
             return
 
         mgmt, excluding, unknown = [], [], []
+        readers, writers = [], []
         for t in trails:
             name = t['trail'].get('Name') or t['trail'].get('TrailARN')
             if t['logging'] is False:
@@ -294,13 +318,27 @@ class CloudtrailAccount(Evaluator):
             if t['logging'] is None or t['coverage'] is None:
                 unknown.append('{} ({})'.format(name, t['error']))
                 continue
-            if not t['coverage']['management']:
+            cov = t['coverage']
+            if not cov['management']:
                 continue
             mgmt.append(name)
-            if t['coverage']['kms']:
-                self.results[key] = [1, 'Trail {} logs KMS management events'.format(name)]
+            if cov.get('kmsRead'):
+                readers.append(name)
+            if cov.get('kmsWrite'):
+                writers.append(name)
+            if readers and writers:
+                # Read-only KMS calls (Decrypt, GenerateDataKey) and write calls
+                # (DisableKey, ScheduleKeyDeletion) are both recorded, possibly by two trails.
+                if readers == writers == [name]:
+                    msg = 'Trail {} logs KMS management events'.format(name)
+                else:
+                    msg = 'KMS read events are logged by {} and write events by {}'.format(
+                        ', '.join(readers), ', '.join(writers))
+                self.results[key] = [1, msg]
                 return
-            if t['coverage'].get('kmsAmbiguous'):
+            if cov.get('kmsRead') or cov.get('kmsWrite'):
+                continue
+            if cov.get('kmsAmbiguous'):
                 unknown.append('{} (selector with several positive operators on eventSource)'.format(name))
                 continue
             excluding.append(name)
@@ -310,6 +348,14 @@ class CloudtrailAccount(Evaluator):
             return
         if not mgmt:
             self.results[key] = [0, 'No logging trail captures management events in this Region']
+            return
+        if writers:
+            self.results[key] = [0, 'Only write KMS management events are logged (by {}); read-only calls such as '
+                                    'Decrypt, Encrypt and GenerateDataKey are not recorded'.format(', '.join(writers))]
+            return
+        if readers:
+            self.results[key] = [0, 'Only read-only KMS management events are logged (by {}); key management calls '
+                                    'such as DisableKey and ScheduleKeyDeletion are not recorded'.format(', '.join(readers))]
             return
         self.results[key] = [-1, 'KMS events excluded by: {}'.format(', '.join(excluding))]
 

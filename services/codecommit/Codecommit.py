@@ -41,15 +41,19 @@ class Codecommit(Service):
         repos = []
         for i in range(0, len(names), self.BATCH_SIZE):
             chunk = names[i:i + self.BATCH_SIZE]
+            metaError = None
             try:
                 resp = self.ccClient.batch_get_repositories(repositoryNames=chunk)
                 found = {r.get('repositoryName'): r for r in resp.get('repositories', []) or []}
             except botocore.exceptions.ClientError as e:
-                code = e.response.get('Error', {}).get('Code', 'Unknown')
-                print(f"Codecommit batch_get_repositories: {code}")
+                metaError = e.response.get('Error', {}).get('Code', 'Unknown')
+                print(f"Codecommit batch_get_repositories: {metaError}")
                 found = {}
             for n in chunk:
-                repos.append(found.get(n) or {'repositoryName': n})
+                ## '_metadataError' marks a repository whose defaultBranch is unknown
+                ## because its metadata could not be read (not because it is empty).
+                repos.append(found.get(n) or {'repositoryName': n,
+                                              '_metadataError': metaError or 'RepositoryMetadataNotReturned'})
 
         if not self.tags:
             return repos
