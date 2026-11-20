@@ -60,11 +60,12 @@ class Codeartifact(Service):
         Return dict:
           domains        -- list of DomainSummary (owned by this account)
           domainError    -- error code if list_domains failed, else None
+          repositoryError -- error code if list_repositories failed, else None
           repositories   -- list of RepositorySummary, each enriched with
                             '_upstreams', '_externalConnections',
                             '_describeError'
         """
-        out = {'domains': [], 'domainError': None, 'repositories': []}
+        out = {'domains': [], 'domainError': None, 'repositoryError': None, 'repositories': []}
         try:
             out['domains'] = self._paginate('list_domains', 'domains')
         except botocore.exceptions.ClientError as e:
@@ -97,6 +98,7 @@ class Codeartifact(Service):
                 if r.get('arn') and r['arn'] not in repos:
                     repos[r['arn']] = r
         except botocore.exceptions.ClientError as e:
+            out['repositoryError'] = e.response.get('Error', {}).get('Code', 'Unknown')
             self._logClientError('list_repositories', e)
 
         for r in repos.values():
@@ -149,6 +151,7 @@ class Codeartifact(Service):
                 '_region': self.region,
                 '_domains': res['domains'],
                 '_domainError': res['domainError'],
+                '_repositoryError': res.get('repositoryError'),
                 '_repositoryCount': len(res['repositories']),
             })
             obj.run(self.__class__)

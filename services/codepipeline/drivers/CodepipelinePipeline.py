@@ -38,6 +38,10 @@ class CodepipelinePipeline(Evaluator):
         r'codeguru|inspector|checkov|trivy|semgrep|cfn-?nag|cfn-?guard|owasp|'
         r'grype|gitleaks|bandit|tfsec|veracode|zap(?![a-z])',
         re.IGNORECASE)
+    NON_TEST_CATEGORIES = ('Deploy', 'Approval', 'Source')
+    ## Stage names that name a deployment environment ('DeployToTest',
+    ## 'Release-Test', 'PromoteTest') are not evidence of a test step.
+    ENV_STAGE_RE = re.compile(r'deploy|release|promot', re.IGNORECASE)
 
     def __init__(self, pipeline, metadata, shared):
         super().__init__()
@@ -171,21 +175,39 @@ class CodepipelinePipeline(Evaluator):
         except CodepipelineLookupError as e:
             errors.append(e.code)
 
+        undecidable, partial = [], []
         try:
             for ruleName, pattern in self.shared.eventRules():
-                if self._eventPatternCovers(pattern):
+                covers = self._eventPatternCovers(pattern)
+                if covers is True:
                     self.results['pipelineNoEventNotification'] = [
                         1, f'EventBridge rule {ruleName} matches failed executions of this pipeline']
                     return
+                if covers is None:
+                    undecidable.append(ruleName)
+                elif self._narrowingDetailKeys(pattern) and \
+                        self._eventPatternCovers(pattern, ignoreNarrowing=True) is not False:
+                    ## Would match this pipeline's failures but for the extra filters.
+                    partial.append(f"{ruleName} (detail.{', detail.'.join(self._narrowingDetailKeys(pattern))})")
         except CodepipelineLookupError as e:
             errors.append(e.code)
 
         if errors:
             self.results['pipelineNoEventNotification'] = [0, f'Unable to evaluate ({errors[0]})']
             return
-        self.results['pipelineNoEventNotification'] = [
-            -1, 'No enabled notification rule or EventBridge rule with a target alerts on '
-                'failed executions of this pipeline']
+        if undecidable:
+            ## An operator this matcher cannot decide statically: neither a
+            ## PASS nor a FAIL can be justified.
+            self.results['pipelineNoEventNotification'] = [
+                0, 'Unable to evaluate (unsupported EventBridge pattern operator in rule(s): '
+                   + ', '.join(undecidable) + ')']
+            return
+        msg = ('No enabled notification rule or EventBridge rule with a target alerts on '
+               'failed executions of this pipeline')
+        if partial:
+            msg += ('<br>EventBridge rule(s) that only match a subset of failures: '
+                    + '; '.join(partial))
+        self.results['pipelineNoEventNotification'] = [-1, msg]
 
     def _notificationRuleCovers(self, rule):
         if not self.arn or rule.get('Resource') != self.arn:
@@ -198,44 +220,83 @@ class CodepipelinePipeline(Evaluator):
         return any(t.get('TargetStatus') in self.LIVE_TARGET_STATUSES
                    for t in rule.get('Targets') or [])
 
-    def _eventPatternCovers(self, pattern):
-        detailTypes = pattern.get('detail-type')
-        if detailTypes is not None and not self._matches(detailTypes, self.EVENT_DETAIL_TYPES):
-            return False
-        resources = pattern.get('resources')
-        if resources is not None and not self._matches(resources, [self.arn or '']):
-            return False
+    ## detail fields the coverage test understands. Any other detail filter
+    ## (type, stage, action, execution-id, ...) narrows the rule to a subset of
+    ## failures, so the rule does not alert on every failed execution.
+    KNOWN_DETAIL_KEYS = ('pipeline', 'state')
+
+    def _narrowingDetailKeys(self, pattern):
+        detail = pattern.get('detail')
+        if not isinstance(detail, dict):
+            return []
+        return sorted(k for k in detail if k not in self.KNOWN_DETAIL_KEYS)
+
+    def _eventPatternCovers(self, pattern, ignoreNarrowing=False):
+        """True if the pattern matches every failed execution of this
+        pipeline, False if it does not, None if it cannot be decided."""
         detail = pattern.get('detail') or {}
         if not isinstance(detail, dict):
             return False
-        if 'pipeline' in detail and not self._matches(detail['pipeline'], [self._resourceName]):
+        if self._narrowingDetailKeys(pattern) and not ignoreNarrowing:
             return False
-        if 'state' in detail and not self._matches(detail['state'], ['FAILED']):
+        checks = []
+        if pattern.get('detail-type') is not None:
+            checks.append(self._matches(pattern['detail-type'], self.EVENT_DETAIL_TYPES))
+        if pattern.get('resources') is not None:
+            checks.append(self._matches(pattern['resources'], [self.arn or '']))
+        if 'pipeline' in detail:
+            checks.append(self._matches(detail['pipeline'], [self._resourceName or '']))
+        if 'state' in detail:
+            checks.append(self._matches(detail['state'], ['FAILED']))
+        if any(c is False for c in checks):
             return False
+        if any(c is None for c in checks):
+            return None
         return True
 
     @staticmethod
     def _matches(patternValue, candidates):
-        """Minimal EventBridge matcher: exact strings, prefix, anything-but.
-        Other content filters are treated as matching (cannot be decided
-        statically without the event)."""
+        """Minimal EventBridge matcher over string fields that are always
+        present. Returns True (some candidate matches), False (none does) or
+        None (an operator this matcher does not understand)."""
         values = patternValue if isinstance(patternValue, list) else [patternValue]
+        undecided = False
         for v in values:
             if isinstance(v, str):
                 if v in candidates:
                     return True
-            elif isinstance(v, dict):
-                if 'prefix' in v and isinstance(v['prefix'], str):
-                    if any(c.startswith(v['prefix']) for c in candidates):
+            elif isinstance(v, dict) and len(v) == 1:
+                op, arg = next(iter(v.items()))
+                if op == 'prefix' and isinstance(arg, str):
+                    if any(c.startswith(arg) for c in candidates):
                         return True
-                elif 'anything-but' in v:
-                    excluded = v['anything-but']
-                    excluded = excluded if isinstance(excluded, list) else [excluded]
+                elif op == 'suffix' and isinstance(arg, str):
+                    if any(c.endswith(arg) for c in candidates):
+                        return True
+                elif op == 'equals-ignore-case' and isinstance(arg, str):
+                    if any(c.lower() == arg.lower() for c in candidates):
+                        return True
+                elif op == 'wildcard' and isinstance(arg, str):
+                    rx = '^' + '.*'.join(re.escape(p) for p in arg.split('*')) + '$'
+                    if any(re.match(rx, c) for c in candidates):
+                        return True
+                elif op == 'exists' and isinstance(arg, bool):
+                    ## These fields are present on every CodePipeline event.
+                    if arg:
+                        return True
+                elif op == 'numeric':
+                    pass  # string fields never match a numeric filter
+                elif op == 'anything-but' and (
+                        isinstance(arg, str)
+                        or (isinstance(arg, list) and all(isinstance(x, str) for x in arg))):
+                    excluded = arg if isinstance(arg, list) else [arg]
                     if any(c not in excluded for c in candidates):
                         return True
                 else:
-                    return True
-        return False
+                    undecided = True
+            else:
+                undecided = True
+        return None if undecided else False
 
     # ------------------------------------------------------------------ #
     # 4. No security test action (SEC11-BP03) - heuristic
@@ -251,8 +312,17 @@ class CodepipelinePipeline(Evaluator):
                 self.results['pipelineNoSecurityTestAction'] = [
                     1, f"Security scan action {stage.get('name')}/{action.get('name')} ({prov})"]
                 return
+            ## Deploy / Approval / Source actions do not run tests; their names
+            ## (and the stage name, e.g. 'DeployToTest') usually refer to a
+            ## target environment, not a test step.
+            if cat in self.NON_TEST_CATEGORIES:
+                continue
             cfg = action.get('configuration') or {}
-            for label in (action.get('name'), stage.get('name'), cfg.get('ProjectName')):
+            labels = [action.get('name'), cfg.get('ProjectName')]
+            stageName = stage.get('name')
+            if isinstance(stageName, str) and not self.ENV_STAGE_RE.search(stageName):
+                labels.append(stageName)
+            for label in labels:
                 if isinstance(label, str) and self.SECURITY_NAME_RE.search(label):
                     self.results['pipelineNoSecurityTestAction'] = [
                         1, f"Action {stage.get('name')}/{action.get('name')} appears to run "

@@ -2,13 +2,14 @@
 
 The emulator does not implement codeartifact.list_repositories; the service
 also discovers repositories with list_repositories_in_domain (implemented),
-so these checks are fully testable here.
+so the domain and repository checks are fully testable here.
+codeartifactNotUsed reports INFO while list_repositories is unreadable.
 """
 import json
 
 import pytest
 
-from tests.emulator.conftest import assertFlagFixCycle
+from tests.emulator.conftest import assertFlagFixCycle, runCheck
 
 
 
@@ -86,12 +87,20 @@ def test_codeartifact_package_origin_unrestricted(emu, uid):
 
 
 def test_codeartifact_not_used(emu, uid):
+    """The emulator does not implement list_repositories. With no owned domain
+    the account may still administer repositories in a shared domain, so the
+    check must not FAIL on that unreadable listing. The FAIL state (both
+    listings readable and empty) is covered by tests/test_low_mix2.py."""
     ca = emu.client('codeartifact')
     if ca.list_domains().get('domains'):
         pytest.skip('emulator already has CodeArtifact domains; cannot assert the "not used" state')
     domain = f'ss-dom-{uid}'
     try:
-        assertFlagFixCycle(emu, 'codeartifact', 'codeartifactNotUsed', 'CodeArtifact::Account',
-                           lambda: None, lambda: ca.create_domain(domain=domain))
+        before = runCheck(emu, 'codeartifact', 'codeartifactNotUsed', 'CodeArtifact::Account')
+        res = before.results['CodeArtifact::Account']['codeartifactNotUsed']
+        assert res[0] == 0 and res[1].startswith('Unable to evaluate ('), res
+        ca.create_domain(domain=domain)
+        after = runCheck(emu, 'codeartifact', 'codeartifactNotUsed', 'CodeArtifact::Account')
+        assert after.statuses() == {'CodeArtifact::Account': 1}
     finally:
         _cleanup(ca, domain, [])

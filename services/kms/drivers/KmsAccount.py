@@ -180,6 +180,7 @@ class KmsAccount(Evaluator):
 
         usage = {}      # keyId -> {label: count}
         errors = []
+        unreadServices = set()
         evaluated = 0
         clients = {}
         for label, svc, op, listKey, field in self.KEY_REFERENCE_SOURCES:
@@ -197,6 +198,7 @@ class KmsAccount(Evaluator):
                 code = self._errorCode(e)
                 if code not in self._NOT_AVAILABLE:
                     errors.append(f"{label}: {code}")
+                    unreadServices.add(self._SERVICE_OF.get(label, label))
             except botocore.exceptions.EndpointConnectionError:
                 pass
 
@@ -205,9 +207,14 @@ class KmsAccount(Evaluator):
             return
 
         flagged = []
+        ## Could an unread source have pushed some key over the threshold?
+        ## (A key may also be referenced only by unread sources.)
+        couldReach = len(unreadServices) >= self.BROAD_USE_MIN_SERVICES
         for keyId, perLabel in usage.items():
             services = {self._SERVICE_OF.get(l, l) for l in perLabel}
             if len(services) < self.BROAD_USE_MIN_SERVICES:
+                if len(services | unreadServices) >= self.BROAD_USE_MIN_SERVICES:
+                    couldReach = True
                 continue
             try:
                 md = self._describeKey(keyId)
@@ -223,5 +230,9 @@ class KmsAccount(Evaluator):
         note = ('<br>Not checked: ' + '; '.join(errors)) if errors else ''
         if flagged:
             self.results['SingleKeyBroadUse'] = [-1, "<br>".join(flagged) + note]
+        elif couldReach:
+            ## Not a PASS: the unreadable sources could hold the references
+            ## that put a key at the threshold.
+            self.results['SingleKeyBroadUse'] = [0, 'Unable to evaluate (' + '; '.join(errors) + ')']
         else:
             self.results['SingleKeyBroadUse'] = [1, f"No customer managed key is used by {self.BROAD_USE_MIN_SERVICES} or more data-store services" + note]

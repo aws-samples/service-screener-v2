@@ -198,7 +198,7 @@ def test_macie_automated_discovery_flag_fix_stub():
 # --------------------------------------------------------------------------- #
 def _bucket(name='my-bucket'):
     def factory():
-        Config.set('s3::macieBucketInventory::us-east-1', None)
+        Config.set(f's3::macieBucketInventory::{ACCOUNT}::us-east-1', None)
         s3, m = _client('s3'), _client('macie2')
         return {'s3': s3, 'macie2': m}, S3Bucket(name, s3, m)
     return factory
