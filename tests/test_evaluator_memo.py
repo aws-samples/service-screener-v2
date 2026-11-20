@@ -94,3 +94,47 @@ def test_transient_errors_not_cached_shared():
     with pytest.raises(botocore.exceptions.ClientError):
         D()._sharedMemo('org', fn)
     assert D()._sharedMemo('org', fn) == ['org'] and len(calls) == 2
+
+
+def _tbLen(e):
+    n, tb = 0, e.__traceback__
+    while tb is not None:
+        n, tb = n + 1, tb.tb_next
+    return n
+
+
+@pytest.mark.parametrize('shared', [False, True])
+def test_cached_error_traceback_does_not_grow(shared):
+    """Re-raising the one cached exception appended every caller's frames to
+    it (152 frames after 50 calls). Each caller must get a fresh copy."""
+    Config.init()
+    d = D()
+    def fn():
+        raise botocore.exceptions.ClientError({'Error': {'Code': 'AccessDenied', 'Message': 'x'}}, 'Op')
+    call = (lambda: D()._sharedMemo('org-denied', fn)) if shared else (lambda: d._memo('k', fn))
+    seen, lens = [], []
+    for _ in range(50):
+        with pytest.raises(botocore.exceptions.ClientError) as e:
+            call()
+        assert e.value.response['Error']['Code'] == 'AccessDenied'
+        assert e.value.operation_name == 'Op'
+        seen.append(e.value)
+        lens.append(_tbLen(e.value))
+    assert max(lens[1:]) == min(lens[1:]) <= 5, lens[:5]
+    assert len({id(x) for x in seen[1:]}) == 49
+    if not shared:
+        assert _tbLen(d._memoStore['k'][1]) <= 5   # the cached object stays bounded too
+
+
+def test_uncopyable_cached_error_still_reraised():
+    class Odd(Exception):
+        def __init__(self, a, b):
+            super().__init__(a)
+            self.b = b
+    d = D()
+    def fn():
+        raise Odd('a', 'b')
+    for _ in range(20):
+        with pytest.raises(Odd) as e:
+            d._memo('k', fn)
+        assert _tbLen(e.value) <= 5

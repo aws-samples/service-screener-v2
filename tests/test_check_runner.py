@@ -54,3 +54,50 @@ def test_check_result_statuses():
     assert r.statuses() == {'Bucket::a': -1, 'Bucket::b': 1}
     assert r.flagged() == ['Bucket::a']
     assert r.statuses('Other') == {'Bucket::a': 1, 'Bucket::c': -1}
+
+
+def _runCheckMain(monkeypatch, result, argv):
+    import run_check
+    monkeypatch.setattr(run_check.CheckRunner, 'run', staticmethod(lambda *a, **k: result))
+    monkeypatch.setattr(run_check.boto3.session, 'Session', lambda **k: None)
+    return run_check.main(argv)
+
+
+def test_run_check_expect_with_method_name(monkeypatch):
+    """--check Access runs _checkAccess, whose result keys differ from 'access'.
+    The expectation must judge those keys, not report 'no result'."""
+    r = CheckResult('s3', 'us-east-1', 'Access', {
+        'Bucket::b1': {'PublicReadAccessBlock': [-1, 'x'], 'PublicAccessBlock': [1, '']}}, [])
+    assert _runCheckMain(monkeypatch, r, ['-s', 's3', '-c', 'Access', '--expect-not', '-1']) == 1
+    assert _runCheckMain(monkeypatch, r, ['-s', 's3', '-c', 'Access', '--expect', '-1']) == 1
+    ok = CheckResult('s3', 'us-east-1', 'Access', {
+        'Bucket::b1': {'PublicReadAccessBlock': [-1, 'x'], 'PublicAccessBlock': [-1, '']}}, [])
+    assert _runCheckMain(monkeypatch, ok, ['-s', 's3', '-c', 'Access', '--expect', '-1']) == 0
+
+
+def test_run_check_expect_with_result_key(monkeypatch):
+    r = CheckResult('s3', 'us-east-1', 'PublicReadAccessBlock', {
+        'Bucket::b1': {'PublicReadAccessBlock': [-1, 'x']}, 'Bucket::b2': {}}, [])
+    assert _runCheckMain(monkeypatch, r, ['-s', 's3', '-c', 'PublicReadAccessBlock', '--expect', '-1']) == 0
+    empty = CheckResult('s3', 'us-east-1', 'PublicReadAccessBlock', {'Bucket::b2': {}}, [])
+    assert _runCheckMain(monkeypatch, empty, ['-s', 's3', '-c', 'PublicReadAccessBlock', '--expect', '-1']) == 1
+
+
+def test_run_check_resource_is_exact(monkeypatch):
+    """'bucket-1' must not also cover 'bucket-10' (CheckRunner filters by substring)."""
+    r = CheckResult('s3', 'us-east-1', 'PublicReadAccessBlock', {
+        'Bucket::bucket-1': {'PublicReadAccessBlock': [-1, 'x']},
+        'Bucket::bucket-10': {'PublicReadAccessBlock': [1, '']}}, [])
+    argv = ['-s', 's3', '-c', 'PublicReadAccessBlock', '--resource', 'bucket-1', '--expect', '-1']
+    assert _runCheckMain(monkeypatch, r, argv) == 0
+    assert list(r.results) == ['Bucket::bucket-1']
+
+
+def test_resource_id_matches():
+    from utils.CheckRunner import resourceIdMatches
+    assert resourceIdMatches('Bucket::bucket-1', 'bucket-1')
+    assert resourceIdMatches('Bucket::bucket-1', 'Bucket::bucket-1')
+    assert not resourceIdMatches('Bucket::bucket-10', 'bucket-1')
+    assert resourceIdMatches('Role::arn:aws:iam::1:role/app', 'app')
+    assert resourceIdMatches('Fn::arn:aws:lambda:us-east-1:1:function:f1', 'f1')
+    assert not resourceIdMatches('Fn::arn:aws:lambda:us-east-1:1:function:f10', 'f1')

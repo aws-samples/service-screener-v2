@@ -56,7 +56,22 @@ def _memoFetch(store, lock, key, fn):
     if ok:
         # Each caller gets its own copy: some checks modify what they read.
         return copy.deepcopy(value)
-    raise value
+    raise _freshError(value)
+
+
+def _freshError(e):
+    """A copy of a cached exception with no traceback. Re-raising the one
+    cached object would append every caller's frames to its __traceback__
+    (unbounded growth, keeps drivers alive, races between threads)."""
+    try:
+        c = copy.copy(e)
+        if type(c) is not type(e):
+            raise TypeError
+        c.__cause__, c.__suppress_context__ = e.__cause__, e.__suppress_context__
+        return c.with_traceback(None)
+    except Exception:
+        # Not copyable: still drop the old frames so growth stays bounded.
+        return e.with_traceback(None)
 
 
 def _log_slow_check(tmp_obj, method_name, timeSpent):

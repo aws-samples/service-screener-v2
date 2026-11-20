@@ -68,6 +68,15 @@ def emulatorSession(port=9297, region='us-east-1'):
     return boto3.session.Session(region_name=region)
 
 
+def resourceIdMatches(rid, resource):
+    """True when `resource` names this resource exactly: the whole id, the
+    part after 'Driver::', or the last ARN/path segment of it. 'bucket-1'
+    does not match 'Bucket::bucket-10'."""
+    rid = str(rid)
+    name = rid.split('::', 1)[-1]
+    return resource in (rid, name) or name.endswith('/' + resource) or name.endswith(':' + resource)
+
+
 def assertEmulatorOnly(session):
     """Fail closed if a client from this session would reach anything other
     than the local emulator."""
@@ -93,6 +102,13 @@ class CheckResult:
                 if k.lower() == key and isinstance(v, (list, tuple)) and v:
                     out[rid] = v[0]
         return out
+
+    def allStatuses(self):
+        """{(resourceId, checkKey): status} over every key in results. After
+        run(), results only hold the requested key or, when `check` is a method
+        name, every key that method returned."""
+        return {(rid, k): v[0] for rid, res in self.results.items() for k, v in res.items()
+                if isinstance(v, (list, tuple)) and v}
 
     def flagged(self, check=None):
         return sorted(rid for rid, s in self.statuses(check).items() if s == -1)
