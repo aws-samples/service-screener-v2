@@ -48,3 +48,13 @@ def test_not_evaluable_cases():
                                 'DataRepositoryConfiguration': {'ImportPath': 's3://b'}}) == 0
     assert _evaluate('WINDOWS', {}) == 0
     assert _evaluate('WINDOWS', {'AutomaticBackupRetentionDays': 0}, lifecycle='DELETING') == 0
+
+
+def test_lustre_data_repository_config_without_import_path_is_still_checked():
+    """Only legacy ImportPath linking blocks backups; a DataRepositoryConfiguration block
+    without ImportPath must not hide AutomaticBackupRetentionDays=0."""
+    cfg = {'DeploymentType': 'PERSISTENT_1', 'AutomaticBackupRetentionDays': 0,
+           'DataRepositoryConfiguration': {'Lifecycle': 'AVAILABLE', 'AutoImportPolicy': 'NONE'}}
+    assert _evaluate('LUSTRE', cfg) == -1
+    cfg['AutomaticBackupRetentionDays'] = 7
+    assert _evaluate('LUSTRE', cfg) == 1

@@ -63,7 +63,7 @@ def test_each_read_called_once_with_stubber():
             getattr(d, c)()
         st.assert_no_pending_responses()
     r = d.results
-    assert 'EnabledLifecycle' not in r and r['Lifecycle'] == [1, 'Enabled']
+    assert 'Lifecycle' not in r and r['EnabledLifecycle'] == [1, 'Enabled']
     assert r['FileSystemPolicy'] == [1, 'Policy configured']
     # The stubbed mount target has no SecurityGroups key -> flagged by both checks
     assert r['MountTargetSecurityGroups'] == [-1, '1 mount target(s) without security groups']
@@ -169,7 +169,14 @@ def test_results_identical_to_original_and_calls_once_under_threads():
             list(ex.map(lambda c: getattr(new, c)(), _all_checks(EfsDriver)))
 
         assert _all_checks(Orig) == _all_checks(EfsDriver)
-        assert new.results == old.results, name
+        ## Lifecycle reporting was corrected after the de-duplication: the stray
+        ## 'Lifecycle' key (no reporter entry) is gone and EnabledLifecycle always
+        ## carries the result. Every other result is unchanged.
+        oldR = {k: v for k, v in old.results.items() if k not in ('Lifecycle', 'EnabledLifecycle')}
+        newR = {k: v for k, v in new.results.items() if k != 'EnabledLifecycle'}
+        assert newR == oldR, name
+        assert 'Lifecycle' not in new.results
+        assert new.results['EnabledLifecycle'] == old.results.get('EnabledLifecycle', [1, 'Enabled']), name
         for op in MEMO_OPS:
             assert old_mocks[op].call_count >= 1, (name, op)
             assert new_mocks[op].call_count == 1, (name, op, new_mocks[op].call_count)
@@ -184,3 +191,21 @@ def test_cache_is_per_file_system():
         d = EfsDriver(_fs(), client)
         d._checkFileSystemPolicy(); d._checkTLSRequired(); d._checkComprehensiveSecurity()
     assert mocks['describe_file_system_policy'].call_count == 2
+
+
+def test_lifecycle_result_keys_all_have_reporter_entries():
+    import json
+    reporter = json.load(open(os.path.join(ROOT, 'services', 'efs', 'efs.reporter.json')))
+    for policies, expected in (([{'TransitionToIA': 'AFTER_30_DAYS'}], [1, 'Enabled']), ([], [-1, 'Disabled'])):
+        client, _ = _mocked_client({'describe_lifecycle_configuration': {'LifecyclePolicies': policies}})
+        d = EfsDriver(_fs(), client)
+        d._checkLifecycle_configuration()
+        assert d.results == {'EnabledLifecycle': expected}
+        assert set(d.results) <= set(reporter)
+
+
+def test_lifecycle_unreadable_is_not_evaluable():
+    client, _ = _mocked_client({'describe_lifecycle_configuration': 'AccessDeniedException'})
+    d = EfsDriver(_fs(), client)
+    d._checkLifecycle_configuration()
+    assert d.results == {'EnabledLifecycle': [0, 'Unable to evaluate (AccessDeniedException)']}

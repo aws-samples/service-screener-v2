@@ -11,13 +11,37 @@ class TransferServer(Evaluator):
     Status contract (services/Evaluator.py): -1 = FAIL, 1 = PASS, 0 = INFO.
     """
 
-    ## Security policies that still offer SHA-1 / CBC / older algorithms and
-    ## have newer replacements (TransferSecurityPolicy-2024-01 / 2025-03 and the
-    ## FIPS-2024-01 / FIPS-2025-03 equivalents).
+    ## Security policies that still offer SHA-1 / legacy algorithms (or are
+    ## deprecated) and have newer replacements (TransferSecurityPolicy-2024-01 /
+    ## 2025-03 and the FIPS-2024-01 / FIPS-2025-03 equivalents). The Restricted-*
+    ## variants are identical to their base policy minus chacha20-poly1305, so they
+    ## keep the same weaknesses (Restricted-2018-11 still offers
+    ## diffie-hellman-group14-sha1 and hmac-sha1). The PQ-SSH-*Experimental-2023-04
+    ## policies are deprecated by AWS.
+    ## Source: https://docs.aws.amazon.com/transfer/latest/userguide/security-policies.html
     OUTDATED_POLICIES = (
         'TransferSecurityPolicy-2018-11',
+        'TransferSecurityPolicy-Restricted-2018-11',
         'TransferSecurityPolicy-2020-06',
+        'TransferSecurityPolicy-Restricted-2020-06',
         'TransferSecurityPolicy-FIPS-2020-06',
+        'TransferSecurityPolicy-PQ-SSH-Experimental-2023-04',
+        'TransferSecurityPolicy-PQ-SSH-FIPS-Experimental-2023-04',
+    )
+
+    ## Server security policies with no SHA-1 KEX/MAC and no deprecation notice.
+    ## Any name in neither list is reported as INFO (not evaluable), never PASS.
+    CURRENT_POLICIES = (
+        'TransferSecurityPolicy-2022-03',
+        'TransferSecurityPolicy-2023-05',
+        'TransferSecurityPolicy-FIPS-2023-05',
+        'TransferSecurityPolicy-2024-01',
+        'TransferSecurityPolicy-FIPS-2024-01',
+        'TransferSecurityPolicy-FIPS-2024-05',
+        'TransferSecurityPolicy-2025-03',
+        'TransferSecurityPolicy-FIPS-2025-03',
+        'TransferSecurityPolicy-SshAuditCompliant-2025-02',
+        'TransferSecurityPolicy-AS2Restricted-2025-07',
     )
 
     def __init__(self, server, transferClient):
@@ -52,5 +76,8 @@ class TransferServer(Evaluator):
             return
         if not policy:
             self.results[key] = [0, 'Unable to evaluate (SecurityPolicyName not returned)']
+            return
+        if policy not in self.CURRENT_POLICIES:
+            self.results[key] = [0, f'Unable to evaluate (unrecognised security policy {policy})']
             return
         self.results[key] = [1, f"Protocols {', '.join(protocols) or 'N/A'}; security policy {policy}"]
