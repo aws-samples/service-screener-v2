@@ -13,6 +13,8 @@ import threading
 import botocore
 from botocore.config import Config as bConfig
 
+from services.Evaluator import _isTransient
+
 # list_permission_sets on an *account* instance of Identity Center fails
 # with this code; permission sets only exist on the organization instance.
 ACCOUNT_INSTANCE_CODE = 'ValidationException'
@@ -54,12 +56,17 @@ class SsoData:
         return out
 
     def _cached(self, key, fn):
+        """(value, None) or (None, errorCode). Throttling / 5xx errors are
+        returned but not cached, so a later caller retries."""
         with self._lock:
             if key not in self._cache:
                 try:
-                    self._cache[key] = (fn(), None)
+                    result = (fn(), None)
                 except botocore.exceptions.ClientError as e:
-                    self._cache[key] = (None, _code(e))
+                    result = (None, _code(e))
+                    if _isTransient(e):
+                        return result
+                self._cache[key] = result
             return self._cache[key]
 
     # ------------------------------------------------------------------ #
@@ -72,12 +79,14 @@ class SsoData:
             if 'instances' in self._cache:
                 return self._cache['instances']
             found, errors, seen = [], [], set()
+            transient = False
             for region in self.regions:
                 client = self._client(region)
                 try:
                     insts = self._paginate(client, 'list_instances', 'Instances')
                 except botocore.exceptions.ClientError as e:
                     errors.append('{}: {}'.format(region, _code(e)))
+                    transient = transient or _isTransient(e)
                     continue
                 for inst in insts:
                     arn = inst.get('InstanceArn')
@@ -93,8 +102,11 @@ class SsoData:
                             item['Kind'] = 'ACCOUNT'
                         else:
                             errors.append('{} {}: {}'.format(region, arn, _code(e)))
+                            transient = transient or _isTransient(e)
                             continue
                     found.append(item)
+            if transient:
+                return found, errors     # not cached: the next caller retries
             self._cache['instances'] = (found, errors)
             return self._cache['instances']
 

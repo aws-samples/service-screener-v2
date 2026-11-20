@@ -15,6 +15,8 @@ import threading
 
 import botocore
 
+from services.Evaluator import _isTransient
+
 # Codes that mean "this account cannot read org-level data" (member account
 # without delegated administration, or not in an org at all).
 MEMBER_ERROR_CODES = {
@@ -36,6 +38,19 @@ def _code(e):
     return e.response.get('Error', {}).get('Code', 'Unknown')
 
 
+def errorCode(e):
+    """ClientError code, or the class name of any other botocore error."""
+    if isinstance(e, botocore.exceptions.ClientError):
+        return _code(e)
+    return type(e).__name__
+
+
+def isTransient(e):
+    """Same rule as services.Evaluator._isTransient (throttling, 5xx/429,
+    connection and timeout errors): such errors must not be cached."""
+    return _isTransient(e)
+
+
 class OrgData:
     def __init__(self, orgClient, callerAccountId, describeOrgResp=None, describeOrgErr=None):
         self.orgClient = orgClient
@@ -47,12 +62,20 @@ class OrgData:
 
     # ------------------------------------------------------------------ #
     def _cached(self, key, fn):
+        """(value, None) or (None, errorCode). Throttling / 5xx / connection
+        errors are returned but not cached, so the next caller retries
+        instead of every org check reporting 'Unable to evaluate'. Other
+        botocore errors (e.g. NoCredentialsError) are reported by class name
+        instead of escaping and aborting the IAM scan."""
         with self._lock:
             if key not in self._cache:
                 try:
-                    self._cache[key] = (fn(), None)
-                except botocore.exceptions.ClientError as e:
-                    self._cache[key] = (None, _code(e))
+                    result = (fn(), None)
+                except (botocore.exceptions.ClientError, botocore.exceptions.BotoCoreError) as e:
+                    result = (None, errorCode(e))
+                    if isTransient(e):
+                        return result
+                self._cache[key] = result
             return self._cache[key]
 
     def _paginate(self, op, resultKey, **kw):
@@ -72,6 +95,8 @@ class OrgData:
                 try:
                     self._cache[key] = (True, self._paginate(op, resultKey, **kw))
                 except Exception as e:
+                    if isTransient(e):
+                        raise    # not cached: the next caller retries
                     self._cache[key] = (False, e)
             ok, value = self._cache[key]
         if not ok:
@@ -192,6 +217,12 @@ class OrgData:
             return out
         return self._cached('ous', fetch)
 
+    def serviceAccessPrincipals(self):
+        """Service principals with trusted access to the organization."""
+        return self._cached('serviceAccess', lambda: {
+            sp.get('ServicePrincipal') for sp in self._paginate(
+                'list_aws_service_access_for_organization', 'EnabledServicePrincipals')})
+
     def accountTags(self, accountId):
         return self._cached('tags::' + str(accountId), lambda: self._paginate(
             'list_tags_for_resource', 'Tags', ResourceId=accountId))
@@ -295,13 +326,40 @@ def _resourceCoversAnyIam(stmt, accountIds):
                for acct in accountIds)
 
 
-def _isExceptionCondition(op, key, vals):
-    """A condition that only exempts principals (everyone else is denied)."""
+# Principals that a *narrow* exception (a break-glass role, an automation
+# role) never matches. An aws:PrincipalArn exception value matching one of
+# them exempts a whole class of principals (every role, every user ...), so
+# the Deny only binds what is left (e.g. IAM users and root).
+_BROAD_PRINCIPAL_SAMPLES = ['arn:aws:iam::123456789012:role/zz-any-role-7f3a',
+                            'arn:aws:iam::123456789012:role/zz/any/path/zz-any-role-7f3a',
+                            'arn:aws:iam::123456789012:user/zz-any-user-7f3a']
+# SCPs only apply to principals of the organization, so a Deny conditioned on
+# "principal NOT in the organization" never fires for them.
+_NEVER_FIRES_NEGATED_KEYS = {'aws:principalorgid'}
+
+
+def _exceptionIsNarrow(base, key, vals, samples):
+    if key in _NEVER_FIRES_NEGATED_KEYS:
+        return False
+    if key == 'aws:principalarn':
+        # ArnNotEquals behaves like ArnNotLike (both accept wildcards).
+        wildcard = base in ('stringnotlike', 'arnnotlike', 'arnnotequals')
+        for v in vals:
+            for sample in samples:
+                if fnmatch.fnmatchcase(sample, v) if wildcard else sample == v:
+                    return False
+    return True
+
+
+def _isExceptionCondition(op, key, vals, samples=None):
+    """A condition that only exempts specific principals (everyone else is
+    denied). `samples` are the principals the Deny must keep binding
+    (default: arbitrary roles and users)."""
     base = _baseOperator(op)
     if key == 'aws:requestedregion':
         return False
     if base.startswith('stringnot') or base.startswith('arnnot'):
-        return True
+        return _exceptionIsNarrow(base, key, vals, samples or _BROAD_PRINCIPAL_SAMPLES)
     if base == 'bool' and key in _EXCEPTION_BOOL_KEYS and all(v.lower() == 'false' for v in vals):
         return True
     return False
@@ -336,7 +394,9 @@ def _rootDenial(stmt, accountIds):
                 and all(any(_rootPatternCovers(base, v, a) for v in vals) for a in accountIds):
             rootKeyFound = True
             continue
-        if _isExceptionCondition(op, key, vals):
+        # Exempting roles or users does not weaken a root-user denial; an
+        # exception that matches the root ARN itself does.
+        if _isExceptionCondition(op, key, vals, ['arn:aws:iam::{}:root'.format(a) for a in accountIds]):
             continue
         return False
     return rootKeyFound
@@ -352,9 +412,9 @@ def _regionRestriction(stmt):
     regionFound = False
     for (op, key), vals in conditionKeys(stmt).items():
         if key == 'aws:requestedregion':
-            if op.startswith('forallvalues:') or op.startswith('foranyvalue:'):
-                return False
-            base = op[:-len('ifexists')] if op.endswith('ifexists') else op
+            # aws:RequestedRegion is single-valued and always present, so a
+            # ForAnyValue:/ForAllValues: prefix evaluates like the bare operator.
+            base = _baseOperator(op)
             # StringNotLike "*" excludes every region, i.e. denies nothing.
             if base in ('stringnotequals', 'stringnotlike', 'stringnotequalsignorecase') and vals \
                     and not (base == 'stringnotlike' and any(v.strip('*?') == '' for v in vals)):
@@ -428,34 +488,68 @@ def _baseOperator(op):
 
 
 def denyIsUnconditionalGuardrail(stmt):
-    """True when the Deny applies to everyone except explicit exceptions."""
+    """True when the Deny applies to everyone except explicit, specific
+    exceptions (a role-wide or user-wide exemption, or a negated
+    aws:PrincipalOrgID, does not count)."""
     cond = stmt.get('Condition')
     if not cond:
         return True
     if not isinstance(cond, dict):
         return False
-    for (op, key), vals in conditionKeys(stmt).items():
-        base = _baseOperator(op)
-        if key == 'aws:requestedregion':
-            return False
-        if base.startswith('stringnot') or base.startswith('arnnot'):
-            continue
-        if base == 'bool' and key in _EXCEPTION_BOOL_KEYS and all(v.lower() == 'false' for v in vals):
-            continue
-        return False
-    return True
+    return all(_isExceptionCondition(op, key, vals) for (op, key), vals in conditionKeys(stmt).items())
 
 
-def guardrailCoverage(policies, requirements):
+def _policyMayAllow(policy, action):
+    """False only when the SCP certainly grants no Allow for `action`.
+    FullAWSAccess, unknown content (AWS-managed / unparseable) and Allow
+    statements with conditions or specific resources all count as allowing,
+    so an implicit deny is never inferred from incomplete data."""
+    if policy.get('Id') == FULL_AWS_ACCESS_ID:
+        return True
+    doc = policy.get('Content')
+    if not isinstance(doc, dict):
+        return True
+    for s in statements(doc):
+        if s.get('Effect') != 'Allow':
+            continue
+        if 'Action' in s and any(_actionMatches(p, action) for p in _asList(s.get('Action'))):
+            return True
+        if 'NotAction' in s and not any(_actionMatches(p, action) for p in _asList(s.get('NotAction'))):
+            return True
+    return False
+
+
+def implicitDenyLevel(levels, action):
+    """Allow-list SCP strategy: an action is only allowed when an SCP attached
+    at EVERY level of the path (root, each OU, the account) allows it.
+    levels: [(label, [policies attached to that node])]. Returns the label of
+    the first level whose SCPs allow nothing matching `action`, else None.
+    Only a level that carries an allow-list (a parsed SCP with an Allow
+    statement) is evaluated: a level whose known SCPs are Deny-only would deny
+    everything, which in practice means its FullAWSAccess attachment was not
+    returned, so it is never taken as an implicit deny."""
+    for label, pols in levels:
+        hasAllowList = any(isinstance(p.get('Content'), dict) and
+                           any(st.get('Effect') == 'Allow' for st in statements(p['Content'])) for p in pols)
+        if hasAllowList and not any(_policyMayAllow(p, action) for p in pols):
+            return label
+    return None
+
+
+def guardrailCoverage(policies, requirements, implicit=None):
     """Evaluate attached customer SCPs against guardrail requirements.
 
     policies:     [{'Name', 'Content'}] (customer SCPs that are attached)
     requirements: [(label, [[alt, alt...], [alt...]])] - a guardrail is met
                   when every inner list has at least one action denied.
+    implicit:     {action: levelLabel} actions that no SCP at some level of
+                  the path allows (allow-list strategy), i.e. denied anyway.
     Returns {'met': {label: set(policyNames)}, 'missing': [label],
              'conditional': {label: set(policyNames)}, 'unparsed': [names]}
     """
     deniedBy, condBy, unparsed = {}, {}, []
+    for a, level in (implicit or {}).items():
+        deniedBy.setdefault(a, set()).add('not allowed by the SCPs attached to {}'.format(level))
     allActions = {a for _, reqs in requirements for alts in reqs for a in alts}
     for p in policies:
         if p.get('Content') is None:

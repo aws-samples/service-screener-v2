@@ -77,9 +77,16 @@ def oidcProvidersInStatement(statement):
 
 def subConditionValues(condition, host):
     """Values of positive-match conditions on '<host>:sub' (case-insensitive)."""
-    values = []
+    return [v for block in subConditionBlocks(condition, host) for v in block]
+
+
+def subConditionBlocks(condition, host):
+    """Values of positive-match conditions on '<host>:sub', one list per
+    operator block. Values inside a block are alternatives (OR); separate
+    operator blocks are ANDed."""
+    blocks = []
     if not isinstance(condition, dict):
-        return values
+        return blocks
     target = (host + ':sub').lower()
     for operator, block in condition.items():
         if not isinstance(operator, str) or not isinstance(block, dict):
@@ -92,10 +99,13 @@ def subConditionValues(condition, host):
             op = op[:-len('ifexists')]
         if op not in _SUB_OPERATORS:
             continue
+        values = []
         for key, value in block.items():
             if str(key).lower() == target:
                 values.extend(v for v in _asList(value) if isinstance(v, str))
-    return values
+        if values:
+            blocks.append(values)
+    return blocks
 
 
 def subValueIsUnrestricted(value, rule):
@@ -138,6 +148,11 @@ def evaluateOidcTrust(trustDoc):
                 continue
             if not values:
                 findings.append('{}: no {}:sub condition'.format(host, host))
+                continue
+            # Operator blocks are ANDed: one block whose every value pins the
+            # caller's identity restricts the statement.
+            blocks = subConditionBlocks(stmt.get('Condition'), host)
+            if any(not any(subValueIsUnrestricted(v, rule) for v in b) for b in blocks):
                 continue
             loose = [v for v in values if subValueIsUnrestricted(v, rule)]
             if loose:
