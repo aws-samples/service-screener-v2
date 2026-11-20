@@ -163,9 +163,12 @@ class Ec2Vpc(Evaluator):
        endpoints - all VPC endpoints of the region (unfiltered), or None when unreadable
                    (endpointsError holds the error code)
        instances - EC2 instance dicts of the region (None when ssmVpcEndpointsMissing is not run)
-       peerRouting - getPeerRouteContext() (None when vpcPeeringFullRoute is not run)"""
+       peerRouting - getPeerRouteContext() (None when vpcPeeringFullRoute is not run)
+       ssmPingStatus - {instanceId: SSM PingStatus} of SSM-managed instances, or None
+                   when ssm:DescribeInstanceInformation was not read / not readable"""
     def __init__(self, vpc, flowLogs, ec2Client, routing=None, endpoints=None,
-                 endpointsError=None, selfAccount=None, instances=None, peerRouting=None):
+                 endpointsError=None, selfAccount=None, instances=None, peerRouting=None,
+                 ssmPingStatus=None):
         super().__init__()
         self.vpc = vpc
         self.flowLogs = flowLogs
@@ -176,6 +179,7 @@ class Ec2Vpc(Evaluator):
         self.selfAccount = selfAccount
         self.instances = instances
         self.peerRouting = peerRouting
+        self.ssmPingStatus = ssmPingStatus
 
         self._resourceName = vpc['VpcId']
 
@@ -301,7 +305,16 @@ class Ec2Vpc(Evaluator):
         endpoints. FAIL when such instances exist and the VPC has no active
         ssm / ssmmessages interface endpoint. Subnets with a default route are
         not flagged: NAT / proxy egress is a valid path (EC2SSMNotManaged
-        observes the outcome per instance)."""
+        observes the outcome per instance).
+        Without in-VPC endpoints, isolated instances whose SSM Agent is Online
+        reach Systems Manager another way (typically centralized interface
+        endpoints in a shared-services VPC, resolved through a private hosted
+        zone associated with this VPC). PingStatus proves only that the ssm
+        endpoint is reachable, so it is used only when 'ssm' has no in-VPC
+        endpoint: all Online and ssmmessages present in-VPC -> PASS; all Online
+        but ssmmessages also missing -> INFO (not proven); some Online -> INFO.
+        When only ssmmessages is missing, Online status proves nothing about it
+        and the result stays FAIL."""
         key = 'ssmVpcEndpointsMissing'
         if self.routing is None or self.instances is None:
             return
@@ -361,6 +374,23 @@ class Ec2Vpc(Evaluator):
         dnsOff = [f"{s} ({noDns[s]})" for s in missing if s in noDns]
         if len(dnsOff) == len(missing):
             self.results[key] = [0, f"{where}; interface endpoint(s) {', '.join(dnsOff)} have private DNS disabled - verify a private hosted zone resolves the SSM hostnames{optNote}"]
+            return
+        # PingStatus is driven by the agent's calls to the ssm endpoint
+        # (UpdateInstanceInformation), so Online proves only that 'ssm' is
+        # reachable. It is used only when 'ssm' itself has no in-VPC endpoint;
+        # ssmmessages reachability (Session Manager) is never inferred from it.
+        ping = self.ssmPingStatus or {}
+        online = [i for i in instIds if ping.get(i) == 'Online'] if 'ssm' in missing else []
+        if online and len(online) == len(instIds):
+            if 'ssmmessages' in missing:
+                self.results[key] = [0, f"No {', '.join(missing)} interface endpoint in this VPC; the SSM Agent is Online for all {where}, so ssm is reachable another way (likely centralized endpoints in a shared-services VPC), but ssmmessages (Session Manager) reachability is not proven - verify it{optNote}"]
+            else:
+                self.results[key] = [1, f"No ssm interface endpoint in this VPC, but the SSM Agent is Online for all {where} (ssm reachable, likely via centralized endpoints in a shared-services VPC); ssmmessages endpoint present{optNote}"]
+            return
+        if online:
+            offline = [i for i in instIds if i not in online]
+            shownOff = ', '.join(offline[:5]) + (f" (+{len(offline) - 5} more)" if len(offline) > 5 else '')
+            self.results[key] = [0, f"No {', '.join(missing)} interface endpoint in this VPC; SSM Agent Online for {len(online)}/{len(instIds)} instance(s) in isolated subnets (likely centralized endpoints), not Online: {shownOff}{optNote}"]
             return
         self.results[key] = [-1, f"No {', '.join(missing)} interface endpoint for {where}{optNote}"]
 

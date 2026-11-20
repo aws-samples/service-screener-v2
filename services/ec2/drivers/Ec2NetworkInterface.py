@@ -4,7 +4,7 @@ import botocore
 
 from utils.Config import Config
 from services.ec2.acctCache import acctKey
-from services.Evaluator import Evaluator
+from services.Evaluator import Evaluator, _isTransient
 
 DEFAULT_ROUTES = ('0.0.0.0/0', '::/0')
 
@@ -70,7 +70,8 @@ def getSubnetRouting(ec2Client):
             subnets.extend(page.get('Subnets', []))
     except Exception as e:
         ctx['error'] = _errCode(e)
-        Config.set(cacheKey, ctx)
+        if not _isTransient(e):   # throttling / 5xx: let the next caller retry
+            Config.set(cacheKey, ctx)
         return ctx
 
     ctx['_routeTables'] = routeTables

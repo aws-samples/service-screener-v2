@@ -1180,10 +1180,16 @@ def test_nacl_allow_all_ingress_flag_fix():
     assert _naclResult([_entry(100, 'allow')] + IMPLICIT)[0] == -1
     assert _naclResult([_entry(100, 'allow', proto='6')] + IMPLICIT)[0] == 1        # tcp only
     assert _naclResult([_entry(100, 'allow', cidr='::/0', v6=True)] + IMPLICIT)[0] == -1
-    # IPv4 deny before allow-all, IPv6 still open
+    # narrow IPv4 deny (tcp only) before allow-all, IPv6 still open: IPv6 is the FAIL,
+    # IPv4 allow-all behind a narrow deny is noted (not treated as filtered)
     res = _naclResult([_entry(50, 'deny', proto='6'), _entry(100, 'allow'),
                        _entry(101, 'allow', cidr='::/0', v6=True)] + IMPLICIT)
-    assert res[0] == -1 and '::/0' in res[1] and 'rule 100' not in res[1]
+    assert res[0] == -1 and 'rule 101 allows all traffic from ::/0 with no preceding deny rule' in res[1]
+    assert 'rule 100 allows all traffic from 0.0.0.0/0 behind only narrow deny rule(s) 50' in res[1]
+    # a deny of all traffic from 0.0.0.0/0 does filter the IPv4 family
+    res = _naclResult([_entry(50, 'deny'), _entry(100, 'allow'),
+                       _entry(101, 'allow', cidr='::/0', v6=True)] + IMPLICIT)
+    assert res[0] == -1 and 'rule 100' not in res[1]
     assert _naclResult([_entry(100, 'allow', egress=True)] + IMPLICIT)[0] == 1     # egress only
     assert _naclResult([_entry(100, 'allow')] + IMPLICIT, default=True)[0] == 0     # default NACL: INFO
     assert _naclResult([_entry(100, 'allow')] + IMPLICIT, assoc=False) is None      # not associated

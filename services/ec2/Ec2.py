@@ -13,6 +13,7 @@ from utils.Tools import _pi
 from utils.Tools import _warn
 
 from utils.Config import Config
+from services.Evaluator import _isTransient
 from services.ec2.acctCache import acctKey
 from services.Service import Service
 from services.ec2.drivers.Ec2Instance import Ec2Instance
@@ -380,15 +381,18 @@ class Ec2(Service):
 
     def getInstanceAllSecurityGroups(self, instance):
         """Every security group on the instance's network interfaces (no tag filter:
-        the groups decide what the instance accepts). None when unreadable."""
+        the groups decide what the instance accepts). Returns (groups, errorCode):
+        (None, '<code>') when unreadable, (groups, None) otherwise - the error is
+        returned with the result, not stored on self, so it cannot leak across
+        instances."""
         ids = {g.get('GroupId') for g in instance.get('SecurityGroups', []) or []}
         for eni in instance.get('NetworkInterfaces', []) or []:
             ids.update(g.get('GroupId') for g in eni.get('Groups', []) or [])
         try:
             allSGs = self._getAllSecurityGroupsCached()
-        except botocore.exceptions.ClientError:
-            return None
-        return [allSGs[i] for i in sorted(i for i in ids if i) if i in allSGs]
+        except botocore.exceptions.ClientError as e:
+            return None, e.response.get('Error', {}).get('Code', 'ClientError')
+        return [allSGs[i] for i in sorted(i for i in ids if i) if i in allSGs], None
 
     def getDataTierSecurityGroups(self, enis):
         """{groupId: (group, {kind: [eniId, ...]})} for security groups attached to
@@ -504,6 +508,7 @@ class Ec2(Service):
             return cached
 
         ctx = {'inOrg': None, 'accounts': None, 'error': None, 'orgId': None}
+        transient = False
         try:
             org = self.orgClient.describe_organization()
             ctx['inOrg'] = True
@@ -514,8 +519,10 @@ class Ec2(Service):
                 ctx['inOrg'] = False
             else:
                 ctx['error'] = code
+                transient = _isTransient(e)
         except Exception as e:
             ctx['error'] = type(e).__name__
+            transient = _isTransient(e)
 
         if ctx['inOrg'] is True:
             try:
@@ -527,10 +534,13 @@ class Ec2(Service):
                 ctx['accounts'] = accounts
             except botocore.exceptions.ClientError as e:
                 ctx['accountsError'] = e.response['Error']['Code']
+                transient = _isTransient(e)
             except Exception as e:
                 ctx['accountsError'] = type(e).__name__
+                transient = _isTransient(e)
 
-        Config.set(cacheKey, ctx)
+        if not transient:   # throttling / 5xx: not cached, the next caller retries
+            Config.set(cacheKey, ctx)
         return ctx
 
     def getSelfSnapshots(self):
@@ -1061,6 +1071,10 @@ class Ec2(Service):
             vpcRouting = getSubnetRouting(self.ec2Client)
             allEndpoints, allEndpointsErr = self.getAllVpcEndpoints()
         vpcInstances = list(instancesById.values()) if self._ruleSelected('ssmVpcEndpointsMissing') else None
+        # SSM managed instances: read once here, used by ssmVpcEndpointsMissing (agents
+        # Online through centralized endpoints) and by the per-instance SSM checks below.
+        ssmManagedSet = self.getSSMManagedInstances()
+        vpcPing = getattr(self, 'ssmPingStatus', None) if ssmManagedSet is not None else None
         peerRouting = None
         if vpcs and self._ruleSelected('vpcPeeringFullRoute'):
             # reuse the route tables getSubnetRouting already read in this scan (for the VPC
@@ -1071,7 +1085,7 @@ class Ec2(Service):
         for vpc in vpcs:
             _pi('VPC::Virtual Private Cloud', vpc['VpcId'])
             obj = Ec2Vpc(vpc, flowLogs, self.ec2Client, vpcRouting, allEndpoints, allEndpointsErr, selfAccount,
-                         vpcInstances, peerRouting)
+                         vpcInstances, peerRouting, vpcPing)
             obj.run(self.__class__)
             objs[f"VPC::{vpc['VpcId']}"] = obj.getInfo()
             
@@ -1110,8 +1124,7 @@ class Ec2(Service):
             obj.run(self.__class__)
             objs[f"KeyPair::{kp['KeyName']}"] = obj.getInfo()
         
-        # SSM Managed Instance Checks
-        ssmManagedSet = self.getSSMManagedInstances()
+        # SSM Managed Instance Checks (ssmManagedSet read before the VPC checks)
         # If the managed-instance lookup failed (getSSMManagedInstances returns
         # None) EC2SSMNotManaged is skipped to avoid false positives;
         # ec2InstanceWithKeyPair then reports "Unable to evaluate".
@@ -1122,11 +1135,12 @@ class Ec2(Service):
                     if instanceData['State']['Name'] not in ('running', 'stopped'):
                         continue
                     _pi('EC2::SSM Check', instanceData['InstanceId'])
+                    instSgs, instSgError = (self.getInstanceAllSecurityGroups(instanceData)
+                                            if self._ruleSelected('selfManagedDataStoreOnEc2') else (None, None))
                     obj = Ec2SSM(instanceData['InstanceId'], ssmManagedSet, instanceData,
                                  getattr(self, 'ssmError', None), getattr(self, 'ssmPingStatus', None),
                                  self.ssmClient, getattr(self, 'ssmPlatform', None),
-                                 self.getInstanceAllSecurityGroups(instanceData)
-                                 if self._ruleSelected('selfManagedDataStoreOnEc2') else None)
+                                 instSgs, instSgError)
                     obj.run(self.__class__)
                     objs[f"SSM::{instanceData['InstanceId']}"] = obj.getInfo()
         
