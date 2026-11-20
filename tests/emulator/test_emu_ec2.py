@@ -841,11 +841,17 @@ def test_nacl_allow_all_ingress(emu, isolatedVpc):
         _, after = assertFlagFixCycle(emu, 'ec2', 'naclAllowAllIngress', f'NACL::{nacl}', misconfigure, fix)
         assert list(after.values()) == [1]
 
-        # a lower-numbered deny before the allow-all rule -> not flagged
+        # only a narrow deny (tcp 22) before the allow-all rule: all other traffic from the
+        # internet is still allowed -> INFO, never PASS
         ec2.replace_network_acl_entry(NetworkAclId=nacl, RuleNumber=100, Protocol='-1', RuleAction='allow',
                                       Egress=False, CidrBlock='0.0.0.0/0')
         ec2.create_network_acl_entry(NetworkAclId=nacl, RuleNumber=50, Protocol='6', RuleAction='deny',
                                      Egress=False, CidrBlock='0.0.0.0/0', PortRange={'From': 22, 'To': 22})
+        res = runCheck(emu, 'ec2', 'naclAllowAllIngress', f'NACL::{nacl}').statuses()
+        assert list(res.values()) == [0], res
+        # a deny of all traffic from 0.0.0.0/0 before the allow-all rule -> filtered (PASS)
+        ec2.create_network_acl_entry(NetworkAclId=nacl, RuleNumber=40, Protocol='-1', RuleAction='deny',
+                                     Egress=False, CidrBlock='0.0.0.0/0')
         res = runCheck(emu, 'ec2', 'naclAllowAllIngress', f'NACL::{nacl}').statuses()
         assert list(res.values()) == [1], res
         # the default NACL allows all by design -> INFO, never FAIL

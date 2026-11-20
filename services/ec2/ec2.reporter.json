@@ -1781,7 +1781,7 @@
 	},
 	"naclAllowAllIngress": {
 		"category": "S",
-		"^description": "Custom Network ACL allows all inbound traffic: {$COUNT} custom (non-default) Network ACL(s) associated with subnets allow all protocols and ports from 0.0.0.0/0 or ::/0 with no lower-numbered deny rule, so they add no subnet-level filtering. Restrict the inbound rules to the ports and source ranges the subnet tier needs (e.g. only from the load balancer subnets for an application tier) to add a second layer of defence behind security groups. Default NACLs, which allow all traffic by design, are not flagged.",
+		"^description": "Custom Network ACL allows all inbound traffic: {$COUNT} custom (non-default) Network ACL(s) associated with subnets allow all protocols and ports from 0.0.0.0/0 or ::/0 with no lower-numbered deny rule, so they add no subnet-level filtering. An allow-all rule reached behind only narrow deny rules (one host, port or protocol) is reported as INFO for review. Restrict the inbound rules to the ports and source ranges the subnet tier needs (e.g. only from the load balancer subnets for an application tier) to add a second layer of defence behind security groups. Default NACLs, which allow all traffic by design, are not flagged.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
@@ -1853,7 +1853,7 @@
 	},
 	"ssmVpcEndpointsMissing": {
 		"category": "S",
-		"^description": "Isolated subnets without Systems Manager endpoints: {$COUNT} VPC(s) have EC2 instances in subnets with no default route (no internet gateway, NAT, transit gateway or other 0.0.0.0/0 / ::/0 path) and no ssm / ssmmessages interface VPC endpoint, so the SSM Agent cannot reach Systems Manager. These instances cannot be patched, inventoried or accessed through Session Manager, which pushes operators back to SSH keys and bastions. Create interface endpoints for com.amazonaws.<region>.ssm and ssmmessages (and ec2messages for SSM Agent < 3.3.40.0) with private DNS enabled.",
+		"^description": "Isolated subnets without Systems Manager endpoints: {$COUNT} VPC(s) have EC2 instances in subnets with no default route (no internet gateway, NAT, transit gateway or other 0.0.0.0/0 / ::/0 path) and no ssm / ssmmessages interface VPC endpoint, so the SSM Agent cannot reach Systems Manager. These instances cannot be patched, inventoried or accessed through Session Manager, which pushes operators back to SSH keys and bastions. Create interface endpoints for com.amazonaws.<region>.ssm and ssmmessages (and ec2messages for SSM Agent < 3.3.40.0) with private DNS enabled. Instances whose SSM Agent is Online without in-VPC endpoints (e.g. through centralized endpoints in a shared-services VPC) are not flagged; partially Online fleets are reported as INFO.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,

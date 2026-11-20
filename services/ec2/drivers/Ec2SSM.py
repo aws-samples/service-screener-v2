@@ -33,7 +33,7 @@ class Ec2SSM(Evaluator):
     (ssmError holds the error code); pingStatus maps instance ID -> PingStatus."""
 
     def __init__(self, instanceId, ssmManagedSet, instanceData=None, ssmError=None, pingStatus=None,
-                 ssmClient=None, platformType=None, securityGroups=None):
+                 ssmClient=None, platformType=None, securityGroups=None, securityGroupsError=None):
         super().__init__()
         self.instanceId = instanceId
         self.ssmManagedSet = ssmManagedSet
@@ -43,6 +43,7 @@ class Ec2SSM(Evaluator):
         self.ssmClient = ssmClient
         self.platformType = platformType or {}
         self.securityGroups = securityGroups
+        self.securityGroupsError = securityGroupsError
 
         self._resourceName = instanceId
 
@@ -155,7 +156,11 @@ class Ec2SSM(Evaluator):
         (e.g. a proxy, or a security group shared with a managed database)."""
         key = 'selfManagedDataStoreOnEc2'
         inst = self.instanceData
-        if not inst or self.securityGroups is None:
+        if not inst:
+            return
+        if self.securityGroups is None:
+            # the check only runs when selected, so None means the groups were not readable
+            self.results[key] = [0, f"Unable to evaluate ({self.securityGroupsError or 'security groups not readable'})"]
             return
         ports = self._datastorePorts()
 
@@ -177,6 +182,12 @@ class Ec2SSM(Evaluator):
         elif ports and packages is not None:
             self.results[key] = [0, f"Security group opens {', '.join(ports[:5])} but SSM Inventory shows no data store server package"]
         elif ports:
-            self.results[key] = [-1, f"Security group opens data store port(s) {', '.join(ports[:5])} (port heuristic{invNote or '; instance not SSM-managed, no inventory'})"]
+            if invNote:
+                why = invNote
+            elif self.ssmManagedSet is None:
+                why = f"; SSM managed instances not readable ({self.ssmError or 'unknown error'}), no inventory"
+            else:
+                why = '; instance not SSM-managed, no inventory'
+            self.results[key] = [-1, f"Security group opens data store port(s) {', '.join(ports[:5])} (port heuristic{why})"]
         else:
             self.results[key] = [1, f"No data store ports or packages detected{invNote}"]

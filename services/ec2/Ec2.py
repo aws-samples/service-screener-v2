@@ -385,9 +385,11 @@ class Ec2(Service):
         ids = {g.get('GroupId') for g in instance.get('SecurityGroups', []) or []}
         for eni in instance.get('NetworkInterfaces', []) or []:
             ids.update(g.get('GroupId') for g in eni.get('Groups', []) or [])
+        self.instanceSgError = None
         try:
             allSGs = self._getAllSecurityGroupsCached()
-        except botocore.exceptions.ClientError:
+        except botocore.exceptions.ClientError as e:
+            self.instanceSgError = e.response.get('Error', {}).get('Code', 'ClientError')
             return None
         return [allSGs[i] for i in sorted(i for i in ids if i) if i in allSGs]
 
@@ -1068,6 +1070,10 @@ class Ec2(Service):
             vpcRouting = getSubnetRouting(self.ec2Client)
             allEndpoints, allEndpointsErr = self.getAllVpcEndpoints()
         vpcInstances = list(instancesById.values()) if self._ruleSelected('ssmVpcEndpointsMissing') else None
+        # SSM managed instances: read once here, used by ssmVpcEndpointsMissing (agents
+        # Online through centralized endpoints) and by the per-instance SSM checks below.
+        ssmManagedSet = self.getSSMManagedInstances()
+        vpcPing = getattr(self, 'ssmPingStatus', None) if ssmManagedSet is not None else None
         peerRouting = None
         if vpcs and self._ruleSelected('vpcPeeringFullRoute'):
             # reuse the route tables getSubnetRouting already read in this scan (for the VPC
@@ -1078,7 +1084,7 @@ class Ec2(Service):
         for vpc in vpcs:
             _pi('VPC::Virtual Private Cloud', vpc['VpcId'])
             obj = Ec2Vpc(vpc, flowLogs, self.ec2Client, vpcRouting, allEndpoints, allEndpointsErr, selfAccount,
-                         vpcInstances, peerRouting)
+                         vpcInstances, peerRouting, vpcPing)
             obj.run(self.__class__)
             objs[f"VPC::{vpc['VpcId']}"] = obj.getInfo()
             
@@ -1117,8 +1123,7 @@ class Ec2(Service):
             obj.run(self.__class__)
             objs[f"KeyPair::{kp['KeyName']}"] = obj.getInfo()
         
-        # SSM Managed Instance Checks
-        ssmManagedSet = self.getSSMManagedInstances()
+        # SSM Managed Instance Checks (ssmManagedSet read before the VPC checks)
         # If the managed-instance lookup failed (getSSMManagedInstances returns
         # None) EC2SSMNotManaged is skipped to avoid false positives;
         # ec2InstanceWithKeyPair then reports "Unable to evaluate".
@@ -1133,7 +1138,8 @@ class Ec2(Service):
                                  getattr(self, 'ssmError', None), getattr(self, 'ssmPingStatus', None),
                                  self.ssmClient, getattr(self, 'ssmPlatform', None),
                                  self.getInstanceAllSecurityGroups(instanceData)
-                                 if self._ruleSelected('selfManagedDataStoreOnEc2') else None)
+                                 if self._ruleSelected('selfManagedDataStoreOnEc2') else None,
+                                 getattr(self, 'instanceSgError', None))
                     obj.run(self.__class__)
                     objs[f"SSM::{instanceData['InstanceId']}"] = obj.getInfo()
         
