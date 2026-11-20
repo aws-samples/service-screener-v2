@@ -164,7 +164,14 @@ class S3AccessPoint(Evaluator):
                     # with no public policy this is not an exposure.
                     self.results[key] = [0, msg + ' (not blocked by bucket/account) but access point is VPC-only' + origin]
                     return
-                findings.append(msg + ' (also off on bucket and account: ' + ', '.join(stillOff) + ')')
+                note = ''
+                if not policyPublic:
+                    ## Security Hub S3.19 treats access point BPA off as a finding on its
+                    ## own; say whether a public policy is attached right now.
+                    polUnknown = [u for u in unknown if u.startswith('policy status:')]
+                    note = ('; access point policy status unreadable (' + polUnknown[0] + ')' if polUnknown
+                            else '; no public access point policy is attached now, but nothing blocks one')
+                findings.append(msg + ' (also off on bucket and account: ' + ', '.join(stillOff) + ')' + note)
             elif unk:
                 unresolved.append(msg)
             else:

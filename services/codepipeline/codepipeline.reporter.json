@@ -36,7 +36,7 @@
     },
     "pipelineNoEventNotification": {
         "category": "S",
-        "^description": "{$COUNT} pipeline(s) have no enabled AWS CodeStar notification rule for failed executions and no enabled EventBridge rule (with a target) matching failed CodePipeline executions. Failed or tampered pipeline runs, such as a security test stage that blocks a release, then go unnoticed.",
+        "^description": "{$COUNT} pipeline(s) have no enabled AWS CodeStar notification rule for failed executions and no enabled EventBridge rule (with a target) matching every failed execution of the pipeline (a rule that only matches some stages, actions or action types does not count). Failed or tampered pipeline runs, such as a security test stage that blocks a release, then go unnoticed.",
         "shortDesc": "Notify on pipeline execution failures",
         "criticality": "L",
         "downtime": 0,

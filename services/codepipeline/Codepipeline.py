@@ -6,6 +6,7 @@ import botocore
 from utils.Tools import _pi
 from utils.Config import Config
 from services.Service import Service
+from services.Evaluator import _isTransient
 
 from services.codepipeline.drivers.CodepipelinePipeline import CodepipelinePipeline
 
@@ -161,7 +162,9 @@ class CodepipelineShared:
             try:
                 result = self._inspectRole(roleArn)
             except CodepipelineLookupError as e:
-                self._roleCache[roleArn] = e
+                ## Throttling / 5xx are not cached: the next pipeline retries.
+                if not e.transient:
+                    self._roleCache[roleArn] = e
                 raise
             self._roleCache[roleArn] = result
             return result
@@ -202,7 +205,7 @@ class CodepipelineShared:
             code = e.response.get('Error', {}).get('Code', 'Unknown')
             if code in ('NoSuchEntity', 'NoSuchEntityException'):
                 return None
-            raise CodepipelineLookupError(code)
+            raise CodepipelineLookupError(code, transient=_isTransient(e))
         return findings
 
     # ---------------- Notifications ---------------- #
@@ -222,9 +225,11 @@ class CodepipelineShared:
                             continue
                         rules.append(self.csnClient.describe_notification_rule(Arn=r['Arn']))
             except botocore.exceptions.ClientError as e:
-                self._notificationRules = CodepipelineLookupError(
-                    e.response.get('Error', {}).get('Code', 'Unknown'))
-                raise self._notificationRules
+                err = CodepipelineLookupError(
+                    e.response.get('Error', {}).get('Code', 'Unknown'), transient=_isTransient(e))
+                if not err.transient:
+                    self._notificationRules = err
+                raise err
             except botocore.exceptions.EndpointConnectionError:
                 self._notificationRules = CodepipelineLookupError('EndpointUnavailable')
                 raise self._notificationRules
@@ -260,17 +265,21 @@ class CodepipelineShared:
                         if targets:
                             rules.append((r['Name'], pattern))
             except botocore.exceptions.ClientError as e:
-                self._eventRules = CodepipelineLookupError(
-                    e.response.get('Error', {}).get('Code', 'Unknown'))
-                raise self._eventRules
+                err = CodepipelineLookupError(
+                    e.response.get('Error', {}).get('Code', 'Unknown'), transient=_isTransient(e))
+                if not err.transient:
+                    self._eventRules = err
+                raise err
             self._eventRules = rules
             return rules
 
 
 class CodepipelineLookupError(Exception):
-    def __init__(self, code):
+    def __init__(self, code, transient=False):
         super().__init__(code)
         self.code = code
+        ## True for throttling / 5xx: such errors are never cached.
+        self.transient = transient
 
 
 def _asList(v):

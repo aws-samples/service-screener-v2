@@ -6,7 +6,8 @@ class CodeartifactAccount(Evaluator):
     Region-scoped CodeArtifact usage check.
 
     detail: '_region', '_domains' (list_domains output), '_domainError'
-            (error code or None), '_repositoryCount' (repositories this account
+            (error code or None), '_repositoryError' (list_repositories error
+            code or None), '_repositoryCount' (repositories this account
             administers, including in domains owned by other accounts).
     """
 
@@ -28,6 +29,9 @@ class CodeartifactAccount(Evaluator):
                    f"{repoCount} repository(ies))"
             ]
             return
+        ## Either listing failing means usage is unknown: an account with no
+        ## owned domain may still administer repositories in a shared domain.
+        err = err or self.detail.get('_repositoryError')
         if err:
             self.results['codeartifactNotUsed'] = [0, f"Unable to evaluate ({err})"]
             return

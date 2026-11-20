@@ -55,7 +55,10 @@ def orgConditionScopes(condition):
             if str(key).lower() not in ORG_SCOPING_KEYS:
                 continue
             values = value if isinstance(value, list) else [value]
-            if values and all(isinstance(v, str) and v and set(v) - {'*', '?'} for v in values):
+            ## Every value must name a concrete organization ID (or an OU path
+            ## under one): 'o-*' or '*/*' match every organization.
+            k = str(key).lower()
+            if values and all(PolicyPrincipal._valueScopes(k, v) for v in values):
                 return True
     return False
 

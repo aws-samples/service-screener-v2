@@ -9,7 +9,7 @@ import json
 from utils.Config import Config
 from utils.Policy import Policy
 from utils import PolicyPrincipal
-from services.Evaluator import Evaluator
+from services.Evaluator import Evaluator, _isTransient
 
 # Guards the once-per-Region fetch of Macie's bucket inventory (macie2.describe_buckets).
 _macieInventoryLock = threading.Lock()
@@ -849,7 +849,10 @@ class S3Bucket(Evaluator):
         if self.macieClient is None:
             return ('err', 'Unable to evaluate (no Macie client)')
         region = self.macieClient.meta.region_name
-        cfgKey = f's3::macieBucketInventory::{region}'
+        ## Config persists across accounts in a --sequential multi-account run:
+        ## key by account as well as region.
+        acct = (Config.get('stsInfo', {}) or {}).get('Account', 'default')
+        cfgKey = f's3::macieBucketInventory::{acct}::{region}'
         with _macieInventoryLock:
             cached = Config.get(cfgKey, None)
             if cached is not None:
@@ -863,6 +866,9 @@ class S3Bucket(Evaluator):
                 out = ('ok', inv)
             except botocore.exceptions.ClientError as e:
                 err = e.response.get('Error', {})
+                if _isTransient(e):
+                    # Throttling / 5xx: not cached, the next bucket retries.
+                    return ('err', f"Unable to evaluate ({err.get('Code', 'Unknown')})")
                 if err.get('Code') == 'AccessDeniedException' and 'not enabled' in (err.get('Message') or '').lower():
                     out = ('err', 'Macie not enabled in this Region')
                 else:
