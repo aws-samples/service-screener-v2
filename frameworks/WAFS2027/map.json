@@ -74,7 +74,6 @@
                 "cognito.cognitoSmsOnlyMfa",
                 "cognito.cognitoThreatProtectionAuditOnly",
                 "cognito.cognitoWeakPasswordPolicy",
-                "iam.enableGuardDuty",
                 "iam.mfaActive",
                 "iam.passwordPolicy",
                 "iam.passwordPolicyLength",
@@ -237,9 +236,7 @@
                 "config.configNoRules"
             ],
             "FND05-BP02 Establish emergency access mechanisms": [
-                "cloudtrail.OrganizationTrailEnabled",
                 "cloudwatch.trailWOMAroot1",
-                "iam.hasExternalIdentityProvider",
                 "iam.rootMfaActive"
             ],
             "FND05-BP03 Configure audit logging of cloud operations": [
@@ -447,7 +444,6 @@
             "SEC01-BP01 Separate workloads using accounts": [
                 "iam.accountMixesEnvironments",
                 "iam.accountNotVended",
-                "iam.enableCostBudget",
                 "iam.hasOrganization",
                 "iam.orgMgmtAccountHostsWorkloads",
                 "iam.orgOuStructureFlat"
