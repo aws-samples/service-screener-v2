@@ -10,7 +10,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Managing rules in a web ACL]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-editing.html>",
-			"[AWS WAF security best practices]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-processing.html>"
+			"[Using web ACLs with rules and rule groups in AWS WAF]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-processing.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -60,7 +60,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Testing rules with Count]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-testing.html>",
-			"[Overriding a managed rule group action]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-action.html>"
+			"[Overriding rule group actions in AWS WAF]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-rule-group-override-options.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -124,7 +124,7 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Web ACL and rule visibility configuration]<https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html>"
+			"[Monitoring AWS WAF with Amazon CloudWatch]<https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -156,7 +156,7 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Web ACL and rule visibility configuration]<https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html>"
+			"[Monitoring AWS WAF with Amazon CloudWatch]<https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -190,7 +190,7 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Tagging AWS resources]<https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html>",
-			"[Tagging AWS WAF resources]<https://docs.aws.amazon.com/waf/latest/APIReference/API_TagResource.html>"
+			"[AWS WAF TagResource API reference]<https://docs.aws.amazon.com/waf/latest/APIReference/API_TagResource.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -223,7 +223,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[AWSManagedRulesSQLiRuleSet]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-list.html#aws-managed-rule-groups-use-case-sql-db>",
-			"[OWASP A03: Injection]<https://top10.owasp.org/A03_2021-Injection/>"
+			"[OWASP Top 10:2021 A03 Injection]<https://owasp.org/Top10/2021/A03_2021-Injection/>"
 		],
 		"remediation": null,
 		"remediation_risk": null,

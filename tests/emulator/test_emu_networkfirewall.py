@@ -272,3 +272,27 @@ def test_networkfirewall_not_deployed(emu, uid):
         assertFlagFixCycle(emu, 'networkfirewall', 'networkFirewallNotDeployed', env.vpc, misconfigure, fix)
     finally:
         env.cleanup()
+
+
+def test_networkfirewall_not_deployed_ignores_orphan_route_table(emu, uid):
+    """A custom route table with 0.0.0.0/0 -> IGW but no subnet association
+    routes no traffic: the VPC is not internet-connected through it. Flag while
+    the table is associated with the workload subnet; after disassociating it
+    (orphan table, route still present) the VPC must PASS."""
+    env = Env(emu, uid, '10.79', withFirewall=False)
+    ec2 = env.ec2
+    try:
+        rt = env.routeTable(env.wlSubnet)
+        env.setDefault(rt, GatewayId=env.igw)
+        eni = ec2.create_network_interface(SubnetId=env.wlSubnet)['NetworkInterface']['NetworkInterfaceId']
+        env.extra.append(lambda: ec2.delete_network_interface(NetworkInterfaceId=eni))
+
+        def misconfigure():
+            pass  # workload subnet uses the IGW route table
+
+        def fix():
+            ec2.disassociate_route_table(AssociationId=env.routeTables[-1][1])
+
+        assertFlagFixCycle(emu, 'networkfirewall', 'networkFirewallNotDeployed', env.vpc, misconfigure, fix)
+    finally:
+        env.cleanup()

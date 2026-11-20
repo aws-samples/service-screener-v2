@@ -98,7 +98,7 @@ class Vpclattice(Service):
             try:
                 obj = VpclatticeServiceNetwork(sn, self.latticeClient, accountId)
                 obj.run(self.__class__)
-                objs[f"ServiceNetwork::{sn.get('name') or sn.get('id')}"] = obj.getInfo()
+                objs[f"ServiceNetwork::{obj._resourceName}"] = obj.getInfo()
                 del obj
             except Exception as e:
                 print(f"Error processing VPC Lattice service network {sn.get('id')}: {e}")
@@ -107,7 +107,7 @@ class Vpclattice(Service):
             try:
                 obj = VpclatticeService(svc, self.latticeClient, accountId)
                 obj.run(self.__class__)
-                objs[f"Service::{svc.get('name') or svc.get('id')}"] = obj.getInfo()
+                objs[f"Service::{obj._resourceName}"] = obj.getInfo()
                 del obj
             except Exception as e:
                 print(f"Error processing VPC Lattice service {svc.get('id')}: {e}")

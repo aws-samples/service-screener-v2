@@ -200,16 +200,17 @@ class BedrockAgentCore(Evaluator):
                 -1,
                 f"Overly permissive runtime role(s): {', '.join(offenders)}"
             ]
-        elif scoped:
+        elif unverified:
+            # Some roles were never evaluated: not a PASS, even if the rest are scoped.
             self.results['bedrockACRuntimeWildcardRole'] = [
-                1,
-                f"{scoped} runtime role(s) appear scoped"
-                + (f"; {unverified} unverified" if unverified else "")
+                0,
+                f"Unable to evaluate ({unverified} of {len(self.runtimes)} runtime role(s) not readable"
+                + (f"; {scoped} scoped" if scoped else "") + ")"
             ]
         else:
             self.results['bedrockACRuntimeWildcardRole'] = [
-                0,
-                f"Could not verify any runtime role ({unverified} unverified)"
+                1,
+                f"All {scoped} runtime role(s) appear scoped"
             ]
 
     def _checkBedrockACRuntimeNoGateway(self):

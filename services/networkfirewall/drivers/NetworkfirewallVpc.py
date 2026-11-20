@@ -7,8 +7,9 @@ class NetworkfirewallVpc(Evaluator):
     Per-VPC check: an internet-connected VPC with no traffic inspection.
 
     "Internet-connected" = an internet gateway is attached to the VPC and at
-    least one route table sends 0.0.0.0/0 or ::/0 to it (or ::/0 to an
-    egress-only internet gateway). Inspection is present when a Network
+    least one route table in use (the main table or one with a subnet
+    association) sends 0.0.0.0/0 or ::/0 to it (or ::/0 to an egress-only
+    internet gateway). Inspection is present when a Network
     Firewall is deployed in the VPC or the VPC has any Gateway Load Balancer
     endpoint (Network Firewall endpoints, VPC endpoint associations and
     third-party appliances all surface as GWLB endpoints).
@@ -35,10 +36,17 @@ class NetworkfirewallVpc(Evaluator):
     @staticmethod
     def internetRoutes(net):
         """Default routes in the VPC that target an attached internet gateway
-        or an egress-only internet gateway."""
+        or an egress-only internet gateway. Only route tables that subnets
+        actually use count: the main route table and tables with at least one
+        subnet association. Orphan tables (no associations) and gateway
+        edge-associated tables route no subnet traffic to the internet."""
         igws = set((net or {}).get('igws') or [])
         out = []
         for rt in (net or {}).get('routeTables', []) or []:
+            assocs = [a for a in rt.get('Associations', []) or []
+                      if (a.get('AssociationState') or {}).get('State') not in ('disassociating', 'disassociated')]
+            if not any(a.get('Main') or a.get('SubnetId') for a in assocs):
+                continue
             for r in defaultRoutes(rt):
                 gw = r.get('GatewayId') or ''
                 if (gw.startswith('igw-') and gw in igws) or r.get('EgressOnlyInternetGatewayId'):

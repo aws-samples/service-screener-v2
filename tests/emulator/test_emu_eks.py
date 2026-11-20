@@ -109,13 +109,26 @@ def test_eks_workload_identity_fixed_by_irsa_oidc_provider(emu, cluster):
     assertFlagFixCycle(emu, 'eks', 'eksNoIRSAConfigured', cluster['name'], lambda: None, fix)
 
 
-def test_eks_workload_identity_fixed_by_pod_identity_agent_addon(emu, cluster):
+def test_eks_workload_identity_agent_addon_alone_is_not_pass(emu, cluster):
+    """The eks-pod-identity-agent add-on only makes Pod Identity available. With
+    no pod identity associations (and no IAM OIDC provider) every pod still uses
+    the node role: 0 (available, not in use), never PASS. Adding an association
+    is the fix that must PASS."""
     eks = emu.client('eks')
 
-    def fix():
+    def misconfigure():
         eks.create_addon(clusterName=cluster['name'], addonName='eks-pod-identity-agent')
+        st = runCheck(emu, 'eks', 'eksNoIRSAConfigured', cluster['name']).statuses()
+        assert st and all(s == 0 for s in st.values()), st
 
-    assertFlagFixCycle(emu, 'eks', 'eksNoIRSAConfigured', cluster['name'], lambda: None, fix)
+    def fix():
+        eks.create_pod_identity_association(clusterName=cluster['name'], namespace='default',
+                                            serviceAccount='app', roleArn=cluster['roleArn'])
+
+    misconfigure()
+    fix()
+    st = runCheck(emu, 'eks', 'eksNoIRSAConfigured', cluster['name']).statuses()
+    assert st and all(s == 1 for s in st.values()), st
 
 
 def test_eks_nodegroup_ami_missing_ssm_param_is_not_pass(emu, cluster):
