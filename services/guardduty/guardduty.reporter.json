@@ -346,7 +346,7 @@
     },
     "guarddutyS3MalwareProtectionOff": {
         "category": "S",
-        "^description": "{$COUNT} region(s) have no active GuardDuty Malware Protection plan for S3, or a plan is in WARNING/ERROR status. Buckets that receive files from untrusted sources (customer uploads, partners, public ingestion) should have newly uploaded objects scanned for malware before they are processed. The scanner cannot tell which buckets receive untrusted uploads, so review whether this applies to your workloads.",
+        "^description": "{$COUNT} region(s) contain S3 buckets but have no GuardDuty Malware Protection plan for S3, or have a plan that is not ACTIVE (for example WARNING/ERROR status). Regions with no S3 buckets are not flagged. Buckets that receive files from untrusted sources (customer uploads, partners, public ingestion) should have newly uploaded objects scanned for malware before they are processed. The scanner cannot tell which buckets receive untrusted uploads, so review whether this applies to your workloads.",
         "downtime": 0,
         "slowness": 0,
         "additionalCost": 1,

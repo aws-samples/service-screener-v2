@@ -40,9 +40,14 @@ class DmsEndpoint(Evaluator):
         key = 'dmsEndpointSslNone'
 
         if engine == 'kafka':
-            proto = ((ep.get('KafkaSettings') or {}).get('SecurityProtocol') or '').lower()
+            kafka = ep.get('KafkaSettings') or {}
+            proto = (kafka.get('SecurityProtocol') or '').lower()
             if proto == 'plaintext':
                 self.results[key] = [-1, 'Kafka endpoint uses SecurityProtocol=plaintext (no TLS)']
+            elif not proto and kafka.get('Broker'):
+                ## Settings were returned but no protocol: DMS connects to the broker in
+                ## plaintext unless a TLS SecurityProtocol is chosen explicitly.
+                self.results[key] = [-1, 'Kafka endpoint has no SecurityProtocol set (DMS default plaintext, no TLS)']
             elif proto:
                 self.results[key] = [1, f'Kafka endpoint uses SecurityProtocol={proto}']
             else:

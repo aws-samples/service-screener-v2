@@ -63,6 +63,7 @@ class cloudfrontDist(Evaluator):
 
     # Viewer security policies that only negotiate TLS 1.2+ with modern ciphers.
     VIEWER_MIN_TLS_OK = ('TLSv1.2_2021', 'TLSv1.2_2025', 'TLSv1.3_2025')
+    VIEWER_TLS12_LEGACY_CIPHERS = ('TLSv1.2_2018', 'TLSv1.2_2019')
     ORIGIN_TLS_OLD = ('TLSv1', 'TLSv1.1')
 
     def _checkViewerMinTlsOld(self):
@@ -85,8 +86,12 @@ class cloudfrontDist(Evaluator):
             minProto = viewerCert.get('MinimumProtocolVersion', '')
             if not minProto:
                 viewerNote = 'Unable to evaluate (MinimumProtocolVersionMissing)'
+            elif minProto in self.VIEWER_TLS12_LEGACY_CIPHERS:
+                ## TLS 1.2 is the minimum version, but the policy still offers legacy ciphers.
+                issues.append(f'viewer MinimumProtocolVersion {minProto} (TLS 1.2 minimum, '
+                              'but legacy cipher suites allowed)')
             elif minProto not in self.VIEWER_MIN_TLS_OK:
-                issues.append(f'viewer MinimumProtocolVersion {minProto}')
+                issues.append(f'viewer MinimumProtocolVersion {minProto} (allows TLS older than 1.2)')
 
         for origin in (cfg.get('Origins') or {}).get('Items', []) or []:
             coc = origin.get('CustomOriginConfig')
