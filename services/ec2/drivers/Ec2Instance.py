@@ -8,7 +8,7 @@ from services.ec2.acctCache import acctKey
 
 from datetime import timedelta
 from utils.Tools import aws_parseInstanceFamily, _warn
-from services.Evaluator import Evaluator
+from services.Evaluator import Evaluator, _isTransient
 from services.ec2.drivers.Ec2UserDataScan import decodeUserData, findSecrets
 from services.ec2.drivers.Ec2NetworkInterface import getSubnetRouting, evaluatePlacement
 from services.ec2.drivers.Ec2EbsVolume import volumeSnapshots
@@ -146,6 +146,7 @@ class Ec2Instance(Evaluator):
             return
 
         self.ec2ImageInfo = None
+        transient = False
         try:
             resp = self.ec2Client.describe_images(ImageIds=[imageId], IncludeDeprecated=True, IncludeDisabled=True)
             for image in resp.get('Images', []):
@@ -154,7 +155,10 @@ class Ec2Instance(Evaluator):
         except botocore.exceptions.ClientError as e:
             code = e.response.get('Error', {}).get('Code', 'ClientError')
             self.ec2ImageStatus = 'missing' if code in self.IMAGE_NOT_FOUND_CODES else 'error:' + code
+            transient = _isTransient(e)
 
+        if transient:   # throttling / 5xx: not cached, the next instance retries
+            return
         Config.set(cacheKey, self.ec2ImageInfo)
         Config.set(statusKey, self.ec2ImageStatus)
 

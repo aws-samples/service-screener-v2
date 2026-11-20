@@ -7,7 +7,7 @@ import constants as _C
 
 from utils.Config import Config
 from services.ec2.acctCache import acctKey
-from services.Evaluator import Evaluator
+from services.Evaluator import Evaluator, _isTransient
 from services.ec2.drivers.Ec2SecGroup import Ec2SecGroup
 
 class Ec2ElbCommon(Evaluator):
@@ -243,7 +243,10 @@ class Ec2ElbCommon(Evaluator):
                     found = [t for t in resp.get('TrustStores', []) if t.get('TrustStoreArn') == arn]
                     table[arn] = found[0] if found else {'_error': 'TrustStoreNotFound'}
                 except botocore.exceptions.ClientError as e:
-                    table[arn] = {'_error': e.response['Error']['Code']}
+                    err = {'_error': e.response['Error']['Code']}
+                    if _isTransient(e):   # not cached: the next listener retries
+                        return err
+                    table[arn] = err
             return table[arn]
 
     def _checkAlbMtlsOff(self):

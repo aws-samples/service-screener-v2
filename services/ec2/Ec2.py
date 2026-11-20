@@ -13,6 +13,7 @@ from utils.Tools import _pi
 from utils.Tools import _warn
 
 from utils.Config import Config
+from services.Evaluator import _isTransient
 from services.ec2.acctCache import acctKey
 from services.Service import Service
 from services.ec2.drivers.Ec2Instance import Ec2Instance
@@ -504,6 +505,7 @@ class Ec2(Service):
             return cached
 
         ctx = {'inOrg': None, 'accounts': None, 'error': None, 'orgId': None}
+        transient = False
         try:
             org = self.orgClient.describe_organization()
             ctx['inOrg'] = True
@@ -514,8 +516,10 @@ class Ec2(Service):
                 ctx['inOrg'] = False
             else:
                 ctx['error'] = code
+                transient = _isTransient(e)
         except Exception as e:
             ctx['error'] = type(e).__name__
+            transient = _isTransient(e)
 
         if ctx['inOrg'] is True:
             try:
@@ -527,10 +531,13 @@ class Ec2(Service):
                 ctx['accounts'] = accounts
             except botocore.exceptions.ClientError as e:
                 ctx['accountsError'] = e.response['Error']['Code']
+                transient = _isTransient(e)
             except Exception as e:
                 ctx['accountsError'] = type(e).__name__
+                transient = _isTransient(e)
 
-        Config.set(cacheKey, ctx)
+        if not transient:   # throttling / 5xx: not cached, the next caller retries
+            Config.set(cacheKey, ctx)
         return ctx
 
     def getSelfSnapshots(self):
