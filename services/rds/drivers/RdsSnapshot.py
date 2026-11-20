@@ -9,16 +9,19 @@ class RdsSnapshot(Evaluator):
     snapshot    : item from describe_db_snapshots / describe_db_cluster_snapshots
     isCluster   : True for a DB cluster snapshot
     accountId   : the scanned account (sharing to itself is not external)
-    orgAccounts : set of account IDs in the AWS Organization, or None when the
-                  list cannot be read (member account / no permission)
+    orgAccounts : set of account IDs in the AWS Organization (empty when the
+                  account is not in an organization), or None when the list
+                  cannot be read (member account / no permission)
     publicCoveredInstances / publicCoveredClusters :
-                  identifiers of the DB instances / Aurora clusters on which
-                  RdsCommon._checkPublicSnapshot (SnapshotRDSIsPublic) ran in
-                  this scan. A public (restore=all) snapshot of one of those
-                  sources is already reported under SnapshotRDSIsPublic and is
-                  not reported again here; public snapshots whose source no
-                  longer exists (or is not evaluated, e.g. Multi-AZ DB
-                  clusters, unsupported engines) are reported here.
+                  identifiers of the DB instances / Aurora clusters for which
+                  RdsCommon._checkPublicSnapshot (SnapshotRDSIsPublic) reported
+                  a public snapshot (FAIL) in this scan. A public (restore=all)
+                  snapshot of one of those sources is already reported under
+                  SnapshotRDSIsPublic and is not reported again here; public
+                  snapshots whose source no longer exists, is not evaluated
+                  (e.g. Multi-AZ DB clusters, unsupported engines) or whose
+                  SnapshotRDSIsPublic lookup failed or found nothing are
+                  reported here.
     """
     def __init__(self, snapshot, isCluster, rdsClient, accountId, orgAccounts=None,
                  publicCoveredInstances=None, publicCoveredClusters=None):
@@ -96,7 +99,7 @@ class RdsSnapshot(Evaluator):
 
         if self.orgAccounts is not None:
             external = [a for a in shared if a not in self.orgAccounts]
-            note = 'outside your AWS Organization'
+            note = 'outside your AWS Organization' if self.orgAccounts else 'account is not in an AWS Organization'
         else:
             external = shared
             note = 'organization membership not verifiable from this account'
@@ -106,7 +109,16 @@ class RdsSnapshot(Evaluator):
         # when the source is gone or not covered by that check.
         publicHere = public and not self._publicReportedBySnapshotRDSIsPublic()
 
-        if external:
+        if external and self.orgAccounts is None and not publicHere:
+            # Organization membership is unreadable here (member account or
+            # no organizations:ListAccounts): the shares are commonly to the
+            # organization's own backup/DR accounts, so do not FAIL on them.
+            self.results['rdsSnapshotSharedExternally'] = [
+                0, 'Unable to evaluate (organization membership not readable from this account); '
+                   'restorable by account(s): {}{}'.format(
+                       ', '.join(sorted(external)),
+                       '; public access (restore=all) is reported under SnapshotRDSIsPublic' if public else '')]
+        elif external:
             msg = 'Restorable by account(s): {} ({})'.format(', '.join(sorted(external)), note)
             if publicHere:
                 msg = 'Public: restorable by any AWS account (restore=all); also ' + msg[0].lower() + msg[1:]
@@ -114,7 +126,7 @@ class RdsSnapshot(Evaluator):
                 msg += '; public access (restore=all) is reported under SnapshotRDSIsPublic'
             self.results['rdsSnapshotSharedExternally'] = [-1, msg]
         elif publicHere:
-            self.results['rdsSnapshotSharedExternally'] = [-1, 'Public: restorable by any AWS account (restore=all); source DB/cluster not evaluated by SnapshotRDSIsPublic']
+            self.results['rdsSnapshotSharedExternally'] = [-1, 'Public: restorable by any AWS account (restore=all); source DB/cluster not reported by SnapshotRDSIsPublic']
         elif public:
             self.results['rdsSnapshotSharedExternally'] = [0, 'Public (restore=all) - reported under SnapshotRDSIsPublic for the source DB/cluster; not shared with specific external accounts']
         else:

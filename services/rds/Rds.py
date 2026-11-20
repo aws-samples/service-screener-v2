@@ -134,8 +134,11 @@ class Rds(Service):
             accounts = set()
             for page in self.orgClient.get_paginator('list_accounts').paginate():
                 accounts |= {a['Id'] for a in page.get('Accounts', [])}
-        except botocore.exceptions.ClientError:
-            accounts = None
+        except botocore.exceptions.ClientError as e:
+            # Not in an organization: every other account is external (empty
+            # set). Any other error: membership unknown (None).
+            code = e.response.get('Error', {}).get('Code')
+            accounts = set() if code == 'AWSOrganizationsNotInUseException' else None
         Config.set(cacheKey, {'accounts': accounts})
         return accounts
 
@@ -294,7 +297,12 @@ class Rds(Service):
                 obj.setEngine(engine)
                 obj.run(self.__class__)
 
-                if publicCheckRuns:
+                ## Only a source on which SnapshotRDSIsPublic actually FAILED is
+                ## covered: when that check errored (throttling, access
+                ## denied) or did not see the snapshot, RdsSnapshot reports
+                ## the public snapshot itself instead of hiding it.
+                publicResult = (obj.results.get('SnapshotRDSIsPublic') or [None])[0]
+                if publicCheckRuns and publicResult == -1:
                     if engine.startswith('aurora'):
                         if instance.get('DBClusterIdentifier'):
                             publicCoveredClusters.add(instance['DBClusterIdentifier'])

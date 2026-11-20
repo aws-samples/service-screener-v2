@@ -9,6 +9,13 @@ class CloudwatchAlarms(Evaluator):
     Driver for CloudWatch Alarms checks
     Handles alarm configuration validation including SNS notifications and billing alarms
     """
+
+    ## AWS namespaces that publish datapoints continuously while the resource
+    ## exists, so two weeks without data means the resource is gone (or
+    ## stopped). Other AWS/* namespaces (Lambda, SNS, SQS, API Gateway, ALB,
+    ## Step Functions, ...) publish only when there is activity, so an idle
+    ## resource looks the same as a deleted one.
+    CONTINUOUS_AWS_NAMESPACES = frozenset(('AWS/EC2', 'AWS/RDS', 'AWS/ElastiCache'))
     
     def __init__(self, alarm, cwClient, metricFilterMetrics=None):
         super().__init__()
@@ -300,5 +307,12 @@ class CloudwatchAlarms(Evaluator):
             return
 
         names = ', '.join(sorted({f'{ns}/{mn}' for ns, mn, _ in metrics}))
+        eventDriven = sorted({ns for ns, _, _ in metrics
+                              if (ns or '').startswith('AWS/') and ns not in self.CONTINUOUS_AWS_NAMESPACES})
+        if eventDriven:
+            self.results[key] = [0, f'In INSUFFICIENT_DATA for {days} days and its metric ({names}) has published '
+                                    f'no data in the last 14 days; {", ".join(eventDriven)} publishes only on '
+                                    'activity, so the resource may be idle or deleted - verify it still exists']
+            return
         self.results[key] = [-1, f'In INSUFFICIENT_DATA for {days} days and its metric ({names}) has published '
                                  'no data in the last 14 days']

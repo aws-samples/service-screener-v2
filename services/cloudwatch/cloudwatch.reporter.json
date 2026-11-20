@@ -618,7 +618,7 @@
 	},
 	"cwAlarmActionsDisabled": {
 		"category": "S",
-		"^description": "{$COUNT} CloudWatch alarm(s) have actions configured but ActionsEnabled set to false, or have been in INSUFFICIENT_DATA for more than 7 days while the metric they watch has published no data for 14 days (the metric was likely renamed or its resource deleted). Disabled alarms never notify anyone, and an alarm on a metric that no longer exists cannot fire, so the event it was built to detect goes unnoticed. Alarms on sparse metrics (log metric filters such as CloudTrail/CIS alarms, or metrics with recent data) are not flagged.",
+		"^description": "{$COUNT} CloudWatch alarm(s) have actions configured but ActionsEnabled set to false, or have been in INSUFFICIENT_DATA for more than 7 days while the metric they watch has published no data for 14 days (the metric was likely renamed or its resource deleted). Disabled alarms never notify anyone, and an alarm on a metric that no longer exists cannot fire, so the event it was built to detect goes unnoticed. Alarms on sparse metrics (log metric filters such as CloudTrail/CIS alarms, or metrics with recent data) are not flagged. Alarms on AWS metrics published only on activity (for example AWS/Lambda, AWS/SNS, AWS/SQS) are reported as informational, because an idle resource cannot be told apart from a deleted one; only custom metrics and continuously published AWS metrics (AWS/EC2, AWS/RDS, AWS/ElastiCache) are flagged.",
 		"shortDesc": "Enable alarm actions and fix alarms without data",
 		"criticality": "L",
 		"downtime": 0,
@@ -635,7 +635,7 @@
 	},
 	"cwLogsCentralizationRuleMissing": {
 		"category": "S",
-		"^description": "The organization has no CloudWatch Logs centralization rule. Centralization rules copy log data from member accounts and regions into a central account so it is retained and searchable even if a member account is compromised. Other centralization patterns (subscription filters, Amazon Data Firehose, an S3 log archive) are also valid; review whether one is in place. Evaluated only from the management or delegated administrator account. The finding is reported once per scanned region because rules select their source regions.",
+		"^description": "The organization has no CloudWatch Logs centralization rule. Centralization rules copy log data from member accounts and regions into a central account so it is retained and searchable even if a member account is compromised. Other centralization patterns (subscription filters, Amazon Data Firehose, an S3 log archive) are also valid; review whether one is in place. Evaluated only from the management or delegated administrator account. The finding is reported once per scanned region because rules select their source regions. A rule counts only when it is not Unhealthy and its scope includes the scanned account; an Unhealthy rule is reported, and a rule scoped by organizational unit (or other conditions that cannot be decided here) is reported as not evaluable.",
 		"shortDesc": "Centralize CloudWatch Logs across the organization",
 		"criticality": "L",
 		"downtime": 0,

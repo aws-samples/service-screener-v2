@@ -173,13 +173,15 @@ class BackupPlan(Evaluator):
             ]
             return
 
-        infrequent = []
+        infrequent, unknown = [], []
         for rule in self.rules:
             expr = rule.get('ScheduleExpression') or ''
             freq = self._scheduleIsFrequent(expr)
             # freq: True (daily or more), False (less than daily), None (unknown)
             if freq is False:
                 infrequent.append(f"{rule.get('RuleName', '(unnamed)')}={expr}")
+            elif freq is None:
+                unknown.append(f"{rule.get('RuleName', '(unnamed)')}={expr or '(no schedule)'}")
 
         if infrequent:
             self.results['backupPlanInfrequentSchedule'] = [
@@ -187,9 +189,14 @@ class BackupPlan(Evaluator):
                 f"Rule(s) with < daily frequency: {', '.join(infrequent[:5])}"
                 + (f" (+{len(infrequent) - 5} more)" if len(infrequent) > 5 else "")
             ]
+        elif unknown:
+            self.results['backupPlanInfrequentSchedule'] = [
+                0, f"Unable to evaluate schedule frequency of rule(s): {', '.join(unknown[:5])}"
+                + (f" (+{len(unknown) - 5} more)" if len(unknown) > 5 else "")
+            ]
         else:
             self.results['backupPlanInfrequentSchedule'] = [
-                1, "All rules fire at least once per 24h (or schedule unparseable)"
+                1, "All rules fire at least once per 24h"
             ]
 
     # ------------------------------------------------------------------ #
@@ -504,47 +511,78 @@ class BackupPlan(Evaluator):
         if m:
             minute_f, hour_f, dom_f, month_f, dow_f = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
 
-            # If day-of-week restricts to specific days (not '?' or '*'), the
-            # schedule fires only on those weekdays → less than daily.
-            if dow_f not in ('?', '*'):
-                # Some special cases: '1-7', '*/1' still daily; explicit list
-                # (e.g. '1,3,5' or '1' or 'MON') is not daily.
-                if not cls._cronFieldMatchesAll(dow_f):
+            # Day-of-week, day-of-month and month must each allow every value
+            # of their domain (e.g. '*', '?', '1-7', 'MON-SUN', '1-31',
+            # 'JAN-DEC'); any restriction means some days have no backup.
+            # The hour field only needs one firing per day.
+            for field, domain in ((dow_f, 'dow'), (dom_f, 'dom'), (month_f, 'month')):
+                allDays = cls._cronFieldMatchesAll(field, domain)
+                if allDays is None:
+                    return None
+                if not allDays:
                     return False
-
-            # If day-of-month restricts to specific days, the schedule fires
-            # only on those calendar days → less than daily.
-            if dom_f not in ('?', '*'):
-                if not cls._cronFieldMatchesAll(dom_f):
-                    return False
-
-            # If month restricts to specific months, still less than daily.
-            if month_f not in ('*',):
-                if not cls._cronFieldMatchesAll(month_f):
-                    return False
-
-            # By this point DOW/DOM/MONTH allow any day. Hour must allow at
-            # least one firing per day; even a single fixed hour still means
-            # once-per-day = daily.
             return True
 
         return None
 
-    @staticmethod
-    def _cronFieldMatchesAll(field):
-        """Return True if the cron field expression represents every value in
-        its range (e.g. '*', '*/1', '1-7' for DOW, '1-31' for DOM)."""
-        f = field.strip()
+    _CRON_DOMAINS = {'dow': (1, 7), 'dom': (1, 31), 'month': (1, 12)}
+    _CRON_NAMES = {
+        'dow': {n: i + 1 for i, n in enumerate(('SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'))},
+        'month': {n: i + 1 for i, n in enumerate(('JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+                                                  'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'))},
+    }
+
+    @classmethod
+    def _cronFieldMatchesAll(cls, field, domain='dow'):
+        """True if the cron field covers every value of its domain ('*', '?',
+        '*/1', '1-7' / 'SUN-SAT' for day-of-week, '1-31' for day-of-month,
+        '1-12' / 'JAN-DEC' for month, or lists adding up to that), False if it
+        restricts the values (including 'L', 'W' and '#' forms), None if the
+        field cannot be parsed."""
+        f = field.strip().upper()
         if f in ('*', '?'):
             return True
-        if f in ('*/1', '1/1'):
-            return True
-        # Rough heuristic: hyphen ranges are considered "every value" only
-        # when explicitly full-range for that field. We do not attempt to
-        # compute the field's max here — anything more complex is safest
-        # treated as a restriction (i.e. return False so schedule is flagged
-        # as infrequent).
-        return False
+        lo, hi = cls._CRON_DOMAINS[domain]
+        names = cls._CRON_NAMES.get(domain, {})
+
+        def val(tok):
+            if tok in names:
+                return names[tok]
+            if tok.isdigit() and lo <= int(tok) <= hi:
+                return int(tok)
+            raise ValueError(tok)
+
+        values = set()
+        for item in f.split(','):
+            if not item:
+                return None
+            plain = all(t in names or t.isdigit() or t == '*' for t in re.split(r'[-/]', item))
+            if not plain and re.search(r'[LW#]', item):
+                if re.fullmatch(r'(\d{1,2}|[A-Z]{3})?(L|W|LW|#\d)', item) or item in ('L', 'LW'):
+                    return False  # last day / nearest weekday / nth weekday: a subset of days
+                return None
+            rng, _, step = item.partition('/')
+            try:
+                stepN = int(step) if step else 1
+                if stepN < 1:
+                    return None
+                if rng == '*':
+                    start, end = lo, hi
+                elif '-' in rng:
+                    a, b = rng.split('-', 1)
+                    start, end = val(a), val(b)
+                else:
+                    start = val(rng)
+                    end = hi if step else start
+            except ValueError:
+                return None
+            if start <= end:
+                values.update(range(start, end + 1, stepN))
+            else:
+                # Wrap-around range, e.g. FRI-MON.
+                seq = list(range(start, hi + 1)) + list(range(lo, end + 1))
+                values.update(seq[::stepN])
+        return values >= set(range(lo, hi + 1))
 
     def _planProtectsPitrResources(self):
         """Return True if any selection ARN clearly references a PITR-capable

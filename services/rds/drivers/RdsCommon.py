@@ -498,7 +498,7 @@ class RdsCommon(Evaluator):
                     SnapshotType='manual'
                 )
 
-                snapshots = result.get('DBClusterSnapshots')
+                snapshots = result.get('DBClusterSnapshots') or []
                 while result.get('Marker') is not None:
                     result = self.rdsClient.describe_db_cluster_snapshots(
                         DBClusterIdentifier=identifier,
@@ -506,7 +506,7 @@ class RdsCommon(Evaluator):
                         Marker=result.get('Marker')
                     )
 
-                    snapshots = snapshots + result.get('DBSnapshots')
+                    snapshots = snapshots + (result.get('DBClusterSnapshots') or [])
                 return snapshots
 
             snapshots = self._clusterSharedMemo('describe_db_cluster_snapshots:manual', identifier, fetch)
@@ -517,7 +517,7 @@ class RdsCommon(Evaluator):
                 SnapshotType='manual'
             )
             
-            snapshots = result.get('DBSnapshots')
+            snapshots = result.get('DBSnapshots') or []
             while result.get('Marker') is not None:
                 result = self.rdsClient.describe_db_snapshots(
                     DBInstanceIdentifier=identifier,
@@ -525,7 +525,7 @@ class RdsCommon(Evaluator):
                     Marker=result.get('Marker')
                 )
                 
-                snapshots = snapshots + result.get('DBSnapshots')
+                snapshots = snapshots + (result.get('DBSnapshots') or [])
         
         if not snapshots:
             return
