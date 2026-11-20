@@ -66,12 +66,14 @@ class CodecommitRepository(Evaluator):
         return best
 
     @staticmethod
-    def _coversBranch(content, ref):
+    def _coversBranch(content, ref, branchKnown=True):
+        """branchKnown=False: repository metadata could not be read, so the default
+        branch is unknown; only an unscoped template is proven to cover it."""
         dests = content.get('DestinationReferences')
         if not dests:
             return True  # no destination filter = applies to every branch
         if ref is None:
-            return True  # empty repo / unknown default branch: cannot narrow
+            return branchKnown  # empty repo (no branch yet): cannot narrow
         return any(d == ref or fnmatch.fnmatchcase(ref, d) for d in dests if isinstance(d, str))
 
     def _checkNoApprovalRule(self):
@@ -90,21 +92,37 @@ class CodecommitRepository(Evaluator):
 
         branch = self.repo.get('defaultBranch')
         ref = f'refs/heads/{branch}' if branch else None
-        errors, effective, zeroOrOther = [], [], []
+        metaError = self.repo.get('_metadataError') if not branch else None
+        errors, effective, zeroOrOther, scopedUnknown = [], [], [], []
         for n in names:
             content, err = self._getTemplateContent(n)
             if err or not isinstance(content, dict):
                 errors.append(f'{n}: {err or "UnparseableContent"}')
                 continue
-            if self._requiredApprovals(content) >= 1 and self._coversBranch(content, ref):
+            if self._requiredApprovals(content) >= 1 and self._coversBranch(content, ref, metaError is None):
                 effective.append(n)
+            elif metaError and self._requiredApprovals(content) >= 1:
+                scopedUnknown.append(n)  # branch-scoped; default branch unknown
             else:
                 zeroOrOther.append(n)
 
         if effective:
-            where = f'default branch {branch}' if branch else 'pull requests (default branch not yet set)'
+            if branch:
+                where = f'default branch {branch}'
+            elif metaError:
+                where = 'every branch'
+            else:
+                where = 'pull requests (default branch not yet set)'
             self.results[self.KEY] = [
-                1, f"Approval rule template(s) {', '.join(effective[:5])} require at least one approval for {where}"]
+                1, f"Approval rule template(s) {', '.join(effective[:5])} require at least one approval for {where}. "
+                   "Approval rules gate pull request merges only; also deny direct pushes and merges "
+                   "(codecommit:GitPush, PutFile, MergeBranches*) to the default branch with IAM "
+                   "(condition key codecommit:References)"]
+        elif scopedUnknown:
+            self.results[self.KEY] = [
+                0, f"Unable to evaluate ({metaError}) — the default branch is unknown and branch-scoped "
+                   f"template(s) {', '.join(scopedUnknown[:5])} may not cover it"
+                   + (f"; {'; '.join(errors[:3])}" if errors else '')]
         elif errors:
             self.results[self.KEY] = [0, f"Unable to evaluate ({'; '.join(errors[:3])})"]
         else:

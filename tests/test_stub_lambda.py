@@ -41,6 +41,27 @@ def _driver(fn, lam=None):
 
 
 # ---------------- lambdaDeprecatedRuntime ----------------
+import services.lambda_.drivers.LambdaCommon as _lcMod  # noqa: E402
+from datetime import datetime as _realDatetime, date as _date  # noqa: E402
+
+PINNED_TODAY = _date(2026, 11, 20)
+
+
+def _pinToday(monkeypatch, day):
+    """Pin the driver's notion of 'today' so these tests never depend on the wall clock."""
+    class _Fixed(_realDatetime):
+        @classmethod
+        def now(cls, tz=None):
+            return _realDatetime(day.year, day.month, day.day, 12, 0, tzinfo=tz)
+    monkeypatch.setattr(_lcMod, 'datetime', _Fixed)
+
+
+@pytest.fixture
+def pinnedToday(monkeypatch):
+    _pinToday(monkeypatch, PINNED_TODAY)
+
+
+@pytest.mark.usefixtures('pinnedToday')
 @pytest.mark.parametrize('runtime,expected', [
     ('python3.8', -1), ('nodejs16.x', -1), ('go1.x', -1), ('provided', -1), ('java8', -1),
     ('provided.al2', -1), ('python3.10', -1),
@@ -195,6 +216,7 @@ def test_signer_profile_not_found_cross_account_not_evaluable():
 
 def test_deprecated_runtime_future_date_passes(monkeypatch):
     """Published future dates pass until reached, then flag automatically."""
+    _pinToday(monkeypatch, PINNED_TODAY)
     d = _driver(_fn(Runtime='python3.11'))
     d._checkLambdaDeprecatedRuntime()
     assert d.results['lambdaDeprecatedRuntime'] == [1, 'python3.11 is scheduled for deprecation on 2027-06-30']
@@ -215,3 +237,21 @@ def test_env_var_secrets_patterns(env, expected):
     d = _driver(_fn(Environment={'Variables': env}))
     d._checkLambdaEnvVarSecrets()
     assert d.results['lambdaEnvVarSecrets'][0] == expected
+
+
+@pytest.mark.parametrize('runtime,deadline', [('nodejs22.x', '2027-05-30'), ('python3.11', '2027-06-30'),
+                                              ('python3.10', '2026-10-31')])
+def test_deprecated_runtime_boundary_dates(monkeypatch, runtime, deadline):
+    """Day before the published date -> PASS (scheduled); on the date and after -> FAIL."""
+    from datetime import timedelta
+    day = _date.fromisoformat(deadline)
+    assert LambdaCommon.DEPRECATED_RUNTIMES[runtime] == deadline
+    for today, expected in ((day - timedelta(days=1), 1), (day, -1), (day + timedelta(days=1), -1)):
+        _pinToday(monkeypatch, today)
+        d = _driver(_fn(Runtime=runtime))
+        d._checkLambdaDeprecatedRuntime()
+        r = d.results['lambdaDeprecatedRuntime']
+        assert r[0] == expected, (today, r)
+        assert r[1] == (f'{runtime} is scheduled for deprecation on {deadline}' if expected == 1
+                        else f'{runtime} deprecated since {deadline}')
+

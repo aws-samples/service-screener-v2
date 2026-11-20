@@ -420,3 +420,124 @@ def test_update_trail_to_log_archive_bucket_flag_then_pass():
     c = Clients()
     _sameAcctStubs(c, [updated], ['my-logs'])
     assert _runSame(c) == [1, 'Logs are delivered to buckets outside this account']
+
+
+# ---------------------------------------------------------------- management / data event capture
+
+def _captureStubs(c, trails):
+    """trails: [(trailDict, isLogging|Exception code, selectors)]"""
+    c.st['ct'].add_response('describe_trails', {'trailList': [t for t, _, _ in trails]}, {'includeShadowTrails': True})
+    for t, logging, sel in trails:
+        if isinstance(logging, str):
+            c.st['ct'].add_client_error('get_trail_status', logging, expected_params={'Name': t['TrailARN']})
+        else:
+            c.st['ct'].add_response('get_trail_status', {'IsLogging': logging}, {'Name': t['TrailARN']})
+        c.st['ct'].add_response('get_event_selectors', dict(TrailARN=t['TrailARN'], **sel),
+                                {'TrailName': t['TrailARN']})
+
+
+MGMT_AND_DATA = {'EventSelectors': [{'ReadWriteType': 'All', 'IncludeManagementEvents': True,
+                                     'DataResources': [{'Type': 'AWS::S3::Object', 'Values': ['arn:aws:s3']}]}]}
+
+
+def _runCapture(c, flagsFromOtherRegions=False):
+    Config.set('CloudTrail_listGlobalServEnabled', [])
+    # Account-wide flags as an earlier Region's trail (or a stopped trail) would leave them.
+    Config.set('CloudTrail_hasManagementEventsCaptured', flagsFromOtherRegions)
+    Config.set('CloudTrail_hasDataEventsCaptured', flagsFromOtherRegions)
+    d = c.driver()
+    d._checkHasOneTrailConfiguredCorrectly()
+    c.done()
+    Config.set('__sharedMemo', None)
+    return d.results['HasManagementEventsCaptured'], d.results['HasDataEventsCaptured']
+
+
+def test_event_capture_stopped_trail_is_not_pass_then_logging_passes():
+    c = Clients()
+    _captureStubs(c, [(_trail('t1'), False, MGMT_AND_DATA)])
+    mgmt, data = _runCapture(c, flagsFromOtherRegions=True)
+    assert mgmt[0] == -1 and 'logging is stopped' in mgmt[1]
+    assert data[0] == -1
+
+    c = Clients()
+    _captureStubs(c, [(_trail('t1'), True, MGMT_AND_DATA)])
+    mgmt, data = _runCapture(c)
+    assert mgmt == [1, 'Trail t1 is logging management events in this Region']
+    assert data[0] == 1
+
+
+def test_event_capture_single_region_trail_of_other_region_not_counted():
+    """A single-Region us-east-1 trail set the account-wide flags; eu-west-1 has no
+    trail that applies to it (describe_trails includeShadowTrails returns none)."""
+    c = Clients()
+    _captureStubs(c, [])
+    mgmt, data = _runCapture(c, flagsFromOtherRegions=True)
+    assert mgmt[0] == -1 and data[0] == -1
+
+
+def test_event_capture_unreadable_status_is_info():
+    c = Clients()
+    _captureStubs(c, [(_trail('t1', acct=OTHER, org=True), 'AccessDeniedException', MGMT_AND_DATA)])
+    mgmt, data = _runCapture(c, flagsFromOtherRegions=True)
+    assert mgmt == [0, 'Unable to evaluate (t1 (AccessDeniedException))']
+    assert data[0] == 0
+
+
+def test_event_capture_data_only_trail():
+    c = Clients()
+    _captureStubs(c, [(_trail('t1'), True, {'AdvancedEventSelectors': [{'Name': 'd', 'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Data']}, {'Field': 'resources.type', 'Equals': ['AWS::S3::Object']}]}]})])
+    mgmt, data = _runCapture(c, flagsFromOtherRegions=True)
+    assert mgmt[0] == -1 and data[0] == 1
+
+
+# ---------------------------------------------------------------- KMS read / write coverage
+
+def test_selector_coverage_read_write_type():
+    c = selectorCoverage({'EventSelectors': [{'ReadWriteType': 'WriteOnly', 'IncludeManagementEvents': True}]})
+    assert c['management'] and c['kmsWrite'] and not c['kmsRead'] and not c['kms']
+    c = selectorCoverage({'EventSelectors': [{'ReadWriteType': 'ReadOnly', 'IncludeManagementEvents': True}]})
+    assert c['kmsRead'] and not c['kmsWrite'] and not c['kms']
+    c = selectorCoverage({'AdvancedEventSelectors': [{'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Management']}, {'Field': 'readOnly', 'Equals': ['false']}]}]})
+    assert c['kmsWrite'] and not c['kmsRead'] and not c['kms']
+    c = selectorCoverage({'AdvancedEventSelectors': [
+        {'FieldSelectors': [{'Field': 'eventCategory', 'Equals': ['Management']}, {'Field': 'readOnly', 'Equals': ['false']}]},
+        {'FieldSelectors': [{'Field': 'eventCategory', 'Equals': ['Management']}, {'Field': 'readOnly', 'Equals': ['true']}]}]})
+    assert c['kms']
+
+
+def _kmsRun(selectors):
+    c = Clients()
+    _kmsStubs(c, selectors)
+    d = c.driver()
+    d._checkCloudtrailExcludesKmsEvents()
+    c.done()
+    Config.set('__sharedMemo', None)
+    return d.results['cloudtrailExcludesKmsEvents']
+
+
+def test_kms_write_only_trail_is_not_pass():
+    r = _kmsRun({'EventSelectors': [{'ReadWriteType': 'WriteOnly', 'IncludeManagementEvents': True}]})
+    assert r[0] == 0 and 'Decrypt' in r[1] and 'not recorded' in r[1]
+    r = _kmsRun({'AdvancedEventSelectors': [{'Name': 'w', 'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Management']}, {'Field': 'readOnly', 'Equals': ['false']}]}]})
+    assert r[0] == 0 and 'Decrypt' in r[1]
+    r = _kmsRun({'EventSelectors': [{'ReadWriteType': 'ReadOnly', 'IncludeManagementEvents': True}]})
+    assert r[0] == 0 and 'ScheduleKeyDeletion' in r[1]
+    r = _kmsRun({'EventSelectors': [{'ReadWriteType': 'All', 'IncludeManagementEvents': True}]})
+    assert r == [1, 'Trail t1 logs KMS management events']
+
+
+def test_kms_read_and_write_trails_combined_pass():
+    c = Clients()
+    t1, t2 = _trail('w'), _trail('r')
+    c.st['ct'].add_response('describe_trails', {'trailList': [t1, t2]}, {'includeShadowTrails': True})
+    for t, rw in ((t1, 'WriteOnly'), (t2, 'ReadOnly')):
+        c.st['ct'].add_response('get_trail_status', {'IsLogging': True}, {'Name': t['TrailARN']})
+        c.st['ct'].add_response('get_event_selectors', {'TrailARN': t['TrailARN'], 'EventSelectors': [
+            {'ReadWriteType': rw, 'IncludeManagementEvents': True}]}, {'TrailName': t['TrailARN']})
+    d = c.driver()
+    d._checkCloudtrailExcludesKmsEvents()
+    c.done()
+    assert d.results['cloudtrailExcludesKmsEvents'] == [1, 'KMS read events are logged by r and write events by w']

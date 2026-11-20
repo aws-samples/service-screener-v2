@@ -230,7 +230,7 @@
 	},
 	"HasManagementEventsCaptured": {
 		"category": "O",
-		"^description": "None of your existing Amazon CloudTrail trails cover AWS Management events. Management events provide visibility into management operations that are performed on resources in your AWS account. These are also known as control plane operations. Example management events include:<br>- Configuring security (for example, IAM AttachRolePolicy API operations)<br>- Registering devices (for example, Amazon EC2 CreateDefaultVpc API operations)<br>- Configuring rules for routing data (for example, Amazon EC2 CreateSubnet API operations)<br>- Setting up logging (for example, AWS CloudTrail CreateTrail API operations)<br><br>Management events can also include non-API events that occur in your account. For example, when a user logs in to your account, CloudTrail logs the ConsoleLogin event.",
+		"^description": "No logging Amazon CloudTrail trail that applies to this Region captures AWS Management events (a trail whose logging is stopped, or a single-Region trail of another Region, records nothing here). Management events provide visibility into management operations that are performed on resources in your AWS account. These are also known as control plane operations. Example management events include:<br>- Configuring security (for example, IAM AttachRolePolicy API operations)<br>- Registering devices (for example, Amazon EC2 CreateDefaultVpc API operations)<br>- Configuring rules for routing data (for example, Amazon EC2 CreateSubnet API operations)<br>- Setting up logging (for example, AWS CloudTrail CreateTrail API operations)<br><br>Management events can also include non-API events that occur in your account. For example, when a user logs in to your account, CloudTrail logs the ConsoleLogin event.",
 		"shortDesc": "Trail to include Management Events",
 		"criticality": "H",
 		"downtime": 0,
@@ -263,7 +263,7 @@
 	},
 	"HasDataEventsCaptured": {
 		"category": "S",
-		"^description": "None of your existing Amazon CloudTrail trails cover AWS Data events. Data events provide visibility into the resource operations performed on or within a resource. These are also known as data plane operations. Data events are often high-volume activities.",
+		"^description": "No logging Amazon CloudTrail trail that applies to this Region captures AWS Data events (a trail whose logging is stopped, or a single-Region trail of another Region, records nothing here). Data events provide visibility into the resource operations performed on or within a resource. These are also known as data plane operations. Data events are often high-volume activities.",
 		"shortDesc": "Trail to include data event",
 		"criticality": "M",
 		"downtime": 0,
@@ -397,7 +397,7 @@
 	},
 	"cloudtrailExcludesKmsEvents": {
 		"category": "S",
-		"^description": "In {$COUNT} Region(s), every logging CloudTrail trail that captures management events excludes AWS KMS events (kms.amazonaws.com), either with ExcludeManagementEventSources or with an advanced event selector on eventSource. Without these events you have no audit record of who used, disabled or scheduled deletion of your KMS keys (Decrypt, GenerateDataKey, DisableKey, ScheduleKeyDeletion). Keep KMS events in at least one trail, or use advanced event selectors to filter only high-volume read events while keeping key management calls.",
+		"^description": "In {$COUNT} Region(s), every logging CloudTrail trail that captures management events excludes AWS KMS events (kms.amazonaws.com), either with ExcludeManagementEventSources or with an advanced event selector on eventSource. Without these events you have no audit record of who used, disabled or scheduled deletion of your KMS keys (Decrypt, GenerateDataKey, DisableKey, ScheduleKeyDeletion). A trail limited to write-only (ReadWriteType WriteOnly or an advanced selector on readOnly=false) does not record read-only KMS calls such as Decrypt and GenerateDataKey, and a read-only trail does not record key management calls; such Regions are reported as INFO. Keep all KMS events in at least one trail, or use advanced event selectors to filter only high-volume read events while keeping key management calls.",
 		"shortDesc": "Log AWS KMS management events in at least one trail",
 		"criticality": "M",
 		"downtime": 0,

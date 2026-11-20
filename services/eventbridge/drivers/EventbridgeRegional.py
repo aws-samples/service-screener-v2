@@ -319,6 +319,15 @@ class EventbridgeRegional(Evaluator):
             ]
             return
 
+        enrichErrors = routing.get('enrichmentErrors') or []
+        if enrichErrors:
+            self.results[key] = [
+                0,
+                f"Unable to evaluate ({', '.join(enrichErrors)}) — no local rule routes security findings, "
+                "and GuardDuty/Security Hub membership or Security Hub aggregation could not be read"
+            ]
+            return
+
         self.results[key] = [
             -1,
             "No ENABLED rule with a target on the default event bus matches finding events "
@@ -332,10 +341,12 @@ class EventbridgeRegional(Evaluator):
     def _checkHealthEventsNotRouted(self):
         """
         AWS Health delivers Region-specific events to the default bus of the
-        affected Region and global events to us-east-1. FAIL only when neither
-        the scanned Region nor us-east-1 has an ENABLED aws.health rule with a
-        target. When only us-east-1 routes Health events, global events are
-        covered but this Region's events are not; that is reported as INFO.
+        affected Region and global events to the partition's global-event Region
+        (us-east-1; us-gov-west-1 in AWS GovCloud (US); cn-north-1 in China).
+        FAIL only when neither the scanned Region nor that Region has an ENABLED
+        aws.health rule with a target. When only the global-event Region routes
+        Health events, global events are covered but this Region's events are
+        not; that is reported as INFO.
         """
         key = 'healthEventsNotRouted'
         routing = self.routing
@@ -347,23 +358,25 @@ class EventbridgeRegional(Evaluator):
             return
 
         region = routing.get('_region', 'this Region')
+        globalRegion = routing.get('_globalRegion', 'us-east-1')
         local = self._routesBySource(routing.get('regionRules'), [self.HEALTH_SOURCE])[self.HEALTH_SOURCE]
         if local:
             self.results[key] = [1, f"AWS Health events in {region} are routed by: " + self._joinNames(local)]
             return
 
-        if region != 'us-east-1':
+        if region != globalRegion:
             if routing.get('globalError'):
+                where = globalRegion or "the partition's global-event Region"
                 self.results[key] = [
                     0, f"Unable to evaluate ({routing['globalError']}) — no aws.health rule in {region}, "
-                    "and us-east-1 (global events) could not be read"]
+                    f"and {where} (global events) could not be read"]
                 return
             globalRoutes = self._routesBySource(
                 routing.get('globalRules'), [self.HEALTH_SOURCE])[self.HEALTH_SOURCE]
             if globalRoutes:
                 self.results[key] = [
                     0,
-                    "Global AWS Health events are routed in us-east-1 by " + self._joinNames(globalRoutes)
+                    f"Global AWS Health events are routed in {globalRegion} by " + self._joinNames(globalRoutes)
                     + f", but no rule routes Region-specific Health events in {region}"
                 ]
                 return
@@ -372,7 +385,7 @@ class EventbridgeRegional(Evaluator):
             -1,
             f"No ENABLED rule with a target matches AWS Health events (source aws.health, detail-type "
             f"'AWS Health Event') on the default bus in {region}"
-            + ("" if region == 'us-east-1' else " or us-east-1")
+            + ("" if region == globalRegion else f" or {globalRegion}")
             + " — service events and scheduled changes affecting this account reach no responder"
         ]
 
