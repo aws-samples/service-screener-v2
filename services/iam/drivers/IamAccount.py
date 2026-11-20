@@ -12,7 +12,8 @@ from .IamCommon import IamCommon
 from . import IamPolicyHelpers
 from . import IamX509
 from .IamOrgData import OrgData, SCP, RCP, TAG, BACKUP, DECLARATIVE_EC2, FULL_AWS_ACCESS_ID, statements, denyCoversAction, conditionKeys, scpGuardrails, SCP_GUARDRAILS, \
-    denyIsUnconditionalGuardrail, guardrailCoverage, NOT_IN_ORG
+    denyIsUnconditionalGuardrail, guardrailCoverage, implicitDenyLevel, PRIV_ESC_ACTIONS, NOT_IN_ORG, \
+    MEMBER_ERROR_CODES
 from .IamSsoData import SsoData, parseIsoDuration
 
 
@@ -880,6 +881,28 @@ class IamAccount(IamCommon):
             out.append((nid, nodes[nid], pathPols))
         return out
 
+    def _scpPathLevels(self, pols):
+        """nid -> [(nodeLabel, [every SCP attached to that node, AWS-managed
+        FullAWSAccess included])] from the node up to the root, for the
+        allow-list evaluation (IamOrgData.implicitDenyLevel)."""
+        tree, _ = self.orgData.tree()
+        nodes = (tree or {}).get('nodes', {})
+        byTarget = {}
+        for p in pols:
+            for t in p.get('Targets') or []:
+                byTarget.setdefault(t.get('TargetId'), []).append(p)
+
+        def levels(nid):
+            out, cur, seen = [], nid, set()
+            while cur and cur not in seen and cur in nodes:
+                seen.add(cur)
+                node = nodes[cur]
+                label = 'Root' if node['Type'] == 'ROOT' else self._nodeLabel(cur, node)
+                out.append((label, byTarget.get(cur, [])))
+                cur = node.get('Parent')
+            return out
+        return levels
+
     @staticmethod
     def _nodeLabel(nid, node):
         return '{} {} ({})'.format('OU' if node['Type'] == 'ORGANIZATIONAL_UNIT' else 'Account', node.get('Name', ''), nid)
@@ -1022,6 +1045,7 @@ class IamAccount(IamCommon):
                     memberAccounts.setdefault(cur, set()).add(nid)
                 cur = nodes.get(cur, {}).get('Parent')
 
+        levelsOf = self._scpPathLevels(pols)
         evaluated, missing, unknown = 0, [], []
         lackCount = {g: 0 for g in SCP_GUARDRAILS}
         for nid, node, pathPols in targets:
@@ -1032,6 +1056,12 @@ class IamAccount(IamCommon):
                 if p['Content'] is None:
                     unparsed = True
                 have |= scpGuardrails(p['Content'], accts)
+            if 'preventPrivEscalation' not in have:
+                # Allow-list strategy: a privilege-escalation action that no
+                # SCP at some level of the path allows is denied as well.
+                levels = levelsOf(nid)
+                if any(implicitDenyLevel(levels, a) for a in PRIV_ESC_ACTIONS):
+                    have.add('preventPrivEscalation')
             lacking = [SCP_GUARDRAILS[g] for g in SCP_GUARDRAILS if g not in have]
             if lacking and not unparsed:
                 for g in SCP_GUARDRAILS:
@@ -1270,13 +1300,17 @@ class IamAccount(IamCommon):
             return
 
         labels = [label for label, _ in requirements]
+        allActions = sorted({a for _, reqs in requirements for alts in reqs for a in alts})
+        levelsOf = self._scpPathLevels(pols)
         cache, missing, unknown = {}, [], []
         lackCount = {label: 0 for label in labels}
         conditional, metBy = {}, {}
         for nid, node, pathPols in targets:
-            sig = tuple(sorted(p['Id'] for p in pathPols))
+            levels = levelsOf(nid)
+            implicit = {a: lvl for a in allActions for lvl in [implicitDenyLevel(levels, a)] if lvl}
+            sig = (tuple(sorted(p['Id'] for p in pathPols)), tuple(sorted(implicit.items())))
             if sig not in cache:
-                cache[sig] = guardrailCoverage(pathPols, requirements)
+                cache[sig] = guardrailCoverage(pathPols, requirements, implicit)
             cov = cache[sig]
             for label, names in cov['met'].items():
                 metBy.setdefault(label, set()).update(names)
@@ -1405,13 +1439,18 @@ class IamAccount(IamCommon):
         orgInsts = [i for i in insts if i['Kind'] == 'ORG' or not orgOnly]
         if orgInsts:
             return orgInsts
-        if errors:
+        memberAccount = self.orgData.inOrganization() and not self.orgData.isManagementAccount()
+        if errors and memberAccount and all(e.split(': ')[-1] in MEMBER_ERROR_CODES for e in errors):
+            # A member account can see the organization instance but is
+            # denied its permission sets unless it is the delegated admin.
+            self.results[key] = [0, 'Not evaluable from member account']
+        elif errors:
             self.results[key] = [0, 'Unable to evaluate ({})'.format(errors[0].split(': ')[-1])]
         elif not self.ssoData.regions:
             self.results[key] = [0, 'Unable to evaluate (no regions selected)']
         elif insts:
             self.results[key] = [0, 'Not applicable: only an account instance of IAM Identity Center exists (permission sets require the organization instance)']
-        elif self.orgData.inOrganization() and not self.orgData.isManagementAccount():
+        elif memberAccount:
             self.results[key] = [0, 'Not evaluable from member account']
         else:
             self.results[key] = [0, 'Not applicable: no IAM Identity Center instance found in scanned regions ({})'.format(
@@ -1812,6 +1851,26 @@ class IamAccount(IamCommon):
                 notes.append('{}: {}'.format(region, type(e).__name__))
         return enrolled, lzFound, notes
 
+    def _controlTowerEnrollmentUnreadable(self, lzFound, notes):
+        """Why Control Tower enrollment could not be read (None when it was
+        read, or Control Tower is not in use). Called when no enrolled
+        account was found."""
+        regions = ', '.join(r for r in (Config.get('REGIONS_SELECTED', []) or []) if r != 'GLOBAL') or 'none'
+        if lzFound:
+            return 'Control Tower enrollment unreadable: {}'.format(notes[0]) if notes else None
+        principals, err = self.orgData.serviceAccessPrincipals()
+        if err:
+            if notes:
+                return 'Control Tower landing zone unreadable ({}) and trusted-access list unreadable ({})'.format(
+                    ', '.join(notes), err)
+            return None
+        if 'controltower.amazonaws.com' not in principals:
+            return None
+        if notes:
+            return 'Control Tower landing zone unreadable: {}'.format(', '.join(notes))
+        return ('AWS Control Tower is enabled for the organization but no landing zone was found in the scanned '
+                'Region(s) ({}); include the Control Tower home Region in the scan').format(regions)
+
     def _checkAccountNotVended(self):
         """Member accounts that joined the organization by invitation were not
         provisioned by an account-vending process (Account Factory, AFT or a
@@ -1842,8 +1901,18 @@ class IamAccount(IamCommon):
                 invited = [a for a in invited if a['Id'] not in enrolled]
                 if skipped:
                     enrolledNote = '<br>{} invited account(s) enrolled in Control Tower not reported'.format(len(skipped))
-            elif lzFound and notes:
-                enrolledNote = '<br>(Control Tower enrollment unreadable: {})'.format(notes[0])
+            else:
+                unreadable = self._controlTowerEnrollmentUnreadable(lzFound, notes)
+                if unreadable:
+                    # Invited accounts may be enrolled in Control Tower: a
+                    # FAIL here could be false.
+                    self.results[key] = [0, 'Unable to evaluate ({}); {} of {} active member account(s) joined by invitation:<br>{}'.format(
+                        unreadable, len(invited), len(members), self._detail(['{} ({})'.format(a.get('Name', ''), a['Id'])
+                                                                               for a in invited]))]
+                    return
+                if notes:
+                    enrolledNote = '<br>(Control Tower not enabled for the organization; landing zone read errors: {})'.format(
+                        ', '.join(notes))
         if invited:
             self.results[key] = [-1, '{} of {} active member account(s) joined by invitation, not through an account-vending process:<br>{}{}'.format(
                 len(invited), len(members), self._detail(['{} ({}) joined {}'.format(
@@ -2260,7 +2329,7 @@ class IamAccount(IamCommon):
                 if stype == 'CERTIFICATE_BUNDLE':
                     certs = IamX509.pemCertificates(data.get('x509CertificateData'))
                     if not certs:
-                        notes.append('{}: no certificate found in bundle'.format(name))
+                        notes.append('{}: unable to evaluate (no certificate found in bundle)'.format(name))
                     for idx, (_nb, notAfter, err) in enumerate(certs):
                         label = '{} certificate #{}'.format(name, idx + 1)
                         if err:
@@ -2285,9 +2354,9 @@ class IamAccount(IamCommon):
                     elif ca.get('NotAfter') is not None:
                         self._raExpiry('{} ACM PCA'.format(name), ca['NotAfter'], now, issues)
                     else:
-                        notes.append('{}: ACM PCA status {} (no validity date)'.format(name, caStatus))
+                        notes.append('{}: unable to evaluate ACM PCA {} (status {}, no validity date)'.format(name, pcaArn, caStatus))
                 else:
-                    notes.append('{}: source {} not evaluated'.format(name, stype))
+                    notes.append('{}: unable to evaluate (source type {} not supported)'.format(name, stype))
 
             for crl in crls:
                 if crl.get('enabled') is False and crl.get('trustAnchorArn') in enabledArns:

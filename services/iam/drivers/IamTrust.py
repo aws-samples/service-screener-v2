@@ -108,26 +108,59 @@ def _conditions(stmt):
     return out
 
 
+_EXTERNAL_ID_OPERATORS = ('stringequals', 'stringequalsignorecase', 'stringlike')
+
+
+def _externalIdValueWeakness(base, vals, knownAccounts):
+    if not vals:
+        return 'sts:ExternalId condition has no value'
+    for v in vals:
+        if base == 'stringlike' and ('*' in v or '?' in v):
+            return 'sts:ExternalId contains wildcards'
+        if len(v) < MIN_EXTERNAL_ID_LENGTH:
+            return 'sts:ExternalId shorter than {} characters'.format(MIN_EXTERNAL_ID_LENGTH)
+        if v.isdigit():
+            return 'sts:ExternalId is numeric-only'
+        if v in knownAccounts:
+            return 'sts:ExternalId equals an account ID'
+    return None
+
+
 def externalIdWeakness(stmt, knownAccounts):
-    """None if the statement enforces a strong sts:ExternalId, else a reason."""
+    """None if the statement enforces a strong sts:ExternalId, else a reason.
+
+    Condition blocks are ANDed, so the statement is strong when
+      - one block pins the value to strong values (StringEquals /
+        StringEqualsIgnoreCase / StringLike without wildcards, optionally
+        ForAnyValue:/ForAllValues: or IfExists), and
+      - one block requires the key to be present: no IfExists and no
+        ForAllValues: (both are true when sts:ExternalId is absent).
+    sts:ExternalId is single-valued, so ForAnyValue: compares like the bare
+    operator and is false when the key is absent."""
     ext = [(op, vals) for op, k, vals in _conditions(stmt) if k == 'sts:externalid']
     if not ext:
         return 'no sts:ExternalId condition'
+    reasons, strongValue, required = [], False, False
     for op, vals in ext:
-        if op.endswith('ifexists'):
-            return 'sts:ExternalId uses {} (not enforced when absent)'.format(op)
-        if op not in ('stringequals', 'stringlike'):
-            return 'sts:ExternalId uses unsupported operator {}'.format(op)
-        for v in vals:
-            if op == 'stringlike' and ('*' in v or '?' in v):
-                return 'sts:ExternalId contains wildcards'
-            if len(v) < MIN_EXTERNAL_ID_LENGTH:
-                return 'sts:ExternalId shorter than {} characters'.format(MIN_EXTERNAL_ID_LENGTH)
-            if v.isdigit():
-                return 'sts:ExternalId is numeric-only'
-            if v in knownAccounts:
-                return 'sts:ExternalId equals an account ID'
-    return None
+        prefix, _, base = op.rpartition(':')
+        ifExists = base.endswith('ifexists')
+        if ifExists:
+            base = base[:-len('ifexists')]
+        if base not in _EXTERNAL_ID_OPERATORS or prefix not in ('', 'foranyvalue', 'forallvalues'):
+            reasons.append('sts:ExternalId uses unsupported operator {}'.format(op))
+            continue
+        if ifExists or prefix == 'forallvalues':
+            reasons.append('sts:ExternalId uses {} (not enforced when absent)'.format(op))
+        else:
+            required = True
+        weak = _externalIdValueWeakness(base, vals, knownAccounts)
+        if weak:
+            reasons.append(weak)
+        else:
+            strongValue = True
+    if strongValue and required:
+        return None
+    return reasons[0] if reasons else 'sts:ExternalId not enforced'
 
 
 def _orgValueIsOwn(key, base, value, orgId):

@@ -85,6 +85,8 @@ class TestAccountNotVended:
         clients, stubs = _regional(controltower=[('list_landing_zones', {'landingZones': []}, {})])
         h = Harness(regionalClients=clients)
         _accounts(h, _acct(MGMT, 'mgmt', 'INVITED'), _acct(MEMBER, 'legacy-app', 'INVITED'), _acct(MEMBER2, 'vended'))
+        # Control Tower is not enabled for the organization (no trusted access).
+        h.org.add_response('list_aws_service_access_for_organization', {'EnabledServicePrincipals': []})
         r = h.run('AccountNotVended', self.KEY)
         stubs['controltower'].assert_no_pending_responses()
         assert r[0] == -1 and 'legacy-app (222222222222)' in r[1] and MGMT not in r[1] and MEMBER2 not in r[1], r
