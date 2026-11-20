@@ -247,6 +247,15 @@ class WATools2027(WATools):
             return None
         return resp.get('Answer', {}) or {}
 
+    def createMilestoneIfNotExists(self):
+        """Record a milestone only when SS may write to the workload: a
+        milestone on a NOT_CURRENT/DEPRECATED lens review (or one whose
+        status could not be read) is a write after SS said it would not write."""
+        if not self.canWrite or self.HASPERMISSION is False:
+            _info(f"[WATools2027] Lens review is {self.lensStatus}; no milestone created")
+            return None
+        return super().createMilestoneIfNotExists()
+
     def updateAnswers(self, questionId, selectedChoices, unselectedNotes, failedChoices=None):
         """Write SS results for one question.
 

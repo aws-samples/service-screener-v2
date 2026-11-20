@@ -350,7 +350,7 @@ def _runFramework(data, tools=None):
     return fw, {r[1].split(' ', 1)[0]: r[2] for r in rows}, rows
 
 
-SEC01_BP01_CHECKS = ['accountMixesEnvironments', 'accountNotVended', 'enableCostBudget', 'hasOrganization',
+SEC01_BP01_CHECKS = ['accountMixesEnvironments', 'accountNotVended', 'hasOrganization',
                      'orgMgmtAccountHostsWorkloads', 'orgOuStructureFlat']
 
 
@@ -385,7 +385,7 @@ class TestComplianceRequiresEvaluatedPass:
         assert 'sec-accounts' not in t.state['securely-operate']['SelectedChoices']
 
     def test_member_account_unreadable_checks_block_pass(self, tmp_path):
-        # Member account: 5 of 6 SEC01-BP01 checks are "Not evaluable from
+        # Member account: 4 of 5 SEC01-BP01 checks are "Not evaluable from
         # member account" and 1 passes. The unreadable checks may hide a
         # failure, so the BP is not met and the choice is not selected.
         # Old code: comp 1 and 'sec-accounts' selected.
@@ -424,7 +424,7 @@ class TestComplianceRequiresEvaluatedPass:
     def test_informational_only_check_does_not_block_pass(self, tmp_path):
         _writeRaw(tmp_path, {'iam': {'GLOBAL': {'Account': {
             'hasOrganization': [1, 'ok'],
-            'enableCostBudget': [0, 'Not applicable: account is not part of AWS Organizations']}}}})
+            'accountMixesEnvironments': [0, 'Not applicable: account is not part of AWS Organizations']}}}})
         _, comp, rows = _runFramework({'iam': {'summary': {}}})
         assert comp['SEC01-BP01'] == 1
         row = [r for r in rows if r[1].startswith('SEC01-BP01 ')][0]
@@ -637,7 +637,7 @@ class TestComplianceRequiresEvaluatedPass:
     def test_suppressed_failure_is_not_a_pass(self, tmp_path):
         # -1 in the raw results but absent from the summary = suppressed.
         _writeRaw(tmp_path, {'iam': {'GLOBAL': {'Account': {'hasOrganization': [-1, 'no org'],
-                                                            'enableCostBudget': [1, 'ok']}}}})
+                                                            'accountNotVended': [1, 'ok']}}}})
         _, comp, rows = _runFramework({'iam': {'summary': {}}})
         assert comp['SEC01-BP01'] == 0
         row = [r for r in rows if r[1].startswith('SEC01-BP01 ')][0]
@@ -904,3 +904,102 @@ def test_stubber_real_api_shapes():
                         ['Best practices with failed SS checks:', '- SEC01-BP01 Separate workloads using accounts'],
                         failedChoices=['sec-accounts'])
         st.assert_no_pending_responses()
+
+
+# --------------------------------------------------------------------------- #
+# Low finding: a milestone was created on a workload whose lens review is not
+# CURRENT, right after SS warned that nothing would be written.
+# --------------------------------------------------------------------------- #
+class TestMilestoneGatedByLensStatus:
+    def _fw(self, status, newMileStone, milestones=()):
+        t = _tools(lens_status=status)
+        t.cfg = {'newMileStone': newMileStone, 'reportName': 'SS_Report_2027'}
+        t.waClient.list_milestones.return_value = {'MilestoneSummaries': list(milestones)}
+        t.generateReviewReport = MagicMock(return_value=[])
+        return _framework(t), t
+
+    @pytest.mark.parametrize('status', ['NOT_CURRENT', 'DEPRECATED'])
+    @pytest.mark.parametrize('newMileStone', [0, 1])
+    def test_no_milestone_when_lens_not_current(self, status, newMileStone):
+        fw, t = self._fw(status, newMileStone)
+        fw._hookPostBuildContentDetail()
+        t.waClient.create_milestone.assert_not_called()   # old code: called
+        t.generateReviewReport.assert_called_once()       # read-only report still produced
+
+    def test_new_milestone_when_lens_current(self):
+        fw, t = self._fw('CURRENT', 1)
+        fw._hookPostBuildContentDetail()
+        t.waClient.create_milestone.assert_called_once()
+
+    def test_first_milestone_when_lens_current_and_none_exist(self):
+        fw, t = self._fw('CURRENT', 0)
+        fw._hookPostBuildContentDetail()
+        t.waClient.create_milestone.assert_called_once()
+
+    def test_no_milestone_when_lens_review_unread(self):
+        # canWrite stays False when listAnswers never read the lens review.
+        t = WATools2027()
+        t.waInfo = {'isExists': True, 'WorkloadId': 'wl-1', 'LensesAlias': 'wellarchitected'}
+        t.cfg = {'newMileStone': 1}
+        t.waClient = MagicMock()
+        t.createMilestoneIfNotExists()
+        t.waClient.create_milestone.assert_not_called()
+
+
+# --------------------------------------------------------------------------- #
+# Low finding: checks mapped to unrelated best practices gave false FAILs.
+# --------------------------------------------------------------------------- #
+class TestMapRelevance:
+    m = json.load(open(MAP_PATH))['mapping']
+
+    def _bp(self, bpId):
+        for bps in self.m.values():
+            for k, v in bps.items():
+                if k.startswith(bpId + ' '):
+                    return v
+        raise KeyError(bpId)
+
+    @pytest.mark.parametrize('bpId,check', [
+        ('FND02-BP02', 'iam.enableGuardDuty'),            # threat detection, not sign-in
+        ('SEC01-BP01', 'iam.enableCostBudget'),           # spend monitoring, not account separation
+        ('FND05-BP02', 'cloudtrail.OrganizationTrailEnabled'),   # logging, not break-glass
+        ('FND05-BP02', 'iam.hasExternalIdentityProvider'),       # federation, not break-glass
+    ])
+    def test_unrelated_check_not_mapped(self, bpId, check):
+        assert check not in self._bp(bpId)
+
+    @pytest.mark.parametrize('bpId,check', [
+        ('FND05-BP07', 'iam.enableGuardDuty'),
+        ('FND01-BP03', 'iam.enableCostBudget'),
+        ('FND01-BP04', 'iam.enableCostBudget'),           # sandbox spend limits
+        ('FND02-BP03', 'iam.hasExternalIdentityProvider'),
+        ('FND05-BP02', 'iam.rootMfaActive'),
+        ('FND05-BP02', 'cloudwatch.trailWOMAroot1'),
+    ])
+    def test_check_kept_where_relevant(self, bpId, check):
+        assert check in self._bp(bpId)
+
+    def test_strong_signin_not_failed_by_guardduty_off(self, tmp_path):
+        _writeRaw(tmp_path, {'iam': {'GLOBAL': {'Account': {
+            'mfaActive': [1, 'ok'], 'passwordPolicy': [1, 'ok'],
+            'enableGuardDuty': [-1, '']}}}})
+        _, comp, _ = _runFramework({'iam': {'summary': _summary('enableGuardDuty')}})
+        assert comp['FND02-BP02'] == 1          # old code: -1
+        assert comp['FND05-BP07'] == -1
+
+    def test_account_separation_not_failed_by_missing_budget(self, tmp_path):
+        _writeRaw(tmp_path, {'iam': {'GLOBAL': {'Account': {
+            'hasOrganization': [1, 'ok'], 'enableCostBudget': [-1, '']}}}})
+        _, comp, _ = _runFramework({'iam': {'summary': _summary('enableCostBudget')}})
+        assert comp['SEC01-BP01'] == 1          # old code: -1
+        assert comp['FND01-BP04'] == -1
+
+    def test_emergency_access_not_failed_by_missing_idp_or_org_trail(self, tmp_path):
+        _writeRaw(tmp_path, {
+            'iam': {'GLOBAL': {'Account': {'rootMfaActive': [1, 'ok'],
+                                           'hasExternalIdentityProvider': [-1, 'none']}}},
+            'cloudtrail': {'us-east-1': {'Org': {'OrganizationTrailEnabled': [-1, 'none']}}}})
+        _, comp, _ = _runFramework({'iam': {'summary': _summary('hasExternalIdentityProvider')},
+                                    'cloudtrail': {'summary': _summary('OrganizationTrailEnabled')}})
+        assert comp['FND05-BP02'] == 1          # old code: -1
+        assert comp['FND02-BP03'] == -1
