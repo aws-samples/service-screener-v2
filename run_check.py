@@ -24,7 +24,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.getcwd())
 
 import boto3  # noqa: E402
-from utils.CheckRunner import CheckRunner, emulatorSession  # noqa: E402
+from utils.CheckRunner import CheckRunner, emulatorSession, resourceIdMatches  # noqa: E402
 
 
 def main(argv=None):
@@ -32,7 +32,8 @@ def main(argv=None):
     p.add_argument('--service', '-s', required=True, help='Service folder name, e.g. s3, iam, ec2')
     p.add_argument('--check', '-c', help='Result key (e.g. PublicReadAccessBlock) or method name without _check (e.g. Access)')
     p.add_argument('--region', '-r', default='us-east-1')
-    p.add_argument('--resource', help='Only report resources whose identifier contains this text')
+    p.add_argument('--resource', help='Only report this resource: its full identifier, its name '
+                                      '(e.g. my-bucket for Bucket::my-bucket) or the last ARN segment')
     p.add_argument('--profile', '-p', help='AWS profile (ignored with --emulator)')
     p.add_argument('--emulator', nargs='?', const=9297, type=int, metavar='PORT',
                    help='Use the local AWS Emulator on 127.0.0.1:PORT (default 9297)')
@@ -51,6 +52,10 @@ def main(argv=None):
 
     res = CheckRunner.run(a.service, a.check, region=a.region, session=session,
                           resource=a.resource, emulator=bool(a.emulator), debug=a.debug)
+    if a.resource:
+        # CheckRunner filters by substring; keep only exact identifier matches
+        # so 'bucket-1' does not also cover 'bucket-10'.
+        res.results = {rid: v for rid, v in res.results.items() if resourceIdMatches(rid, a.resource)}
 
     if a.json:
         print(json.dumps(res.toDict(), indent=2, default=str))
@@ -61,7 +66,9 @@ def main(argv=None):
         if res.errors:
             print(f"\n{len(res.errors)} check error(s); rerun with --json for details", file=sys.stderr)
 
-    statuses = res.statuses() if a.check else {}
+    # Every key in res.results: the requested key, or all keys returned by
+    # the method when --check is a method name (e.g. Access).
+    statuses = {f'{rid} {k}': st for (rid, k), st in res.allStatuses().items()} if a.check else {}
     if a.expect is not None or a.expectNot is not None:
         if not statuses:
             print(f"EXPECTATION FAILED: no result for check '{a.check}'", file=sys.stderr)
