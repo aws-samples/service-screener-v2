@@ -60,7 +60,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Testing rules with Count]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-testing.html>",
-			"[Overriding a managed rule group action]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-action.html>"
+			"[Overriding rule group actions in AWS WAF]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-rule-group-override-options.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -124,7 +124,7 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Web ACL and rule visibility configuration]<https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html>"
+			"[Monitoring AWS WAF with Amazon CloudWatch]<https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -156,7 +156,7 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Web ACL and rule visibility configuration]<https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html>"
+			"[Monitoring AWS WAF with Amazon CloudWatch]<https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,

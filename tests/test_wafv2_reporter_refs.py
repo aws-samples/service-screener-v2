@@ -42,3 +42,29 @@ def test_owasp_injection_link_uses_canonical_owasp_url():
     assert urls, 'expected the OWASP A03 reference'
     for u in urls:
         assert u.startswith('https://owasp.org/Top10/2021/'), u
+
+
+# Page titles verified 2026-11-20 (docs.aws.amazon.com <title>). Every reference
+# to one of these pages must carry a label that names the page topic.
+EXPECTED_LABEL_WORDS = {
+    'https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-rule-group-override-options.html': 'overriding',
+    'https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-action.html': 'rule action',
+    'https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html': 'cloudwatch',
+    'https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-processing-order.html': 'priorit',
+    'https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-groups-versioning.html': 'version',
+}
+
+
+def test_labels_match_target_page_topic():
+    for key in REPORTER:
+        for url, label in _refs(key).items():
+            words = EXPECTED_LABEL_WORDS.get(url)
+            if words:
+                assert words in label.lower(), (key, label, url)
+
+
+def test_override_reference_points_at_override_page():
+    for key in REPORTER:
+        for url, label in _refs(key).items():
+            if label.lower().startswith('overriding'):
+                assert url.endswith('/web-acl-rule-group-override-options.html'), (key, label, url)
