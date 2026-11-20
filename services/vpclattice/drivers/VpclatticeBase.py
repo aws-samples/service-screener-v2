@@ -28,7 +28,11 @@ class VpclatticeBase(Evaluator):
         self.client = client
         self.accountId = accountId
         self.identifier = self.resource.get('arn') or self.resource.get('id')
-        self._resourceName = self.resource.get('name') or self.resource.get('id') or 'unknown'
+        name = self.resource.get('name') or self.resource.get('id') or 'unknown'
+        ## list_services / list_service_networks also return RAM-shared resources,
+        ## whose names can collide with local ones. Qualify shared resources with
+        ## the owner account so results and checkpoints never overwrite each other.
+        self._resourceName = f"{name}@{self._ownerAccount()}" if self._sharedFromOtherAccount() else name
         self.addII('id', self.resource.get('id'))
         self.addII('authType', self.resource.get('authType'))
 

@@ -550,15 +550,18 @@ class EksCommon(Evaluator):
     def _checkNoIRSAConfigured(self):
         """
         Pod-level workload identity (FND02-BP10).
-        PASS when the cluster has at least one working workload identity mechanism:
+        PASS when the cluster has evidence that pod-level workload identity is in use:
           - IRSA: the cluster OIDC issuer is registered as an IAM OIDC identity provider
             (an issuer URL alone exists on every cluster and does not enable IRSA), or
-          - EKS Pod Identity: pod identity associations exist, or the
-            eks-pod-identity-agent add-on is installed / EKS Auto Mode (agent built in).
+          - EKS Pod Identity: at least one pod identity association exists.
+        The eks-pod-identity-agent add-on or EKS Auto Mode (agent built in) only makes
+        Pod Identity available; with no associations every pod still uses the node
+        role, so that case is 0 (mechanism available, not in use), never PASS.
         FAIL only when none of these are present. If a source cannot be read and no
-        mechanism was found, the result is 0 (Unable to evaluate).
+        evidence was found, the result is 0 (Unable to evaluate).
         """
         evidence = []
+        available = []
         unable = []
 
         identity = self.clusterInfo.get('identity') or {}
@@ -589,12 +592,12 @@ class EksCommon(Evaluator):
             unable.append('eks:' + self._errCode(e))
 
         if (self.clusterInfo.get('computeConfig') or {}).get('enabled') is True:
-            evidence.append('EKS Auto Mode (Pod Identity agent built in)')
+            available.append('EKS Auto Mode (Pod Identity agent built in)')
         else:
             try:
                 for page in self._clusterListPages('list_addons'):
                     if 'eks-pod-identity-agent' in (page.get('addons', []) or []):
-                        evidence.append('eks-pod-identity-agent add-on')
+                        available.append('eks-pod-identity-agent add-on')
                         break
             except botocore.exceptions.ClientError as e:
                 unable.append('eks:' + self._errCode(e))
@@ -603,6 +606,10 @@ class EksCommon(Evaluator):
             self.results['eksNoIRSAConfigured'] = [1, 'Workload identity: ' + ', '.join(evidence)]
         elif unable:
             self.results['eksNoIRSAConfigured'] = [0, 'Unable to evaluate (' + ', '.join(sorted(set(unable))) + ')']
+        elif available:
+            self.results['eksNoIRSAConfigured'] = [0, 'EKS Pod Identity available (' + ', '.join(available)
+                                                   + ') but no pod identity associations and no IAM OIDC provider; '
+                                                   + 'pods use the node IAM role']
         elif not issuer:
             self.results['eksNoIRSAConfigured'] = [-1, 'No OIDC issuer and no EKS Pod Identity configured']
         else:
