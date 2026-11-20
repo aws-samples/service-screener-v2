@@ -5,7 +5,8 @@
    Ec2ElbCommon._getTrustStore; non-transient errors (AccessDenied) still are.
 2. naclAllowAllIngress: a narrow deny rule before an allow-all rule is not a PASS.
 3. ssmVpcEndpointsMissing: isolated instances whose SSM Agent is Online (centralized
-   endpoints in a hub VPC) are not a FAIL.
+   endpoints in a hub VPC) are not a FAIL when 'ssm' has no in-VPC endpoint; Online
+   never proves ssmmessages (INFO when it is also missing, FAIL when only it is).
 4. selfManagedDataStoreOnEc2: unreadable security groups -> 'Unable to evaluate';
    an SSM lookup failure is not reported as 'not SSM-managed'.
 5. selfManagedDataStoreOnEc2 pages the whole AWS:Application inventory (locked:
@@ -241,6 +242,23 @@ def test_nacl_full_deny_before_allow_all_passes():
     assert _nacl([_entry(50, 'deny', cidr='::/0', v6=True), _entry(100, 'allow', cidr='::/0', v6=True)])[0] == 1
 
 
+def test_nacl_split_denies_covering_family_pass():
+    # all-protocol denies 0.0.0.0/1 + 128.0.0.0/1 together deny all IPv4 before the allow-all
+    assert _nacl([_entry(50, 'deny', cidr='0.0.0.0/1'), _entry(51, 'deny', cidr='128.0.0.0/1'),
+                  _entry(100, 'allow')])[0] == 1
+    assert _nacl([_entry(50, 'deny', cidr='::/1', v6=True), _entry(51, 'deny', cidr='8000::/1', v6=True),
+                  _entry(100, 'allow', cidr='::/0', v6=True)])[0] == 1
+    # a gap in coverage keeps it INFO
+    assert _nacl([_entry(50, 'deny', cidr='0.0.0.0/1'), _entry(51, 'deny', cidr='128.0.0.0/2'),
+                  _entry(100, 'allow')])[0] == 0
+    # one half denied for one protocol only does not complete coverage
+    assert _nacl([_entry(50, 'deny', cidr='0.0.0.0/1'), _entry(51, 'deny', proto='6', cidr='128.0.0.0/1'),
+                  _entry(100, 'allow')])[0] == 0
+    # coverage completed only after the allow-all does not count
+    assert _nacl([_entry(50, 'deny', cidr='0.0.0.0/1'), _entry(100, 'allow'),
+                  _entry(150, 'deny', cidr='128.0.0.0/1')])[0] == 0
+
+
 def test_nacl_mixed_families():
     # IPv4: allow-all behind a narrow deny; IPv6: unfiltered -> FAIL listing the open family
     res = _nacl([_entry(50, 'deny', proto='6'), _entry(100, 'allow'), _entry(101, 'allow', cidr='::/0', v6=True)])
@@ -260,17 +278,41 @@ def _isolatedRouting():
             'subnetVpc': {'subnet-a': 'vpc-1'}}
 
 
-def _ssmEp(ping):
+def _iface(svc, dns=True):
+    return {'VpcEndpointId': f'vpce-{svc}', 'VpcId': 'vpc-1', 'VpcEndpointType': 'Interface',
+            'State': 'available', 'ServiceName': f'com.amazonaws.us-east-1.{svc}', 'PrivateDnsEnabled': dns}
+
+
+def _ssmEp(ping, endpoints=()):
     inst = [{'InstanceId': IID, 'VpcId': 'vpc-1', 'SubnetId': 'subnet-a', 'State': {'Name': 'running'}},
             {'InstanceId': 'i-0second0000000000', 'VpcId': 'vpc-1', 'SubnetId': 'subnet-a', 'State': {'Name': 'running'}}]
-    obj = Ec2Vpc({'VpcId': 'vpc-1', 'OwnerId': SELF}, [], None, _isolatedRouting(), [], None, SELF, inst,
+    obj = Ec2Vpc({'VpcId': 'vpc-1', 'OwnerId': SELF}, [], None, _isolatedRouting(), list(endpoints), None, SELF, inst,
                  None, ping)
     return _run(obj, '_checkSsmVpcEndpointsMissing')['ssmVpcEndpointsMissing']
 
 
-def test_ssm_endpoints_centralized_all_online_pass():
-    res = _ssmEp({IID: 'Online', 'i-0second0000000000': 'Online'})
+ALL_ONLINE = {IID: 'Online', 'i-0second0000000000': 'Online'}
+
+
+def test_ssm_endpoints_centralized_all_online_ssmmessages_unproven_info():
+    # no in-VPC ssm nor ssmmessages: Online proves ssm only -> INFO, never PASS
+    res = _ssmEp(ALL_ONLINE)
+    assert res[0] == 0 and 'centralized' in res[1] and 'not proven' in res[1]
+
+
+def test_ssm_endpoints_centralized_ssm_only_missing_all_online_pass():
+    # ssmmessages present in-VPC, ssm missing but agents Online -> ssm reachable another way
+    res = _ssmEp(ALL_ONLINE, [_iface('ssmmessages'), _iface('ec2messages')])
     assert res[0] == 1 and 'centralized' in res[1]
+
+
+def test_ssm_endpoints_only_ssmmessages_missing_online_still_fails():
+    # review repro: in-VPC ssm (private DNS) + ec2messages, no ssmmessages anywhere,
+    # agents Online through the in-VPC ssm endpoint -> Session Manager broken -> FAIL
+    res = _ssmEp(ALL_ONLINE, [_iface('ssm'), _iface('ec2messages')])
+    assert res[0] == -1 and 'ssmmessages' in res[1] and 'centralized' not in res[1]
+    res = _ssmEp({IID: 'Online', 'i-0second0000000000': 'ConnectionLost'}, [_iface('ssm')])
+    assert res[0] == -1 and 'centralized' not in res[1]
 
 
 def test_ssm_endpoints_centralized_partially_online_info():
@@ -300,15 +342,15 @@ def test_datastore_security_groups_unreadable_not_silent():
     assert _run(obj, '_checkSelfManagedDataStoreOnEc2')['selfManagedDataStoreOnEc2'][0] == 0
 
 
-def test_instance_security_groups_error_code_recorded():
+def test_instance_security_groups_error_code_returned_not_shared():
     def denied():
         raise botocore.exceptions.ClientError({'Error': {'Code': 'UnauthorizedOperation'}}, 'DescribeSecurityGroups')
     ns = types.SimpleNamespace(_getAllSecurityGroupsCached=denied)
-    assert Ec2.getInstanceAllSecurityGroups(ns, {'SecurityGroups': [{'GroupId': 'sg-1'}]}) is None
-    assert ns.instanceSgError == 'UnauthorizedOperation'
+    assert Ec2.getInstanceAllSecurityGroups(ns, {'SecurityGroups': [{'GroupId': 'sg-1'}]}) == \
+        (None, 'UnauthorizedOperation')
+    assert not hasattr(ns, 'instanceSgError')          # no per-instance state on the shared object
     ns = types.SimpleNamespace(_getAllSecurityGroupsCached=lambda: {'sg-1': SG})
-    assert Ec2.getInstanceAllSecurityGroups(ns, {'SecurityGroups': [{'GroupId': 'sg-1'}]}) == [SG]
-    assert ns.instanceSgError is None
+    assert Ec2.getInstanceAllSecurityGroups(ns, {'SecurityGroups': [{'GroupId': 'sg-1'}]}) == ([SG], None)
 
 
 def test_datastore_ssm_lookup_failed_message():

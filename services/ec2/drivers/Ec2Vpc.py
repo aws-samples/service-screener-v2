@@ -309,7 +309,12 @@ class Ec2Vpc(Evaluator):
         Without in-VPC endpoints, isolated instances whose SSM Agent is Online
         reach Systems Manager another way (typically centralized interface
         endpoints in a shared-services VPC, resolved through a private hosted
-        zone associated with this VPC): all Online -> PASS, some Online -> INFO."""
+        zone associated with this VPC). PingStatus proves only that the ssm
+        endpoint is reachable, so it is used only when 'ssm' has no in-VPC
+        endpoint: all Online and ssmmessages present in-VPC -> PASS; all Online
+        but ssmmessages also missing -> INFO (not proven); some Online -> INFO.
+        When only ssmmessages is missing, Online status proves nothing about it
+        and the result stays FAIL."""
         key = 'ssmVpcEndpointsMissing'
         if self.routing is None or self.instances is None:
             return
@@ -370,10 +375,17 @@ class Ec2Vpc(Evaluator):
         if len(dnsOff) == len(missing):
             self.results[key] = [0, f"{where}; interface endpoint(s) {', '.join(dnsOff)} have private DNS disabled - verify a private hosted zone resolves the SSM hostnames{optNote}"]
             return
+        # PingStatus is driven by the agent's calls to the ssm endpoint
+        # (UpdateInstanceInformation), so Online proves only that 'ssm' is
+        # reachable. It is used only when 'ssm' itself has no in-VPC endpoint;
+        # ssmmessages reachability (Session Manager) is never inferred from it.
         ping = self.ssmPingStatus or {}
-        online = [i for i in instIds if ping.get(i) == 'Online']
+        online = [i for i in instIds if ping.get(i) == 'Online'] if 'ssm' in missing else []
         if online and len(online) == len(instIds):
-            self.results[key] = [1, f"No {', '.join(missing)} interface endpoint in this VPC, but the SSM Agent is Online for all {where} (likely centralized endpoints in a shared-services VPC)"]
+            if 'ssmmessages' in missing:
+                self.results[key] = [0, f"No {', '.join(missing)} interface endpoint in this VPC; the SSM Agent is Online for all {where}, so ssm is reachable another way (likely centralized endpoints in a shared-services VPC), but ssmmessages (Session Manager) reachability is not proven - verify it{optNote}"]
+            else:
+                self.results[key] = [1, f"No ssm interface endpoint in this VPC, but the SSM Agent is Online for all {where} (ssm reachable, likely via centralized endpoints in a shared-services VPC); ssmmessages endpoint present{optNote}"]
             return
         if online:
             offline = [i for i in instIds if i not in online]

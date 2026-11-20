@@ -381,17 +381,18 @@ class Ec2(Service):
 
     def getInstanceAllSecurityGroups(self, instance):
         """Every security group on the instance's network interfaces (no tag filter:
-        the groups decide what the instance accepts). None when unreadable."""
+        the groups decide what the instance accepts). Returns (groups, errorCode):
+        (None, '<code>') when unreadable, (groups, None) otherwise - the error is
+        returned with the result, not stored on self, so it cannot leak across
+        instances."""
         ids = {g.get('GroupId') for g in instance.get('SecurityGroups', []) or []}
         for eni in instance.get('NetworkInterfaces', []) or []:
             ids.update(g.get('GroupId') for g in eni.get('Groups', []) or [])
-        self.instanceSgError = None
         try:
             allSGs = self._getAllSecurityGroupsCached()
         except botocore.exceptions.ClientError as e:
-            self.instanceSgError = e.response.get('Error', {}).get('Code', 'ClientError')
-            return None
-        return [allSGs[i] for i in sorted(i for i in ids if i) if i in allSGs]
+            return None, e.response.get('Error', {}).get('Code', 'ClientError')
+        return [allSGs[i] for i in sorted(i for i in ids if i) if i in allSGs], None
 
     def getDataTierSecurityGroups(self, enis):
         """{groupId: (group, {kind: [eniId, ...]})} for security groups attached to
@@ -1134,12 +1135,12 @@ class Ec2(Service):
                     if instanceData['State']['Name'] not in ('running', 'stopped'):
                         continue
                     _pi('EC2::SSM Check', instanceData['InstanceId'])
+                    instSgs, instSgError = (self.getInstanceAllSecurityGroups(instanceData)
+                                            if self._ruleSelected('selfManagedDataStoreOnEc2') else (None, None))
                     obj = Ec2SSM(instanceData['InstanceId'], ssmManagedSet, instanceData,
                                  getattr(self, 'ssmError', None), getattr(self, 'ssmPingStatus', None),
                                  self.ssmClient, getattr(self, 'ssmPlatform', None),
-                                 self.getInstanceAllSecurityGroups(instanceData)
-                                 if self._ruleSelected('selfManagedDataStoreOnEc2') else None,
-                                 getattr(self, 'instanceSgError', None))
+                                 instSgs, instSgError)
                     obj.run(self.__class__)
                     objs[f"SSM::{instanceData['InstanceId']}"] = obj.getInfo()
         

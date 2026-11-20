@@ -1,3 +1,5 @@
+import ipaddress
+
 import boto3
 import botocore
 
@@ -39,7 +41,8 @@ class Ec2NACL(Evaluator):
         """Custom (non-default) NACL associated with subnets whose inbound rules allow
         all protocols / all ports from 0.0.0.0/0 or ::/0 with no lower-numbered deny
         rule for that address family - the NACL adds no subnet-level filtering.
-        Only a deny of all protocols from the whole family (0.0.0.0/0 or ::/0) stops
+        Only a deny of all protocols from the whole family (0.0.0.0/0 or ::/0), or
+        all-protocol deny rules whose CIDRs together cover the family, stops
         the scan; narrower deny rules (one host, one port, one protocol) are skipped,
         and an allow-all reached behind them is reported as INFO (block-list NACL:
         nearly all internet traffic is still allowed), never PASS.
@@ -54,14 +57,26 @@ class Ec2NACL(Evaluator):
                          key=lambda e: e.get('RuleNumber', 0))
         open_, partial = [], []
         for famKey, anyCidr in (('CidrBlock', '0.0.0.0/0'), ('Ipv6CidrBlock', '::/0')):
-            narrow = []
+            narrow, deniedNets = [], []
+            anyNet = ipaddress.ip_network(anyCidr)
             for e in ingress:
                 if famKey not in e:
                     continue
-                allTraffic = str(e.get('Protocol')) == '-1' and e.get(famKey) == anyCidr
+                allProto = str(e.get('Protocol')) == '-1'
+                allTraffic = allProto and e.get(famKey) == anyCidr
                 if e.get('RuleAction') == 'deny':
                     if allTraffic:
                         break  # all traffic of this family is denied before any allow-all
+                    if allProto:
+                        try:
+                            deniedNets.append(ipaddress.ip_network(e.get(famKey), strict=False))
+                        except (TypeError, ValueError):
+                            pass
+                        # all-protocol denies that together cover the family
+                        # (e.g. 0.0.0.0/1 + 128.0.0.0/1) deny everything as well
+                        if anyNet in ipaddress.collapse_addresses(
+                                n for n in deniedNets if n.version == anyNet.version):
+                            break
                     narrow.append(str(e.get('RuleNumber')))
                     continue
                 if e.get('RuleAction') == 'allow' and allTraffic:
