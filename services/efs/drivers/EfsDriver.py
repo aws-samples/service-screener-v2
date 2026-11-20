@@ -41,13 +41,20 @@ class EfsDriver(Evaluator):
             self.results['EncryptedAtRest'] = [-1, 'Disabled']
 
     def _checkLifecycle_configuration(self):
-        self.results['Lifecycle'] = [1, 'Enabled']
-        efs_id = self.efs['FileSystemId']
+        key = 'EnabledLifecycle'
+        try:
+            life_cycle = self._lifecycleConfiguration()
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({e.response['Error']['Code']})"]
+            return
 
-        life_cycle = self._lifecycleConfiguration()
-
-        if len(life_cycle['LifecyclePolicies']) == 0:
-            self.results['EnabledLifecycle'] = [-1, 'Disabled']
+        policies = life_cycle.get('LifecyclePolicies')
+        if policies is None:
+            self.results[key] = [0, 'Unable to evaluate (LifecyclePolicies not returned)']
+        elif len(policies) == 0:
+            self.results[key] = [-1, 'Disabled']
+        else:
+            self.results[key] = [1, 'Enabled']
 
     def _checkBackupPolicy(self):
         self.results['AutomatedBackup'] = [1, 'Enabled']

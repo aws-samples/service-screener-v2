@@ -1,7 +1,7 @@
 {
 	"transferFamilyInsecure": {
 		"category": "S",
-		"^description": "{$COUNT} Transfer Family server(s) allow plaintext FTP or use an outdated security policy (TransferSecurityPolicy-2018-11, TransferSecurityPolicy-2020-06 or TransferSecurityPolicy-FIPS-2020-06). FTP sends user credentials and file contents unencrypted, and the older security policies still offer SHA-1 based and other legacy cryptographic algorithms. Use SFTP or FTPS and attach a current security policy such as TransferSecurityPolicy-2024-01 (or a FIPS equivalent).",
+		"^description": "{$COUNT} Transfer Family server(s) allow plaintext FTP or use an outdated or deprecated security policy (TransferSecurityPolicy-2018-11, TransferSecurityPolicy-Restricted-2018-11, TransferSecurityPolicy-2020-06, TransferSecurityPolicy-Restricted-2020-06, TransferSecurityPolicy-FIPS-2020-06 or the deprecated TransferSecurityPolicy-PQ-SSH-Experimental-2023-04 / TransferSecurityPolicy-PQ-SSH-FIPS-Experimental-2023-04). FTP sends user credentials and file contents unencrypted, and the older security policies still offer SHA-1 based and other legacy cryptographic algorithms. Use SFTP or FTPS and attach a current security policy such as TransferSecurityPolicy-2024-01 (or a FIPS equivalent).",
 		"shortDesc": "Disable FTP and use a current security policy",
 		"criticality": "M",
 		"downtime": 0,

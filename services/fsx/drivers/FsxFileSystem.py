@@ -42,7 +42,7 @@ class FsxFileSystem(Evaluator):
                 self.results[key] = [0, f'Automatic backups not supported on Lustre {deployment} file systems']
                 return
             ## Legacy S3 linking (ImportPath) on persistent file systems does not support backups
-            if cfg.get('DataRepositoryConfiguration'):
+            if (cfg.get('DataRepositoryConfiguration') or {}).get('ImportPath'):
                 self.results[key] = [0, 'Automatic backups not supported on Lustre file systems linked to S3 via ImportPath']
                 return
 

@@ -63,3 +63,25 @@ def test_access_denied_is_not_evaluable():
 
 def test_missing_policy_is_not_pass():
     assert _run(_describe(_server(Protocols=['SFTP'])))[0] == 0
+
+
+def test_restricted_variants_of_outdated_policies_flag():
+    """Restricted-2018-11 / Restricted-2020-06 equal their base policy minus chacha20, so
+    Restricted-2018-11 still offers diffie-hellman-group14-sha1 and hmac-sha1 (AWS docs)."""
+    for pol in ('TransferSecurityPolicy-Restricted-2018-11', 'TransferSecurityPolicy-Restricted-2020-06',
+                'TransferSecurityPolicy-PQ-SSH-Experimental-2023-04',
+                'TransferSecurityPolicy-PQ-SSH-FIPS-Experimental-2023-04'):
+        r = _run(_describe(_server(Protocols=['SFTP'], SecurityPolicyName=pol)))
+        assert r[0] == -1 and pol in r[1], (pol, r)
+
+
+def test_every_current_policy_passes():
+    for pol in TransferServer.CURRENT_POLICIES:
+        assert _run(_describe(_server(Protocols=['SFTP'], SecurityPolicyName=pol)))[0] == 1, pol
+
+
+def test_unrecognised_policy_is_info_not_pass():
+    r = _run(_describe(_server(Protocols=['SFTP'], SecurityPolicyName='TransferSecurityPolicy-Future-2099-01')))
+    assert r == [0, 'Unable to evaluate (unrecognised security policy TransferSecurityPolicy-Future-2099-01)']
+    ## FTP is still a FAIL whatever the policy name
+    assert _run(_describe(_server(Protocols=['FTP'], SecurityPolicyName='TransferSecurityPolicy-Future-2099-01')))[0] == -1
