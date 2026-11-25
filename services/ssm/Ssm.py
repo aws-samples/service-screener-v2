@@ -9,19 +9,22 @@ from services.Service import Service
 from services.ssm.drivers.SsmParameter import SsmParameter
 from services.ssm.drivers.SsmManagedInstance import SsmManagedInstance
 from services.ssm.drivers.SsmSessionManager import SsmSessionManager
+from services.ssm.drivers.SsmDocument import SsmDocument
 
 
 class Ssm(Service):
     """
     AWS Systems Manager service scanner.
 
-    SSM has three unrelated check subjects, so discovery fans out into three
+    SSM has four unrelated check subjects, so discovery fans out into four
     drivers:
 
       SsmParameter       -- per Parameter Store parameter (encryption, hygiene)
       SsmManagedInstance -- per managed instance (patch compliance, agent, ping)
-      SsmSessionManager  -- region-scoped Session Manager preferences and the
-                            Default Host Management Configuration setting
+      SsmDocument        -- per self-owned SSM document (public sharing)
+      SsmSessionManager  -- region-scoped ("SSM::Account"): Session Manager
+                            preferences, Default Host Management, the public
+                            document sharing setting and patch automation
 
     Hydration calls (all read-only):
       - describe_parameters          (paginated)
@@ -31,6 +34,12 @@ class Ssm(Service):
       - list_inventory_entries       (per instance, AWS:InstanceInformation)
       - get_document                 (SSM-SessionManagerRunShell preferences)
       - get_service_setting          (Default Host Management Configuration)
+      - list_documents               (Owner=Self, paginated)
+    Region-scoped checks additionally call (inside the check, read-only):
+      describe_document_permission, get_service_setting, list_associations,
+      describe_association, describe_maintenance_windows,
+      describe_maintenance_window_tasks, get_maintenance_window_task,
+      ssm-quicksetup list_configuration_managers.
     """
 
     ACCESS_DENIED_CODES = (
@@ -65,6 +74,13 @@ class Ssm(Service):
         super().__init__(region)
         ssBoto = self.ssBoto
         self.ssmClient = ssBoto.client('ssm', config=self.bConfig)
+        ## Quick Setup is not offered in every Region; the check tolerates
+        ## endpoint errors, so a client that cannot be built is just skipped.
+        try:
+            self.quickSetupClient = ssBoto.client('ssm-quicksetup',
+                                                  config=self.bConfig)
+        except Exception:
+            self.quickSetupClient = None
 
     # ------------------------------------------------------------------ #
     # Discovery
@@ -113,6 +129,26 @@ class Ssm(Service):
                 return []
             self._logClientError(f'list_tags_for_resource({name})', e)
             return []
+
+    def _listSelfOwnedDocuments(self):
+        documents = []
+        try:
+            paginator = self.ssmClient.get_paginator('list_documents')
+            for page in paginator.paginate(
+                    Filters=[{'Key': 'Owner', 'Values': ['Self']}]):
+                for doc in page.get('DocumentIdentifiers', []) or []:
+                    if not doc.get('Name'):
+                        continue
+                    if self.tags and not self.resourceHasTags(
+                            doc.get('Tags') or []):
+                        continue
+                    doc['_region'] = self.region
+                    documents.append(doc)
+        except botocore.exceptions.ClientError as e:
+            self._logClientError('list_documents', e)
+        except botocore.exceptions.EndpointConnectionError:
+            pass
+        return documents
 
     def _describeInstances(self):
         """Managed instances, each hydrated with patch state and inventory."""
@@ -190,6 +226,7 @@ class Ssm(Service):
             '_accountId': self._currentAccount(),
             '_sessionPreferences': self._getSessionPreferences(),
             '_sessionPreferencesFound': self._sessionPreferencesFound,
+            '_sessionPreferencesError': self._sessionPreferencesError,
             '_dhmcSetting': self._getDhmcSetting(),
         }
 
@@ -202,24 +239,35 @@ class Ssm(Service):
         "configured with empty values".
         """
         self._sessionPreferencesFound = False
+        self._sessionPreferencesError = None
         try:
+            ## JSON is GetDocument's documented default; requested explicitly so
+            ## a document authored in YAML is always returned as parseable JSON.
             resp = self.ssmClient.get_document(
-                Name=self.SESSION_PREFERENCES_DOCUMENT)
+                Name=self.SESSION_PREFERENCES_DOCUMENT, DocumentFormat='JSON')
         except botocore.exceptions.ClientError as e:
             code = e.response.get('Error', {}).get('Code', '')
             if code not in ('InvalidDocument', 'InvalidDocumentVersion'):
+                ## Not "missing" — the document could not be read.
+                self._sessionPreferencesError = code or 'Unknown'
                 self._logClientError('get_document(SSM-SessionManagerRunShell)', e)
             return {}
         except botocore.exceptions.EndpointConnectionError:
+            self._sessionPreferencesError = 'EndpointConnectionError'
             return {}
 
+        ## The document EXISTS from here on. Content that cannot be read as a
+        ## JSON object with an 'inputs' object is "could not evaluate", never
+        ## "no preferences configured" (that would be a false FAIL).
         try:
-            content = json.loads(resp.get('Content') or '{}')
+            content = json.loads(resp.get('Content') or '')
         except (ValueError, TypeError):
+            self._sessionPreferencesError = 'InvalidDocumentContent'
             return {}
 
-        inputs = content.get('inputs')
+        inputs = content.get('inputs') if isinstance(content, dict) else None
         if not isinstance(inputs, dict):
+            self._sessionPreferencesError = 'InvalidDocumentContent'
             return {}
 
         self._sessionPreferencesFound = True
@@ -280,12 +328,24 @@ class Ssm(Service):
             except Exception as e:
                 print(f"Error processing SSM managed instance {instanceId}: {e}")
 
+        for doc in self._listSelfOwnedDocuments():
+            name = doc.get('Name', 'unknown')
+            try:
+                _pi('Ssm', f"Analyzing document: {name}")
+                obj = SsmDocument(doc, self.ssmClient)
+                obj.run(self.__class__)
+                objs[f"SSM Document::{name}"] = obj.getInfo()
+                del obj
+            except Exception as e:
+                print(f"Error processing SSM document {name}: {e}")
+
         ## Session Manager preferences are region-scoped and always evaluated:
         ## they govern every session opened in the region whether or not any
         ## instance is currently registered.
         try:
             detail = self._getSessionManagerDetail()
-            obj = SsmSessionManager(detail, self.ssmClient)
+            obj = SsmSessionManager(detail, self.ssmClient,
+                                    self.quickSetupClient)
             obj.run(self.__class__)
             objs['SSM::Account'] = obj.getInfo()
             del obj

@@ -9,12 +9,12 @@
     "additionalCost": 1,
     "needFullTest": 0,
     "ref": [
-      "[Data protection in Amazon EventBridge]<https://docs.aws.amazon.com/eventbridge/latest/userguide/encryption-at-rest.html>",
-      "[Customer managed keys for event buses]<https://docs.aws.amazon.com/eventbridge/latest/userguide/encryption-at-rest-cmkes.html>"
+      "[Data protection in Amazon EventBridge]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-encryption-event-bus-cmkey.html>",
+      "[Customer managed keys for event buses]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-encryption-event-bus-cmkey-configure.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
-    "remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/encryption-at-rest-cmkes.html"
+    "remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-encryption-event-bus-cmkey-configure.html"
   },
   "ebBusPublicPolicy": {
     "category": "S",
@@ -95,7 +95,7 @@
     "needFullTest": 1,
     "ref": [
       "[Amazon EventBridge targets]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-targets.html>",
-      "[Adding targets to a rule]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-rule.html>"
+      "[Adding targets to a rule]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-rule-visual.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
@@ -146,7 +146,7 @@
     "needFullTest": 0,
     "ref": [
       "[Amazon EventBridge rules]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-rules.html>",
-      "[Creating a rule that reacts to events]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-rule.html>"
+      "[Creating a rule that reacts to events]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-create-rule-visual.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
@@ -163,7 +163,7 @@
     "needFullTest": 0,
     "ref": [
       "[Archiving and replaying events]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-archive.html>",
-      "[Replaying archived events]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-archive-replay.html>"
+      "[Replaying archived events]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-archive.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
@@ -180,11 +180,11 @@
     "needFullTest": 0,
     "ref": [
       "[EventBridge schemas]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-schema.html>",
-      "[Schema discovery]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-schema-discovery.html>"
+      "[Schema discovery]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-schemas-infer.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
-    "remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-schema-discovery.html"
+    "remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-schemas-infer.html"
   },
   "ebConnectionNoAuth": {
     "category": "S",
@@ -197,11 +197,11 @@
     "needFullTest": 1,
     "ref": [
       "[Connections for API destinations]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-api-destinations.html>",
-      "[Authorization for API destinations]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-api-destination-auth.html>"
+      "[Authorization for API destinations]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-target-connection-auth.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
-    "remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-api-destination-auth.html"
+    "remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-target-connection-auth.html"
   },
   "ebApiDestinationHttpEndpoint": {
     "category": "S",
@@ -214,7 +214,7 @@
     "needFullTest": 1,
     "ref": [
       "[API destinations]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-api-destinations.html>",
-      "[Data protection in transit]<https://docs.aws.amazon.com/eventbridge/latest/userguide/data-protection.html>"
+      "[Data protection in transit]<https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-data-protection.html>"
     ],
     "remediation": null,
     "remediation_risk": null,
@@ -236,5 +236,41 @@
     "remediation": null,
     "remediation_risk": null,
     "remediation_doc": "https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-global-endpoints.html"
+  },
+  "securityFindingsNotRouted": {
+    "category": "S",
+    "^description": "{$COUNT} region(s) have no enabled EventBridge rule with a target that matches the finding events of Amazon GuardDuty, AWS Security Hub, Amazon Inspector or IAM Access Analyzer on the default event bus (both source and detail-type are evaluated: a rule limited to 'AWS API Call via CloudTrail' events or to Security Hub custom actions does not receive findings), and the account is not a GuardDuty/Security Hub member nor aggregating Security Hub findings into another Region. When membership or aggregation cannot be read (for example AccessDenied on guardduty:GetAdministratorAccount or securityhub:GetAdministratorAccount), the Region is reported as INFO rather than flagged. Findings are then only visible to someone who opens the console, so a compromised credential or exposed resource can go unnoticed for days. Route findings to a responder (ticketing, chat, on-call paging or automated remediation) so every finding is triaged.",
+    "shortDesc": "Route security findings to a responder with an EventBridge rule",
+    "criticality": "M",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": [
+      "[Creating a rule for GuardDuty findings with EventBridge]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_findings_eventbridge.html>",
+      "[Using EventBridge for automated response and remediation (Security Hub)]<https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cloudwatch-events.html>",
+      "[Amazon Inspector: creating custom responses with EventBridge]<https://docs.aws.amazon.com/inspector/latest/user/findings-managing-automating-responses.html>",
+      "[Monitoring IAM Access Analyzer with EventBridge]<https://docs.aws.amazon.com/IAM/latest/UserGuide/access-analyzer-eventbridge.html>"
+    ],
+    "remediation": null,
+    "remediation_risk": null,
+    "remediation_doc": "https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_findings_eventbridge.html"
+  },
+  "healthEventsNotRouted": {
+    "category": "O",
+    "^description": "{$COUNT} region(s) have no enabled EventBridge rule with a target that matches AWS Health events (source aws.health, detail-type 'AWS Health Event' or 'AWS Health Abuse Event') on the default event bus (in the Region or, for global events, in the partition's global-event Region: us-east-1, us-gov-west-1 in AWS GovCloud (US), cn-north-1 in China). AWS Health service issues, scheduled maintenance and security notifications about the account's resources then reach no team automatically and are only seen when someone opens the AWS Health Dashboard. If AWS Health events are centralised with the organizational view in another account, confirm routing there.",
+    "shortDesc": "Route AWS Health events to an operations responder",
+    "criticality": "L",
+    "downtime": 0,
+    "slowness": 0,
+    "additionalCost": 0,
+    "needFullTest": 0,
+    "ref": [
+      "[Monitoring AWS Health events with Amazon EventBridge]<https://docs.aws.amazon.com/health/latest/ug/cloudwatch-events-health.html>",
+      "[Creating an EventBridge rule for AWS Health]<https://docs.aws.amazon.com/health/latest/ug/creating-event-bridge-events-rule-for-aws-health.html>"
+    ],
+    "remediation": null,
+    "remediation_risk": null,
+    "remediation_doc": "https://docs.aws.amazon.com/health/latest/ug/cloudwatch-events-health.html"
   }
 }

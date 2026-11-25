@@ -10,7 +10,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Managing rules in a web ACL]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-editing.html>",
-			"[AWS WAF security best practices]<https://docs.aws.amazon.com/waf/latest/developerguide/security-best-practices.html>"
+			"[Using web ACLs with rules and rule groups in AWS WAF]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-processing.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -60,7 +60,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Testing rules with Count]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-testing.html>",
-			"[Overriding a managed rule group action]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-rule-group-override-options.html>"
+			"[Overriding rule group actions in AWS WAF]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-rule-group-override-options.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -124,11 +124,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Web ACL and rule visibility configuration]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-basic-configuration.html>"
+			"[Monitoring AWS WAF with Amazon CloudWatch]<https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-basic-configuration.html"
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html"
 	},
 	"wafv2SampledRequestsDisabled": {
 		"category": "O",
@@ -156,11 +156,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Web ACL and rule visibility configuration]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-basic-configuration.html>"
+			"[Monitoring AWS WAF with Amazon CloudWatch]<https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-basic-configuration.html"
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/monitoring-cloudwatch.html"
 	},
 	"wafv2NotAssociated": {
 		"category": "C",
@@ -189,12 +189,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Tagging AWS resources]<https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html>",
-			"[Tagging AWS WAF resources]<https://docs.aws.amazon.com/waf/latest/developerguide/tagging.html>"
+			"[Tagging AWS resources]<https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html>",
+			"[AWS WAF TagResource API reference]<https://docs.aws.amazon.com/waf/latest/APIReference/API_TagResource.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/general/latest/gr/aws_tagging.html"
+		"remediation_doc": "https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html"
 	},
 	"wafv2NoIpReputationList": {
 		"category": "S",
@@ -223,7 +223,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[AWSManagedRulesSQLiRuleSet]<https://docs.aws.amazon.com/waf/latest/developerguide/aws-managed-rule-groups-list.html#aws-managed-rule-groups-use-case-sql-db>",
-			"[OWASP A03: Injection]<https://owasp.org/Top10/A03_2021-Injection/>"
+			"[OWASP Top 10:2021 A03 Injection]<https://owasp.org/Top10/2021/A03_2021-Injection/>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -304,11 +304,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[WAF rule priorities]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-rule-order.html>"
+			"[WAF rule priorities]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-processing-order.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-rule-order.html"
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-processing-order.html"
 	},
 	"wafv2ManagedRuleGroupVersionPinned": {
 		"category": "O",
@@ -320,11 +320,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Managed rule group versions]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-group-versioning.html>"
+			"[Managed rule group versions]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-groups-versioning.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-group-versioning.html"
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-groups-versioning.html"
 	},
 	"wafv2NoBotControl": {
 		"category": "S",
@@ -497,11 +497,11 @@
 		"additionalCost": -1,
 		"needFullTest": 1,
 		"ref": [
-			"[WAF rule priority]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-rule-order.html>"
+			"[WAF rule priority]<https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-processing-order.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-rule-order.html"
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/web-acl-processing-order.html"
 	},
 	"wafv2IpSetEmpty": {
 		"category": "O",
@@ -577,11 +577,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Managed rule group versioning]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-group-versioning.html>"
+			"[Managed rule group versioning]<https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-groups-versioning.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-group-versioning.html"
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/waf-managed-rule-groups-versioning.html"
 	},
 	"wafv2AlbWithoutWebAcl": {
 		"category": "S",
@@ -657,10 +657,78 @@
 		"additionalCost": 1,
 		"needFullTest": 1,
 		"ref": [
-			"[WAF with Cognito user pools]<https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-waf.html>"
+			"[WAF with Cognito user pools]<https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-waf.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/cognito-user-pool-waf.html"
+		"remediation_doc": "https://docs.aws.amazon.com/cognito/latest/developerguide/user-pool-waf.html"
+	},
+	"shieldAdvancedNoProactiveEngagement": {
+		"category": "S",
+		"^description": "Shield Advanced is active but proactive engagement is not enabled or no emergency contacts are configured. Without them the Shield Response Team (SRT) cannot contact you when a health-check-based DDoS event affects your protected resources, delaying incident response. Reported once per account.",
+		"shortDesc": "Enable Shield Advanced proactive engagement and configure emergency contacts",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Configuring proactive engagement]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-srt-proactive-engagement.html>",
+			"[Contacting the SRT for help with a suspected DDoS event]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-srt-contacting.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/ddos-srt-proactive-engagement.html"
+	},
+	"shieldAdvancedPublicResourcesUnprotected": {
+		"category": "S",
+		"^description": "Shield Advanced is subscribed but {$COUNT} scope(s) contain internet-facing resources (internet-facing ALB/CLB, associated Elastic IPs, CloudFront distributions, public Route 53 hosted zones) with no Shield Advanced protection. The subscription only covers resources that are explicitly added as protections, so these resources get no enhanced DDoS detection, SRT support or cost protection. Accounts without a subscription are reported as INFO only.",
+		"shortDesc": "Add Shield Advanced protections for every internet-facing resource",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Adding AWS Shield Advanced protection to AWS resources]<https://docs.aws.amazon.com/waf/latest/developerguide/configure-new-protection.html>",
+			"[Resources that AWS Shield Advanced protects]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-advanced-summary-protected-resources.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/configure-new-protection.html"
+	},
+	"shieldAutoL7MitigationDisabled": {
+		"category": "S",
+		"^description": "{$COUNT} Shield Advanced protection(s) on CloudFront distributions or Application Load Balancers do not have automatic application layer DDoS mitigation enabled. Without it, Shield Advanced will not create and deploy WAF rules automatically to counter HTTP floods, so mitigation of L7 attacks depends on manual action.",
+		"shortDesc": "Enable automatic application layer DDoS mitigation on CloudFront/ALB protections",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Automating application layer DDoS mitigation with Shield Advanced]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-automatic-app-layer-response.html>",
+			"[Enabling automatic application layer DDoS mitigation]<https://docs.aws.amazon.com/waf/latest/developerguide/ddos-automatic-app-layer-response-config.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/ddos-automatic-app-layer-response.html"
+	},
+	"fmsNoNetworkPolicies": {
+		"category": "S",
+		"^description": "This account is an AWS Firewall Manager administrator but has no Firewall Manager policies in {$COUNT} region(s). WAF, Shield Advanced, security group, Network Firewall and DNS Firewall baselines are therefore not centrally enforced on new accounts and resources in the organization. Only evaluated when the scanned account is confirmed as the Firewall Manager administrator (other accounts, and regions outside the administrator's region scope, are reported as informational); other mechanisms (CloudFormation StackSets, Landing Zone Accelerator) are valid alternatives.",
+		"shortDesc": "Define Firewall Manager policies to enforce network protections organization-wide",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[AWS Firewall Manager policies]<https://docs.aws.amazon.com/waf/latest/developerguide/working-with-policies.html>",
+			"[Getting started with AWS Firewall Manager]<https://docs.aws.amazon.com/waf/latest/developerguide/getting-started-fms.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/waf/latest/developerguide/working-with-policies.html"
 	}
 }

@@ -1,7 +1,8 @@
 import json
 import os
+import re
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone, date
 
 import botocore
 import boto3
@@ -26,6 +27,98 @@ class LambdaCommon(Evaluator):
         'provided'
     ]
 
+    # lambdaDeprecatedRuntime: runtime identifier -> deprecation date (YYYY-MM-DD),
+    # from https://docs.aws.amazon.com/lambda/latest/dg/lambda-runtimes.html
+    # ("Deprecated runtimes" / "Upcoming runtime deprecations"). Maintain this table
+    # when AWS publishes new dates. A runtime is flagged only once its deprecation
+    # date is in the past; published future dates are listed so they flag
+    # automatically once reached. Dates as published on the AWS runtimes page
+    # (re-checked 2026-11-20 against "Supported runtimes" on lambda-runtimes.html
+    # and the deprecated-runtimes table on runtime-support-policy.html; AL2-based
+    # runtimes do not share one date: provided.al2 2026-07-31, python3.10
+    # 2026-10-31, java8.al2/java11/java17/python3.11 2027-06-30).
+    # Container-only runtimes (dotnet5.0, dotnet9) are not listed: container image
+    # functions return no Runtime and are reported separately.
+    DEPRECATED_RUNTIMES = {
+        'nodejs': '2016-08-30',
+        'nodejs4.3': '2020-03-05',
+        'nodejs4.3-edge': '2020-03-05',
+        'nodejs6.10': '2019-08-12',
+        'nodejs8.10': '2020-03-06',
+        'nodejs10.x': '2021-07-30',
+        'nodejs12.x': '2023-03-31',
+        'nodejs14.x': '2023-12-04',
+        'nodejs16.x': '2024-06-12',
+        'nodejs18.x': '2025-09-01',
+        'nodejs20.x': '2026-04-30',
+        'nodejs22.x': '2027-05-30',
+        'nodejs24.x': '2028-04-30',
+        'python2.7': '2021-07-15',
+        'python3.6': '2022-07-18',
+        'python3.7': '2023-12-04',
+        'python3.8': '2024-10-14',
+        'python3.9': '2025-12-15',
+        'python3.10': '2026-10-31',
+        'python3.11': '2027-06-30',
+        'python3.12': '2028-10-31',
+        'python3.13': '2029-06-30',
+        'python3.14': '2029-06-30',
+        'ruby2.5': '2021-07-30',
+        'ruby2.7': '2023-12-07',
+        'ruby3.2': '2026-03-31',
+        'ruby3.3': '2027-03-31',
+        'ruby3.4': '2028-03-31',
+        'ruby4.0': '2029-03-31',
+        'java8': '2024-01-08',
+        'java8.al2': '2027-06-30',
+        'java11': '2027-06-30',
+        'java17': '2027-06-30',
+        'java8.al2023': '2029-06-30',
+        'java11.al2023': '2029-06-30',
+        'java17.al2023': '2029-06-30',
+        'java21': '2029-06-30',
+        'java25': '2029-06-30',
+        'go1.x': '2024-01-08',
+        'provided': '2024-01-08',
+        'provided.al2': '2026-07-31',
+        'provided.al2023': '2029-06-30',
+        'dotnetcore1.0': '2019-06-27',
+        'dotnetcore2.0': '2019-05-30',
+        'dotnetcore2.1': '2022-01-05',
+        'dotnetcore3.1': '2023-04-03',
+        'dotnet6': '2024-12-20',
+        'dotnet7': '2024-05-14',
+        'dotnet8': '2026-11-10',
+        'dotnet10': '2028-11-14',
+    }
+
+    # lambdaEnvVarSecrets: same name patterns as ecs.ecsTaskDefinitionNoSecretsInEnvVars
+    SECRET_NAME_PATTERNS = [
+        re.compile(r'AWS_SECRET_ACCESS_KEY', re.IGNORECASE),
+        re.compile(r'AWS_SESSION_TOKEN', re.IGNORECASE),
+        re.compile(r'PASSWORD', re.IGNORECASE),
+        re.compile(r'PASSWD', re.IGNORECASE),
+        re.compile(r'(^|_)SECRET($|_)', re.IGNORECASE),
+        re.compile(r'API[_-]?KEY', re.IGNORECASE),
+        re.compile(r'PRIVATE[_-]?KEY', re.IGNORECASE),
+        re.compile(r'(^|_)TOKEN($|_)', re.IGNORECASE),
+        re.compile(r'CREDENTIALS?', re.IGNORECASE),
+        re.compile(r'CONNECTION[_-]?STRING', re.IGNORECASE),
+        re.compile(r'AUTH[_-]?KEY', re.IGNORECASE),
+    ]
+    # Names that point at a secret rather than hold it (e.g. DB_PASSWORD_SECRET_ARN)
+    SECRET_REFERENCE_NAME_RE = re.compile(
+        r'_(ARN|NAME|ID|PATH|PARAM|PARAMETER|PARAMETER_NAME|SSM|REF|URL|URI|ENDPOINT|TTL|TIMEOUT|EXPIRY|EXPIRATION|ENABLED|HEADER)$',
+        re.IGNORECASE)
+    # Values that reference Secrets Manager / SSM Parameter Store instead of embedding a secret
+    SECRET_REFERENCE_VALUE_RE = re.compile(r'^arn:aws[a-z-]*:(secretsmanager|ssm|kms):', re.IGNORECASE)
+    # SSM Parameter Store hierarchical path (e.g. /prod/db/password) - a reference, not the secret
+    SSM_PATH_VALUE_RE = re.compile(r'^/[A-Za-z0-9_.\-/]+$')
+    BENIGN_VALUE_RE = re.compile(r'^(true|false|yes|no|on|off|none|null|enabled|disabled|\d{1,5})$', re.IGNORECASE)
+    AWS_ACCESS_KEY_ID_RE = re.compile(r'\b(AKIA|ASIA)[0-9A-Z]{16}\b')
+    PEM_PRIVATE_KEY_RE = re.compile(r'-----BEGIN [A-Z ]*PRIVATE KEY-----')
+    URL_WITH_PASSWORD_RE = re.compile(r'[a-z][a-z0-9+.-]*://[^/\s:@]*:[^/\s@]+@', re.IGNORECASE)
+
     RUNTIME_PATH = _C.BOTOCORE_DIR + '/data/lambda/2015-03-31/service-2.json'
     CW_HISTORY_DAYS = [30, 7]
 
@@ -42,6 +135,53 @@ class LambdaCommon(Evaluator):
         self.results = {}
         self.init()
     
+    # ------------------------------------------------------------------ #
+    # Read-once API helpers. Several checks need the same per-function data;
+    # IAM role details are shared across functions that reuse a role.
+    # ------------------------------------------------------------------ #
+    def _codeSigningConfig(self):
+        return self._memo(('get_function_code_signing_config', self.function_name),
+                          lambda: self.lambda_client.get_function_code_signing_config(FunctionName=self.function_name))
+
+    def _functionConfiguration(self):
+        return self._memo(('get_function_configuration', self.function_name),
+                          lambda: self.lambda_client.get_function_configuration(FunctionName=self.function_name))
+
+    def _functionConcurrency(self):
+        return self._memo(('get_function_concurrency', self.function_name),
+                          lambda: self.lambda_client.get_function_concurrency(FunctionName=self.function_name))
+
+    def _eventSourceMappings(self):
+        return self._memo(('list_event_source_mappings', self.function_name),
+                          lambda: self.lambda_client.list_event_source_mappings(FunctionName=self.function_name))
+
+    def _iamGetRole(self, role_name):
+        return self._sharedMemo(('iam', 'get_role', role_name),
+                                lambda: self.iam_client.get_role(RoleName=role_name))
+
+    def _iamListRolePolicies(self, role_name):
+        return self._sharedMemo(('iam', 'list_role_policies', role_name),
+                                lambda: self.iam_client.list_role_policies(RoleName=role_name))
+
+    def _iamListAttachedRolePolicies(self, role_name):
+        return self._sharedMemo(('iam', 'list_attached_role_policies', role_name),
+                                lambda: self.iam_client.list_attached_role_policies(RoleName=role_name))
+
+    def _iamGetRolePolicy(self, role_name, policy_name):
+        return self._sharedMemo(('iam', 'get_role_policy', role_name, policy_name),
+                                lambda: self.iam_client.get_role_policy(RoleName=role_name, PolicyName=policy_name))
+
+    def _sqsGetQueueUrl(self, sqs_client, queue_name):
+        region = sqs_client.meta.region_name
+        return self._sharedMemo(('sqs', region, 'get_queue_url', queue_name),
+                                lambda: sqs_client.get_queue_url(QueueName=queue_name))
+
+    def _sqsVisibilityTimeoutAttrs(self, sqs_client, queue_url):
+        region = sqs_client.meta.region_name
+        return self._sharedMemo(('sqs', region, 'get_queue_attributes', queue_url, 'VisibilityTimeout'),
+                                lambda: sqs_client.get_queue_attributes(QueueUrl=queue_url,
+                                                                        AttributeNames=['VisibilityTimeout']))
+
     @staticmethod
     def get_arn_role_name(arn):
         array = arn.split("/")
@@ -103,9 +243,7 @@ class LambdaCommon(Evaluator):
         role_name = self.get_arn_role_name(role_arn)
 
         try:
-            role = self.iam_client.get_role(
-                RoleName=role_name
-            )
+            role = self._iamGetRole(role_name)
         except botocore.exceptions.ClientError as e:
             if e.response['Error']['Code'] == 'NoSuchEntity':
                 self.results['lambdaMissingRole'] = [-1, '']
@@ -117,9 +255,7 @@ class LambdaCommon(Evaluator):
         if self.lambda_['PackageType'] != 'Zip':
             return
         try:
-            code_sign = self.lambda_client.get_function_code_signing_config(
-                FunctionName=self.function_name
-            )
+            code_sign = self._codeSigningConfig()
             if not code_sign.get('CodeSigningConfigArn'):
                 self.results['lambdaCodeSigningDisabled'] = [-1, 'Disabled']
         except botocore.exceptions.ClientError as e:
@@ -128,9 +264,7 @@ class LambdaCommon(Evaluator):
         return
 
     def _check_dead_letter_queue_disabled(self):
-        config = self.lambda_client.get_function_configuration(
-            FunctionName=self.function_name
-        )
+        config = self._functionConfiguration()
 
         if not config.get('DeadLetterConfig'):
             self.results['lambdaDeadLetterQueueDisabled'] = [-1, 'Disabled']
@@ -154,9 +288,7 @@ class LambdaCommon(Evaluator):
         return
 
     def _check_provisioned_concurrency(self):
-        concurrency = self.lambda_client.get_function_concurrency(
-            FunctionName=self.function_name
-        )
+        concurrency = self._functionConcurrency()
 
         if not concurrency.get('ReservedConcurrentExecutions'):
             self.results['lambdaReservedConcurrencyDisabled'] = [-1, 'Disabled']
@@ -272,14 +404,10 @@ class LambdaCommon(Evaluator):
         """Check if SQS visibility timeout is at least 6x function timeout"""
         try:
             # Get event source mappings
-            mappings = self.lambda_client.list_event_source_mappings(
-                FunctionName=self.function_name
-            )
+            mappings = self._eventSourceMappings()
             
             # Get function timeout
-            func_config = self.lambda_client.get_function_configuration(
-                FunctionName=self.function_name
-            )
+            func_config = self._functionConfiguration()
             function_timeout = func_config.get('Timeout', 3)
             
             # Check each SQS event source
@@ -297,14 +425,11 @@ class LambdaCommon(Evaluator):
                     
                     try:
                         # Get queue URL
-                        queue_url_response = sqs_client.get_queue_url(QueueName=queue_name)
+                        queue_url_response = self._sqsGetQueueUrl(sqs_client, queue_name)
                         queue_url = queue_url_response['QueueUrl']
                         
                         # Get queue attributes
-                        attrs = sqs_client.get_queue_attributes(
-                            QueueUrl=queue_url,
-                            AttributeNames=['VisibilityTimeout']
-                        )
+                        attrs = self._sqsVisibilityTimeoutAttrs(sqs_client, queue_url)
                         
                         visibility_timeout = int(attrs['Attributes'].get('VisibilityTimeout', 30))
                         
@@ -382,9 +507,7 @@ class LambdaCommon(Evaluator):
     def _check_partial_batch_response(self):
         """Check if partial batch response is enabled for stream sources"""
         try:
-            mappings = self.lambda_client.list_event_source_mappings(
-                FunctionName=self.function_name
-            )
+            mappings = self._eventSourceMappings()
             
             for mapping in mappings.get('EventSourceMappings', []):
                 event_source_arn = mapping.get('EventSourceArn', '')
@@ -408,9 +531,7 @@ class LambdaCommon(Evaluator):
     def _check_batching_window(self):
         """Check if batching window is configured for stream sources"""
         try:
-            mappings = self.lambda_client.list_event_source_mappings(
-                FunctionName=self.function_name
-            )
+            mappings = self._eventSourceMappings()
             
             for mapping in mappings.get('EventSourceMappings', []):
                 event_source_arn = mapping.get('EventSourceArn', '')
@@ -434,9 +555,7 @@ class LambdaCommon(Evaluator):
     def _check_iterator_age_alarm(self):
         """Check if IteratorAge alarms are configured for stream consumers"""
         try:
-            mappings = self.lambda_client.list_event_source_mappings(
-                FunctionName=self.function_name
-            )
+            mappings = self._eventSourceMappings()
             
             has_stream_source = False
             for mapping in mappings.get('EventSourceMappings', []):
@@ -659,18 +778,15 @@ class LambdaCommon(Evaluator):
             role_name = self.get_arn_role_name(role_arn)
             
             # Get role policies
-            inline_policies = self.iam_client.list_role_policies(RoleName=role_name)
-            attached_policies = self.iam_client.list_attached_role_policies(RoleName=role_name)
+            inline_policies = self._iamListRolePolicies(role_name)
+            attached_policies = self._iamListAttachedRolePolicies(role_name)
             
             has_wildcard = False
             has_aws_managed = False
             
             # Check inline policies for wildcards
             for policy_name in inline_policies.get('PolicyNames', []):
-                policy = self.iam_client.get_role_policy(
-                    RoleName=role_name,
-                    PolicyName=policy_name
-                )
+                policy = self._iamGetRolePolicy(role_name, policy_name)
                 policy_doc = policy.get('PolicyDocument', {})
                 
                 # Check for wildcard actions or resources
@@ -819,9 +935,7 @@ class LambdaCommon(Evaluator):
                 
                 if throttle_count > 0:
                     # Check if reserved concurrency is set
-                    concurrency = self.lambda_client.get_function_concurrency(
-                        FunctionName=self.function_name
-                    )
+                    concurrency = self._functionConcurrency()
                     
                     if not concurrency.get('ReservedConcurrentExecutions'):
                         self.results['lambdaNoReservedConcurrencyForThrottling'] = [
@@ -833,3 +947,108 @@ class LambdaCommon(Evaluator):
             print(f"Error checking reserved concurrency for throttling: {str(e)}")
         
         return
+
+    # ------------------------------------------------------------------ #
+    # WAFS2027 security checks
+    # ------------------------------------------------------------------ #
+    def _checkLambdaDeprecatedRuntime(self):
+        """FAIL when the function runtime has passed its AWS deprecation date."""
+        key = 'lambdaDeprecatedRuntime'
+        runtime = self.lambda_.get('Runtime')
+        if not runtime:
+            if self.lambda_.get('PackageType') == 'Image':
+                self.results[key] = [0, 'Container image function; runtime is managed in the image']
+            else:
+                self.results[key] = [0, 'Unable to evaluate (Runtime not returned)']
+            return
+
+        deprecated = self.DEPRECATED_RUNTIMES.get(runtime)
+        today = datetime.now(timezone.utc).date()
+        if deprecated and date.fromisoformat(deprecated) <= today:
+            self.results[key] = [-1, f"{runtime} deprecated since {deprecated}"]
+        else:
+            if deprecated:
+                self.results[key] = [1, f"{runtime} is scheduled for deprecation on {deprecated}"]
+            else:
+                self.results[key] = [1, f"{runtime} has no published deprecation date"]
+
+    def _checkLambdaEnvVarSecrets(self):
+        """FAIL when environment variables look like they hold credentials.
+        Only variable NAMES are reported - values are never echoed."""
+        key = 'lambdaEnvVarSecrets'
+        env = self.lambda_.get('Environment') or {}
+        variables = env.get('Variables')
+        if variables is None and env.get('Error'):
+            code = (env.get('Error') or {}).get('ErrorCode') or 'EnvironmentError'
+            self.results[key] = [0, f'Unable to evaluate ({code})']
+            return
+        if not variables:
+            self.results[key] = [1, 'No environment variables']
+            return
+
+        findings = []
+        for name, value in variables.items():
+            val = '' if value is None else str(value).strip()
+            if not val:
+                continue
+            # Value-side: unmistakable credential material regardless of name
+            if self.AWS_ACCESS_KEY_ID_RE.search(val):
+                findings.append(f"{name} (AWS access key ID)")
+                continue
+            if self.PEM_PRIVATE_KEY_RE.search(val):
+                findings.append(f"{name} (PEM private key)")
+                continue
+            if self.URL_WITH_PASSWORD_RE.search(val):
+                findings.append(f"{name} (URL with embedded password)")
+                continue
+            # Name-side: secret-like name holding a literal (not a reference)
+            if name.upper().startswith('AWS_LAMBDA_') or self.SECRET_REFERENCE_NAME_RE.search(name):
+                continue
+            if (self.SECRET_REFERENCE_VALUE_RE.match(val) or self.SSM_PATH_VALUE_RE.match(val)
+                    or self.BENIGN_VALUE_RE.match(val)):
+                continue
+            if any(p.search(name) for p in self.SECRET_NAME_PATTERNS):
+                findings.append(name)
+
+        if findings:
+            msg = 'Credential-like environment variable(s): ' + ', '.join(findings[:5])
+            if len(findings) > 5:
+                msg += f" (+{len(findings) - 5} more)"
+            self.results[key] = [-1, msg]
+        else:
+            self.results[key] = [1, 'No credential-like environment variables detected']
+
+    def _getCodeSigningPolicy(self, cscArn):
+        """UntrustedArtifactOnDeployment for a code signing config (cached per ARN)."""
+        cache = Config.get('lambdaCscPolicyCache', None)
+        if cache is None:
+            cache = {}
+            Config.set('lambdaCscPolicyCache', cache)
+        if cscArn not in cache:
+            resp = self.lambda_client.get_code_signing_config(CodeSigningConfigArn=cscArn)
+            policies = (resp.get('CodeSigningConfig') or {}).get('CodeSigningPolicies') or {}
+            # API default when not specified is Warn
+            cache[cscArn] = policies.get('UntrustedArtifactOnDeployment', 'Warn')
+        return cache[cscArn]
+
+    def _checkLambdaCodeSigningWarnOnly(self):
+        """FAIL when the attached code signing config only warns on untrusted artifacts."""
+        key = 'lambdaCodeSigningWarnOnly'
+        if self.lambda_.get('PackageType', 'Zip') != 'Zip':
+            self.results[key] = [0, 'Code signing not applicable to container image functions']
+            return
+        try:
+            resp = self._codeSigningConfig()
+            cscArn = resp.get('CodeSigningConfigArn')
+            if not cscArn:
+                self.results[key] = [0, 'No code signing config attached (see lambdaCodeSigningDisabled)']
+                return
+            policy = self._getCodeSigningPolicy(cscArn)
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({e.response['Error']['Code']})"]
+            return
+
+        if policy == 'Warn':
+            self.results[key] = [-1, f"UntrustedArtifactOnDeployment=Warn ({cscArn.split(':')[-1]})"]
+        else:
+            self.results[key] = [1, f"UntrustedArtifactOnDeployment={policy}"]

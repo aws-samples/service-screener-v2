@@ -10,7 +10,7 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Managing the configuration recorder]<https://docs.aws.amazon.com/config/latest/developerguide/stop-start-recorder.html>",
-			"[Setting up AWS Config]<https://docs.aws.amazon.com/config/latest/developerguide/setup-aws-config-with-console.html>"
+			"[Setting up AWS Config]<https://docs.aws.amazon.com/config/latest/developerguide/gs-console.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -44,7 +44,7 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Managing the delivery channel]<https://docs.aws.amazon.com/config/latest/developerguide/manage-delivery-channel.html>",
-			"[Setting up AWS Config]<https://docs.aws.amazon.com/config/latest/developerguide/setup-aws-config-with-console.html>"
+			"[Setting up AWS Config]<https://docs.aws.amazon.com/config/latest/developerguide/gs-console.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -61,7 +61,7 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Managing the delivery channel]<https://docs.aws.amazon.com/config/latest/developerguide/manage-delivery-channel.html>",
-			"[Security best practices for AWS Config]<https://docs.aws.amazon.com/config/latest/developerguide/security-best-practices-for-Config.html>"
+			"[Security best practices for AWS Config]<https://docs.aws.amazon.com/config/latest/developerguide/s3-kms-key-policy.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -77,7 +77,7 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Notifications AWS Config sends to an SNS topic]<https://docs.aws.amazon.com/config/latest/developerguide/notifications-that-aws-config-sends-to-an-amazon-sns-topic.html>",
+			"[Notifications AWS Config sends to an SNS topic]<https://docs.aws.amazon.com/config/latest/developerguide/manage-delivery-channel.html>",
 			"[Managing the delivery channel]<https://docs.aws.amazon.com/config/latest/developerguide/manage-delivery-channel.html>"
 		],
 		"remediation": null,
@@ -112,11 +112,11 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Evaluating resources with AWS Config rules]<https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config.html>",
-			"[Managing AWS Config rules]<https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config-rules.html>"
+			"[Managing AWS Config rules]<https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config_components.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config-rules.html"
+		"remediation_doc": "https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config_components.html"
 	},
 	"configRulesNonCompliant": {
 		"category": "S",
@@ -128,7 +128,7 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Viewing compliance information]<https://docs.aws.amazon.com/config/latest/developerguide/view-manage-resource-config.html>",
+			"[Viewing compliance information]<https://docs.aws.amazon.com/config/latest/developerguide/remediation.html>",
 			"[Remediating non-compliant resources]<https://docs.aws.amazon.com/config/latest/developerguide/remediation.html>"
 		],
 		"remediation": null,
@@ -199,5 +199,58 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/config/latest/developerguide/select-resources.html"
+	},
+	"configNoProactiveRules": {
+		"category": "S",
+		"^description": "{$COUNT} region(s) have active AWS Config rules but none of them evaluates in PROACTIVE mode. Detective rules only flag a non-compliant resource after it has been deployed; proactive evaluation lets AWS Config assess a resource configuration before provisioning (for example from a CloudFormation hook or the StartResourceEvaluation API), so misconfigurations can be stopped at deployment time. Enable the PROACTIVE evaluation mode on the managed rules that support it for your critical controls. Teams that already enforce the same policies in CI (for example with cfn-guard or Checkov) can treat this as advisory.",
+		"shortDesc": "Enable proactive evaluation on supported AWS Config rules",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Evaluation modes for AWS Config rules]<https://docs.aws.amazon.com/config/latest/developerguide/evaluate-config.html>",
+			"[List of AWS Config managed rules by evaluation mode]<https://docs.aws.amazon.com/config/latest/developerguide/managed-rules-by-evaluation-mode.html>",
+			"[Evaluating your resources with AWS Config rules]<https://docs.aws.amazon.com/config/latest/developerguide/evaluating-your-resources.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/config/latest/developerguide/managed-rules-by-evaluation-mode.html"
+	},
+	"configDataProtectionRulesMissing": {
+		"category": "S",
+		"^description": "{$COUNT} region(s) have active AWS Config rules but none of them evaluates a core data-protection control: encryption at rest (for example s3-bucket-server-side-encryption-enabled, encrypted-volumes, rds-storage-encrypted), encryption in transit (for example s3-bucket-ssl-requests-only, elb-tls-https-listeners-only), KMS key rotation, or public exposure of stored data. Without such rules, drift away from your data-protection baseline is not detected continuously. Rules deployed by conformance packs and Security Hub are recognised; custom rules cannot be classified automatically and are reported for review instead of as a finding.",
+		"shortDesc": "Deploy AWS Config rules for data-protection controls",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Operational Best Practices for Encryption and Key Management]<https://docs.aws.amazon.com/config/latest/developerguide/operational-best-practices-for-Encryption-and-Keys.html>",
+			"[List of AWS Config managed rules]<https://docs.aws.amazon.com/config/latest/developerguide/managed-rules-by-aws-config.html>",
+			"[Conformance packs]<https://docs.aws.amazon.com/config/latest/developerguide/conformance-packs.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/config/latest/developerguide/operational-best-practices-for-Encryption-and-Keys.html"
+	},
+	"configRemediationManualOnly": {
+		"category": "S",
+		"^description": "{$COUNT} region(s) have AWS Config remediation configurations but every one of them is manual (Automatic=False). Manual remediation still waits for someone to trigger the SSM Automation document, so non-compliant resources stay exposed until a person acts. For well-understood, low-risk corrections (for example blocking public S3 access or enabling default encryption), consider enabling automatic remediation with retry limits. Manual remediation remains a valid choice where a human approval step is required.",
+		"shortDesc": "Enable automatic remediation for low-risk AWS Config rules",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Setting up automatic remediation]<https://docs.aws.amazon.com/config/latest/developerguide/setup-autoremediation.html>",
+			"[Remediating non-compliant resources with AWS Config rules]<https://docs.aws.amazon.com/config/latest/developerguide/remediation.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/config/latest/developerguide/setup-autoremediation.html"
 	}
 }

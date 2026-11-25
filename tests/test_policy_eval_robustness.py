@@ -121,7 +121,7 @@ class TestKmsKeyPolicy:
 
     @pytest.mark.parametrize('condition', [
         {'StringEquals': {'kms:CallerAccount': ACCOUNT, 'kms:ViaService': 'ec2.us-east-1.amazonaws.com'}},
-        {'StringEquals': {'aws:PrincipalOrgID': 'o-abc123'}},
+        {'StringEquals': {'aws:PrincipalOrgID': 'o-abc123defg'}},
     ])
     def test_scoped_wildcard_not_flagged(self, condition):
         res = _kms({'Sid': 'Scoped', 'Effect': 'Allow', 'Principal': {'AWS': '*'},
@@ -134,7 +134,7 @@ class TestKmsKeyPolicy:
         # having no conditions.
         res = _kms({'Effect': 'Allow', 'Principal': {'AWS': 'arn:aws:iam::222222222222:role/r'},
                     'Action': 'kms:*', 'Resource': '*',
-                    'Condition': {'StringEquals': {'aws:PrincipalOrgID': 'o-abc123'}}})
+                    'Condition': {'StringEquals': {'aws:PrincipalOrgID': 'o-abc123defg'}}})
         assert 'noSid:1' not in res.get('KeyPolicyWildcardAction', [0, ''])[1]
         assert 'noSid:1' not in res.get('KeyPolicyNoConditions', [0, ''])[1]
 

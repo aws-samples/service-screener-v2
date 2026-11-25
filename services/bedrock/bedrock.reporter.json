@@ -10,7 +10,7 @@
 		"needFullTest": 1,
 		"ref": [
 			"[Use Guardrails with an agent]<https://docs.aws.amazon.com/bedrock/latest/userguide/agents-guardrail.html>",
-			"[AWS Well-Architected Agentic AI Lens - Security]<https://docs.aws.amazon.com/wellarchitected/latest/agentic-ai-lens/welcome.html>"
+			"[AWS Well-Architected Agentic AI Lens - Security]<https://docs.aws.amazon.com/wellarchitected/latest/agentic-ai-lens/agentsec04-bp01.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -43,11 +43,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Write effective agent instructions]<https://docs.aws.amazon.com/bedrock/latest/userguide/agents-prompt-templates.html>"
+			"[Write effective agent instructions]<https://docs.aws.amazon.com/bedrock/latest/userguide/agents-create.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/bedrock/latest/userguide/agents-prompt-templates.html"
+		"remediation_doc": "https://docs.aws.amazon.com/bedrock/latest/userguide/agents-create.html"
 	},
 	"bedrockAgentIdleSessionTimeout": {
 		"category": "C",
@@ -284,11 +284,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Bedrock encryption with KMS]<https://docs.aws.amazon.com/bedrock/latest/userguide/encryption.html>"
+			"[Bedrock encryption with KMS]<https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-permissions-kms.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/bedrock/latest/userguide/encryption.html"
+		"remediation_doc": "https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-permissions-kms.html"
 	},
 	"bedrockGuardrailStatusFailed": {
 		"category": "O",
@@ -605,11 +605,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AgentCore runtime lifecycle]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime.html>"
+			"[AgentCore runtime lifecycle]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-troubleshooting.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime.html"
+		"remediation_doc": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-troubleshooting.html"
 	},
 	"bedrockACRuntimeWildcardRole": {
 		"category": "S",
@@ -781,11 +781,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[AgentCore Evaluators]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/evaluator.html>"
+			"[AgentCore Evaluators]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/evaluators.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/evaluator.html"
+		"remediation_doc": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/evaluators.html"
 	},
 	"bedrockACServiceLimitRuntimes": {
 		"category": "R",
@@ -797,10 +797,10 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Bedrock AgentCore quotas]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/quotas.html>"
+			"[Bedrock AgentCore quotas]<https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/bedrock-agentcore-limits.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/quotas.html"
+		"remediation_doc": "https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/bedrock-agentcore-limits.html"
 	}
 }

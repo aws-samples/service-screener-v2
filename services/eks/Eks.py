@@ -18,6 +18,7 @@ class Eks(Service):
         self.eksClient = ssBoto.client('eks', config=self.bConfig)
         self.ec2Client = ssBoto.client('ec2', config=self.bConfig)
         self.iamClient = ssBoto.client('iam')
+        self.ssmClient = ssBoto.client('ssm', config=self.bConfig)
         
     def getClusters(self):
         arr = []
@@ -49,7 +50,7 @@ class Eks(Service):
 
             if cluster not in pendingClusters:
                 ## Already checkpointed - skip describe_cluster, Evaluator.run() serves the cached result.
-                obj = EksCommon(cluster, None, self.eksClient, self.ec2Client, self.iamClient)
+                obj = EksCommon(cluster, None, self.eksClient, self.ec2Client, self.iamClient, self.ssmClient)
                 obj.run(self.__class__)
                 objs['Cluster::' + cluster] = obj.getInfo()
                 continue
@@ -66,7 +67,7 @@ class Eks(Service):
                 if self.resourceHasTags(nTags) == False:
                     continue
 
-            obj = EksCommon(cluster, clusterInfo, self.eksClient, self.ec2Client, self.iamClient)
+            obj = EksCommon(cluster, clusterInfo, self.eksClient, self.ec2Client, self.iamClient, self.ssmClient)
             obj.run(self.__class__)
             objs['Cluster::' + cluster] = obj.getInfo()
 

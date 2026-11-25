@@ -319,11 +319,11 @@
 		"criticality": "L",
 		"shortDesc": "Set value to ON",
 		"ref": [
-			"[RDS MySQL Autocommit]<https://docs.aws.amazon.com/whitepapers/latest/amazon-aurora-mysql-db-admin-handbook/transaction-management-and-autocommit.html>"
+			"[RDS MySQL Autocommit]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.AuroraMySQL.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/amazon-aurora-mysql-db-admin-handbook/transaction-management-and-autocommit.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Aurora.AuroraMySQL.html"
 	},
 	"MYSQL__parammInnodbStatsPersistent": {
 		"category": "P",
@@ -732,7 +732,7 @@
 	},
 	"MSSQLorPG__TransportEncrpytionDisabled": {
 		"category": "S",
-		"^description": "[MSSQL Transport Encryption] You have {$COUNT} instance(s) does not enable transport encryption. You can use Secure Sockets Layer (SSL) to encrypt connections between your client applications and your Amazon RDS DB instances running Microsoft SQL Server. SSL support is available in all AWS regions for all supported SQL Server editions.",
+		"^description": "[MSSQL/PostgreSQL Transport Encryption] You have {$COUNT} RDS for SQL Server / PostgreSQL instance(s) or Aurora PostgreSQL / Multi-AZ DB cluster(s) that do not enforce transport encryption (rds.force_ssl is 0, or is unset on RDS for PostgreSQL 14 and older / Aurora PostgreSQL 16 and older, where the engine default is 0). You can use Secure Sockets Layer (SSL/TLS) to encrypt connections between your client applications and your databases; set rds.force_ssl=1 in a custom DB parameter group (DB cluster parameter group for Aurora PostgreSQL and Multi-AZ DB clusters) after confirming clients support TLS. When rds.force_ssl is not returned for SQL Server, the result is reported as not evaluable rather than assumed.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
@@ -740,7 +740,9 @@
 		"criticality": "M",
 		"shortDesc": "Using SSL",
 		"ref": [
-			"[RDS SQLServer SSL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/SQLServer.Concepts.General.SSL.Using.html>"
+			"[RDS SQLServer SSL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/SQLServer.Concepts.General.SSL.Using.html>",
+			"[Requiring SSL/TLS for RDS for PostgreSQL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/PostgreSQL.Concepts.General.SSL.html>",
+			"[Securing Aurora PostgreSQL data with SSL/TLS]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraPostgreSQL.Security.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -840,11 +842,11 @@
 		"criticality": "L",
 		"shortDesc": "Setup with sub-optimal setting for Enhanced Monitoring",
 		"ref": [
-			"[RDS Enhanced Monitoring]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Monitoring.OS.overview.html>"
+			"[RDS Enhanced Monitoring]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Monitoring.OS.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Monitoring.OS.overview.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Monitoring.OS.html"
 	},
 	"CACertExpiringIn365days": {
 		"category": "O",
@@ -984,11 +986,11 @@
 		"criticality": "M",
 		"shortDesc": "Freeable Memory Less than 10%",
 		"ref": [
-			"[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+			"[Rightsizing Guide]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html"
+		"remediation_doc": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html"
 	},
 	"FreeMemoryDropMT50pctIn24hours": {
 		"category": "CP",
@@ -1000,11 +1002,11 @@
 		"criticality": "H",
 		"shortDesc": "Freeable Memory Drop > 50%",
 		"ref": [
-			"[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+			"[Rightsizing Guide]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html"
+		"remediation_doc": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html"
 	},
 	"RightSizingMemoryMonthMinMT60pct": {
 		"category": "CP",
@@ -1016,11 +1018,11 @@
 		"criticality": "M",
 		"shortDesc": "Freeable Memory > 60% (months)",
 		"ref": [
-			"[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+			"[Rightsizing Guide]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html"
+		"remediation_doc": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html"
 	},
 	"RightSizingCpuMonthMaxLT50pct": {
 		"category": "CP",
@@ -1032,11 +1034,11 @@
 		"criticality": "H",
 		"shortDesc": "Max CPU < 50% (months)",
 		"ref": [
-			"[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+			"[Rightsizing Guide]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html"
+		"remediation_doc": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html"
 	},
 	"RightSizingCpuLowUsageDetected": {
 		"category": "CP",
@@ -1048,11 +1050,11 @@
 		"criticality": "M",
 		"shortDesc": "Low Minumum & Average CPUUtilization",
 		"ref": [
-			"[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+			"[Rightsizing Guide]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html"
+		"remediation_doc": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html"
 	},
 	"RightSizingCpuLowUsageDetectedWithWeeklySpike": {
 		"category": "CP",
@@ -1064,11 +1066,11 @@
 		"criticality": "L",
 		"shortDesc": "Weekly CPU Usage Spike detected",
 		"ref": [
-			"[Rightsizing Guide]<https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html>"
+			"[Rightsizing Guide]<https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/whitepapers/latest/cost-optimization-right-sizing/tips-for-right-sizing-your-workloads.html"
+		"remediation_doc": "https://docs.aws.amazon.com/compute-optimizer/latest/ug/view-ec2-recommendations.html"
 	},
 	"AuroraStorageTypeToUseIOOpt": {
 		"category": "C",
@@ -1080,7 +1082,7 @@
 		"criticality": "M",
 		"shortDesc": "Consider using I/O-Optimized",
 		"ref": [
-			"[Choosing Aurora StorageType]<https://youtu.be/OlFeaVd6Ll4?si=r_2V66HqA83tJOkg&t=351>",
+			"[Choosing Aurora StorageType]<https://www.youtube.com/watch?v=OlFeaVd6Ll4&t=351s>",
 			"[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications>"
 		],
 		"remediation": null,
@@ -1097,7 +1099,7 @@
 		"criticality": "M",
 		"shortDesc": "Consider using Aurora Standard",
 		"ref": [
-			"[Choosing Aurora StorageType]<https://youtu.be/OlFeaVd6Ll4?si=r_2V66HqA83tJOkg&t=351>",
+			"[Choosing Aurora StorageType]<https://www.youtube.com/watch?v=OlFeaVd6Ll4&t=351s>",
 			"[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications>"
 		],
 		"remediation": null,
@@ -1114,7 +1116,7 @@
 		"criticality": "I",
 		"shortDesc": "(Informational) Cluster IO/Storage Ratio",
 		"ref": [
-			"[Choosing Aurora StorageType]<https://youtu.be/OlFeaVd6Ll4?si=r_2V66HqA83tJOkg&t=351>",
+			"[Choosing Aurora StorageType]<https://www.youtube.com/watch?v=OlFeaVd6Ll4&t=351s>",
 			"[About Aurora StorageType]<https://aws.amazon.com/blogs/aws/new-amazon-aurora-i-o-optimized-cluster-configuration-with-up-to-40-cost-savings-for-i-o-intensive-applications>"
 		],
 		"remediation": null,
@@ -1385,5 +1387,92 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_Events.html"
+	},
+	"rdsLogExportsDisabled": {
+		"category": "S",
+		"^description": "[Logging] {$COUNT} RDS DB instance(s)/cluster(s) do not publish their security-relevant database logs to Amazon CloudWatch Logs (PostgreSQL/Aurora PostgreSQL: postgresql log; MySQL/MariaDB: error log, plus audit log when MARIADB_AUDIT_PLUGIN is configured; Aurora MySQL: audit log; SQL Server: error log; RDS for Oracle is not evaluated because the rds service has no Oracle engine driver). Without exported logs, authentication failures, privilege changes and errors are kept only on the instance for a short time, cannot be alerted on and are lost when the instance is deleted. Enable log exports on the instance (or on the cluster for Aurora and Multi-AZ DB clusters).",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"criticality": "M",
+		"shortDesc": "Publish database logs to CloudWatch Logs",
+		"ref": [
+			"[Publishing database logs to CloudWatch Logs]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Procedural.UploadtoCloudWatch.html>",
+			"[Publishing Aurora logs to CloudWatch Logs]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/USER_LogAccess.Procedural.UploadtoCloudWatch.html>",
+			"[Security Hub RDS.9]<https://docs.aws.amazon.com/securityhub/latest/userguide/rds-controls.html#rds-9>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_LogAccess.Procedural.UploadtoCloudWatch.html"
+	},
+	"rdsSecureTransportNotRequired": {
+		"category": "S",
+		"^description": "[Transport Encryption] {$COUNT} RDS for MySQL / MariaDB DB instance(s) or Aurora MySQL / Multi-AZ DB cluster(s) do not set require_secure_transport to ON in their (cluster) parameter group, so clients may connect without TLS and credentials and data can travel in plaintext. The default is OFF for RDS for MySQL, Aurora MySQL and RDS for MariaDB 10.5 - 11.4 (MariaDB 11.8 and later default to ON and are not flagged when the parameter is unset; MariaDB before 10.5 does not support the parameter). Set require_secure_transport=1 (ON) in a custom DB parameter group (DB cluster parameter group for Aurora MySQL) after confirming clients support TLS. PostgreSQL and SQL Server rds.force_ssl is reported separately.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": -1,
+		"criticality": "M",
+		"shortDesc": "Require TLS for MySQL/MariaDB/Aurora MySQL",
+		"ref": [
+			"[Requiring SSL/TLS for RDS for MySQL]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/mysql-ssl-connections.require-ssl.html>",
+			"[Requiring SSL/TLS for RDS for MariaDB]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/mariadb-ssl-connections.require-ssl.html>",
+			"[TLS connections to Aurora MySQL]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/AuroraMySQL.Security.html#AuroraMySQL.Security.SSL>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/mysql-ssl-connections.require-ssl.html"
+	},
+	"rdsSnapshotSharedExternally": {
+		"category": "S",
+		"^description": "[RDS Snapshot] {$COUNT} manual RDS DB/cluster snapshot(s) can be restored by other AWS accounts: the restore attribute lists account IDs outside your AWS Organization, or is 'all' (public) for a snapshot whose source DB instance / Aurora cluster is not reported by SnapshotRDSIsPublic - for example because the source has been deleted, it is a Multi-AZ DB cluster snapshot, or the SnapshotRDSIsPublic lookup failed. Public snapshots of live sources that SnapshotRDSIsPublic reports are reported once, there. When organization membership cannot be read (member accounts without organizations:ListAccounts), snapshots shared only with specific accounts are reported as not evaluable instead. Anyone in those accounts can restore a full copy of the database. Remove public access and review the shared accounts, removing those that are not required.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"criticality": "M",
+		"shortDesc": "Review snapshots shared with other accounts",
+		"ref": [
+			"[Sharing a DB snapshot]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ShareSnapshot.html>",
+			"[Sharing a DB cluster snapshot]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-share-snapshot.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ShareSnapshot.html"
+	},
+	"rdsSnapshotUnencrypted": {
+		"category": "S",
+		"^description": "[RDS Snapshot] {$COUNT} manual RDS DB/cluster snapshot(s) or AWS Backup-managed DB snapshot(s) are not encrypted. Unencrypted snapshots keep a full copy of the data at rest without KMS protection and can be shared or copied without key-policy control. Copy the snapshot with a KMS key (copy-db-snapshot / copy-db-cluster-snapshot with --kms-key-id) and delete the unencrypted copy once it is no longer needed.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"criticality": "M",
+		"shortDesc": "Encrypt RDS snapshots",
+		"ref": [
+			"[Encrypting Amazon RDS resources]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html>",
+			"[Copying a DB snapshot]<https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_CopySnapshot.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_CopySnapshot.html"
+	},
+	"auroraNoGlobalDatabase": {
+		"category": "R",
+		"^description": "[Disaster Recovery] {$COUNT} Aurora cluster(s) are not part of an Aurora global database. For business-critical workloads with low RPO/RTO requirements, an Aurora global database replicates to secondary Regions with typically sub-second lag and supports managed cross-Region failover. This is a DR strategy and cost decision - ignore it for clusters whose recovery objectives are met by backups.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"criticality": "L",
+		"shortDesc": "Consider Aurora Global Database for critical clusters",
+		"ref": [
+			"[Using Amazon Aurora global databases]<https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database.html>",
+			"[Disaster recovery options in the cloud]<https://docs.aws.amazon.com/whitepapers/latest/disaster-recovery-workloads-on-aws/disaster-recovery-options-in-the-cloud.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/aurora-global-database-getting-started.html"
 	}
 }

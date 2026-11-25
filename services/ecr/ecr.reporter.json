@@ -225,11 +225,11 @@
 		"additionalCost": 1,
 		"needFullTest": 1,
 		"ref": [
-			"[ECR replication]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/registry-settings-replication.html>"
+			"[ECR replication]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/registry-settings-configure.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonECR/latest/userguide/registry-settings-replication.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonECR/latest/userguide/registry-settings-configure.html"
 	},
 	"ecrPullThroughCache": {
 		"category": "O",
@@ -327,5 +327,23 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-scanning.html"
+	},
+	"ecrImageSigningNotConfigured": {
+		"category": "S",
+		"^description": "The ECR registry in this region has no managed signing configuration (get_signing_configuration returns no rules) and there is no active AWS Signer signing profile for the Notation-OCI container platform. Without image signing, consumers cannot verify that an image was produced by a trusted build pipeline and was not tampered with after push, weakening software supply-chain integrity. Note: teams that sign images in CI with a third-party Notation/Cosign key outside AWS Signer may see this as advisory.",
+		"shortDesc": "Enable ECR managed signing or sign images with AWS Signer (Notation)",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 1,
+		"ref": [
+			"[ECR managed signing]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/managed-signing.html>",
+			"[Signing an image stored in an ECR private repository]<https://docs.aws.amazon.com/AmazonECR/latest/userguide/image-signing.html>",
+			"[AWS Signer for container images]<https://docs.aws.amazon.com/signer/latest/developerguide/container-workflow.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonECR/latest/userguide/managed-signing.html"
 	}
 }

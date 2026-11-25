@@ -80,6 +80,24 @@
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/secure-connections-supported-viewer-protocols-ciphers.html"
 	},
+	"cloudfrontViewerMinTlsOld": {
+		"category": "S",
+		"^description": "{$COUNT} CloudFront distribution(s) use a viewer security policy (MinimumProtocolVersion) below TLSv1.2_2021 on a custom certificate, or have an HTTPS custom origin that permits TLSv1/TLSv1.1. Policies TLSv1 to TLSv1.1_2016 allow TLS versions older than TLS 1.2; TLSv1.2_2018 and TLSv1.2_2019 require TLS 1.2 but still offer legacy cipher suites (for example CBC-mode and non-forward-secret ciphers). These protocol versions and cipher suites are deprecated and weaken encryption in transit. Distributions on the default *.cloudfront.net certificate are reported as informational: CloudFront fixes their viewer security policy at TLSv1 (TLS 1.0/1.1 accepted) and it can only be raised by switching to a custom certificate.",
+		"shortDesc": "Set the viewer security policy to TLSv1.2_2021 or later and remove TLSv1/TLSv1.1 from origin SSL protocols.",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Supported protocols and ciphers between viewers and CloudFront]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/secure-connections-supported-viewer-protocols-ciphers.html>",
+			"[Supported protocols and ciphers between CloudFront and the origin]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/secure-connections-supported-ciphers-cloudfront-to-origin.html>",
+			"[Distribution settings - Security policy]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesGeneral.html#DownloadDistValues-security-policy>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/secure-connections-supported-viewer-protocols-ciphers.html"
+	},
 	"originFailover": {
 		"category": "R",
 		"^description": "Your CloudFront distributions is not setup for origin failover. To set up origin failover, you must have a distribution with at least two origins.",
@@ -256,11 +274,11 @@
 		"additionalCost": -1,
 		"needFullTest": 0,
 		"ref": [
-			"[Choosing the price class for a CloudFront distribution]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/PriceClass.html>",
-			"[Cost optimization]<https://docs.aws.amazon.com/whitepapers/latest/amazon-cloudfront-media/cost-optimization.html>"
+			"[Choosing the price class for a CloudFront distribution]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesGeneral.html#DownloadDistValuesPriceClass>",
+			"[Cost optimization]<https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesGeneral.html#DownloadDistValuesPriceClass>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/PriceClass.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesGeneral.html#DownloadDistValuesPriceClass"
 	}
 }

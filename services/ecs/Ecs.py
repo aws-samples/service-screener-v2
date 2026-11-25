@@ -1,3 +1,5 @@
+import json
+
 import botocore
 
 from utils.Config import Config
@@ -42,6 +44,9 @@ class Ecs(Service):
         # Secrets Manager / SSM — used by check 35 to validate secret references
         self.secretsClient = ssBoto.client('secretsmanager', config=self.bConfig)
         self.ssmClient = ssBoto.client('ssm', config=self.bConfig)
+        # IAM — task-role privilege inspection (ecsTaskRoleOverprivileged)
+        self.iamClient = ssBoto.client('iam', config=self.bConfig)
+        self._roleCache = {}
 
         # Populated in getResources()
         self._clusters = []             # list of describe_clusters dicts
@@ -282,12 +287,14 @@ class Ecs(Service):
             cid = (s.get('_cluster') or {}).get('clusterArn')
             services_by_cluster.setdefault(cid, []).append(s)
 
+        latest_agent = self._latestAgentVersion() if self._clusters else (None, 'NoClusters')
         for cluster in self._clusters:
             try:
                 name = cluster.get('clusterName', cluster.get('clusterArn', 'unknown'))
                 _pi('Ecs', f"Analyzing cluster: {name}")
                 cluster_services = services_by_cluster.get(cluster.get('clusterArn'), [])
-                obj = EcsCluster(cluster, cluster_services)
+                obj = EcsCluster(cluster, cluster_services,
+                                 ecs_client=self.ecsClient, latest_agent=latest_agent)
                 obj.run(self.__class__)
                 objs[f"Ecs::Cluster::{name}"] = obj.getInfo()
                 del obj
@@ -333,6 +340,8 @@ class Ecs(Service):
                     secrets_client=self.secretsClient,
                     ssm_client=self.ssmClient,
                     cluster_has_fargate_cmk=cluster_has_fargate_cmk,
+                    iam_client=self.iamClient,
+                    role_cache=self._roleCache,
                 )
                 obj.run(self.__class__)
                 objs[f"Ecs::TaskDef::{fam}:{rev}"] = obj.getInfo()
@@ -341,6 +350,29 @@ class Ecs(Service):
                 print(f"Error processing ECS task definition {td.get('taskDefinitionArn')}: {e}")
 
         return objs
+
+    # Public SSM parameters published by AWS for the ECS-optimized AMIs; their
+    # JSON value includes the container agent version shipped in that AMI.
+    AGENT_VERSION_PARAMS = (
+        '/aws/service/ecs/optimized-ami/amazon-linux-2023/recommended',
+        '/aws/service/ecs/optimized-ami/amazon-linux-2/recommended',
+    )
+
+    def _latestAgentVersion(self):
+        """Return (agentVersion, errorCode) from the recommended ECS-optimized AMI parameter."""
+        err = None
+        for name in self.AGENT_VERSION_PARAMS:
+            try:
+                val = self.ssmClient.get_parameter(Name=name)['Parameter']['Value']
+                ver = json.loads(val).get('ecs_agent_version')
+                if ver:
+                    return ver, None
+                err = err or 'AgentVersionMissing'
+            except botocore.exceptions.ClientError as e:
+                err = err or e.response.get('Error', {}).get('Code', 'Unknown')
+            except (ValueError, TypeError, KeyError, AttributeError):
+                err = err or 'ParameterParseError'
+        return None, err
 
     def _elbv2Client(self):
         """Lazily initialise elbv2 client — only needed if any service has load balancers."""

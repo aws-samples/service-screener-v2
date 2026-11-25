@@ -106,10 +106,14 @@ class RdsCommon(Evaluator):
         details = Config.get(key, {})
         
         if not details:
-            versions = self.rdsClient.describe_db_engine_versions(
-                Engine=engine,
-                EngineVersion=engineVersion
-            )
+            # Only a found version is kept in Config; the read itself is shared
+            # so DBs on an unknown/deprecated version do not each re-query it.
+            versions = self._sharedMemo(
+                (self.rdsClient.meta.region_name, 'describe_db_engine_versions', engine, engineVersion),
+                lambda: self.rdsClient.describe_db_engine_versions(
+                    Engine=engine,
+                    EngineVersion=engineVersion
+                ))
             version = versions.get('DBEngineVersions')
             if not version:
                 self.results['EngineVersionMinor'] = [-1, "**DEPRECIATED**"]
@@ -122,53 +126,43 @@ class RdsCommon(Evaluator):
         self.enginePatches = details
         
     def loadParameterInfo(self):
-        arr = {}
-        
+        # Subclasses call this again from their own __init__, and many DBs
+        # share one parameter group: the collected values are read once per
+        # (region, parameter group) for the whole scan.
         if self.isCluster == False:
             paramGroupName = self.db['DBParameterGroups'][0]['DBParameterGroupName']
-            results = self.rdsClient.describe_db_parameters(
-                DBParameterGroupName = paramGroupName
-            )
-
-            for param in results.get('Parameters'):
-                if param['IsModifiable'] == 1 and 'ParameterValue' in param:
-                    arr[param['ParameterName']] = param['ParameterValue']
-            
-            while results.get('Marker') is not None:
-                results = self.rdsClient.describe_db_parameters(
-                    DBParameterGroupName = paramGroupName,
-                    Marker = results.get('Marker')
-                )
-
-                for param in results.get('Parameters'):
-                    #__pr(param['ParameterName'] + ' = ' + param['ParameterValue'] + ' || ' + param['IsModifiable'])
-                    if param['IsModifiable'] == 1 and 'ParameterValue' in param:
-                        arr[param['ParameterName']] = param['ParameterValue']
-            
-        else: 
+            op, nameKey = 'describe_db_parameters', 'DBParameterGroupName'
+        else:
             paramGroupName = self.db['DBClusterParameterGroup']
-            results = self.rdsClient.describe_db_cluster_parameters(
-                DBClusterParameterGroupName = paramGroupName
-            )
+            op, nameKey = 'describe_db_cluster_parameters', 'DBClusterParameterGroupName'
+
+        self.dbParams = self._sharedMemo(
+            (self.rdsClient.meta.region_name, op, paramGroupName),
+            lambda: self._collectModifiableParams(op, nameKey, paramGroupName))
+
+    def _collectModifiableParams(self, op, nameKey, paramGroupName):
+        fn = getattr(self.rdsClient, op)
+        arr = {}
+        results = fn(**{nameKey: paramGroupName})
+
+        for param in results.get('Parameters'):
+            if param.get('IsModifiable', True) == 1 and 'ParameterValue' in param:
+                arr[param['ParameterName']] = param['ParameterValue']
+
+        while results.get('Marker') is not None:
+            results = fn(**{nameKey: paramGroupName, 'Marker': results.get('Marker')})
 
             for param in results.get('Parameters'):
-                if param['IsModifiable'] == 1 and 'ParameterValue' in param:
+                #__pr(param['ParameterName'] + ' = ' + param['ParameterValue'] + ' || ' + param['IsModifiable'])
+                if param.get('IsModifiable', True) == 1 and 'ParameterValue' in param:
                     arr[param['ParameterName']] = param['ParameterValue']
-            
-            while results.get('Marker') is not None:
-                results = self.rdsClient.describe_db_cluster_parameters(
-                    DBClusterParameterGroupName = paramGroupName,
-                    Marker = results.get('Marker')
-                )
+        return arr
 
-                for param in results.get('Parameters'):
-                    #__pr(param['ParameterName'] + ' = ' + param['ParameterValue'] + ' || ' + param['IsModifiable'])
-                    if param['IsModifiable'] == 1 and 'ParameterValue' in param:
-                        arr[param['ParameterName']] = param['ParameterValue']
-            
-
-        self.dbParams = arr
-        del arr
+    # Cluster-level reads below are shared by the cluster's own driver and by
+    # every member instance driver (all carry DBClusterIdentifier), so they
+    # are fetched once per (region, cluster) for the whole scan.
+    def _clusterSharedMemo(self, op, clusterId, fn):
+        return self._sharedMemo((self.rdsClient.meta.region_name, op, clusterId), fn)
 
     ##Common Logic Belows
     ##All checks start from __check;
@@ -177,12 +171,15 @@ class RdsCommon(Evaluator):
             if self.db.get('DBClusterIdentifier', None) == None:
                 return
 
-            resp = self.rdsClient.describe_db_cluster_snapshots(
-                DBClusterIdentifier=self.db['DBClusterIdentifier'],
-                SnapshotType='public',
-                IncludePublic=True,
-                MaxRecords=20
-            )
+            clusterId = self.db['DBClusterIdentifier']
+            resp = self._clusterSharedMemo(
+                'describe_db_cluster_snapshots:public', clusterId,
+                lambda: self.rdsClient.describe_db_cluster_snapshots(
+                    DBClusterIdentifier=clusterId,
+                    SnapshotType='public',
+                    IncludePublic=True,
+                    MaxRecords=20
+                ))
             publicSnapshots = resp.get('DBClusterSnapshots')
         else:
             if self.db.get('DBInstanceIdentifier', None) == None:
@@ -207,8 +204,39 @@ class RdsCommon(Evaluator):
         if not self.engine in validEngine:
             return
         
-        if 'rds.force_ssl' in self.dbParams and self.dbParams['rds.force_ssl'] == '0':
-            self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [-1, 'rds.force_ssl==0']
+        val = self.dbParams.get('rds.force_ssl', None)
+        if val is not None:
+            if str(val).strip() == '0':
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [-1, 'rds.force_ssl==0']
+            elif str(val).strip() == '1':
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [1, 'rds.force_ssl==1']
+            return
+
+        # rds.force_ssl not returned by the parameter group: fall back to the
+        # engine default only where AWS documents it per major version. Aurora / Multi-AZ cluster member instances
+        # take the setting from the cluster parameter group (evaluated on the
+        # cluster object), so they are skipped here.
+        if self._isClusterMemberInstance():
+            return
+        # Documented engine defaults: RDS for PostgreSQL 15+ -> 1 (14 and
+        # older -> 0); Aurora PostgreSQL 17+ -> 1 (16 and older -> 0).
+        defaultOnFrom = {'postgres': 15, 'aurora-postgresql': 17}
+        if self.engine in defaultOnFrom:
+            try:
+                major = int(str(self.db.get('EngineVersion', '')).split('.')[0])
+            except ValueError:
+                major = None
+            minOn = defaultOnFrom[self.engine]
+            if major is None:
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [0, 'Unable to evaluate (rds.force_ssl not set; engine version unknown)']
+            elif major >= minOn:
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [1, 'rds.force_ssl not set (engine default 1 for {} {}+)'.format(self.engine, minOn)]
+            else:
+                self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [-1, 'rds.force_ssl not set (engine default 0 before {} {})'.format(self.engine, minOn)]
+            return
+        # SQL Server: no version-specific default to rely on; never PASS (or
+        # FAIL) on an unknown value.
+        self.results['MSSQLorPG__TransportEncrpytionDisabled'] = [0, 'Unable to evaluate (rds.force_ssl not returned by the parameter group)']
     
     def _checkMasterUsername(self):
         defaultMasterUser = {
@@ -324,26 +352,13 @@ class RdsCommon(Evaluator):
         
         if not instTypes:
             try:
-                results = self.rdsClient.describe_orderable_db_instance_options(
-                    # DBInstanceClass = self.db['DBInstanceClass'],
-                    Engine = self.db['Engine'],
-                    EngineVersion = self.db['EngineVersion'],
-                    MaxRecords = 20
-                )
-                
-                arr = []
-                for instClass in results.get('OrderableDBInstanceOptions'):
-                    arr.append(instClass['DBInstanceClass'])
-                
-                while results.get('Marker') is not None:
-                    results = self.rdsClient.describe_orderable_db_instance_options(
-                        Engine = self.db['Engine'],
-                        EngineVersion = self.db['EngineVersion'],
-                        Marker = results.get('Marker')
-                    )
-                    
-                    for instClass in results.get('OrderableDBInstanceOptions'):
-                        arr.append(instClass['DBInstanceClass'])
+                # Collected list shared per (region, engine, version): a failed
+                # read is not stored in Config, so without this every instance
+                # on that engine version would repeat it.
+                arr = self._sharedMemo(
+                    (self.rdsClient.meta.region_name, 'describe_orderable_db_instance_options',
+                     self.db['Engine'], self.db['EngineVersion']),
+                    self._collectOrderableInstanceClasses)
                 
                 instTypes = list(set(arr))
                 Config.set(key, instTypes)
@@ -374,6 +389,29 @@ class RdsCommon(Evaluator):
         if compressedLists[dbInstFamily] > dbInstGeneration:
             self.results['LatestInstanceGeneration'] = [-1, self.db['DBInstanceClass']]
     
+    def _collectOrderableInstanceClasses(self):
+        results = self.rdsClient.describe_orderable_db_instance_options(
+            # DBInstanceClass = self.db['DBInstanceClass'],
+            Engine = self.db['Engine'],
+            EngineVersion = self.db['EngineVersion'],
+            MaxRecords = 20
+        )
+
+        arr = []
+        for instClass in results.get('OrderableDBInstanceOptions'):
+            arr.append(instClass['DBInstanceClass'])
+
+        while results.get('Marker') is not None:
+            results = self.rdsClient.describe_orderable_db_instance_options(
+                Engine = self.db['Engine'],
+                EngineVersion = self.db['EngineVersion'],
+                Marker = results.get('Marker')
+            )
+
+            for instClass in results.get('OrderableDBInstanceOptions'):
+                arr.append(instClass['DBInstanceClass'])
+        return arr
+
     def _checkIsOpenSource(self):
         if self.isCluster == True:
             return
@@ -438,9 +476,9 @@ class RdsCommon(Evaluator):
         if 'DBClusterMembers' in self.db:
             members = self.db['DBClusterMembers']
         else:
-            resp = self.rdsClient.describe_db_clusters(
-                DBClusterIdentifier=cluster
-            )
+            resp = self._clusterSharedMemo(
+                'describe_db_clusters', cluster,
+                lambda: self.rdsClient.describe_db_clusters(DBClusterIdentifier=cluster))
             members = resp.get('DBClusters')[0].get('DBClusterMembers', [])
 
         if len(members) < 2 or len(members) > 7:
@@ -453,20 +491,25 @@ class RdsCommon(Evaluator):
     def _checkOldSnapshots(self):
         if self.db.get('DBClusterIdentifier'):
             identifier = self.db['DBClusterIdentifier']
-            result = self.rdsClient.describe_db_cluster_snapshots(
-                DBClusterIdentifier=identifier,
-                SnapshotType='manual'
-            )
-            
-            snapshots = result.get('DBClusterSnapshots')
-            while result.get('Marker') is not None:
+
+            def fetch():
                 result = self.rdsClient.describe_db_cluster_snapshots(
                     DBClusterIdentifier=identifier,
-                    SnapshotType='manual',
-                    Marker=result.get('Marker')
+                    SnapshotType='manual'
                 )
-                
-                snapshots = snapshots + result.get('DBSnapshots')
+
+                snapshots = result.get('DBClusterSnapshots') or []
+                while result.get('Marker') is not None:
+                    result = self.rdsClient.describe_db_cluster_snapshots(
+                        DBClusterIdentifier=identifier,
+                        SnapshotType='manual',
+                        Marker=result.get('Marker')
+                    )
+
+                    snapshots = snapshots + (result.get('DBClusterSnapshots') or [])
+                return snapshots
+
+            snapshots = self._clusterSharedMemo('describe_db_cluster_snapshots:manual', identifier, fetch)
         else:
             identifier = self.db['DBInstanceIdentifier']
             result = self.rdsClient.describe_db_snapshots(
@@ -474,7 +517,7 @@ class RdsCommon(Evaluator):
                 SnapshotType='manual'
             )
             
-            snapshots = result.get('DBSnapshots')
+            snapshots = result.get('DBSnapshots') or []
             while result.get('Marker') is not None:
                 result = self.rdsClient.describe_db_snapshots(
                     DBInstanceIdentifier=identifier,
@@ -482,7 +525,7 @@ class RdsCommon(Evaluator):
                     Marker=result.get('Marker')
                 )
                 
-                snapshots = snapshots + result.get('DBSnapshots')
+                snapshots = snapshots + (result.get('DBSnapshots') or [])
         
         if not snapshots:
             return
@@ -869,3 +912,143 @@ class RdsCommon(Evaluator):
         
         if not hasSubscriptions:
             self.results['EventSubscriptionNotConfigured'] = [-1, 'No event subscriptions configured']
+
+    ## ---- WAFS2027 checks ----
+    def _isClusterMemberInstance(self):
+        # Aurora and Multi-AZ DB cluster members inherit log exports and the
+        # cluster parameter group from the cluster; evaluate them once on the
+        # cluster object instead of on every member instance.
+        return self.isCluster == False and bool(self.db.get('DBClusterIdentifier'))
+
+    def _hasAuditPluginOption(self):
+        # MySQL/MariaDB audit log only exists when MARIADB_AUDIT_PLUGIN is
+        # added to the instance's option group. Returns (found, errorCode);
+        # errorCode is set (and found is None) when an option group cannot
+        # be read.
+        found = False
+        for og in self.db.get('OptionGroupMemberships', []) or []:
+            name = og.get('OptionGroupName')
+            if not name:
+                continue
+            cacheKey = 'rds::optionGroupOptions::' + self.rdsClient.meta.region_name + '::' + name
+            options = Config.get(cacheKey, None)
+            if options is None:
+                try:
+                    resp = self.rdsClient.describe_option_groups(OptionGroupName=name)
+                    options = []
+                    for grp in resp.get('OptionGroupsList', []):
+                        options += [o.get('OptionName') for o in grp.get('Options', [])]
+                    Config.set(cacheKey, options)
+                except botocore.exceptions.ClientError as e:
+                    code = e.response.get('Error', {}).get('Code', 'ClientError')
+                    _warn("Unable to describe option group {}: {}".format(name, code))
+                    return None, code
+            if 'MARIADB_AUDIT_PLUGIN' in options:
+                found = True
+        return found, None
+
+    def _checkRdsLogExportsDisabled(self):
+        if self._isClusterMemberInstance():
+            return
+
+        auditUnknown = None
+        if self.engine in ('postgres', 'aurora-postgresql'):
+            required = ['postgresql']
+        elif self.engine == 'aurora-mysql':
+            required = ['audit']
+        elif self.engine in ('mysql', 'mariadb'):
+            required = ['error']
+            if self.isCluster == False:
+                hasAudit, auditUnknown = self._hasAuditPluginOption()
+                if hasAudit == True:
+                    required.append('audit')
+        elif self.engine == 'sqlserver':
+            required = ['error']
+        else:
+            # Oracle ('audit') is not evaluated: Rds.engineDriver has no Oracle
+            # driver, so Oracle instances never reach RdsCommon.
+            return
+
+        exported = self.db.get('EnabledCloudwatchLogsExports', []) or []
+        missing = [t for t in required if t not in exported]
+        if missing:
+            self.results['rdsLogExportsDisabled'] = [-1, 'Not exported to CloudWatch Logs: {} (exported: {})'.format(
+                ', '.join(missing), ', '.join(exported) if exported else 'none')]
+        elif auditUnknown and 'audit' not in exported:
+            # Option group unreadable: cannot tell whether an audit log export
+            # is also required, so do not PASS.
+            self.results['rdsLogExportsDisabled'] = [0, 'Unable to evaluate ({}) - option group unreadable; audit plugin status unknown'.format(auditUnknown)]
+        else:
+            self.results['rdsLogExportsDisabled'] = [1, 'Exported: ' + ', '.join(exported)]
+
+    def _checkRdsSecureTransportNotRequired(self):
+        # PostgreSQL / Aurora PostgreSQL / SQL Server rds.force_ssl is already
+        # reported by MSSQLorPG__TransportEncrpytionDisabled (_checkSSLParams).
+        if self.engine not in ('mysql', 'mariadb', 'aurora-mysql'):
+            return
+        if self._isClusterMemberInstance():
+            return
+        # Aurora MySQL sets require_secure_transport in the cluster parameter group.
+        if self.engine == 'aurora-mysql' and self.isCluster == False:
+            return
+
+        val = self.dbParams.get('require_secure_transport', None)
+        if val is None:
+            ver = self._engineVersionTuple()
+            if self.engine == 'mariadb' and ver is not None and ver < (10, 5):
+                # Parameter only exists on RDS for MariaDB 10.5 and higher.
+                self.results['rdsSecureTransportNotRequired'] = [0, 'require_secure_transport not supported on MariaDB ' + self.db.get('EngineVersion', '')]
+                return
+            if self.engine == 'mariadb' and ver is not None and ver >= (11, 8):
+                # RDS for MariaDB 11.8+ defaults require_secure_transport to ON.
+                self.results['rdsSecureTransportNotRequired'] = [1, 'require_secure_transport not set (engine default ON for MariaDB 11.8+)']
+                return
+            if self.engine == 'mariadb' and ver is None:
+                self.results['rdsSecureTransportNotRequired'] = [0, 'Unable to evaluate (engine version unknown; default depends on MariaDB version)']
+                return
+            # Engine default is OFF for RDS MySQL, Aurora MySQL and MariaDB 10.5 - 11.4.
+            self.results['rdsSecureTransportNotRequired'] = [-1, 'require_secure_transport not set (engine default OFF)']
+            return
+
+        if str(val).strip().lower() in ('1', 'on', 'true'):
+            self.results['rdsSecureTransportNotRequired'] = [1, 'require_secure_transport=' + str(val)]
+        else:
+            self.results['rdsSecureTransportNotRequired'] = [-1, 'require_secure_transport=' + str(val)]
+
+    def _engineVersionTuple(self):
+        # '10.11.6' -> (10, 11); None when unparsable / missing.
+        try:
+            parts = str(self.db.get('EngineVersion', '')).split('.')
+            return (int(parts[0]), int(parts[1]))
+        except (ValueError, IndexError):
+            return None
+
+    def _checkAuroraNoGlobalDatabase(self):
+        if self.isCluster == False or self.engine not in ('aurora-mysql', 'aurora-postgresql'):
+            return
+        if self.db.get('EngineMode', 'provisioned') not in ('provisioned', None):
+            # Aurora Serverless v1 / parallel query modes cannot join a global database.
+            return
+
+        if self.db.get('GlobalClusterIdentifier'):
+            self.results['auroraNoGlobalDatabase'] = [1, 'Member of global database ' + self.db['GlobalClusterIdentifier']]
+            return
+
+        cacheKey = 'rds::GlobalClusterMemberArns::' + self.rdsClient.meta.region_name
+        memberArns = Config.get(cacheKey, None)
+        if memberArns is None:
+            try:
+                memberArns = []
+                paginator = self.rdsClient.get_paginator('describe_global_clusters')
+                for page in paginator.paginate():
+                    for gc in page.get('GlobalClusters', []):
+                        memberArns += [m.get('DBClusterArn') for m in gc.get('GlobalClusterMembers', [])]
+                Config.set(cacheKey, memberArns)
+            except botocore.exceptions.ClientError as e:
+                self.results['auroraNoGlobalDatabase'] = [0, 'Unable to evaluate ({})'.format(e.response['Error']['Code'])]
+                return
+
+        if self.db.get('DBClusterArn') in memberArns:
+            self.results['auroraNoGlobalDatabase'] = [1, 'Member of a global database']
+        else:
+            self.results['auroraNoGlobalDatabase'] = [-1, 'Not part of an Aurora global database']

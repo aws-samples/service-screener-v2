@@ -77,12 +77,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Lambda code scanning]<https://docs.aws.amazon.com/inspector/latest/user/scanning-lambda-code.html>",
+            "[Lambda code scanning]<https://docs.aws.amazon.com/inspector/latest/user/scanning_resources_lambda_code.html>",
             "[Lambda scanning]<https://docs.aws.amazon.com/inspector/latest/user/scanning-lambda.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/scanning-lambda-code.html"
+        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/scanning_resources_lambda_code.html"
     },
     "inspectorCodeRepositoryScanningDisabled": {
         "category": "S",
@@ -94,12 +94,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Code security scanning]<https://docs.aws.amazon.com/inspector/latest/user/code-security-scanning.html>",
+            "[Code security scanning]<https://docs.aws.amazon.com/inspector/latest/user/code-security-assessments.html>",
             "[Getting started]<https://docs.aws.amazon.com/inspector/latest/user/getting_started_tutorial.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/code-security-scanning.html"
+        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/code-security-assessments.html"
     },
     "inspectorCoverageGap": {
         "category": "S",
@@ -111,12 +111,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Understanding coverage]<https://docs.aws.amazon.com/inspector/latest/user/managing-coverage.html>",
-            "[Coverage troubleshooting]<https://docs.aws.amazon.com/inspector/latest/user/troubleshooting.html>"
+            "[Understanding coverage]<https://docs.aws.amazon.com/inspector/latest/user/assessing-coverage.html>",
+            "[Coverage troubleshooting]<https://docs.aws.amazon.com/inspector/latest/user/assessing-coverage.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/managing-coverage.html"
+        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/assessing-coverage.html"
     },
     "inspectorCriticalFindings": {
         "category": "S",
@@ -162,11 +162,64 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Remediating findings]<https://docs.aws.amazon.com/inspector/latest/user/remediating-findings.html>",
+            "[Remediating findings]<https://docs.aws.amazon.com/inspector/latest/user/findings-understanding-details.html>",
             "[Managing findings]<https://docs.aws.amazon.com/inspector/latest/user/findings-managing.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/remediating-findings.html"
+        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/findings-understanding-details.html"
+    },
+    "inspectorFindingsAged": {
+        "category": "S",
+        "^description": "{$COUNT} region(s) have active CRITICAL or HIGH Inspector findings that have been open longer than the remediation SLA (default 15 days for CRITICAL, 30 days for HIGH). Counting open findings shows the size of the backlog; aging shows whether the vulnerability management process is actually closing them. Findings that persist past the SLA indicate patching is not keeping pace with newly disclosed vulnerabilities, leaving known, high-impact weaknesses exposed for extended periods.",
+        "shortDesc": "Remediate CRITICAL/HIGH findings within SLA",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Managing findings]<https://docs.aws.amazon.com/inspector/latest/user/findings-managing.html>",
+            "[Understanding severity levels]<https://docs.aws.amazon.com/inspector/latest/user/findings-understanding-severity.html>",
+            "[SEC06-BP01 Perform vulnerability management]<https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_protect_compute_vulnerability_management.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/findings-managing.html"
+    },
+    "inspectorOrgAutoEnableIncomplete": {
+        "category": "S",
+        "^description": "{$COUNT} region(s) where the Inspector delegated administrator does not automatically enable EC2, ECR and Lambda scanning for member accounts, has reached the member account limit, or has organization member accounts that are not in the ENABLED state. New or unenrolled accounts then run workloads that are never scanned, and the gap is invisible from the administrator's aggregated findings view. This check can only be evaluated from the Inspector delegated administrator account.",
+        "shortDesc": "Auto-enable Inspector for all org accounts",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Managing multiple accounts with AWS Organizations]<https://docs.aws.amazon.com/inspector/latest/user/managing-multiple-accounts.html>",
+            "[Designating a delegated administrator]<https://docs.aws.amazon.com/inspector/latest/user/designating-admin.html>",
+            "[Delegated administrator and member accounts]<https://docs.aws.amazon.com/inspector/latest/user/admin-member-relationship.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/managing-multiple-accounts.html"
+    },
+    "inspectorSuppressionBroad": {
+        "category": "S",
+        "^description": "{$COUNT} region(s) have Inspector suppression rules whose criteria use only severity, resource type, finding type, score, fix-available, exploit-available, component type or vulnerability source fields, with no resource, vulnerability, repository or tag scoping. Such a rule silently suppresses every current and future finding of that class, including new high-impact CVEs on any resource, so the findings view understates real exposure. Suppression rules should be scoped to specific, accepted risks.",
+        "shortDesc": "Scope Inspector suppression rules narrowly",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Suppressing Amazon Inspector findings]<https://docs.aws.amazon.com/inspector/latest/user/findings-managing-supression-rules.html>",
+            "[Managing findings]<https://docs.aws.amazon.com/inspector/latest/user/findings-managing.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/inspector/latest/user/findings-managing-supression-rules.html"
     }
 }

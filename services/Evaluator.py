@@ -1,3 +1,4 @@
+import copy
 import traceback
 import botocore
 import time
@@ -16,6 +17,61 @@ import constants as _C
 
 # Guards concurrent appends to the slow-checks log file.
 _slow_log_lock = threading.Lock()
+
+# Guards creation of per-key locks for Evaluator._memo / _sharedMemo.
+_memo_init_lock = threading.Lock()
+
+
+_TRANSIENT_ERROR_CODES = frozenset((
+    'Throttling', 'ThrottlingException', 'ThrottledException', 'TooManyRequestsException',
+    'RequestLimitExceeded', 'RequestThrottled', 'RequestThrottledException', 'SlowDown',
+    'ProvisionedThroughputExceededException', 'ServiceUnavailable', 'ServiceUnavailableException',
+    'InternalError', 'InternalFailure', 'InternalServerError', 'InternalServerException',
+))
+
+
+def _isTransient(e):
+    """Errors a later retry may not hit: never cache them, so one throttled
+    call does not become 'unable to evaluate' for every later check."""
+    if isinstance(e, (botocore.exceptions.ConnectionError, botocore.exceptions.ReadTimeoutError,
+                      botocore.exceptions.ConnectTimeoutError)):
+        return True
+    if isinstance(e, botocore.exceptions.ClientError):
+        err = e.response.get('Error', {}) or {}
+        status = (e.response.get('ResponseMetadata', {}) or {}).get('HTTPStatusCode') or 0
+        return err.get('Code') in _TRANSIENT_ERROR_CODES or status >= 500 or status == 429
+    return False
+
+
+def _memoFetch(store, lock, key, fn):
+    with lock:
+        if key not in store:
+            try:
+                store[key] = (True, fn())
+            except Exception as e:
+                if _isTransient(e):
+                    raise            # not cached: the next caller retries
+                store[key] = (False, e)  # cached and re-raised to every caller
+    ok, value = store[key]
+    if ok:
+        # Each caller gets its own copy: some checks modify what they read.
+        return copy.deepcopy(value)
+    raise _freshError(value)
+
+
+def _freshError(e):
+    """A copy of a cached exception with no traceback. Re-raising the one
+    cached object would append every caller's frames to its __traceback__
+    (unbounded growth, keeps drivers alive, races between threads)."""
+    try:
+        c = copy.copy(e)
+        if type(c) is not type(e):
+            raise TypeError
+        c.__cause__, c.__suppress_context__ = e.__cause__, e.__suppress_context__
+        return c.with_traceback(None)
+    except Exception:
+        # Not copyable: still drop the old frames so growth stays bounded.
+        return e.with_traceback(None)
 
 
 def _log_slow_check(tmp_obj, method_name, timeSpent):
@@ -77,6 +133,40 @@ class Evaluator():
         self.chartData = {}
         self.classname = type(self).__name__
     
+    # ------------------------------------------------------------------ #
+    # Read-once caches for API responses shared by several _check methods.
+    # Checks of one driver run concurrently (see run()), so both helpers are
+    # thread-safe and fetch at most once. A raised exception is cached and
+    # re-raised to every caller, so each check handles errors exactly as if
+    # it had made the call itself.
+    # ------------------------------------------------------------------ #
+    def _memo(self, key, fn):
+        """Per-resource cache: fn() runs at most once per driver instance."""
+        with _memo_init_lock:
+            if not hasattr(self, '_memoStore'):
+                self._memoStore = {}
+                self._memoLocks = {}
+            lock = self._memoLocks.setdefault(key, threading.Lock())
+        return _memoFetch(self._memoStore, lock, key, fn)
+
+    def _sharedMemo(self, key, fn):
+        """Cache shared by every driver instance in this scan, for account- or
+        region-level data that does not depend on the resource. Include the
+        region (and anything else that changes the answer) in `key`. Cleared by
+        Config.init()."""
+        store = Config.get('__sharedMemo', None)
+        if not isinstance(store, dict):
+            with _memo_init_lock:
+                store = Config.get('__sharedMemo', None)
+                if not isinstance(store, dict):
+                    store = {'values': {}, 'locks': {}}
+                    Config.set('__sharedMemo', store)
+        acct = (Config.get('stsInfo', {}) or {}).get('Account', 'default')
+        fullKey = (acct, key)
+        with _memo_init_lock:
+            lock = store['locks'].setdefault(fullKey, threading.Lock())
+        return _memoFetch(store['values'], lock, fullKey, fn)
+
     def addII(self, k, v):
         self.InventoryInfo[k] = v
         

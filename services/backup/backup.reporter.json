@@ -18,7 +18,7 @@
 	},
 	"backupVaultDefaultEncryption": {
 		"category": "S",
-		"^description": "{$COUNT} AWS Backup vault(s) are encrypted with an AWS-owned KMS key (EncryptionKeyType=AWS_OWNED_KMS_KEY) rather than a customer-managed KMS key (CMK). AWS-owned keys do not permit key-policy control, cross-account grant auditing, or custom rotation policies. Regulated workloads should use a CMK.",
+		"^description": "{$COUNT} AWS Backup vault(s) are encrypted with an AWS-owned KMS key (EncryptionKeyType=AWS_OWNED_KMS_KEY) or with the AWS-managed key aws/backup (KMS KeyManager=AWS, resolved with kms:DescribeKey) rather than a customer-managed KMS key (CMK). These keys do not permit key-policy control, cross-account grant auditing, or custom rotation policies. Regulated workloads should use a CMK.",
 		"shortDesc": "Encrypt backup vaults with a customer-managed KMS key",
 		"criticality": "M",
 		"downtime": 0,
@@ -155,11 +155,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Backup region settings]<https://docs.aws.amazon.com/aws-backup/latest/devguide/opt-in.html>"
+			"[Backup region settings]<https://docs.aws.amazon.com/aws-backup/latest/devguide/assigning-resources.html#backup-service-optin>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/opt-in.html"
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/assigning-resources.html#backup-service-optin"
 	},
 	"backupRecoveryPointNotEncrypted": {
 		"category": "S",
@@ -268,11 +268,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Recovery point lifecycle]<https://docs.aws.amazon.com/aws-backup/latest/devguide/API_Lifecycle.html>"
+			"[Recovery point lifecycle]<https://docs.aws.amazon.com/aws-backup/latest/APIReference/API_Lifecycle.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/API_Lifecycle.html"
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/APIReference/API_Lifecycle.html"
 	},
 	"backupVaultLockNotFinalized": {
 		"category": "S",
@@ -308,7 +308,7 @@
 	},
 	"backupCriticalResourcesUnprotected": {
 		"category": "R",
-		"^description": "{$COUNT} production resource(s) (RDS instances, DynamoDB tables, EFS filesystems, EBS volumes) are not protected by AWS Backup in this region. Cross-referenced against list_protected_resources — resources that appear in the account but not in the protected set have zero recovery-point coverage.",
+		"^description": "{$COUNT} production resource(s) (RDS DB instances and DB clusters, DynamoDB tables, EFS filesystems, in-use EBS volumes) are not protected by AWS Backup in this region. Cross-referenced against list_protected_resources: Aurora, DocumentDB, Neptune and Multi-AZ DB cluster members are matched at cluster level, and an EBS volume also counts as protected when the EC2 instance it is attached to is protected. Resources that appear in the account but not in the protected set have zero recovery-point coverage. When list_protected_resources or a resource listing cannot be read, the check reports 'Unable to evaluate' instead of a result.",
 		"shortDesc": "Assign every production resource to a backup plan",
 		"criticality": "H",
 		"downtime": 0,
@@ -316,7 +316,7 @@
 		"additionalCost": 1,
 		"needFullTest": 1,
 		"ref": [
-			"[list_protected_resources]<https://docs.aws.amazon.com/aws-backup/latest/devguide/API_ListProtectedResources.html>",
+			"[list_protected_resources]<https://docs.aws.amazon.com/aws-backup/latest/APIReference/API_ListProtectedResources.html>",
 			"[Assign resources to a backup plan]<https://docs.aws.amazon.com/aws-backup/latest/devguide/assigning-resources.html>"
 		],
 		"remediation": null,
@@ -325,7 +325,7 @@
 	},
 	"backupRecoveryPointNoCMK": {
 		"category": "S",
-		"^description": "{$COUNT} AWS Backup vault(s) contain recovery point(s) with EncryptionKeyType=AWS_OWNED_KMS_KEY. Similar to the vault-level check, but at the recovery-point level — AWS-owned keys do not allow cross-account sharing or custom rotation policies. Often redundant with backupVaultDefaultEncryption; useful for older points created before a vault migration.",
+		"^description": "{$COUNT} AWS Backup vault(s) contain recovery point(s) that are not on a customer-managed KMS key: EncryptionKeyType=AWS_OWNED_KMS_KEY, an AWS-managed key such as aws/backup, aws/ebs or aws/rds (KMS KeyManager=AWS, resolved with kms:DescribeKey), or no encryption at all. Similar to the vault-level check, but at the recovery-point level; AWS-owned and AWS-managed keys do not allow cross-account sharing or custom rotation policies. Often redundant with backupVaultDefaultEncryption; useful for older points created before a vault migration and for points whose encryption is inherited from the source resource.",
 		"shortDesc": "Re-encrypt recovery points onto a customer-managed KMS key",
 		"criticality": "L",
 		"downtime": 0,
@@ -354,5 +354,175 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/logicallyairgappedvault.html"
+	},
+	"backupJobsFailing": {
+		"category": "R",
+		"^description": "{$COUNT} region(s) have AWS Backup backup or copy jobs that FAILED, were ABORTED or EXPIRED in the last 7 days. Every failed job is a missed recovery point: the affected resources are not protected to the RPO that the backup plan promises. Investigate the StatusMessage of each job (permissions, resource state, start/completion windows) and fix the cause.",
+		"shortDesc": "Investigate and fix failed, aborted or expired backup/copy jobs",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Monitoring AWS Backup jobs]<https://docs.aws.amazon.com/aws-backup/latest/devguide/monitoring.html>",
+			"[Troubleshooting AWS Backup]<https://docs.aws.amazon.com/aws-backup/latest/devguide/troubleshooting.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/troubleshooting.html"
+	},
+	"backupRestoreJobsFailing": {
+		"category": "R",
+		"^description": "{$COUNT} region(s) have AWS Backup restore jobs, or restore-testing validations, that FAILED in the last 30 days. A failed restore proves that at least some backups cannot currently be recovered as expected. Review the StatusMessage / ValidationStatusMessage of each job and fix the backup, IAM role or restore metadata before you need it in an incident.",
+		"shortDesc": "Investigate failed restore jobs and restore validations",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Restore testing]<https://docs.aws.amazon.com/aws-backup/latest/devguide/restore-testing.html>",
+			"[Restore testing validation]<https://docs.aws.amazon.com/aws-backup/latest/devguide/restore-testing-validation.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/restore-testing.html"
+	},
+	"backupPlanNoCrossAccountCopy": {
+		"category": "S",
+		"^description": "In {$COUNT} region(s) no AWS Backup plan rule copies recovery points to a vault in a different AWS account (or into a logically air-gapped vault). If the workload account is compromised, an attacker with sufficient permissions can delete or encrypt both the data and its in-account backups. Add a CopyAction to a vault in a dedicated backup account (requires cross-account backup to be enabled in AWS Organizations), or use a logically air-gapped vault.",
+		"shortDesc": "Copy backups to a vault in a separate backup account",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 1,
+		"ref": [
+			"[Creating backup copies across AWS accounts]<https://docs.aws.amazon.com/aws-backup/latest/devguide/create-cross-account-backup.html>",
+			"[Logically air-gapped vaults]<https://docs.aws.amazon.com/aws-backup/latest/devguide/logicallyairgappedvault.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/create-cross-account-backup.html"
+	},
+	"backupMalwareScanDisabled": {
+		"category": "S",
+		"^description": "{$COUNT} AWS Backup plan(s) protect EC2, EBS or S3 resources but have no malware scanning configured (no rule ScanActions and no plan ScanSettings). Without scanning, backups may silently contain malware and a restore can re-introduce it. Consider enabling Amazon GuardDuty Malware Protection for AWS Backup on these plans. Advisory - scanning is a paid feature.",
+		"shortDesc": "Enable GuardDuty malware scanning for EC2/EBS/S3 backup plans",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Malware scanning for AWS Backup]<https://docs.aws.amazon.com/aws-backup/latest/devguide/malware-protection.html>",
+			"[GuardDuty Malware Protection for AWS Backup]<https://docs.aws.amazon.com/guardduty/latest/ug/malware-protection-backup.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/malware-protection.html"
+	},
+	"backupNoFailureAlerting": {
+		"category": "R",
+		"^description": "In {$COUNT} region(s) nothing alerts on AWS Backup job failures: no backup vault sends BACKUP_JOB_FAILED / BACKUP_JOB_COMPLETED / COPY_JOB_FAILED notifications to SNS, there is no enabled EventBridge rule for source aws.backup with a target, and no CloudWatch alarm with actions watches the AWS/Backup failure metrics. Failed backups then go unnoticed until a restore is needed. If alerting is centralised elsewhere (for example a delegated monitoring account), this finding can be accepted.",
+		"shortDesc": "Alert on failed backup and copy jobs",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Notification options with AWS Backup]<https://docs.aws.amazon.com/aws-backup/latest/devguide/backup-notifications.html>",
+			"[Monitoring AWS Backup events using EventBridge]<https://docs.aws.amazon.com/aws-backup/latest/devguide/eventbridge.html>",
+			"[Monitoring AWS Backup metrics with CloudWatch]<https://docs.aws.amazon.com/aws-backup/latest/devguide/cloudwatch.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/backup-notifications.html"
+	},
+	"backupNoRestoreTestingPlan": {
+		"category": "R",
+		"^description": "{$COUNT} region(s) use AWS Backup but have no restore testing plan, or have restore testing plan(s) without any resource selection. Backups that are never restored are not proven to be recoverable. Create a restore testing plan with selections for critical resource types so restores are exercised automatically on a schedule.",
+		"shortDesc": "Create an AWS Backup restore testing plan with selections",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Restore testing]<https://docs.aws.amazon.com/aws-backup/latest/devguide/restore-testing.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/restore-testing.html"
+	},
+	"backupPlanNotTargetingProtectedVault": {
+		"category": "S",
+		"^description": "{$COUNT} AWS Backup plan(s) have at least one rule whose target vault and copy destinations are all neither protected by Vault Lock nor logically air-gapped. Recovery points created by those rules can be deleted by anyone with sufficient permissions in this account, for example a ransomware actor. Point the rule at, or copy it to, a Vault-Locked or logically air-gapped vault.",
+		"shortDesc": "Store or copy each rule's backups in a locked or air-gapped vault",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 1,
+		"ref": [
+			"[AWS Backup Vault Lock]<https://docs.aws.amazon.com/aws-backup/latest/devguide/vault-lock.html>",
+			"[Logically air-gapped vaults]<https://docs.aws.amazon.com/aws-backup/latest/devguide/logicallyairgappedvault.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/vault-lock.html"
+	},
+	"backupRetentionBelowDetectionWindow": {
+		"category": "S",
+		"^description": "{$COUNT} AWS Backup plan(s) or locked vault(s) do not keep a recovery point for at least 35 days: either the longest rule / copy retention (Lifecycle.DeleteAfterDays) of the plan is below 35 days, or the vault's Vault Lock guarantees a minimum retention of fewer than 35 days (MinRetentionDays below 35 or not set), so recovery points in that vault can be deleted before the detection window ends. Compromises and silent data corruption are often detected weeks later; if every recovery point is younger than the detection window, no clean restore point remains. Extend retention (for example a monthly rule) or raise MinRetentionDays to cover your detection window.",
+		"shortDesc": "Retain at least one recovery point beyond the detection window (35 days)",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Backup plan lifecycle and retention]<https://docs.aws.amazon.com/aws-backup/latest/devguide/plan-options-and-configuration.html>",
+			"[AWS Backup Vault Lock]<https://docs.aws.amazon.com/aws-backup/latest/devguide/vault-lock.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/vault-lock.html"
+	},
+	"airGappedVaultNoMpa": {
+		"category": "S",
+		"^description": "{$COUNT} logically air-gapped backup vault(s) have no multi-party approval (MPA) team associated. Without an MPA approval team, access to the vault's recovery points cannot be restored to a different account through multi-party approval if the owning account is compromised, locked out, or closed - removing one of the main recovery paths an air-gapped vault is meant to provide.",
+		"shortDesc": "Associate an MPA approval team with logically air-gapped vaults",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Multi-party approval for logically air-gapped vaults]<https://docs.aws.amazon.com/aws-backup/latest/devguide/multipartyapproval.html>",
+			"[Logically air-gapped vault]<https://docs.aws.amazon.com/aws-backup/latest/devguide/logicallyairgappedvault.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/multipartyapproval.html"
+	},
+	"backupAuditFrameworkMissing": {
+		"category": "R",
+		"^description": "{$COUNT} region(s) use AWS Backup but have no deployed AWS Backup Audit Manager framework. Without a framework, there is no continuous, auditable evaluation of backup controls (backup plan frequency and retention, vault lock, encryption, cross-Region/cross-account copies), so drift from your backup policy can go unnoticed until a restore is needed. Audit Manager requires AWS Config resource recording and incurs AWS Config charges.",
+		"shortDesc": "Deploy an AWS Backup Audit Manager framework",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[AWS Backup Audit Manager]<https://docs.aws.amazon.com/aws-backup/latest/devguide/aws-backup-audit-manager.html>",
+			"[Working with audit frameworks]<https://docs.aws.amazon.com/aws-backup/latest/devguide/working-with-audit-frameworks.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/aws-backup/latest/devguide/working-with-audit-frameworks.html"
 	}
 }

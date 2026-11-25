@@ -41,11 +41,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Glue Data Catalog Resource Policies]<https://docs.aws.amazon.com/glue/latest/dg/glue-resource-policies.html>"
+			"[Glue Data Catalog Resource Policies]<https://docs.aws.amazon.com/glue/latest/dg/security_iam_service-with-iam.html#security_iam_service-with-iam-resource-based-policies>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/glue-resource-policies.html"
+		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/security_iam_service-with-iam.html#security_iam_service-with-iam-resource-based-policies"
 	},
 	"SslEnabled": {
 		"category": "S",
@@ -57,11 +57,11 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Connecting to a JDBC Data Store in a VPC]<https://docs.aws.amazon.com/glue/latest/dg/connection-using.html>"
+			"[Connecting to a JDBC Data Store in a VPC]<https://docs.aws.amazon.com/glue/latest/dg/glue-connections.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/connection-using.html"
+		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/glue-connections.html"
 	},
 	"DevEndpointCloudWatchLogsEncryption": {
 		"category": "S",
@@ -73,11 +73,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Encryption and Secure Access for Development Endpoints]<https://docs.aws.amazon.com/glue/latest/dg/dev-endpoint-encryption.html>"
+			"[Encryption and Secure Access for Development Endpoints]<https://docs.aws.amazon.com/glue/latest/dg/encryption-security-configuration.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/dev-endpoint-encryption.html"
+		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/encryption-security-configuration.html"
 	},
 	"DevEndpointBookmarkEncryption": {
 		"category": "S",
@@ -89,11 +89,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Encryption and Secure Access for Development Endpoints]<https://docs.aws.amazon.com/glue/latest/dg/dev-endpoint-encryption.html>"
+			"[Encryption and Secure Access for Development Endpoints]<https://docs.aws.amazon.com/glue/latest/dg/encryption-security-configuration.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/dev-endpoint-encryption.html"
+		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/encryption-security-configuration.html"
 	},
 	"DevEndpointS3Encryption": {
 		"category": "S",
@@ -105,11 +105,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Encryption and Secure Access for Development Endpoints]<https://docs.aws.amazon.com/glue/latest/dg/dev-endpoint-encryption.html>"
+			"[Encryption and Secure Access for Development Endpoints]<https://docs.aws.amazon.com/glue/latest/dg/encryption-security-configuration.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/dev-endpoint-encryption.html"
+		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/encryption-security-configuration.html"
 	},
 	"JobS3Encryption": {
 		"category": "S",
@@ -185,11 +185,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Encrypting Your AWS Glue Data]<https://docs.aws.amazon.com/glue/latest/dg/encryption-glue-resources.html>"
+			"[Encrypting Your AWS Glue Data]<https://docs.aws.amazon.com/glue/latest/dg/console-machine-learning-transforms.html#ml_transform_sec_config>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/encryption-glue-resources.html"
+		"remediation_doc": "https://docs.aws.amazon.com/glue/latest/dg/console-machine-learning-transforms.html#ml_transform_sec_config"
 	},
 	"JobBookmarkEnabled": {
 		"category": "O",

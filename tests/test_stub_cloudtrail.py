@@ -1,0 +1,543 @@
+"""botocore Stubber tests for CloudTrail WAFS2027 checks.
+
+Why Stubber and not the emulator:
+- manualConsoleWritesDetected: the emulator records its own API calls in LookupEvents
+  but cannot produce events made from an AWS Management Console session
+  (sessionCredentialFromConsole=true), so the FAIL path cannot be set up there.
+- trailBucketSameAccount: the emulator is a single account that is always an
+  Organizations management account; standalone, member, log-archive and
+  cross-account bucket cases need other accounts.
+- cloudtrailExcludesKmsEvents: organization shadow trails whose selectors cannot be
+  read from a member account (AccessDenied) need a second account.
+The drivers are exercised directly with real boto3 clients (real API shapes) wrapped
+by Stubber; nothing is sent over the network.
+"""
+import datetime
+import json
+import os
+import sys
+
+import boto3
+import pytest
+from botocore.stub import Stubber, ANY
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, ROOT)
+
+from utils.Config import Config  # noqa: E402
+from services.cloudtrail.drivers.CloudtrailAccount import CloudtrailAccount  # noqa: E402
+from services.cloudtrail.drivers.CloudtrailHelper import selectorCoverage  # noqa: E402
+
+ACCT = '111122223333'
+OTHER = '999988887777'
+REGION = 'us-east-1'
+
+
+def _client(svc):
+    return boto3.client(svc, region_name=REGION, aws_access_key_id='testing',
+                        aws_secret_access_key='testing', endpoint_url='https://127.0.0.1:1')
+
+
+@pytest.fixture(autouse=True)
+def _cfg():
+    Config.init()
+    Config.set('stsInfo', {'Account': ACCT})
+    yield
+    Config.init()
+
+
+def _trail(name, acct=ACCT, bucket='b', org=False, home=REGION):
+    return {'Name': name, 'S3BucketName': bucket, 'HomeRegion': home, 'IsOrganizationTrail': org,
+            'IsMultiRegionTrail': True, 'TrailARN': f'arn:aws:cloudtrail:{home}:{acct}:trail/{name}'}
+
+
+class Clients:
+    def __init__(self):
+        self.ct, self.s3, self.cfg, self.org = _client('cloudtrail'), _client('s3'), _client('config'), _client('organizations')
+        self.st = {k: Stubber(getattr(self, k)) for k in ('ct', 's3', 'cfg', 'org')}
+
+    def driver(self):
+        for s in self.st.values():
+            s.activate()
+        return CloudtrailAccount(self.ct, 1, s3Client=self.s3, cfgClient=self.cfg, orgClient=self.org)
+
+    def done(self):
+        for s in self.st.values():
+            s.assert_no_pending_responses()
+
+
+# ---------------------------------------------------------------- selectors
+
+def test_selector_coverage_variants():
+    assert selectorCoverage({'EventSelectors': [{'IncludeManagementEvents': True}]})['kms'] is True
+    c = selectorCoverage({'EventSelectors': [{'IncludeManagementEvents': True,
+                                              'ExcludeManagementEventSources': ['kms.amazonaws.com']}]})
+    assert c['management'] and not c['kms']
+    c = selectorCoverage({'AdvancedEventSelectors': [{'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Management']},
+        {'Field': 'eventSource', 'NotEquals': ['kms.amazonaws.com', 'rdsdata.amazonaws.com']}]}]})
+    assert c['management'] and not c['kms']
+    c = selectorCoverage({'AdvancedEventSelectors': [{'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Management']},
+        {'Field': 'eventSource', 'NotEquals': ['rdsdata.amazonaws.com']}]}]})
+    assert c['kms'] is True
+    c = selectorCoverage({'AdvancedEventSelectors': [{'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Data']},
+        {'Field': 'resources.type', 'Equals': ['AWS::S3::Object']}]}]})
+    assert c['data'] and not c['management']
+    assert selectorCoverage({'EventSelectors': [{'IncludeManagementEvents': False}]})['management'] is False
+
+
+# ---------------------------------------------------------------- KMS exclusion
+
+def _kmsStubs(c, selectors, statusErr=None, selErr=None):
+    t = _trail('t1', acct=OTHER, org=True)
+    c.st['ct'].add_response('describe_trails', {'trailList': [t]}, {'includeShadowTrails': True})
+    c.st['ct'].add_response('get_trail_status', {'IsLogging': True}, {'Name': t['TrailARN']})
+    if selErr:
+        c.st['ct'].add_client_error('get_event_selectors', selErr, expected_params={'TrailName': t['TrailARN']})
+    else:
+        c.st['ct'].add_response('get_event_selectors', dict(TrailARN=t['TrailARN'], **selectors),
+                                {'TrailName': t['TrailARN']})
+
+
+def test_kms_excluded_then_fixed():
+    c = Clients()
+    _kmsStubs(c, {'EventSelectors': [{'ReadWriteType': 'All', 'IncludeManagementEvents': True,
+                                      'ExcludeManagementEventSources': ['kms.amazonaws.com']}]})
+    d = c.driver()
+    d._checkCloudtrailExcludesKmsEvents()
+    assert d.results['cloudtrailExcludesKmsEvents'][0] == -1
+    c.done()
+
+    Config.set('__sharedMemo', None)  # re-run = new scan (trail reads are cached per scan)
+    c = Clients()
+    _kmsStubs(c, {'EventSelectors': [{'ReadWriteType': 'All', 'IncludeManagementEvents': True,
+                                      'ExcludeManagementEventSources': []}]})
+    d = c.driver()
+    d._checkCloudtrailExcludesKmsEvents()
+    assert d.results['cloudtrailExcludesKmsEvents'][0] == 1
+    c.done()
+
+
+def test_kms_unreadable_org_trail_is_not_pass():
+    c = Clients()
+    _kmsStubs(c, {}, selErr='AccessDeniedException')
+    d = c.driver()
+    d._checkCloudtrailExcludesKmsEvents()
+    r = d.results['cloudtrailExcludesKmsEvents']
+    assert r[0] == 0 and 'Unable to evaluate' in r[1]
+    c.done()
+
+
+# ---------------------------------------------------------------- same-account bucket
+
+def _sameAcctStubs(c, trails, buckets, channels=None, org=True, cfgErr=None, cfg=True):
+    if org:
+        c.st['org'].add_response('describe_organization', {'Organization': {
+            'Id': 'o-abcdefghij', 'MasterAccountId': OTHER}})
+    else:
+        c.st['org'].add_client_error('describe_organization', 'AWSOrganizationsNotInUseException')
+        return
+    c.st['s3'].add_response('list_buckets', {'Buckets': [{'Name': b} for b in buckets],
+                                             'Owner': {'ID': 'abc'}})
+    c.st['ct'].add_response('describe_trails', {'trailList': trails}, {'includeShadowTrails': True})
+    if not cfg:
+        return
+    if cfgErr:
+        c.st['cfg'].add_client_error('describe_delivery_channels', cfgErr)
+    else:
+        c.st['cfg'].add_response('describe_delivery_channels', {'DeliveryChannels': channels or []}, {})
+
+
+def _runSame(c):
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    c.done()
+    # bucket list and log-archive verdict are cached per account for the scan
+    acct = Config.get('stsInfo')['Account']
+    Config.set('CloudTrail_ownedBuckets::' + acct, None)
+    Config.set('CloudTrail_logArchive::' + acct, None)
+    Config.set('CloudTrail_ownTrailCounted::' + acct, None)
+    Config.set('__sharedMemo', None)  # describe_organization is read once per scan
+    return d.results['trailBucketSameAccount']
+
+
+def test_member_trail_to_own_bucket_flagged_then_fixed():
+    c = Clients()
+    _sameAcctStubs(c, [_trail('local', bucket='my-logs')], ['my-logs', 'other'])
+    assert _runSame(c)[0] == -1
+
+    c = Clients()
+    _sameAcctStubs(c, [_trail('local', bucket='archive-bucket-in-log-account')], ['my-logs'])
+    assert _runSame(c)[0] == 1
+
+
+def test_config_channel_to_own_bucket_flagged():
+    c = Clients()
+    _sameAcctStubs(c, [], ['cfg-bucket'], channels=[{'name': 'default', 's3BucketName': 'cfg-bucket'}])
+    assert _runSame(c)[0] == -1
+
+
+def test_config_unreadable_is_not_pass():
+    c = Clients()
+    _sameAcctStubs(c, [_trail('local', bucket='elsewhere')], ['mine'], cfgErr='AccessDeniedException')
+    r = _runSame(c)
+    assert r[0] == 0 and 'Unable to evaluate' in r[1]
+
+
+def test_log_archive_account_not_flagged():
+    c = Clients()
+    _sameAcctStubs(c, [_trail('org', acct=OTHER, org=True, bucket='org-archive'),
+                       _trail('local', bucket='org-archive')], ['org-archive'], cfg=False)
+    assert _runSame(c)[0] == 1
+
+
+def test_log_archive_memo_survives_other_regions():
+    """A single-Region org trail is only visible in its home Region. Once the log
+    archive role is detected, the account's own Config channel delivering locally in
+    another Region must not be flagged."""
+    c = Clients()
+    _sameAcctStubs(c, [_trail('org', acct=OTHER, org=True, bucket='org-archive')],
+                   ['org-archive', 'cfg-local'], cfg=False)
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    c.done()
+    assert d.results['trailBucketSameAccount'][0] == 1
+
+    c = Clients()  # next Region: org trail not visible, local Config channel
+    _sameAcctStubs(c, [], ['org-archive', 'cfg-local'],
+                   channels=[{'name': 'default', 's3BucketName': 'cfg-local'}], cfg=False)
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    assert d.results['trailBucketSameAccount'][0] == 1
+
+
+def _homeRegionStubs(c, trails, buckets, channels, listBuckets=True):
+    # bucket list and describe_organization are read once per scan, in the first Region
+    if listBuckets:
+        c.st['org'].add_response('describe_organization', {'Organization': {
+            'Id': 'o-abcdefghij', 'MasterAccountId': OTHER}})
+        c.st['s3'].add_response('list_buckets', {'Buckets': [{'Name': b} for b in buckets],
+                                                 'Owner': {'ID': 'abc'}})
+    c.st['ct'].add_response('describe_trails', {'trailList': trails}, {'includeShadowTrails': True})
+    c.st['cfg'].add_response('describe_delivery_channels', {'DeliveryChannels': channels}, {})
+
+
+def test_multiregion_trail_home_not_scanned_flagged_once_then_fixed():
+    """Scan of us-east-1 + us-west-2 only; the account's multi-Region trail is homed in
+    eu-west-1 (not scanned) and writes to a bucket this account owns, while Config goes
+    to a central bucket. Previously this was a false PASS; now the trail is counted
+    in the first scanned Region where it is visible, and only there."""
+    Config.set('REGIONS_SELECTED', ['us-east-1', 'us-west-2'])
+    legacy = _trail('legacy', bucket='my-logs', home='eu-west-1')
+    central = [{'name': 'default', 's3BucketName': 'central-config-bucket'}]
+
+    c = Clients()
+    _homeRegionStubs(c, [legacy], ['my-logs'], central)
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    c.done()
+    r = d.results['trailBucketSameAccount']
+    assert r[0] == -1 and 'legacy' in r[1]
+
+    c = Clients()  # second scanned Region: same trail must not be reported again
+    _homeRegionStubs(c, [legacy], ['my-logs'], central, listBuckets=False)
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    c.done()
+    assert d.results['trailBucketSameAccount'][0] == 1
+
+    # FIX: trail now writes to the log archive account's bucket -> re-run passes
+    Config.set('CloudTrail_ownTrailCounted::' + ACCT, None)
+    Config.set('CloudTrail_ownedBuckets::' + ACCT, None)
+    Config.set('__sharedMemo', None)
+    c = Clients()
+    _homeRegionStubs(c, [_trail('legacy', bucket='archive-in-log-account', home='eu-west-1')],
+                     ['my-logs'], central)
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    c.done()
+    assert d.results['trailBucketSameAccount'][0] == 1
+
+
+def test_multiregion_trail_home_scanned_not_counted_elsewhere():
+    """When the home Region is scanned, the trail is evaluated there only."""
+    Config.set('REGIONS_SELECTED', ['us-east-1', 'eu-west-1'])
+    c = Clients()
+    _homeRegionStubs(c, [_trail('legacy', bucket='my-logs', home='eu-west-1')], ['my-logs'],
+                     [{'name': 'default', 's3BucketName': 'central-config-bucket'}])
+    d = c.driver()  # client Region is us-east-1
+    d._checkTrailBucketSameAccount()
+    c.done()
+    assert d.results['trailBucketSameAccount'][0] == 1
+
+
+def test_owned_buckets_cache_is_per_account():
+    """--sequential multi-account scans share one process: account B must not reuse
+    account A's bucket list (false PASS / false FAIL)."""
+    c = Clients()
+    _sameAcctStubs(c, [_trail('local', bucket='a-logs')], ['a-logs'])
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    c.done()
+    assert d.results['trailBucketSameAccount'][0] == -1
+
+    B = '444455556666'
+    Config.set('stsInfo', {'Account': B})
+    c = Clients()
+    _sameAcctStubs(c, [_trail('local', acct=B, bucket='b-logs')], ['b-logs'])
+    d = c.driver()
+    d._checkTrailBucketSameAccount()
+    c.done()  # list_buckets was called again for B
+    assert d.results['trailBucketSameAccount'][0] == -1
+
+
+def test_account_flags_reset_between_accounts(monkeypatch):
+    """CloudTrail_has* flags are kept across Regions of one account but must be reset
+    when a --sequential multi-account scan moves to the next account."""
+    import services.cloudtrail.Cloudtrail as mod
+
+    seen = []
+
+    class FakeAccount:
+        def __init__(self, *a, **k):
+            pass
+
+        def run(self, cls):
+            seen.append(Config.get('CloudTrail_hasManagementEventsCaptured'))
+
+        def getInfo(self):
+            return {}
+
+    class FakeSession:
+        def client(self, *a, **k):
+            return None
+
+    monkeypatch.setattr(mod, 'CloudtrailAccount', FakeAccount)
+    class Quiet(mod.Cloudtrail):
+        def __del__(self):  # skip Service reporting side effects
+            pass
+
+    svc = Quiet.__new__(Quiet)
+    svc.ssBoto, svc.bConfig, svc.ctClient, svc.snsClient, svc.s3Client = FakeSession(), None, None, None, None
+    svc.getTrails = lambda: []
+
+    svc.advise()
+    Config.set('CloudTrail_hasManagementEventsCaptured', True)  # a trail in account A
+    svc.advise()                                               # next Region, same account
+    Config.set('stsInfo', {'Account': '444455556666'})
+    svc.advise()                                               # account B, no trails
+    assert seen == [False, True, False]
+    assert Config.get('CloudTrail_listGlobalServEnabled') == []
+
+
+def test_kms_ambiguous_selector_is_info():
+    c = selectorCoverage({'AdvancedEventSelectors': [{'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Management']},
+        {'Field': 'eventSource', 'Equals': ['s3.amazonaws.com'], 'StartsWith': ['kms']}]}]})
+    assert c['management'] and not c['kms'] and c['kmsAmbiguous']
+    c = Clients()
+    _kmsStubs(c, {'AdvancedEventSelectors': [{'Name': 'x', 'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Management']},
+        {'Field': 'eventSource', 'Equals': ['s3.amazonaws.com'], 'StartsWith': ['kms']}]}]})
+    d = c.driver()
+    d._checkCloudtrailExcludesKmsEvents()
+    assert d.results['cloudtrailExcludesKmsEvents'][0] == 0
+    c.done()
+
+
+def test_standalone_account_info():
+    c = Clients()
+    _sameAcctStubs(c, [], [], org=False)
+    assert _runSame(c)[0] == 0
+
+
+# ---------------------------------------------------------------- console writes
+
+def _event(name, console, invokedBy=None, readOnly=False):
+    ui = {'type': 'AssumedRole', 'arn': f'arn:aws:sts::{ACCT}:assumed-role/Admin/alice'}
+    if invokedBy:
+        ui['invokedBy'] = invokedBy
+    rec = {'eventType': 'AwsApiCall', 'eventName': name, 'eventSource': 'ec2.amazonaws.com',
+           'readOnly': readOnly, 'userIdentity': ui}
+    if console:
+        rec['sessionCredentialFromConsole'] = 'true'
+    return {'EventId': name, 'EventName': name, 'ReadOnly': str(readOnly).lower(),
+            'EventTime': datetime.datetime(2026, 11, 1), 'CloudTrailEvent': json.dumps(rec)}
+
+
+def _runConsole(events):
+    c = Clients()
+    c.st['ct'].add_response('lookup_events', {'Events': events}, {
+        'LookupAttributes': [{'AttributeKey': 'ReadOnly', 'AttributeValue': 'false'}],
+        'StartTime': ANY, 'EndTime': ANY, 'MaxResults': 50})
+    d = c.driver()
+    d._checkManualConsoleWritesDetected()
+    c.done()
+    return d.results['manualConsoleWritesDetected']
+
+
+def test_console_writes_flagged_then_fixed():
+    r = _runConsole([_event('RunInstances', console=True), _event('CreateTags', console=False)])
+    assert r[0] == -1 and 'RunInstances' in r[1]
+
+    r = _runConsole([_event('RunInstances', console=False),
+                     _event('CreateStack', console=True, invokedBy='cloudformation.amazonaws.com')])
+    assert r[0] == 1
+
+
+def test_console_lookup_denied_is_not_pass():
+    c = Clients()
+    c.st['ct'].add_client_error('lookup_events', 'AccessDeniedException')
+    d = c.driver()
+    d._checkManualConsoleWritesDetected()
+    r = d.results['manualConsoleWritesDetected']
+    assert r[0] == 0 and 'Unable to evaluate' in r[1]
+
+
+def test_update_trail_to_log_archive_bucket_flag_then_pass():
+    """In-place remediation of the SAME trail (needs a second account, so the emulator cannot
+    do it): the trail writes to a bucket this account owns -> FAIL; after UpdateTrail points it
+    at the log archive account's bucket (not in this account's ListBuckets), the re-scan reads
+    the updated trail -> PASS."""
+    c = Clients()
+    _sameAcctStubs(c, [_trail('main', bucket='my-logs')], ['my-logs'])
+    r = _runSame(c)
+    assert r[0] == -1 and 'trail main -> my-logs' in r[1]
+
+    ct = _client('cloudtrail')
+    archive = 'org-log-archive-999988887777'
+    with Stubber(ct) as st:
+        updated = dict(_trail('main', bucket=archive))
+        st.add_response('update_trail', {'Name': 'main', 'S3BucketName': archive,
+                                         'TrailARN': updated['TrailARN'], 'IsMultiRegionTrail': True},
+                        {'Name': 'main', 'S3BucketName': archive})
+        resp = ct.update_trail(Name='main', S3BucketName=archive)
+        st.assert_no_pending_responses()
+    assert resp['S3BucketName'] == archive
+
+    c = Clients()
+    _sameAcctStubs(c, [updated], ['my-logs'])
+    assert _runSame(c) == [1, 'Logs are delivered to buckets outside this account']
+
+
+# ---------------------------------------------------------------- management / data event capture
+
+def _captureStubs(c, trails):
+    """trails: [(trailDict, isLogging|Exception code, selectors)]"""
+    c.st['ct'].add_response('describe_trails', {'trailList': [t for t, _, _ in trails]}, {'includeShadowTrails': True})
+    for t, logging, sel in trails:
+        if isinstance(logging, str):
+            c.st['ct'].add_client_error('get_trail_status', logging, expected_params={'Name': t['TrailARN']})
+        else:
+            c.st['ct'].add_response('get_trail_status', {'IsLogging': logging}, {'Name': t['TrailARN']})
+        c.st['ct'].add_response('get_event_selectors', dict(TrailARN=t['TrailARN'], **sel),
+                                {'TrailName': t['TrailARN']})
+
+
+MGMT_AND_DATA = {'EventSelectors': [{'ReadWriteType': 'All', 'IncludeManagementEvents': True,
+                                     'DataResources': [{'Type': 'AWS::S3::Object', 'Values': ['arn:aws:s3']}]}]}
+
+
+def _runCapture(c, flagsFromOtherRegions=False):
+    Config.set('CloudTrail_listGlobalServEnabled', [])
+    # Account-wide flags as an earlier Region's trail (or a stopped trail) would leave them.
+    Config.set('CloudTrail_hasManagementEventsCaptured', flagsFromOtherRegions)
+    Config.set('CloudTrail_hasDataEventsCaptured', flagsFromOtherRegions)
+    d = c.driver()
+    d._checkHasOneTrailConfiguredCorrectly()
+    c.done()
+    Config.set('__sharedMemo', None)
+    return d.results['HasManagementEventsCaptured'], d.results['HasDataEventsCaptured']
+
+
+def test_event_capture_stopped_trail_is_not_pass_then_logging_passes():
+    c = Clients()
+    _captureStubs(c, [(_trail('t1'), False, MGMT_AND_DATA)])
+    mgmt, data = _runCapture(c, flagsFromOtherRegions=True)
+    assert mgmt[0] == -1 and 'logging is stopped' in mgmt[1]
+    assert data[0] == -1
+
+    c = Clients()
+    _captureStubs(c, [(_trail('t1'), True, MGMT_AND_DATA)])
+    mgmt, data = _runCapture(c)
+    assert mgmt == [1, 'Trail t1 is logging management events in this Region']
+    assert data[0] == 1
+
+
+def test_event_capture_single_region_trail_of_other_region_not_counted():
+    """A single-Region us-east-1 trail set the account-wide flags; eu-west-1 has no
+    trail that applies to it (describe_trails includeShadowTrails returns none)."""
+    c = Clients()
+    _captureStubs(c, [])
+    mgmt, data = _runCapture(c, flagsFromOtherRegions=True)
+    assert mgmt[0] == -1 and data[0] == -1
+
+
+def test_event_capture_unreadable_status_is_info():
+    c = Clients()
+    _captureStubs(c, [(_trail('t1', acct=OTHER, org=True), 'AccessDeniedException', MGMT_AND_DATA)])
+    mgmt, data = _runCapture(c, flagsFromOtherRegions=True)
+    assert mgmt == [0, 'Unable to evaluate (t1 (AccessDeniedException))']
+    assert data[0] == 0
+
+
+def test_event_capture_data_only_trail():
+    c = Clients()
+    _captureStubs(c, [(_trail('t1'), True, {'AdvancedEventSelectors': [{'Name': 'd', 'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Data']}, {'Field': 'resources.type', 'Equals': ['AWS::S3::Object']}]}]})])
+    mgmt, data = _runCapture(c, flagsFromOtherRegions=True)
+    assert mgmt[0] == -1 and data[0] == 1
+
+
+# ---------------------------------------------------------------- KMS read / write coverage
+
+def test_selector_coverage_read_write_type():
+    c = selectorCoverage({'EventSelectors': [{'ReadWriteType': 'WriteOnly', 'IncludeManagementEvents': True}]})
+    assert c['management'] and c['kmsWrite'] and not c['kmsRead'] and not c['kms']
+    c = selectorCoverage({'EventSelectors': [{'ReadWriteType': 'ReadOnly', 'IncludeManagementEvents': True}]})
+    assert c['kmsRead'] and not c['kmsWrite'] and not c['kms']
+    c = selectorCoverage({'AdvancedEventSelectors': [{'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Management']}, {'Field': 'readOnly', 'Equals': ['false']}]}]})
+    assert c['kmsWrite'] and not c['kmsRead'] and not c['kms']
+    c = selectorCoverage({'AdvancedEventSelectors': [
+        {'FieldSelectors': [{'Field': 'eventCategory', 'Equals': ['Management']}, {'Field': 'readOnly', 'Equals': ['false']}]},
+        {'FieldSelectors': [{'Field': 'eventCategory', 'Equals': ['Management']}, {'Field': 'readOnly', 'Equals': ['true']}]}]})
+    assert c['kms']
+
+
+def _kmsRun(selectors):
+    c = Clients()
+    _kmsStubs(c, selectors)
+    d = c.driver()
+    d._checkCloudtrailExcludesKmsEvents()
+    c.done()
+    Config.set('__sharedMemo', None)
+    return d.results['cloudtrailExcludesKmsEvents']
+
+
+def test_kms_write_only_trail_is_not_pass():
+    r = _kmsRun({'EventSelectors': [{'ReadWriteType': 'WriteOnly', 'IncludeManagementEvents': True}]})
+    assert r[0] == 0 and 'Decrypt' in r[1] and 'not recorded' in r[1]
+    r = _kmsRun({'AdvancedEventSelectors': [{'Name': 'w', 'FieldSelectors': [
+        {'Field': 'eventCategory', 'Equals': ['Management']}, {'Field': 'readOnly', 'Equals': ['false']}]}]})
+    assert r[0] == 0 and 'Decrypt' in r[1]
+    r = _kmsRun({'EventSelectors': [{'ReadWriteType': 'ReadOnly', 'IncludeManagementEvents': True}]})
+    assert r[0] == 0 and 'ScheduleKeyDeletion' in r[1]
+    r = _kmsRun({'EventSelectors': [{'ReadWriteType': 'All', 'IncludeManagementEvents': True}]})
+    assert r == [1, 'Trail t1 logs KMS management events']
+
+
+def test_kms_read_and_write_trails_combined_pass():
+    c = Clients()
+    t1, t2 = _trail('w'), _trail('r')
+    c.st['ct'].add_response('describe_trails', {'trailList': [t1, t2]}, {'includeShadowTrails': True})
+    for t, rw in ((t1, 'WriteOnly'), (t2, 'ReadOnly')):
+        c.st['ct'].add_response('get_trail_status', {'IsLogging': True}, {'Name': t['TrailARN']})
+        c.st['ct'].add_response('get_event_selectors', {'TrailARN': t['TrailARN'], 'EventSelectors': [
+            {'ReadWriteType': rw, 'IncludeManagementEvents': True}]}, {'TrailName': t['TrailARN']})
+    d = c.driver()
+    d._checkCloudtrailExcludesKmsEvents()
+    c.done()
+    assert d.results['cloudtrailExcludesKmsEvents'] == [1, 'KMS read events are logged by r and write events by w']

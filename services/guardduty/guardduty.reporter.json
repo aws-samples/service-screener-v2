@@ -91,12 +91,12 @@
         "criticality": "H",
         "shortDesc": "Enable GuardDuty EKS Audit Log Monitoring",
         "ref": [
-            "[GuardDuty EKS Protection]<https://docs.aws.amazon.com/guardduty/latest/ug/eks-protection.html>",
+            "[GuardDuty EKS Protection]<https://docs.aws.amazon.com/guardduty/latest/ug/kubernetes-protection.html>",
             "[Security Hub control GuardDuty.5]<https://docs.aws.amazon.com/securityhub/latest/userguide/guardduty-controls.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/guardduty/latest/ug/eks-protection.html"
+        "remediation_doc": "https://docs.aws.amazon.com/guardduty/latest/ug/kubernetes-protection.html"
     },
     "MalwareProtectionDisabled": {
         "category": "S",
@@ -275,5 +275,90 @@
         "remediation": null,
         "remediation_risk": null,
         "remediation_doc": null
+    },
+    "guardDutyNoFindingsExport": {
+        "category": "S",
+        "^description": "{$COUNT} GuardDuty detector(s) have no findings export (publishing destination) configured, or the destination is not publishing. GuardDuty keeps findings for only 90 days, so without an export to Amazon S3 (or an equivalent aggregation such as Security Hub feeding a SIEM) the evidence needed for later investigations, trend analysis and audits is lost. Member accounts are not evaluated because their administrator account aggregates findings.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "M",
+        "shortDesc": "Export GuardDuty findings to Amazon S3",
+        "ref": [
+            "[Exporting generated GuardDuty findings to Amazon S3]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_exportfindings.html>",
+            "[Understanding findings retention]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_findings.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_exportfindings.html",
+        "needFullTest": 0
+    },
+    "guardDutyNoSnapshotPreservation": {
+        "category": "S",
+        "^description": "{$COUNT} GuardDuty detector(s) have Malware Protection for EC2 enabled but do not retain EBS snapshots when malware is detected (EbsSnapshotPreservation is NO_RETENTION). The snapshots of infected volumes are deleted once the scan finishes, removing the forensic copy that incident responders need to analyse the malware and its impact.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "L",
+        "shortDesc": "Retain GuardDuty malware scan snapshots with findings",
+        "ref": [
+            "[Retaining snapshots in GuardDuty-initiated malware scans]<https://docs.aws.amazon.com/guardduty/latest/ug/malware-protection-customizations.html>",
+            "[Malware Protection for EC2]<https://docs.aws.amazon.com/guardduty/latest/ug/malware-protection.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/guardduty/latest/ug/malware-protection-customizations.html",
+        "needFullTest": 0
+    },
+    "guardDutyOrgAutoEnableIncomplete": {
+        "category": "S",
+        "^description": "{$COUNT} GuardDuty delegated administrator detector(s) do not cover the whole organization: AutoEnableOrganizationMembers is not ALL, a protection plan the administrator uses is not auto-enabled for members (AutoEnable NONE), or one or more member accounts are not in the Enabled relationship status. Accounts outside GuardDuty coverage generate no threat findings. Only evaluated from the GuardDuty delegated administrator account.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "M",
+        "shortDesc": "Auto-enable GuardDuty for all organization members",
+        "ref": [
+            "[Managing GuardDuty accounts with AWS Organizations]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_organizations.html>",
+            "[Setting organization auto-enable preferences]<https://docs.aws.amazon.com/guardduty/latest/ug/set-guardduty-auto-enable-preferences.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/guardduty/latest/ug/set-guardduty-auto-enable-preferences.html",
+        "needFullTest": 0
+    },
+    "detectiveNotEnabled": {
+        "category": "S",
+        "^description": "Amazon Detective is not enabled in {$COUNT} region(s) where GuardDuty runs, and the account is not a member of another account's behavior graph. Detective correlates GuardDuty findings with CloudTrail, VPC Flow Logs and EKS audit logs to speed up root-cause investigation. This is an optional, paid investigation tool; treat this as a recommendation if you already investigate with another tool.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "L",
+        "shortDesc": "Consider enabling Amazon Detective for investigations",
+        "ref": [
+            "[What is Amazon Detective?]<https://docs.aws.amazon.com/detective/latest/userguide/what-is-detective.html>",
+            "[Enabling Amazon Detective]<https://docs.aws.amazon.com/detective/latest/userguide/detective-setup.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/detective/latest/userguide/detective-setup.html",
+        "needFullTest": 0
+    },
+    "guarddutyS3MalwareProtectionOff": {
+        "category": "S",
+        "^description": "{$COUNT} region(s) contain S3 buckets but have no GuardDuty Malware Protection plan for S3, or have a plan that is not ACTIVE (for example WARNING/ERROR status). Regions with no S3 buckets are not flagged. Buckets that receive files from untrusted sources (customer uploads, partners, public ingestion) should have newly uploaded objects scanned for malware before they are processed. The scanner cannot tell which buckets receive untrusted uploads, so review whether this applies to your workloads.",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "criticality": "L",
+        "shortDesc": "Scan untrusted S3 uploads with GuardDuty Malware Protection",
+        "ref": [
+            "[GuardDuty Malware Protection for S3]<https://docs.aws.amazon.com/guardduty/latest/ug/gdu-malware-protection-s3.html>",
+            "[Troubleshooting Malware Protection plan status]<https://docs.aws.amazon.com/guardduty/latest/ug/troubleshoot-s3-malware-protection-status-errors.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/guardduty/latest/ug/gdu-malware-protection-s3.html",
+        "needFullTest": 0
     }
 }

@@ -1,8 +1,11 @@
+import json
+import concurrent.futures as cf
+
 import boto3
 import botocore
 
 from utils.Config import Config
-from utils.Tools import _pi
+from utils.Tools import _pi, _warn
 from services.Service import Service
 
 # Driver imports - will be uncommented when drivers are implemented (Task 8)
@@ -27,275 +30,182 @@ class Sagemaker(Service):
         
         return
     
+    ## Historical resource types (training/tuning jobs, models, endpoint configs)
+    ## accumulate into the thousands. Only the most recent HISTORY_LIMIT of each
+    ## are evaluated; models and endpoint configs used by live endpoints are
+    ## always evaluated. Override with --others '{"sagemakerHistoryLimit": N}'.
+    HISTORY_LIMIT = 100
+    PAGE_SIZE = 100
+    DESCRIBE_WORKERS = 8
+
+    def _historyLimit(self):
+        try:
+            others = (Config.get('_SS_PARAMS', {}) or {}).get('others')
+            if others:
+                val = int(json.loads(others).get('sagemakerHistoryLimit', self.HISTORY_LIMIT))
+                if val > 0:
+                    return val
+        except (ValueError, TypeError, AttributeError):
+            pass
+        return self.HISTORY_LIMIT
+
+    def _listNewestFirst(self, listOp, listKey, limit=None):
+        """List summaries newest first. Returns (summaries, truncated)."""
+        summaries = []
+        paginator = self.sagemakerClient.get_paginator(listOp)
+        pages = paginator.paginate(SortBy='CreationTime', SortOrder='Descending',
+                                   PaginationConfig={'PageSize': self.PAGE_SIZE})
+        for page in pages:
+            items = page.get(listKey, [])
+            if limit is not None and len(summaries) + len(items) > limit:
+                summaries.extend(items[:limit - len(summaries)])
+                return summaries, True
+            summaries.extend(items)
+            if limit is not None and len(summaries) >= limit:
+                return summaries, bool(page.get('NextToken'))
+        return summaries, False
+
+    def _hasRequiredTags(self, arn):
+        if not self.tags:
+            return True
+        try:
+            tags = self.sagemakerClient.list_tags(ResourceArn=arn).get('Tags', [])
+        except botocore.exceptions.ClientError:
+            return False
+        return self.resourceHasTags(tags)
+
+    def _collect(self, label, listOp, listKey, nameKey, arnKey, describe, driverName, idPrefix,
+                 limit=None, mustInclude=()):
+        """List (newest first, optionally capped), then describe the items that
+        are not already checkpointed, in parallel. Items named in mustInclude
+        are always described, even when older than the cap."""
+        try:
+            summaries, truncated = self._listNewestFirst(listOp, listKey, limit)
+        except botocore.exceptions.ClientError as e:
+            if e.response['Error']['Code'] not in ('AccessDenied', 'AccessDeniedException'):
+                print(f"Error listing {label}: {e}")
+            return []
+
+        listed = {x[nameKey] for x in summaries}
+        extraNames = [n for n in mustInclude if n and n not in listed]
+        if truncated:
+            _warn(f"SageMaker {label}: evaluating the {limit} most recent (older ones not scanned"
+                  f"{'; plus ' + str(len(extraNames)) + ' in use by endpoints' if extraNames else ''}). "
+                  f"Raise with --others '{{\"sagemakerHistoryLimit\": N}}'.")
+
+        extras = [{nameKey: n} for n in extraNames]
+        pending = {x[nameKey] for x in self.registerItems(
+            driverName, summaries + extras,
+            idFn=lambda x: f"{idPrefix}::{x[nameKey]}")}
+
+        resources = []
+        # Already checkpointed: keep the summary (or a name stub for in-use items
+        # older than the cap) so advise() still builds the driver and
+        # Evaluator.run() serves the cached result.
+        resources.extend(x for x in summaries + extras if x[nameKey] not in pending)
+        names = [n for n in [x[nameKey] for x in summaries] + extraNames if n in pending]
+
+        def _one(name):
+            try:
+                detail = describe(name)
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                if code not in ('AccessDenied', 'AccessDeniedException', 'ValidationException'):
+                    print(f"Error describing {label} {name}: {e}")
+                return None
+            if not self._hasRequiredTags(detail.get(arnKey)):
+                return None
+            return detail
+
+        if names:
+            workers = min(self.DESCRIBE_WORKERS, len(names))
+            with cf.ThreadPoolExecutor(max_workers=workers) as ex:
+                for name, detail in zip(names, ex.map(_one, names)):
+                    if detail is not None:
+                        _pi('SageMaker', f"{label}: {name}")
+                        resources.append(detail)
+        return resources
+
+    def _fieldValues(self, items, nameKey, field, describe):
+        """Return {name: item[field]} for items, describing (in parallel) the ones that
+        lack the field - e.g. checkpointed list summaries, which carry no
+        EndpointConfigName / ProductionVariants. Undescribable items are skipped."""
+        values, missing = {}, []
+        for x in items:
+            if field in x:
+                values[x[nameKey]] = x.get(field)
+            elif x.get(nameKey):
+                missing.append(x[nameKey])
+
+        def _one(name):
+            try:
+                return describe(name).get(field)
+            except botocore.exceptions.ClientError:
+                return None
+
+        if missing:
+            with cf.ThreadPoolExecutor(max_workers=min(self.DESCRIBE_WORKERS, len(missing))) as ex:
+                for name, val in zip(missing, ex.map(_one, missing)):
+                    if val is not None:
+                        values[name] = val
+        return values
+
     ## method to get resources for the services
     ## return the array of the resources
     def getResources(self):
-        resources = {
-            'notebooks': [],
-            'trainingJobs': [],
-            'models': [],
-            'endpointConfigs': [],
-            'endpoints': [],
-            'tuningJobs': []
+        sm = self.sagemakerClient
+        limit = self._historyLimit()
+
+        # Live resources: always scanned in full.
+        endpoints = self._collect(
+            'Endpoint', 'list_endpoints', 'Endpoints', 'EndpointName', 'EndpointArn',
+            lambda n: sm.describe_endpoint(EndpointName=n), 'EndpointDriver', 'Endpoint')
+        notebooks = self._collect(
+            'Notebook', 'list_notebook_instances', 'NotebookInstances', 'NotebookInstanceName', 'NotebookInstanceArn',
+            lambda n: sm.describe_notebook_instance(NotebookInstanceName=n), 'NotebookDriver', 'Notebook')
+
+        # Endpoint configs: those used by live endpoints, plus the most recent.
+        inUseConfigs = sorted({c for c in self._fieldValues(
+            endpoints, 'EndpointName', 'EndpointConfigName',
+            lambda n: sm.describe_endpoint(EndpointName=n)).values() if c})
+        endpointConfigs = self._collect(
+            'Endpoint Config', 'list_endpoint_configs', 'EndpointConfigs', 'EndpointConfigName', 'EndpointConfigArn',
+            lambda n: sm.describe_endpoint_config(EndpointConfigName=n), 'EndpointConfigDriver', 'EndpointConfig',
+            limit=limit, mustInclude=inUseConfigs)
+
+        # Models: those referenced by in-use endpoint configs, plus the most recent.
+        inUseSet = set(inUseConfigs)
+        variants = self._fieldValues(
+            [c for c in endpointConfigs if c.get('EndpointConfigName') in inUseSet],
+            'EndpointConfigName', 'ProductionVariants',
+            lambda n: sm.describe_endpoint_config(EndpointConfigName=n))
+        inUseModels = sorted({v.get('ModelName')
+                              for vs in variants.values() for v in vs or [] if v.get('ModelName')})
+        models = self._collect(
+            'Model', 'list_models', 'Models', 'ModelName', 'ModelArn',
+            lambda n: sm.describe_model(ModelName=n), 'ModelDriver', 'Model',
+            limit=limit, mustInclude=inUseModels)
+
+        # Immutable job history: the most recent only.
+        trainingJobs = self._collect(
+            'Training Job', 'list_training_jobs', 'TrainingJobSummaries', 'TrainingJobName', 'TrainingJobArn',
+            lambda n: sm.describe_training_job(TrainingJobName=n), 'TrainingJobDriver', 'TrainingJob',
+            limit=limit)
+        tuningJobs = self._collect(
+            'Tuning Job', 'list_hyper_parameter_tuning_jobs', 'HyperParameterTuningJobSummaries',
+            'HyperParameterTuningJobName', 'HyperParameterTuningJobArn',
+            lambda n: sm.describe_hyper_parameter_tuning_job(HyperParameterTuningJobName=n),
+            'TuningJobDriver', 'TuningJob', limit=limit)
+
+        return {
+            'notebooks': notebooks,
+            'trainingJobs': trainingJobs,
+            'models': models,
+            'endpointConfigs': endpointConfigs,
+            'endpoints': endpoints,
+            'tuningJobs': tuningJobs,
         }
-        
-        # Get notebook instances with pagination
-        try:
-            paginator = self.sagemakerClient.get_paginator('list_notebook_instances')
-            for page in paginator.paginate():
-                summaries = page.get('NotebookInstances', [])
-                pendingNames = {n['NotebookInstanceName'] for n in self.registerItems(
-                    'NotebookDriver', summaries, idFn=lambda n: f"Notebook::{n['NotebookInstanceName']}"
-                )}
 
-                for notebook in summaries:
-                    notebookName = notebook['NotebookInstanceName']
-
-                    if notebookName not in pendingNames:
-                        ## Already checkpointed - keep the lightweight summary so advise()
-                        ## still builds the driver and Evaluator.run() serves the cached result.
-                        resources['notebooks'].append(notebook)
-                        continue
-
-                    # Get detailed notebook configuration
-                    try:
-                        notebookDetails = self.sagemakerClient.describe_notebook_instance(
-                            NotebookInstanceName=notebookName
-                        )
-
-                        # Handle tag filtering if configured
-                        if self.tags:
-                            try:
-                                notebookArn = notebookDetails['NotebookInstanceArn']
-                                tagsResponse = self.sagemakerClient.list_tags(ResourceArn=notebookArn)
-                                tags = tagsResponse.get('Tags', [])
-                                if not self.resourceHasTags(tags):
-                                    continue
-                            except botocore.exceptions.ClientError:
-                                continue
-
-                        _pi('SageMaker', f"Notebook: {notebookName}")
-                        resources['notebooks'].append(notebookDetails)
-                    except botocore.exceptions.ClientError as e:
-                        if e.response['Error']['Code'] != 'AccessDenied':
-                            print(f"Error describing notebook {notebookName}: {e}")
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] != 'AccessDenied':
-                print(f"Error listing notebook instances: {e}")
-        
-        # Get training jobs with pagination
-        try:
-            paginator = self.sagemakerClient.get_paginator('list_training_jobs')
-            for page in paginator.paginate():
-                summaries = page.get('TrainingJobSummaries', [])
-                pendingNames = {j['TrainingJobName'] for j in self.registerItems(
-                    'TrainingJobDriver', summaries, idFn=lambda j: f"TrainingJob::{j['TrainingJobName']}"
-                )}
-
-                for job in summaries:
-                    jobName = job['TrainingJobName']
-
-                    if jobName not in pendingNames:
-                        resources['trainingJobs'].append(job)
-                        continue
-
-                    # Get detailed training job configuration
-                    try:
-                        jobDetails = self.sagemakerClient.describe_training_job(
-                            TrainingJobName=jobName
-                        )
-
-                        # Handle tag filtering if configured
-                        if self.tags:
-                            try:
-                                jobArn = jobDetails['TrainingJobArn']
-                                tagsResponse = self.sagemakerClient.list_tags(ResourceArn=jobArn)
-                                tags = tagsResponse.get('Tags', [])
-                                if not self.resourceHasTags(tags):
-                                    continue
-                            except botocore.exceptions.ClientError:
-                                continue
-
-                        _pi('SageMaker', f"Training Job: {jobName}")
-                        resources['trainingJobs'].append(jobDetails)
-                    except botocore.exceptions.ClientError as e:
-                        if e.response['Error']['Code'] != 'AccessDenied':
-                            print(f"Error describing training job {jobName}: {e}")
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] != 'AccessDenied':
-                print(f"Error listing training jobs: {e}")
-        
-        # Get models with pagination
-        try:
-            paginator = self.sagemakerClient.get_paginator('list_models')
-            for page in paginator.paginate():
-                summaries = page.get('Models', [])
-                pendingNames = {m['ModelName'] for m in self.registerItems(
-                    'ModelDriver', summaries, idFn=lambda m: f"Model::{m['ModelName']}"
-                )}
-
-                for model in summaries:
-                    modelName = model['ModelName']
-
-                    if modelName not in pendingNames:
-                        resources['models'].append(model)
-                        continue
-
-                    # Get detailed model configuration
-                    try:
-                        modelDetails = self.sagemakerClient.describe_model(
-                            ModelName=modelName
-                        )
-
-                        # Handle tag filtering if configured
-                        if self.tags:
-                            try:
-                                modelArn = modelDetails['ModelArn']
-                                tagsResponse = self.sagemakerClient.list_tags(ResourceArn=modelArn)
-                                tags = tagsResponse.get('Tags', [])
-                                if not self.resourceHasTags(tags):
-                                    continue
-                            except botocore.exceptions.ClientError:
-                                continue
-
-                        _pi('SageMaker', f"Model: {modelName}")
-                        resources['models'].append(modelDetails)
-                    except botocore.exceptions.ClientError as e:
-                        if e.response['Error']['Code'] != 'AccessDenied':
-                            print(f"Error describing model {modelName}: {e}")
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] != 'AccessDenied':
-                print(f"Error listing models: {e}")
-        
-        # Get endpoint configurations with pagination
-        try:
-            paginator = self.sagemakerClient.get_paginator('list_endpoint_configs')
-            for page in paginator.paginate():
-                summaries = page.get('EndpointConfigs', [])
-                pendingNames = {c['EndpointConfigName'] for c in self.registerItems(
-                    'EndpointConfigDriver', summaries, idFn=lambda c: f"EndpointConfig::{c['EndpointConfigName']}"
-                )}
-
-                for config in summaries:
-                    configName = config['EndpointConfigName']
-
-                    if configName not in pendingNames:
-                        resources['endpointConfigs'].append(config)
-                        continue
-
-                    # Get detailed endpoint configuration
-                    try:
-                        configDetails = self.sagemakerClient.describe_endpoint_config(
-                            EndpointConfigName=configName
-                        )
-
-                        # Handle tag filtering if configured
-                        if self.tags:
-                            try:
-                                configArn = configDetails['EndpointConfigArn']
-                                tagsResponse = self.sagemakerClient.list_tags(ResourceArn=configArn)
-                                tags = tagsResponse.get('Tags', [])
-                                if not self.resourceHasTags(tags):
-                                    continue
-                            except botocore.exceptions.ClientError:
-                                continue
-
-                        _pi('SageMaker', f"Endpoint Config: {configName}")
-                        resources['endpointConfigs'].append(configDetails)
-                    except botocore.exceptions.ClientError as e:
-                        if e.response['Error']['Code'] != 'AccessDenied':
-                            print(f"Error describing endpoint config {configName}: {e}")
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] != 'AccessDenied':
-                print(f"Error listing endpoint configs: {e}")
-        
-        # Get endpoints with pagination
-        try:
-            paginator = self.sagemakerClient.get_paginator('list_endpoints')
-            for page in paginator.paginate():
-                summaries = page.get('Endpoints', [])
-                pendingNames = {e['EndpointName'] for e in self.registerItems(
-                    'EndpointDriver', summaries, idFn=lambda e: f"Endpoint::{e['EndpointName']}"
-                )}
-
-                for endpoint in summaries:
-                    endpointName = endpoint['EndpointName']
-
-                    if endpointName not in pendingNames:
-                        resources['endpoints'].append(endpoint)
-                        continue
-
-                    # Get detailed endpoint configuration
-                    try:
-                        endpointDetails = self.sagemakerClient.describe_endpoint(
-                            EndpointName=endpointName
-                        )
-
-                        # Handle tag filtering if configured
-                        if self.tags:
-                            try:
-                                endpointArn = endpointDetails['EndpointArn']
-                                tagsResponse = self.sagemakerClient.list_tags(ResourceArn=endpointArn)
-                                tags = tagsResponse.get('Tags', [])
-                                if not self.resourceHasTags(tags):
-                                    continue
-                            except botocore.exceptions.ClientError:
-                                continue
-
-                        _pi('SageMaker', f"Endpoint: {endpointName}")
-                        resources['endpoints'].append(endpointDetails)
-                    except botocore.exceptions.ClientError as e:
-                        if e.response['Error']['Code'] != 'AccessDenied':
-                            print(f"Error describing endpoint {endpointName}: {e}")
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] != 'AccessDenied':
-                print(f"Error listing endpoints: {e}")
-        
-        # Get hyperparameter tuning jobs with pagination
-        try:
-            paginator = self.sagemakerClient.get_paginator('list_hyper_parameter_tuning_jobs')
-            for page in paginator.paginate():
-                summaries = page.get('HyperParameterTuningJobSummaries', [])
-                pendingNames = {t['HyperParameterTuningJobName'] for t in self.registerItems(
-                    'TuningJobDriver', summaries, idFn=lambda t: f"TuningJob::{t['HyperParameterTuningJobName']}"
-                )}
-
-                for tuningJob in summaries:
-                    tuningJobName = tuningJob['HyperParameterTuningJobName']
-
-                    if tuningJobName not in pendingNames:
-                        resources['tuningJobs'].append(tuningJob)
-                        continue
-
-                    # Get detailed tuning job configuration
-                    try:
-                        tuningJobDetails = self.sagemakerClient.describe_hyper_parameter_tuning_job(
-                            HyperParameterTuningJobName=tuningJobName
-                        )
-
-                        # Handle tag filtering if configured
-                        if self.tags:
-                            try:
-                                tuningJobArn = tuningJobDetails['HyperParameterTuningJobArn']
-                                tagsResponse = self.sagemakerClient.list_tags(ResourceArn=tuningJobArn)
-                                tags = tagsResponse.get('Tags', [])
-                                if not self.resourceHasTags(tags):
-                                    continue
-                            except botocore.exceptions.ClientError:
-                                continue
-
-                        _pi('SageMaker', f"Tuning Job: {tuningJobName}")
-                        resources['tuningJobs'].append(tuningJobDetails)
-                    except botocore.exceptions.ClientError as e:
-                        if e.response['Error']['Code'] != 'AccessDenied':
-                            print(f"Error describing tuning job {tuningJobName}: {e}")
-        except botocore.exceptions.ClientError as e:
-            if e.response['Error']['Code'] != 'AccessDenied':
-                print(f"Error listing tuning jobs: {e}")
-        
-        return resources
-        
-    
     def advise(self):
         objs = {}
         

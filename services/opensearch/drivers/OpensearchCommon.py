@@ -6,6 +6,7 @@ from utils.Tools import _pr
 from utils.Tools import _warn
 from utils.Tools import aws_parseInstanceFamily
 from utils.Policy import Policy
+from utils.PolicyPrincipal import parsePolicy, iterStatements, statementIsPublic, statementAllowsAction
 from services.Evaluator import Evaluator
 
 class OpensearchCommon(Evaluator):
@@ -124,6 +125,88 @@ class OpensearchCommon(Evaluator):
         if "DomainStatus" in self.attribute:
             if "VPCOptions" in self.attribute["DomainStatus"]:
                 self.results["DomainWithinVPC"] = [1, "Private"]
+
+    # OpenSearch data-plane (HTTP) actions. A public Allow on any of these exposes the
+    # domain's REST API (search/index/delete) to any caller that can reach the endpoint.
+    ES_HTTP_ACTIONS = [
+        'es:ESHttpGet', 'es:ESHttpHead', 'es:ESHttpPost',
+        'es:ESHttpPut', 'es:ESHttpPatch', 'es:ESHttpDelete',
+    ]
+
+    @staticmethod
+    def _sourceIpRestricts(condition):
+        """True if the Condition limits callers with a positive IpAddress match on
+        aws:SourceIp to concrete CIDRs (a /0 range such as 0.0.0.0/0 or ::/0 does not
+        restrict anything)."""
+        if not isinstance(condition, dict):
+            return False
+        for operator, block in condition.items():
+            if not isinstance(operator, str) or not isinstance(block, dict):
+                continue
+            op = operator.lower()
+            if op.startswith('foranyvalue:'):
+                op = op[len('foranyvalue:'):]
+            if op != 'ipaddress':
+                continue
+            for key, value in block.items():
+                if str(key).lower() != 'aws:sourceip':
+                    continue
+                values = value if isinstance(value, list) else [value]
+                values = [str(v).strip() for v in values if v is not None]
+                if values and not any(v.endswith('/0') or v in ('*', '') for v in values):
+                    return True
+        return False
+
+    def _checkAccessPolicyPublic(self):
+        key = 'AccessPolicyPublic'
+        status = self.attribute.get('DomainStatus', {}) or {}
+
+        vpc = status.get('VPCOptions') or {}
+        if vpc.get('VPCId') or vpc.get('SubnetIds'):
+            self.results[key] = [1, 'VPC domain - endpoint not reachable from the internet']
+            return
+
+        raw = status.get('AccessPolicies')
+        if raw is None or (isinstance(raw, str) and raw.strip() == ''):
+            self.results[key] = [1, 'No resource-based access policy']
+            return
+
+        policy = parsePolicy(raw)
+        if policy is None:
+            self.results[key] = [0, 'Unable to evaluate (UnparseableAccessPolicy)']
+            return
+
+        publicSids = []
+        for idx, stmt in enumerate(iterStatements(policy)):
+            # statementIsPublic: Allow + wildcard principal / NotPrincipal and no
+            # org/account/VPC-endpoint scoping condition.
+            if not statementIsPublic(stmt):
+                continue
+            if self._sourceIpRestricts(stmt.get('Condition')):
+                continue
+            if not statementAllowsAction(stmt, self.ES_HTTP_ACTIONS):
+                continue
+            publicSids.append(str(stmt.get('Sid') or f'#{idx}'))
+
+        if publicSids:
+            sids = ', '.join(publicSids)
+            aso = status.get('AdvancedSecurityOptions') or {}
+            fgac = aso.get('Enabled') is True
+            anonymous = aso.get('AnonymousAuthEnabled') is True
+            if fgac and not anonymous:
+                # AWS documents an open resource policy as the recommended setup for FGAC:
+                # every request must still authenticate (internal users, SAML/JWT or IAM),
+                # so data is not anonymously accessible. Only network exposure remains.
+                self.results[key] = [0, 'Public endpoint with open access policy (' + sids + '); fine-grained access control '
+                                        'requires authentication for every request (anonymous auth disabled), but the '
+                                        'endpoint is reachable from the internet - consider IP restriction or a VPC']
+                return
+            note = (' (fine-grained access control has anonymous authentication enabled)' if fgac else
+                    ' (fine-grained access control is not enabled)')
+            self.results[key] = [-1, 'Public endpoint with access policy allowing any principal without IP/org restriction: ' + sids + note]
+            return
+
+        self.results[key] = [1, 'Access policy does not allow anonymous access']
 
     def _checkInstanceVersion(self):
         instance_type = self.cluster_config["InstanceType"]

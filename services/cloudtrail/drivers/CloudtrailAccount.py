@@ -1,13 +1,23 @@
 import botocore
+import datetime
+import json
+import threading
 
 from utils.Config import Config
 from services.Evaluator import Evaluator
+from services.cloudtrail.drivers.CloudtrailHelper import selectorCoverage, ownedBucketNames, errCode, accountIdFromArn, \
+    trailStatus, trailEventSelectors
 
 class CloudtrailAccount(Evaluator):
-    def __init__(self, ctClient, sizeofTrail):
+    def __init__(self, ctClient, sizeofTrail, s3Client=None, cfgClient=None, orgClient=None):
         super().__init__()
         self.ctClient = ctClient
         self.sizeofTrail = sizeofTrail
+        self.s3Client = s3Client
+        self.cfgClient = cfgClient
+        self.orgClient = orgClient
+        self._trailCacheLock = threading.Lock()
+        self._trailCache = None
         
         self._resourceName = 'General'
 
@@ -24,15 +34,42 @@ class CloudtrailAccount(Evaluator):
         if Config.get('CloudTrail_hasGlobalServEnabled') == False:
             self.results['HasCoverGlobalServices'] = [-1, '']
             
-        if Config.get('CloudTrail_hasManagementEventsCaptured') == False:
-            self.results['HasManagementEventsCaptured'] = [-1, '']
-        
-        if Config.get('CloudTrail_hasDataEventsCaptured') == False:
-            self.results['HasDataEventsCaptured'] = [-1, '']
+        self._eventCaptureResult('HasManagementEventsCaptured', 'management', 'management events')
+        self._eventCaptureResult('HasDataEventsCaptured', 'data', 'data events')
             
         lists = Config.get('CloudTrail_listGlobalServEnabled')
         if len(lists) > 1:
             self.results['DuplicateGlobalTrail'] = [-1, '<br>'.join(lists)]
+
+    def _eventCaptureResult(self, key, field, label):
+        """PASS only when a trail that applies to this Region (own single-Region trail,
+        multi-Region or organization trail) is logging and its selectors capture
+        `field` events. A stopped trail, or a single-Region trail of another Region,
+        records nothing here. Unreadable trail status/selectors -> INFO."""
+        trails, code = self._regionTrails()
+        if trails is None:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(code)]
+            return
+        unknown, stopped = [], []
+        for t in trails:
+            name = t['trail'].get('Name') or t['trail'].get('TrailARN')
+            if t['coverage'] is None or t['logging'] is None:
+                if t['coverage'] is None or t['coverage'][field]:
+                    unknown.append('{} ({})'.format(name, t['error']))
+                continue
+            if not t['coverage'][field]:
+                continue
+            if t['logging']:
+                self.results[key] = [1, 'Trail {} is logging {} in this Region'.format(name, label)]
+                return
+            stopped.append(name)
+        if unknown:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(', '.join(unknown))]
+            return
+        msg = 'No logging trail captures {} in this Region'.format(label)
+        if stopped:
+            msg += '; trail(s) {} would capture them but logging is stopped'.format(', '.join(stopped))
+        self.results[key] = [-1, msg]
 
     def _checkGuardDutyIntegration(self):
         """
@@ -201,8 +238,9 @@ class CloudtrailAccount(Evaluator):
                     return
                 raise
             
-            # Check if any trail is an organization trail
-            response = self.ctClient.describe_trails()
+            # Check if any trail is an organization trail. includeShadowTrails
+            # defaults to true, so this is the same read as _describeTrails().
+            response = self._describeTrails()
             trails = response.get('trailList', [])
             
             hasOrgTrail = False
@@ -216,3 +254,279 @@ class CloudtrailAccount(Evaluator):
             
         except Exception as e:
             print(f'-- Unable to check organization trail: {str(e)}')
+
+    ## ---- WAFS2027 checks -------------------------------------------------
+
+    def _accountId(self):
+        return (Config.get('stsInfo', {}) or {}).get('Account')
+
+    def _describeTrails(self):
+        """describe_trails(includeShadowTrails=True), fetched once for this driver."""
+        return self._memo(('describe_trails', self.ctClient.meta.region_name, True),
+                          lambda: self.ctClient.describe_trails(includeShadowTrails=True))
+
+    def _regionTrails(self):
+        """All trails that apply to this Region (incl. multi-Region and organization
+        shadow trails), each with its logging status and event selector coverage.
+        Returns (list, None) or (None, errorCode)."""
+        with self._trailCacheLock:
+            if self._trailCache is not None:
+                return self._trailCache
+            try:
+                trails = self._describeTrails().get('trailList', []) or []
+            except Exception as e:
+                self._trailCache = (None, errCode(e))
+                return self._trailCache
+
+            out = []
+            for t in trails:
+                arn = t.get('TrailARN')
+                info = {'trail': t, 'logging': None, 'coverage': None, 'error': None}
+                try:
+                    st = trailStatus(self, self.ctClient, arn)
+                    info['logging'] = st.get('IsLogging') is True
+                except Exception as e:
+                    info['error'] = errCode(e)
+                try:
+                    sel = trailEventSelectors(self, self.ctClient, arn)
+                    info['coverage'] = selectorCoverage(sel)
+                except Exception as e:
+                    info['error'] = info['error'] or errCode(e)
+                out.append(info)
+            self._trailCache = (out, None)
+            return self._trailCache
+
+    def _checkCloudtrailExcludesKmsEvents(self):
+        """
+        KMS key usage (Decrypt, GenerateDataKey, ScheduleKeyDeletion, ...) must be
+        auditable. Flags the Region when every logging trail that captures management
+        events excludes kms.amazonaws.com (basic ExcludeManagementEventSources or an
+        advanced selector on eventSource).
+        """
+        key = 'cloudtrailExcludesKmsEvents'
+        trails, code = self._regionTrails()
+        if trails is None:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(code)]
+            return
+
+        mgmt, excluding, unknown = [], [], []
+        readers, writers = [], []
+        for t in trails:
+            name = t['trail'].get('Name') or t['trail'].get('TrailARN')
+            if t['logging'] is False:
+                continue
+            if t['logging'] is None or t['coverage'] is None:
+                unknown.append('{} ({})'.format(name, t['error']))
+                continue
+            cov = t['coverage']
+            if not cov['management']:
+                continue
+            mgmt.append(name)
+            if cov.get('kmsRead'):
+                readers.append(name)
+            if cov.get('kmsWrite'):
+                writers.append(name)
+            if readers and writers:
+                # Read-only KMS calls (Decrypt, GenerateDataKey) and write calls
+                # (DisableKey, ScheduleKeyDeletion) are both recorded, possibly by two trails.
+                if readers == writers == [name]:
+                    msg = 'Trail {} logs KMS management events'.format(name)
+                else:
+                    msg = 'KMS read events are logged by {} and write events by {}'.format(
+                        ', '.join(readers), ', '.join(writers))
+                self.results[key] = [1, msg]
+                return
+            if cov.get('kmsRead') or cov.get('kmsWrite'):
+                continue
+            if cov.get('kmsAmbiguous'):
+                unknown.append('{} (selector with several positive operators on eventSource)'.format(name))
+                continue
+            excluding.append(name)
+
+        if unknown:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(', '.join(unknown))]
+            return
+        if not mgmt:
+            self.results[key] = [0, 'No logging trail captures management events in this Region']
+            return
+        if writers:
+            self.results[key] = [0, 'Only write KMS management events are logged (by {}); read-only calls such as '
+                                    'Decrypt, Encrypt and GenerateDataKey are not recorded'.format(', '.join(writers))]
+            return
+        if readers:
+            self.results[key] = [0, 'Only read-only KMS management events are logged (by {}); key management calls '
+                                    'such as DisableKey and ScheduleKeyDeletion are not recorded'.format(', '.join(readers))]
+            return
+        self.results[key] = [-1, 'KMS events excluded by: {}'.format(', '.join(excluding))]
+
+    _ownTrailMemoLock = threading.Lock()
+
+    def _countOwnTrailHere(self, t, region, accountId):
+        """Evaluate each of this account's trails once per scan. Normally that is its
+        home Region. A multi-Region trail whose home Region is not part of the scan
+        (e.g. --regions subset) is counted in the first scanned Region where it is
+        visible, so it is not hidden (false PASS). Memoised per account."""
+        home = t.get('HomeRegion') or region
+        if home == region:
+            return True
+        if not t.get('IsMultiRegionTrail'):
+            return False
+        selected = Config.get('REGIONS_SELECTED', None)
+        if isinstance(selected, (list, tuple, set)) and home in selected:
+            return False  # counted when its home Region is scanned
+        memoKey = 'CloudTrail_ownTrailCounted::' + accountId
+        arn = t.get('TrailARN') or t.get('Name')
+        with CloudtrailAccount._ownTrailMemoLock:
+            seen = Config.get(memoKey, None) or set()
+            if arn in seen:
+                return False
+            seen = set(seen)
+            seen.add(arn)
+            Config.set(memoKey, seen)
+        return True
+
+    def _checkTrailBucketSameAccount(self):
+        """
+        In a multi-account (AWS Organizations) environment, CloudTrail and AWS Config
+        logs should be delivered to a dedicated log archive account so that a
+        compromised workload account cannot tamper with its own audit trail.
+        """
+        key = 'trailBucketSameAccount'
+        if self.orgClient is None or self.s3Client is None:
+            self.results[key] = [0, 'Unable to evaluate (no client)']
+            return
+
+        try:
+            # Account-level answer (Organizations is a global service): read it
+            # once per scan instead of once per scanned Region.
+            self._sharedMemo(('organizations', 'global', 'describe_organization'),
+                             lambda: self.orgClient.describe_organization())
+        except Exception as e:
+            c = errCode(e)
+            if c == 'AWSOrganizationsNotInUseException':
+                self.results[key] = [0, 'Standalone account (not in AWS Organizations); log archive separation not evaluated']
+            else:
+                self.results[key] = [0, 'Unable to evaluate ({})'.format(c)]
+            return
+
+        accountId = self._accountId()
+        if not accountId:
+            self.results[key] = [0, 'Unable to evaluate (unknown account id)']
+            return
+
+        owned, code = ownedBucketNames(self.s3Client)
+        if owned is None:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(code)]
+            return
+
+        try:
+            trails = self._describeTrails().get('trailList', []) or []
+        except Exception as e:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(errCode(e))]
+            return
+
+        own, foreign = [], []
+        region = self.ctClient.meta.region_name
+        for t in trails:
+            if accountIdFromArn(t.get('TrailARN')) == accountId:
+                if self._countOwnTrailHere(t, region, accountId):
+                    own.append(t)
+            else:
+                foreign.append(t)
+
+        # Organization trails owned by another account that deliver into a bucket of
+        # this account: this account is the log archive, so local delivery is expected.
+        # The result is memoised per account for the scan, because a single-Region
+        # organization trail is only visible in its home Region.
+        memoKey = 'CloudTrail_logArchive::' + accountId
+        for t in foreign:
+            if t.get('S3BucketName') in owned:
+                Config.set(memoKey, t.get('Name'))
+                break
+        archiveOf = Config.get(memoKey, None)
+        if archiveOf:
+            self.results[key] = [1, 'This account appears to be the log archive account (receives trail {})'.format(archiveOf)]
+            return
+
+        flagged = []
+        for t in own:
+            b = t.get('S3BucketName')
+            if b and b in owned:
+                flagged.append('trail {} -> {}'.format(t.get('Name'), b))
+
+        cfgError = None
+        cfgChannels = 0
+        if self.cfgClient is not None:
+            try:
+                for ch in self.cfgClient.describe_delivery_channels().get('DeliveryChannels', []) or []:
+                    cfgChannels += 1
+                    b = ch.get('s3BucketName')
+                    if b and b in owned:
+                        flagged.append('Config channel {} -> {}'.format(ch.get('name'), b))
+            except Exception as e:
+                cfgError = errCode(e)
+
+        if flagged:
+            self.results[key] = [-1, '; '.join(flagged)]
+        elif cfgError:
+            self.results[key] = [0, 'Unable to evaluate AWS Config delivery channel ({})'.format(cfgError)]
+        elif own or cfgChannels:
+            self.results[key] = [1, 'Logs are delivered to buckets outside this account']
+        elif foreign:
+            self.results[key] = [1, 'Account is covered by an organization trail owned by another account']
+        else:
+            self.results[key] = [0, 'No trail or AWS Config delivery channel in this Region']
+
+    CONSOLE_LOOKBACK_DAYS = 30
+    CONSOLE_MAX_EVENTS = 250
+
+    def _checkManualConsoleWritesDetected(self):
+        """
+        Heuristic (tier 3): write API calls made from an AWS Management Console session
+        in the last 30 days in this Region indicate changes made outside a deployment
+        pipeline. Samples at most CONSOLE_MAX_EVENTS recent write events, because
+        LookupEvents is limited to 2 requests per second per Region.
+        """
+        key = 'manualConsoleWritesDetected'
+        now = datetime.datetime.now(datetime.timezone.utc)
+        start = now - datetime.timedelta(days=self.CONSOLE_LOOKBACK_DAYS)
+        seen = 0
+        hits = {}
+        capped = False
+        try:
+            pages = self.ctClient.get_paginator('lookup_events').paginate(
+                LookupAttributes=[{'AttributeKey': 'ReadOnly', 'AttributeValue': 'false'}],
+                StartTime=start, EndTime=now,
+                PaginationConfig={'MaxItems': self.CONSOLE_MAX_EVENTS, 'PageSize': 50})
+            for page in pages:
+                for ev in page.get('Events', []) or []:
+                    seen += 1
+                    try:
+                        rec = json.loads(ev.get('CloudTrailEvent') or '{}')
+                    except ValueError:
+                        continue
+                    if rec.get('eventType') != 'AwsApiCall':
+                        continue
+                    if str(rec.get('readOnly')).lower() == 'true':
+                        continue
+                    if str(rec.get('sessionCredentialFromConsole')).lower() != 'true':
+                        continue
+                    # Calls made by an AWS service on the user's behalf are not manual changes.
+                    if (rec.get('userIdentity') or {}).get('invokedBy'):
+                        continue
+                    who = (rec.get('userIdentity') or {}).get('arn') or ev.get('Username') or 'unknown'
+                    hits.setdefault(who, set()).add(rec.get('eventSource', '') + ':' + (rec.get('eventName') or ev.get('EventName') or ''))
+            capped = seen >= self.CONSOLE_MAX_EVENTS
+        except Exception as e:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(errCode(e))]
+            return
+
+        if hits:
+            parts = []
+            for who in sorted(hits)[:5]:
+                parts.append('{}: {}'.format(who, ', '.join(sorted(hits[who])[:5])))
+            self.results[key] = [-1, '{} principal(s) made console write calls: {}'.format(len(hits), '; '.join(parts))]
+        elif capped:
+            self.results[key] = [0, 'No console write calls in the {} most recent write events (sample only)'.format(seen)]
+        else:
+            self.results[key] = [1, 'No console write calls in the last {} days ({} write events)'.format(self.CONSOLE_LOOKBACK_DAYS, seen)]

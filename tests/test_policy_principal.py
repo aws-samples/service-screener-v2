@@ -42,7 +42,7 @@ def _policy(*stmts):
     return {'Version': '2012-10-17', 'Statement': list(stmts)}
 
 
-ORG_CONDITION = {'StringEquals': {'aws:PrincipalOrgID': 'o-abc123'}}
+ORG_CONDITION = {'StringEquals': {'aws:PrincipalOrgID': 'o-abc123defg'}}
 
 PUBLIC_PRINCIPALS = [
     '*',
@@ -77,8 +77,8 @@ class TestConditionScopes:
         {'StringEquals': {'aws:SourceAccount': '111111111111'}},
         {'ArnLike': {'aws:SourceArn': 'arn:aws:s3:::my-bucket'}},
         {'StringEquals': {'aws:SourceVpce': 'vpce-1234'}},
-        {'ForAnyValue:StringLike': {'aws:PrincipalOrgPaths': 'o-abc/r-ab12/ou-ab12-*'}},
-        {'stringequals': {'AWS:PrincipalOrgID': 'o-abc123'}},  # case-insensitive keys/operators
+        {'ForAnyValue:StringLike': {'aws:PrincipalOrgPaths': 'o-abc123defg/r-ab12/ou-ab12-*'}},
+        {'stringequals': {'AWS:PrincipalOrgID': 'o-abc123defg'}},  # case-insensitive keys/operators
     ])
     def test_scoping(self, condition):
         assert pp.conditionScopes(condition) is True
@@ -89,11 +89,11 @@ class TestConditionScopes:
         {'Bool': {'aws:SecureTransport': 'true'}},
         {'IpAddress': {'aws:SourceIp': '0.0.0.0/0'}},
         # IfExists: an anonymous caller has no PrincipalOrgID, so the condition passes
-        {'StringEqualsIfExists': {'aws:PrincipalOrgID': 'o-abc123'}},
+        {'StringEqualsIfExists': {'aws:PrincipalOrgID': 'o-abc123defg'}},
         # Negated operator does not restrict to a known set
-        {'StringNotEquals': {'aws:PrincipalOrgID': 'o-abc123'}},
+        {'StringNotEquals': {'aws:PrincipalOrgID': 'o-abc123defg'}},
         # ForAllValues passes vacuously when the key is absent
-        {'ForAllValues:StringEquals': {'aws:PrincipalOrgID': 'o-abc123'}},
+        {'ForAllValues:StringEquals': {'aws:PrincipalOrgID': 'o-abc123defg'}},
         # Wildcard value matches anything
         {'StringLike': {'aws:PrincipalOrgID': '*'}},
         {'StringLike': {'aws:SourceAccount': ['*']}},
@@ -329,3 +329,41 @@ class TestLambdaPolicy:
         p = Policy(_policy({'Effect': 'Allow', 'Action': '*', 'Resource': '*'}))
         p.inspectPrinciple()
         assert p.hasPublicAccess() is False
+
+
+# --------------------------------------------------------------------------- #
+# Condition values that look scoping but are not (wildcards / malformed IDs)
+# --------------------------------------------------------------------------- #
+class TestConditionValueValidation:
+    @pytest.mark.parametrize('condition', [
+        {'StringLike': {'aws:PrincipalOrgID': 'o-*'}},
+        {'StringLike': {'aws:PrincipalOrgID': ['o-abc123defg', 'o-*']}},   # OR: one open value opens it
+        {'StringEquals': {'aws:PrincipalOrgID': 'abc'}},
+        {'StringLike': {'aws:PrincipalAccount': '*'}},
+        {'StringLike': {'aws:SourceAccount': '1111*'}},
+        {'ArnLike': {'aws:SourceArn': 'arn:aws:sns:us-east-1:*:topic'}},
+        {'ArnLike': {'aws:PrincipalArn': 'arn:aws:iam::*:role/admin'}},
+        {'ArnLike': {'aws:SourceArn': 'arn:aws:s3:::*'}},
+        {'ArnLike': {'aws:SourceArn': 'arn:aws:*'}},
+        {'StringLike': {'aws:PrincipalOrgPaths': 'o-*/r-ab12/*'}},
+        {'StringLike': {'aws:SourceVpce': 'vpce-*'}},
+        {'StringEquals': {'aws:SourceVpc': 'subnet-123'}},
+    ])
+    def test_not_scoping(self, condition):
+        assert pp.conditionScopes(condition) is False
+
+    @pytest.mark.parametrize('condition', [
+        {'StringEquals': {'aws:PrincipalOrgID': 'o-abc123defg'}},
+        {'StringEquals': {'aws:PrincipalAccount': '111122223333'}},
+        {'ArnLike': {'aws:SourceArn': 'arn:aws:sns:us-east-1:111122223333:*'}},
+        {'ArnEquals': {'aws:SourceArn': 'arn:aws:s3:::my-bucket'}},
+        {'ArnLike': {'aws:SourceArn': 'arn:aws:s3:::my-bucket/*'}},
+        {'StringLike': {'aws:PrincipalOrgPaths': 'o-abc123defg/r-ab12/ou-ab12-*'}},
+        {'StringEquals': {'aws:SourceVpce': 'vpce-0123456789abcdef0'}},
+    ])
+    def test_scoping(self, condition):
+        assert pp.conditionScopes(condition) is True
+
+    def test_wildcard_org_condition_is_public(self):
+        stmt = _stmt({'AWS': '*'}, condition={'StringLike': {'aws:PrincipalOrgID': 'o-*'}})
+        assert pp.statementIsPublic(stmt) is True

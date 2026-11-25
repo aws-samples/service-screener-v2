@@ -1,12 +1,17 @@
 import datetime
 from dateutil.tz import tzlocal
 
+from utils import PolicyPrincipal
 from .IamCommon import IamCommon
+from . import IamPolicyHelpers
+import botocore
+
+from .IamTrust import crossAccountTrusts, isAdminLevelDocument, parseDocument
 
 class IamRole(IamCommon):
     MAXSESSIONDURATION = 3600
     MAXROLENOTUSEDDAYS = 14
-    def __init__(self, role, iamClient, authDetails=None, policyDocumentMap=None, roleLastUsedCache=None):
+    def __init__(self, role, iamClient, authDetails=None, policyDocumentMap=None, roleLastUsedCache=None, trustContext=None):
         super().__init__()
         self.role = role
         self.iamClient = iamClient
@@ -14,6 +19,7 @@ class IamRole(IamCommon):
         self._authDetails = authDetails
         self._policyDocumentMap = policyDocumentMap or {}
         self._roleLastUsedCache = roleLastUsedCache
+        self._trustContext = trustContext
 
         self._resourceName = self.role['RoleName']
 
@@ -84,10 +90,139 @@ class IamRole(IamCommon):
                 self.evaluateInlinePolicyFromDocs(inlinePolicies)
         else:
             # Fallback to API calls
-            resp = self.iamClient.list_attached_role_policies(RoleName=role)
+            # First pages of the paginators shared with _adminLevelPolicies() (same requests).
+            resp = next(self._pages(self.iamClient, 'list_attached_role_policies', RoleName=role))
             policies = resp.get('AttachedPolicies')
             self.evaluateManagePolicy(policies)
             
-            resp = self.iamClient.list_role_policies(RoleName=role)
+            resp = next(self._pages(self.iamClient, 'list_role_policies', RoleName=role))
             inlinePolicies = resp.get('PolicyNames')
             self.evaluateInlinePolicy(inlinePolicies, role, 'role')
+
+    def _trustPolicy(self):
+        return self.role.get('AssumeRolePolicyDocument')
+
+    def _checkIamRoleTrustPublicPrincipal(self):
+        """Trust policy allows sts:AssumeRole to any AWS principal without a
+        scoping condition (aws:PrincipalOrgID / PrincipalAccount / PrincipalArn
+        / SourceAccount / SourceArn ...)."""
+        doc = self._trustPolicy()
+        if PolicyPrincipal.parsePolicy(doc) is None:
+            self.results['iamRoleTrustPublicPrincipal'] = [0, 'Unable to evaluate (trust policy not readable)']
+            return
+        public = IamPolicyHelpers.trustAllowsAnyPrincipal(doc)
+        if public:
+            self.results['iamRoleTrustPublicPrincipal'] = [-1, 'Any AWS principal can assume this role: ' + ', '.join(public)]
+        else:
+            self.results['iamRoleTrustPublicPrincipal'] = [1, 'Trust policy restricted to specific principals']
+
+    def _checkOidcRoleTrustNoSubjectCondition(self):
+        """Role trusting an IAM OIDC provider must pin the token's sub claim to
+        the caller's own org/repo/project/namespace."""
+        doc = self._trustPolicy()
+        if PolicyPrincipal.parsePolicy(doc) is None:
+            return
+        findings, notes = IamPolicyHelpers.evaluateOidcTrust(doc)
+        if findings is None:
+            return
+        if findings:
+            self.results['oidcRoleTrustNoSubjectCondition'] = [-1, '<br>'.join(findings + notes)]
+        elif notes:
+            self.results['oidcRoleTrustNoSubjectCondition'] = [0, '<br>'.join(notes)]
+        else:
+            self.results['oidcRoleTrustNoSubjectCondition'] = [1, 'sub condition pins the caller identity']
+
+    # ------------------------------------------------------------------ #
+    # Third-party (outside the organization) trust checks (WAFS2027).
+    # Roles with no cross-account trust get no result. When the org account
+    # list is unreadable a trusted account cannot be told apart from an
+    # intra-org account, so the result is [0, ...] - never a FAIL.
+    # ------------------------------------------------------------------ #
+    ADMIN_MANAGED_POLICY_NAMES = {'AdministratorAccess', 'IAMFullAccess'}
+
+    def _thirdPartyTrusts(self):
+        if self._trustContext is None:
+            return None
+        return crossAccountTrusts(self.role.get('AssumeRolePolicyDocument'), self._trustContext)
+
+    def _unknownNote(self, accounts):
+        reason = (self._trustContext or {}).get('reason') or 'organization account list not readable'
+        return 'Trusts account(s) {} that may be outside the organization; unable to classify ({})'.format(
+            ', '.join(sorted(accounts)), reason)
+
+    def _checkThirdPartyRoleNoExternalId(self):
+        key = 'thirdPartyRoleNoExternalId'
+        trusts = self._thirdPartyTrusts()
+        if not trusts:
+            return
+        bad, unknown, ok = [], set(), []
+        for t in trusts:
+            if t['orgConditioned'] or t['externalIdWeakness'] is None:
+                ok.append(t['account'])
+                continue
+            if t['class'] == 'unknown':
+                unknown.add(t['account'])
+            else:
+                bad.append('{}: {}'.format(t['account'], t['externalIdWeakness']))
+        if bad:
+            self.results[key] = [-1, 'External account trust without a strong sts:ExternalId:<br>' + '<br>'.join(bad)]
+        elif unknown:
+            self.results[key] = [0, self._unknownNote(unknown)]
+        else:
+            self.results[key] = [1, 'Cross-account trust(s) to {} require a strong sts:ExternalId or aws:PrincipalOrgID'.format(
+                ', '.join(sorted(set(ok))))]
+
+    def _adminLevelPolicies(self):
+        """(names, errors) of attached/inline policies granting admin-level access."""
+        found, errors = [], []
+        attached = self.role.get('AttachedManagedPolicies')
+        inline = self.role.get('RolePolicyList')
+        try:
+            if attached is None:
+                attached = []
+                for page in self._pages(self.iamClient, 'list_attached_role_policies', RoleName=self.role['RoleName']):
+                    attached.extend(page.get('AttachedPolicies', []))
+            for p in attached:
+                if p.get('PolicyName') in self.ADMIN_MANAGED_POLICY_NAMES:
+                    found.append(p['PolicyName'])
+                    continue
+                doc = self._policyDocumentMap.get(p.get('PolicyArn'))
+                if doc is None:
+                    pol = self._iamPolicy(p['PolicyArn'])['Policy']
+                    doc = self._iamPolicyVersion(p['PolicyArn'], pol['DefaultVersionId'])['PolicyVersion']['Document']
+                if isAdminLevelDocument(parseDocument(doc)):
+                    found.append(p['PolicyName'])
+            if inline is None:
+                inline = []
+                for page in self._pages(self.iamClient, 'list_role_policies', RoleName=self.role['RoleName']):
+                    for name in page.get('PolicyNames', []):
+                        doc = self._inlinePolicy('role', self.role['RoleName'], name)['PolicyDocument']
+                        inline.append({'PolicyName': name, 'PolicyDocument': doc})
+            for p in inline:
+                if isAdminLevelDocument(parseDocument(p.get('PolicyDocument'))):
+                    found.append('{} (inline)'.format(p.get('PolicyName')))
+        except botocore.exceptions.ClientError as e:
+            errors.append(e.response['Error']['Code'])
+        return found, errors
+
+    def _checkThirdPartyRoleOverprivileged(self):
+        key = 'thirdPartyRoleOverprivileged'
+        trusts = self._thirdPartyTrusts()
+        if not trusts:
+            return
+        # aws:PrincipalOrgID-conditioned trusts only admit org principals.
+        external = sorted({t['account'] for t in trusts if t['class'] == 'external' and not t['orgConditioned']})
+        unknown = sorted({t['account'] for t in trusts if t['class'] == 'unknown' and not t['orgConditioned']})
+        admin, errors = self._adminLevelPolicies()
+        if admin and external:
+            self.results[key] = [-1, 'Role trusted by external account(s) {} has admin-level permissions: {}'.format(
+                ', '.join(external), ', '.join(admin))]
+        elif errors:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(errors[0])]
+        elif admin and unknown:
+            self.results[key] = [0, self._unknownNote(unknown) + '; role has admin-level permissions: {}'.format(', '.join(admin))]
+        elif admin:
+            # Every cross-account trust is restricted by aws:PrincipalOrgID.
+            self.results[key] = [1, 'Admin-level role is not trusted by accounts outside the organization']
+        else:
+            self.results[key] = [1, 'No AdministratorAccess, *:* or iam:* permissions']

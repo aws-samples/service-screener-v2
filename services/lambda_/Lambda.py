@@ -4,6 +4,7 @@ from botocore.exceptions import ClientError
 # import importlib
 
 from services.lambda_.drivers.LambdaCommon import LambdaCommon
+from services.lambda_.drivers.LambdaCodeSigningConfig import LambdaCodeSigningConfig
 from services.Service import Service
 from utils.Config import Config
 
@@ -17,6 +18,7 @@ class Lambda(Service):
         ssBoto = self.ssBoto
         self.lambda_client = ssBoto.client("lambda", config=self.bConfig)
         self.iam_client = ssBoto.client("iam", config=self.bConfig)
+        self.signer_client = ssBoto.client("signer", config=self.bConfig)
         self.tags = []
 
     def get_resources(self):
@@ -80,7 +82,37 @@ class Lambda(Service):
             except (ImportError, AttributeError):
                 print(f"Failed to load driver {driver}")
 
+        for csc in self.get_code_signing_configs():
+            cscId = csc.get('CodeSigningConfigId', csc.get('CodeSigningConfigArn'))
+            _pi('Lambda::CodeSigningConfig', cscId)
+            obj = LambdaCodeSigningConfig(csc, self.signer_client)
+            obj.run(self.__class__)
+            objs[f"Lambda::CodeSigningConfig::{cscId}"] = obj.getInfo()
+
         return objs
+
+    def get_code_signing_configs(self):
+        configs = []
+        try:
+            paginator = self.lambda_client.get_paginator('list_code_signing_configs')
+            for page in paginator.paginate():
+                configs.extend(page.get('CodeSigningConfigs', []))
+        except ClientError as e:
+            print(f"Unable to list Lambda code signing configs ({e.response['Error']['Code']})")
+            return []
+
+        if not self.tags:
+            return configs
+
+        filtered = []
+        for csc in configs:
+            try:
+                tags = self.lambda_client.list_tags(Resource=csc['CodeSigningConfigArn']).get('Tags')
+            except ClientError:
+                continue
+            if self.resourceHasTags(self.convertKeyPairTagToTagFormat(tags)):
+                filtered.append(csc)
+        return filtered
             
             
 if __name__ == "__main__":

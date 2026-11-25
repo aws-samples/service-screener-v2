@@ -51,6 +51,8 @@ Running this tool is free as it is covered under the AWS Free Tier. If you have 
    - cloudformation:CreateStack
    - cloudformation:DeleteStack
 
+   - (Optional, for full WAFS2027 coverage) the extra read-only actions listed in [frameworks/WAFS2027/README.md](frameworks/WAFS2027/README.md#iam-permissions)
+
 4. (Optional) If you need to run cross-account operations, additional permissions are required:
    - iam:SetSecurityTokenServicePreferences
 

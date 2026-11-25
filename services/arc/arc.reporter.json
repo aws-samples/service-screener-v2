@@ -1,0 +1,38 @@
+{
+    "regionSwitchPlanMissing": {
+        "category": "R",
+        "^description": "{$COUNT} account(s) have no Amazon Application Recovery Controller (ARC) Region switch plan and no ARC routing control cluster. For a workload deployed across AWS Regions, ARC Region switch orchestrates the ordered failover steps (scaling, database promotion, DNS and traffic shifts) and routing control provides a highly available, data-plane-only switch for traffic. Without either, Region failover depends on ad-hoc manual runbooks that are slow and error-prone during a regional event. It is reported only when the account shows multi-Region infrastructure: an EventBridge global endpoint, an Aurora global database or DynamoDB global table spanning Regions, or Route 53 latency or failover records that point at different Regions. Accounts without such evidence are reported as informational, not as a finding. Other multi-Region designs (for example S3 Cross-Region Replication alone) are not detected.",
+        "shortDesc": "Orchestrate multi-Region failover with ARC Region switch",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Region switch in ARC]<https://docs.aws.amazon.com/r53recovery/latest/dg/region-switch.html>",
+            "[Routing control in ARC]<https://docs.aws.amazon.com/r53recovery/latest/dg/routing-control.html>",
+            "[REL13-BP05 Automate recovery]<https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_planning_for_recovery_auto_recovery.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/r53recovery/latest/dg/region-switch.html"
+    },
+    "regionSwitchPlanNeverExecuted": {
+        "category": "R",
+        "^description": "{$COUNT} ARC Region switch plan(s) have never completed an execution. A Region switch plan that has never been run end to end may fail during a real regional event because of missing IAM permissions on the execution role, wrong resource references, untested manual-approval steps or a recovery time longer than the stated objective. Well-Architected REL13 recommends regularly testing the disaster recovery implementation; execute the plan (for example during a game day) and review the execution events.",
+        "shortDesc": "Test Region switch plans by executing them",
+        "criticality": "L",
+        "downtime": 1,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Execute a Region switch plan]<https://docs.aws.amazon.com/r53recovery/latest/dg/plan-execution-rs.html>",
+            "[Region switch in ARC]<https://docs.aws.amazon.com/r53recovery/latest/dg/region-switch.html>",
+            "[REL13-BP03 Test disaster recovery implementation]<https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_planning_for_recovery_dr_tested.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/r53recovery/latest/dg/plan-execution-rs.html"
+    }
+}

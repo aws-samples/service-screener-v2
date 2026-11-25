@@ -5,6 +5,8 @@ from utils.Config import Config
 from services.Service import Service
 
 from services.accessanalyzer.drivers.AccessanalyzerCommon import AccessanalyzerCommon
+from services.accessanalyzer.drivers.AccessanalyzerRamShare import AccessanalyzerRamShare
+from services.accessanalyzer.drivers.AccessanalyzerRamAccount import AccessanalyzerRamAccount
 
 
 class Accessanalyzer(Service):
@@ -21,6 +23,14 @@ class Accessanalyzer(Service):
       - list_findings             (per external-access analyzer, CAPPED — see
                                    FINDINGS_PAGE_CAP)
       - list_archive_rules        (per analyzer)
+      - list_findings_v2          (unused-access analyzers, in the driver)
+      - ram.get_resource_shares   (resourceOwner=SELF; one driver per share)
+      - ram.get_resource_share_associations (per share, in the driver)
+      - organizations.describe_organization / list_accounts /
+        list_aws_service_access_for_organization (lazy, read-only)
+
+    RAM shares live here because they are the other regional mechanism that
+    grants access outside the account (no separate RAM service folder).
     """
 
     ACCESS_DENIED_CODES = (
@@ -39,6 +49,9 @@ class Accessanalyzer(Service):
         super().__init__(region)
         ssBoto = self.ssBoto
         self.aaClient = ssBoto.client('accessanalyzer', config=self.bConfig)
+        self.ramClient = ssBoto.client('ram', config=self.bConfig)
+        self.orgClient = ssBoto.client('organizations', config=self.bConfig)
+        self._orgAccounts = False   # False = not fetched yet; None = unavailable
 
     # ------------------------------------------------------------------ #
     # Discovery
@@ -134,22 +147,81 @@ class Accessanalyzer(Service):
             self._logClientError('list_archive_rules', e)
             return 0
 
+    def _listResourceShares(self):
+        """RAM resource shares owned by this account (excluding deleted ones).
+        Returns (shares, errorCode)."""
+        shares = []
+        try:
+            paginator = self.ramClient.get_paginator('get_resource_shares')
+            for page in paginator.paginate(resourceOwner='SELF'):
+                shares += page.get('resourceShares', []) or []
+        except botocore.exceptions.EndpointConnectionError:
+            return [], None
+        except botocore.exceptions.ClientError as e:
+            self._logClientError('ram.get_resource_shares', e)
+            return [], e.response.get('Error', {}).get('Code', 'Unknown')
+        return [s for s in shares
+                if s.get('status') not in ('DELETED', 'DELETING')], None
+
+    def orgAccountIds(self):
+        """Set of account IDs in the organization, or None when it cannot be
+        read (member account, not in an org, access denied). Cached."""
+        if self._orgAccounts is not False:
+            return self._orgAccounts
+        ids = set()
+        try:
+            for page in self.orgClient.get_paginator('list_accounts').paginate():
+                ids |= {a.get('Id') for a in page.get('Accounts', []) or []
+                        if a.get('Id')}
+            self._orgAccounts = ids or None
+        except (botocore.exceptions.ClientError,
+                botocore.exceptions.EndpointConnectionError):
+            self._orgAccounts = None
+        return self._orgAccounts
+
     # ------------------------------------------------------------------ #
     # Advise
     # ------------------------------------------------------------------ #
     def advise(self):
         objs = {}
+        ## Access Analyzer being unreachable in a region must not suppress the
+        ## RAM checks (or the once-per-scan org check) for that region.
         detail = self.getResources()
-        if detail is None:
-            return objs
+        if detail is not None:
+            try:
+                obj = AccessanalyzerCommon(detail, self.aaClient)
+                obj.run(self.__class__)
+                objs['AccessAnalyzer::Account'] = obj.getInfo()
+                del obj
+            except Exception as e:
+                print(f"Error processing Access Analyzer posture in "
+                      f"{self.region}: {e}")
+
+        shares, sharesErr = self._listResourceShares()
         try:
-            obj = AccessanalyzerCommon(detail, self.aaClient)
+            obj = AccessanalyzerRamAccount(
+                {'_region': self.region, '_ramSharesError': sharesErr},
+                self.orgClient)
             obj.run(self.__class__)
-            objs['AccessAnalyzer::Account'] = obj.getInfo()
+            if obj.results:
+                objs['RAM::Account'] = obj.getInfo()
             del obj
         except Exception as e:
-            print(f"Error processing Access Analyzer posture in "
-                  f"{self.region}: {e}")
+            print(f"Error processing RAM account settings in {self.region}: {e}")
+
+        accountId = (Config.get('stsInfo', {}) or {}).get('Account')
+        for share in shares:
+            try:
+                obj = AccessanalyzerRamShare(share, self.ramClient, accountId,
+                                             self.orgAccountIds)
+                obj.run(self.__class__)
+                shareId = (share.get('resourceShareArn') or '').split('/')[-1]
+                objs[f"RAM::ResourceShare::{share.get('name', 'unknown')}"
+                     f" ({shareId})"] = obj.getInfo()
+                del obj
+            except Exception as e:
+                print(f"Error processing RAM resource share "
+                      f"{share.get('name')} in {self.region}: {e}")
         return objs
 
     # ------------------------------------------------------------------ #

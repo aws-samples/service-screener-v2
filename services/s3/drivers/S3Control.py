@@ -18,27 +18,31 @@ class S3Control(Evaluator):
         self.init()
     
     def _checkAccountPublicAccessBlock(self):
-        self.results['S3AccountPublicAccessBlock'] = [-1,'Off']
-        try:
-            stsInfo = Config.get('stsInfo')
-            if not stsInfo:
-                print("Unable to retrieve account information")
-                self.results['S3AccountPublicAccessBlock'] = [-1,'Insufficient info']
-                return
-        except botocore.exceptions.ClientError as e:
-            print('Unable to capture S3 Logging settings:', e.response['Error']['Code'])
-            # self.results['S3AccountPublicAccessBlock'] = [-1,'Insufficient info']
-            
+        stsInfo = Config.get('stsInfo') or {}
+        accountId = stsInfo.get('Account')
+        if not accountId:
+            self.results['S3AccountPublicAccessBlock'] = [0, 'Unable to evaluate (account id unavailable)']
+            return
+
         try:
             resp = self.s3Control.get_public_access_block(
-                AccountId = stsInfo['Account']
+                AccountId = accountId
             )
         except botocore.exceptions.ClientError as e:
-            print("Public access configuration not set")
+            code = e.response['Error']['Code']
+            if code == 'NoSuchPublicAccessBlockConfiguration':
+                self.results['S3AccountPublicAccessBlock'] = [-1, 'Off']
+            else:
+                # AccessDenied etc. is not evidence that BPA is off.
+                self.results['S3AccountPublicAccessBlock'] = [0, f'Unable to evaluate ({code})']
+            return
+        except botocore.exceptions.BotoCoreError as e:
+            self.results['S3AccountPublicAccessBlock'] = [0, f'Unable to evaluate ({type(e).__name__})']
             return
         
         for param, val in resp['PublicAccessBlockConfiguration'].items():
             if val == False:
+                self.results['S3AccountPublicAccessBlock'] = [-1, 'Off']
                 return
             
         self.results['S3AccountPublicAccessBlock'] = [1,'On'] 
@@ -55,11 +59,11 @@ class S3Control(Evaluator):
             stsInfo = Config.get('stsInfo')
             if not stsInfo:
                 print("Unable to retrieve account information for Storage Lens check")
-                self.results['StorageLens'] = [-1, 'Insufficient info']
+                self.results['StorageLens'] = [0, 'Unable to evaluate (account id unavailable)']
                 return
         except Exception as e:
             print(f'Unable to get account info for Storage Lens: {e}')
-            self.results['StorageLens'] = [-1, 'Insufficient info']
+            self.results['StorageLens'] = [0, 'Unable to evaluate (account id unavailable)']
             return
         
         try:
@@ -90,5 +94,8 @@ class S3Control(Evaluator):
                 # No configurations exist
                 self.results['StorageLens'] = [-1, 'Not enabled']
             else:
+                # An API error is not evidence that Storage Lens is disabled.
                 print(f"Unable to check Storage Lens: {error_code}")
-                self.results['StorageLens'] = [-1, f'Error: {error_code}']
+                self.results['StorageLens'] = [0, f'Unable to evaluate ({error_code})']
+        except botocore.exceptions.BotoCoreError as e:
+            self.results['StorageLens'] = [0, f'Unable to evaluate ({type(e).__name__})']

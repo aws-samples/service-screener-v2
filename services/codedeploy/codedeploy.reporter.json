@@ -1,0 +1,20 @@
+{
+    "codedeployNoAutoRollback": {
+        "category": "S",
+        "^description": "{$COUNT} CodeDeploy deployment group(s) do not automatically roll back when a deployment fails (autoRollbackConfiguration is disabled, or DEPLOYMENT_FAILURE is not among its events). Without automatic rollback a failed deployment leaves the faulty or partially applied revision running until someone intervenes manually, so a bad or tampered release stays live longer and the fleet can be left in a mixed, untested state. Enabling rollback on DEPLOYMENT_FAILURE (and, where CloudWatch alarms are configured, on DEPLOYMENT_STOP_ON_ALARM) returns the group to the last known good revision automatically, which is part of deploying software programmatically and repeatably.",
+        "shortDesc": "Enable automatic rollback on deployment failure",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Redeploy and roll back a deployment with CodeDeploy]<https://docs.aws.amazon.com/codedeploy/latest/userguide/deployments-rollback-and-redeploy.html>",
+            "[Configure advanced options for a deployment group]<https://docs.aws.amazon.com/codedeploy/latest/userguide/deployment-groups-configure-advanced-options.html>",
+            "[AutoRollbackConfiguration API reference]<https://docs.aws.amazon.com/codedeploy/latest/APIReference/API_AutoRollbackConfiguration.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/codedeploy/latest/userguide/deployments-rollback-and-redeploy.html"
+    }
+}

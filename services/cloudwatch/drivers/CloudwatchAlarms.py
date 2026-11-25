@@ -9,13 +9,23 @@ class CloudwatchAlarms(Evaluator):
     Driver for CloudWatch Alarms checks
     Handles alarm configuration validation including SNS notifications and billing alarms
     """
+
+    ## AWS namespaces that publish datapoints continuously while the resource
+    ## exists, so two weeks without data means the resource is gone (or
+    ## stopped). Other AWS/* namespaces (Lambda, SNS, SQS, API Gateway, ALB,
+    ## Step Functions, ...) publish only when there is activity, so an idle
+    ## resource looks the same as a deleted one.
+    CONTINUOUS_AWS_NAMESPACES = frozenset(('AWS/EC2', 'AWS/RDS', 'AWS/ElastiCache'))
     
-    def __init__(self, alarm, cwClient):
+    def __init__(self, alarm, cwClient, metricFilterMetrics=None):
         super().__init__()
         self.init()
         
         self.alarm = alarm
         self.cwClient = cwClient
+        ## set of (namespace, metricName) produced by CloudWatch Logs metric
+        ## filters in this region, or None when it could not be read.
+        self.metricFilterMetrics = metricFilterMetrics
         
         try:
             self._resourceName = alarm.get('AlarmName', 'unknown')
@@ -219,3 +229,90 @@ class CloudwatchAlarms(Evaluator):
 
 
 
+
+    def _checkAlarmActionsDisabled(self):
+        """
+        Flag alarms that cannot notify anyone: actions are configured but
+        ActionsEnabled is false, or the alarm has been stuck in
+        INSUFFICIENT_DATA for more than 7 days AND the metric it watches has
+        published no data for two weeks (list_metrics only returns metrics with
+        data in the last 14 days), i.e. the metric was renamed or its resource
+        deleted.
+
+        Alarms on sparse metrics are not flagged: CloudTrail / log metric
+        filter alarms (CIS-style) and other event-driven metrics publish no
+        datapoints until a matching event happens, so with the default
+        TreatMissingData='missing' they legitimately sit in INSUFFICIENT_DATA
+        yet still go to ALARM and notify when the event arrives.
+        """
+        import datetime
+        key = 'cwAlarmActionsDisabled'
+        actions = (self.alarm.get('AlarmActions') or []) + (self.alarm.get('OKActions') or []) \
+            + (self.alarm.get('InsufficientDataActions') or [])
+        if self.alarm.get('ActionsEnabled') is False and actions:
+            self.results[key] = [-1, f'Actions disabled ({len(actions)} configured action(s) will not run)']
+            return
+
+        okMsg = [1, 'Alarm actions enabled and alarm is evaluating']
+        if self.alarm.get('StateValue') != 'INSUFFICIENT_DATA':
+            self.results[key] = okMsg
+            return
+        since = self.alarm.get('StateTransitionedTimestamp') or self.alarm.get('StateUpdatedTimestamp')
+        if not isinstance(since, datetime.datetime):
+            self.results[key] = okMsg
+            return
+        if since.tzinfo is None:
+            since = since.replace(tzinfo=datetime.timezone.utc)
+        days = (datetime.datetime.now(datetime.timezone.utc) - since).days
+        if days <= 7:
+            self.results[key] = okMsg
+            return
+
+        metrics = []
+        if self.alarm.get('MetricName'):
+            metrics.append((self.alarm.get('Namespace'), self.alarm.get('MetricName'),
+                            self.alarm.get('Dimensions') or []))
+        for m in self.alarm.get('Metrics', []) or []:
+            if m.get('AccountId'):
+                ## Cross-account metric: cannot be listed from this account.
+                self.results[key] = [0, f'In INSUFFICIENT_DATA for {days} days; cross-account metric not evaluable']
+                return
+            metric = (m.get('MetricStat') or {}).get('Metric') or {}
+            if metric.get('MetricName'):
+                metrics.append((metric.get('Namespace'), metric.get('MetricName'), metric.get('Dimensions') or []))
+        if not metrics:
+            self.results[key] = [1, f'In INSUFFICIENT_DATA for {days} days; expression-only alarm not evaluated']
+            return
+
+        if self.metricFilterMetrics is None:
+            self.results[key] = [0, 'Unable to evaluate (log metric filters unreadable)']
+            return
+        if any((ns, mn) in self.metricFilterMetrics for ns, mn, _ in metrics):
+            self.results[key] = [1, f'In INSUFFICIENT_DATA for {days} days, but the metric comes from a log metric '
+                                    'filter (sparse; the alarm still fires when a matching event arrives)']
+            return
+
+        try:
+            for ns, mn, dims in metrics:
+                args = {'MetricName': mn,
+                        'Dimensions': [{'Name': d.get('Name'), 'Value': d.get('Value')} for d in dims]}
+                if ns:
+                    args['Namespace'] = ns
+                if self.cwClient.list_metrics(**args).get('Metrics'):
+                    self.results[key] = [1, f'In INSUFFICIENT_DATA for {days} days, but its metric has recent '
+                                            'data (sparse metric)']
+                    return
+        except botocore.exceptions.ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({e.response.get('Error', {}).get('Code', 'ClientError')})"]
+            return
+
+        names = ', '.join(sorted({f'{ns}/{mn}' for ns, mn, _ in metrics}))
+        eventDriven = sorted({ns for ns, _, _ in metrics
+                              if (ns or '').startswith('AWS/') and ns not in self.CONTINUOUS_AWS_NAMESPACES})
+        if eventDriven:
+            self.results[key] = [0, f'In INSUFFICIENT_DATA for {days} days and its metric ({names}) has published '
+                                    f'no data in the last 14 days; {", ".join(eventDriven)} publishes only on '
+                                    'activity, so the resource may be idle or deleted - verify it still exists']
+            return
+        self.results[key] = [-1, f'In INSUFFICIENT_DATA for {days} days and its metric ({names}) has published '
+                                 'no data in the last 14 days']

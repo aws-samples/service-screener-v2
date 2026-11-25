@@ -78,7 +78,7 @@
         "needFullTest": 0,
         "ref": [
             "[Protect a stack from being deleted]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-protect-stacks.html>",
-            "[Stack options]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-add-tags.html>"
+            "[Stack options]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-create-stack.html#configure-stack-options>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -95,7 +95,7 @@
         "needFullTest": 0,
         "ref": [
             "[Monitor and roll back stack operations]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-rollback-triggers.html>",
-            "[Rollback configuration]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-updating-stacks.html>"
+            "[Rollback configuration]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -111,12 +111,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Stack notifications]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-add-tags.html>",
-            "[Monitoring stacks]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks-monitoring.html>"
+            "[Stack notifications]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-create-stack.html#configure-stack-options>",
+            "[Monitoring stacks]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-create-stack.html#configure-stack-options-notification>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks-monitoring.html"
+        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-create-stack.html#configure-stack-options-notification"
     },
     "cfnOldStackUnupdated": {
         "category": "O",
@@ -128,12 +128,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Stack updates]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-updating-stacks.html>",
+            "[Stack updates]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html>",
             "[Working with stacks]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-cfn-updating-stacks.html"
+        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacks.html"
     },
     "cfnIAMCapabilityGranted": {
         "category": "S",
@@ -145,12 +145,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Acknowledging IAM resources]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-iam-template.html>",
+            "[Acknowledging IAM resources]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/control-access-with-iam.html>",
             "[Controlling access with IAM]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-iam-servicerole.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/using-iam-template.html"
+        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/control-access-with-iam.html"
     },
     "cfnNoTags": {
         "category": "O",
@@ -162,11 +162,65 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Setting stack tags]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-add-tags.html>",
+            "[Setting stack tags]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-create-stack.html#configure-stack-options>",
             "[Tagging AWS resources]<https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-add-tags.html"
+        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-console-create-stack.html#configure-stack-options"
+    },
+    "cfnNoProactiveHooks": {
+        "category": "S",
+        "^description": "No CloudFormation hook is enabled in {$COUNT} account Region(s). Hooks \u2014 the managed Guard and Lambda hooks, third-party hooks, and the hooks behind AWS Control Tower proactive controls \u2014 evaluate a stack's resources BEFORE they are provisioned and can block or warn on non-compliant configuration. Without an enabled hook (HookInvocationStatus ENABLED), every misconfiguration in a template is deployed first and only detected afterwards by detective controls, if at all. Pre-deployment gates in a CI pipeline can serve the same purpose; if you rely on those, this finding is advisory.",
+        "shortDesc": "Enable CloudFormation hooks as proactive controls",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[What are CloudFormation Hooks?]<https://docs.aws.amazon.com/cloudformation-cli/latest/hooks-userguide/what-is-cloudformation-hooks.html>",
+            "[Guard Hooks]<https://docs.aws.amazon.com/cloudformation-cli/latest/hooks-userguide/guard-hooks.html>",
+            "[Hook configuration schema]<https://docs.aws.amazon.com/cloudformation-cli/latest/hooks-userguide/hook-configuration-schema.html>",
+            "[AWS Control Tower proactive controls]<https://docs.aws.amazon.com/controltower/latest/controlreference/proactive-controls.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/cloudformation-cli/latest/hooks-userguide/guard-hooks.html"
+    },
+    "cfnPlaintextSecretParams": {
+        "category": "S",
+        "^description": "{$COUNT} CloudFormation stack(s) have parameters whose names indicate a credential (password, secret, token, API key, private key) and whose values DescribeStacks returns in clear text. Anyone with cloudformation:DescribeStacks \u2014 including read-only roles and the console \u2014 can read these values, and they also appear in stack event history. Declare such parameters with NoEcho: true at minimum; better, store the secret in AWS Secrets Manager or SSM Parameter Store SecureString and reference it with a dynamic reference ({{resolve:secretsmanager:...}}) so it never passes through a parameter. Rotate any credential that has been exposed. Parameters of an SSM parameter type (AWS::SSM::Parameter::Value<...>) are included: DescribeStacks returns the resolved value of the plain-text SSM String parameter as ResolvedValue, so it is evaluated the same way. The parameter-name match is a heuristic; NoEcho-masked, ARN and dynamic-reference values are excluded.",
+        "shortDesc": "Stop passing secrets as clear-text stack parameters",
+        "criticality": "H",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 1,
+        "ref": [
+            "[Do not embed credentials in your templates]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/security-best-practices.html#creds>",
+            "[Parameters: NoEcho]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/parameters-section-structure.html>",
+            "[Get values stored in other services using dynamic references]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/dynamic-references.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/dynamic-references-secretsmanager.html"
+    },
+    "cfnStackSetDrift": {
+        "category": "R",
+        "^description": "{$COUNT} CloudFormation StackSet(s) administered from this account are DRIFTED, or have stack instances but have never been checked for drift. A StackSet deploys the same template to many accounts and Regions, so out-of-band changes to its resources undermine a baseline that is meant to be uniform, and the next StackSet update may revert or clash with them. Run drift detection on the StackSet regularly and reconcile drifted instances. (Stacks deployed INTO this account by a StackSet are covered by the per-stack drift checks.)",
+        "shortDesc": "Detect and resolve drift on StackSets",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Performing drift detection on CloudFormation StackSets]<https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-drift.html>",
+            "[DescribeStackSet: StackSetDriftDetectionDetails]<https://docs.aws.amazon.com/AWSCloudFormation/latest/APIReference/API_StackSetDriftDetectionDetails.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stacksets-drift.html"
     }
 }

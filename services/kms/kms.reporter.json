@@ -113,7 +113,7 @@
 	},
 	"KeyPolicyCrossAccount": {
 		"category": "S",
-		"^description": "{$COUNT} KMS key has cross-account access in key policy. Review cross-account principals to ensure they are intentional and necessary. Unintended cross-account access can lead to security risks.",
+		"^description": "{$COUNT} KMS key grants cross-account access in its key policy without an aws:PrincipalOrgID or aws:PrincipalOrgPaths condition, either to an external principal or to a wildcard principal whose kms:CallerAccount, aws:PrincipalAccount, aws:SourceAccount or aws:PrincipalArn condition names another account. Review cross-account principals to ensure they are intentional and necessary, and constrain them to your AWS Organization where possible. Unintended cross-account access can lead to security risks.",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
@@ -121,7 +121,8 @@
 		"criticality": "H",
 		"shortDesc": "Review cross-account key access",
 		"ref": [
-			"[Cross-account access to KMS keys]<https://docs.aws.amazon.com/kms/latest/developerguide/key-policy-modifying-external-accounts.html>"
+			"[Cross-account access to KMS keys]<https://docs.aws.amazon.com/kms/latest/developerguide/key-policy-modifying-external-accounts.html>",
+			"[AWS global condition keys: aws:PrincipalOrgID]<https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_condition-keys.html#condition-keys-principalorgid>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -266,6 +267,90 @@
 		"shortDesc": "Review key management model",
 		"ref": [
 			"[Key management best practices]<https://docs.aws.amazon.com/prescriptive-guidance/latest/aws-kms-best-practices/key-management.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/prescriptive-guidance/latest/aws-kms-best-practices/key-management.html"
+	},
+	"ImportedKeyMaterialExpiring": {
+		"category": "S",
+		"^description": "{$COUNT} KMS key with imported key material has no key material, or key material that expires within 30 days. When imported key material expires, AWS KMS deletes it and the key becomes unusable: data encrypted under that key material cannot be decrypted until the same key material is re-imported. Re-import the key material with a later expiration (or no expiration) before it expires, and keep a secure copy of the key material outside AWS KMS.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"criticality": "H",
+		"shortDesc": "Re-import expiring key material",
+		"ref": [
+			"[Importing key material for AWS KMS keys]<https://docs.aws.amazon.com/kms/latest/developerguide/importing-keys.html>",
+			"[Setting an expiration time for imported key material]<https://docs.aws.amazon.com/kms/latest/developerguide/importing-keys-import-key-material.html#importing-keys-expiration>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/kms/latest/developerguide/importing-keys-import-key-material.html"
+	},
+	"CustomKeyStoreUnhealthy": {
+		"category": "S",
+		"^description": "{$COUNT} region has an AWS KMS custom key store (AWS CloudHSM or external key store) that is in FAILED state, or DISCONNECTED while it still holds KMS keys. Keys in a disconnected or failed custom key store are unavailable, so cryptographic operations on them fail and data protected by them cannot be decrypted. Resolve the connection error and reconnect the key store.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"criticality": "H",
+		"shortDesc": "Reconnect failed custom key store",
+		"ref": [
+			"[Connecting and disconnecting an AWS CloudHSM key store]<https://docs.aws.amazon.com/kms/latest/developerguide/connect-keystore.html>",
+			"[Troubleshooting a custom key store]<https://docs.aws.amazon.com/kms/latest/developerguide/fix-keystore.html>"
+		],
+		"remediation": "aws kms connect-custom-key-store --custom-key-store-id {ResourceId}",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/kms/latest/developerguide/fix-keystore.html"
+	},
+	"RotationPeriodTooLong": {
+		"category": "S",
+		"^description": "{$COUNT} KMS key has automatic rotation enabled with a rotation period longer than 365 days. Longer rotation periods increase the amount of data protected by a single key material version. Set a rotation period that meets your key management policy (365 days is the AWS default).",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"criticality": "L",
+		"shortDesc": "Shorten key rotation period",
+		"ref": [
+			"[Rotate AWS KMS keys]<https://docs.aws.amazon.com/kms/latest/developerguide/rotate-keys.html>"
+		],
+		"remediation": "aws kms enable-key-rotation --key-id {ResourceId} --rotation-period-in-days 365",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/kms/latest/developerguide/rotating-keys-enable.html"
+	},
+	"KeyMissingOwnershipTags": {
+		"category": "S",
+		"^description": "{$COUNT} customer managed KMS key has no ownership tag (for example Owner or Team) or no data classification tag (for example DataClassification). Tagging keys with their owner and the classification of the data they protect supports access reviews, incident response and key lifecycle decisions. Tag conventions are organisation-specific; adjust to your tagging policy.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"criticality": "L",
+		"shortDesc": "Tag keys with owner and classification",
+		"ref": [
+			"[Tags in AWS KMS]<https://docs.aws.amazon.com/kms/latest/developerguide/tagging-keys.html>",
+			"[Best practices for tagging AWS resources]<https://docs.aws.amazon.com/whitepapers/latest/tagging-best-practices/tagging-best-practices.html>"
+		],
+		"remediation": "aws kms tag-resource --key-id {ResourceId} --tags TagKey=Owner,TagValue=<team> TagKey=DataClassification,TagValue=<level>",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/kms/latest/developerguide/tagging-keys.html"
+	},
+	"SingleKeyBroadUse": {
+		"category": "S",
+		"^description": "{$COUNT} region has a customer managed KMS key that protects data in 3 or more different AWS services (EBS, RDS, EFS, Secrets Manager, SSM Parameter Store, CloudWatch Logs). A single key shared across many data stores widens the impact of an over-permissive key policy or a key compromise, and prevents separating access by data classification. Consider separate keys per workload or data classification. This is a heuristic; the intended data classification of each store is not observable.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"criticality": "L",
+		"shortDesc": "Use separate keys per data classification",
+		"ref": [
+			"[AWS KMS best practices: key management]<https://docs.aws.amazon.com/prescriptive-guidance/latest/aws-kms-best-practices/key-management.html>",
+			"[AWS KMS keys]<https://docs.aws.amazon.com/kms/latest/developerguide/concepts.html#kms_keys>"
 		],
 		"remediation": null,
 		"remediation_risk": null,

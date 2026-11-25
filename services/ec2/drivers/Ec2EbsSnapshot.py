@@ -7,6 +7,15 @@ from services.Service import Service
 
 from services.Evaluator import Evaluator
 
+
+def selfOwnedSnapshots(evaluator, ec2Client):
+    """describe_snapshots(OwnerIds=['self']) (single call, as before), shared by
+    every driver of the scan in this region."""
+    return evaluator._sharedMemo(
+        ('ec2', ec2Client.meta.region_name, 'describe_snapshots', ('OwnerIds', ('self',))),
+        lambda: ec2Client.describe_snapshots(OwnerIds=['self']))
+
+
 class Ec2EbsSnapshot(Evaluator):
     def __init__(self, ebsVolumeIds, ec2Client):
         super().__init__()
@@ -16,6 +25,17 @@ class Ec2EbsSnapshot(Evaluator):
         self._resourceName = 'AllEC2Snapshots'
 
         self.init()
+
+    def _selfSnapshots(self):
+        """describe_snapshots(OwnerIds=['self']) - read once per region and shared
+        with Ec2Regional (which makes the same call)."""
+        return selfOwnedSnapshots(self, self.ec2Client)
+
+    def _tierStatus(self, snapshotIds):
+        """describe_snapshot_tier_status for the given snapshot ids, read once."""
+        return self._memo(('describe_snapshot_tier_status', tuple(snapshotIds)),
+                          lambda: self.ec2Client.describe_snapshot_tier_status(
+                              Filters=[{'Name': 'snapshot-id', 'Values': snapshotIds}]))
 
     def _checkSnapshotPublic(self):
         snapshotData = self.ec2Client.describe_snapshots(
@@ -33,9 +53,7 @@ class Ec2EbsSnapshot(Evaluator):
         return
 
     def _checkDeletedVolumeSnapshotList(self):
-        snapshotData = self.ec2Client.describe_snapshots(
-            OwnerIds = ["self"],
-        )
+        snapshotData = self._selfSnapshots()
 
         deletedVolumeSnapshotList = []
         for snapshot in snapshotData['Snapshots']:
@@ -51,9 +69,7 @@ class Ec2EbsSnapshot(Evaluator):
         """Check if first snapshots in chains are archived"""
         try:
             # Get all snapshots owned by this account
-            snapshotData = self.ec2Client.describe_snapshots(
-                OwnerIds=["self"]
-            )
+            snapshotData = self._selfSnapshots()
             
             snapshots = snapshotData.get('Snapshots', [])
             if not snapshots:
@@ -64,14 +80,7 @@ class Ec2EbsSnapshot(Evaluator):
             snapshotIds = [s['SnapshotId'] for s in snapshots]
             
             # Get tier status for all snapshots
-            tierResp = self.ec2Client.describe_snapshot_tier_status(
-                Filters=[
-                    {
-                        'Name': 'snapshot-id',
-                        'Values': snapshotIds
-                    }
-                ]
-            )
+            tierResp = self._tierStatus(snapshotIds)
             
             # Create a map of snapshot tier status
             tierMap = {}
@@ -114,9 +123,7 @@ class Ec2EbsSnapshot(Evaluator):
         """Check if latest snapshots are archived"""
         try:
             # Get all snapshots owned by this account
-            snapshotData = self.ec2Client.describe_snapshots(
-                OwnerIds=["self"]
-            )
+            snapshotData = self._selfSnapshots()
             
             snapshots = snapshotData.get('Snapshots', [])
             if not snapshots:
@@ -125,14 +132,7 @@ class Ec2EbsSnapshot(Evaluator):
             snapshotIds = [s['SnapshotId'] for s in snapshots]
             
             # Get tier status for all snapshots
-            tierResp = self.ec2Client.describe_snapshot_tier_status(
-                Filters=[
-                    {
-                        'Name': 'snapshot-id',
-                        'Values': snapshotIds
-                    }
-                ]
-            )
+            tierResp = self._tierStatus(snapshotIds)
             
             # Create a map of snapshot tier status
             tierMap = {}
@@ -175,9 +175,7 @@ class Ec2EbsSnapshot(Evaluator):
         """Check if old compliance snapshots should be archived"""
         try:
             # Get all snapshots owned by this account
-            snapshotData = self.ec2Client.describe_snapshots(
-                OwnerIds=["self"]
-            )
+            snapshotData = self._selfSnapshots()
             
             snapshots = snapshotData.get('Snapshots', [])
             if not snapshots:
@@ -186,14 +184,7 @@ class Ec2EbsSnapshot(Evaluator):
             snapshotIds = [s['SnapshotId'] for s in snapshots]
             
             # Get tier status for all snapshots
-            tierResp = self.ec2Client.describe_snapshot_tier_status(
-                Filters=[
-                    {
-                        'Name': 'snapshot-id',
-                        'Values': snapshotIds
-                    }
-                ]
-            )
+            tierResp = self._tierStatus(snapshotIds)
             
             # Create a map of snapshot tier status
             tierMap = {}

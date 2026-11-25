@@ -230,7 +230,7 @@
 	},
 	"HasManagementEventsCaptured": {
 		"category": "O",
-		"^description": "None of your existing Amazon CloudTrail trails cover AWS Management events. Management events provide visibility into management operations that are performed on resources in your AWS account. These are also known as control plane operations. Example management events include:<br>- Configuring security (for example, IAM AttachRolePolicy API operations)<br>- Registering devices (for example, Amazon EC2 CreateDefaultVpc API operations)<br>- Configuring rules for routing data (for example, Amazon EC2 CreateSubnet API operations)<br>- Setting up logging (for example, AWS CloudTrail CreateTrail API operations)<br><br>Management events can also include non-API events that occur in your account. For example, when a user logs in to your account, CloudTrail logs the ConsoleLogin event.",
+		"^description": "No logging Amazon CloudTrail trail that applies to this Region captures AWS Management events (a trail whose logging is stopped, or a single-Region trail of another Region, records nothing here). Management events provide visibility into management operations that are performed on resources in your AWS account. These are also known as control plane operations. Example management events include:<br>- Configuring security (for example, IAM AttachRolePolicy API operations)<br>- Registering devices (for example, Amazon EC2 CreateDefaultVpc API operations)<br>- Configuring rules for routing data (for example, Amazon EC2 CreateSubnet API operations)<br>- Setting up logging (for example, AWS CloudTrail CreateTrail API operations)<br><br>Management events can also include non-API events that occur in your account. For example, when a user logs in to your account, CloudTrail logs the ConsoleLogin event.",
 		"shortDesc": "Trail to include Management Events",
 		"criticality": "H",
 		"downtime": 0,
@@ -263,7 +263,7 @@
 	},
 	"HasDataEventsCaptured": {
 		"category": "S",
-		"^description": "None of your existing Amazon CloudTrail trails cover AWS Data events. Data events provide visibility into the resource operations performed on or within a resource. These are also known as data plane operations. Data events are often high-volume activities.",
+		"^description": "No logging Amazon CloudTrail trail that applies to this Region captures AWS Data events (a trail whose logging is stopped, or a single-Region trail of another Region, records nothing here). Data events provide visibility into the resource operations performed on or within a resource. These are also known as data plane operations. Data events are often high-volume activities.",
 		"shortDesc": "Trail to include data event",
 		"criticality": "M",
 		"downtime": 0,
@@ -303,7 +303,7 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[GuardDuty Best Practices]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_best-practices.html>",
+			"[GuardDuty Best Practices]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_settingup.html>",
 			"[Getting Started with GuardDuty]<https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_settingup.html>"
 		],
 		"remediation": "aws guardduty create-detector --enable",
@@ -389,10 +389,62 @@
 		"needFullTest": 0,
 		"ref": [
 			"[CloudWatch Alarms for CloudTrail]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudwatch-alarms-for-cloudtrail.html>",
-			"[CIS AWS Foundations Benchmark]<https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cis-controls.html>"
+			"[CIS AWS Foundations Benchmark]<https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-controls-reference.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudwatch-alarms-for-cloudtrail.html"
+	},
+	"cloudtrailExcludesKmsEvents": {
+		"category": "S",
+		"^description": "In {$COUNT} Region(s), every logging CloudTrail trail that captures management events excludes AWS KMS events (kms.amazonaws.com), either with ExcludeManagementEventSources or with an advanced event selector on eventSource. Without these events you have no audit record of who used, disabled or scheduled deletion of your KMS keys (Decrypt, GenerateDataKey, DisableKey, ScheduleKeyDeletion). A trail limited to write-only (ReadWriteType WriteOnly or an advanced selector on readOnly=false) does not record read-only KMS calls such as Decrypt and GenerateDataKey, and a read-only trail does not record key management calls; such Regions are reported as INFO. Keep all KMS events in at least one trail, or use advanced event selectors to filter only high-volume read events while keeping key management calls.",
+		"shortDesc": "Log AWS KMS management events in at least one trail",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Logging management events]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-management-events-with-cloudtrail.html>",
+			"[Logging AWS KMS API calls with CloudTrail]<https://docs.aws.amazon.com/kms/latest/developerguide/logging-using-cloudtrail.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/logging-management-events-with-cloudtrail.html"
+	},
+	"trailBucketSameAccount": {
+		"category": "S",
+		"^description": "In {$COUNT} Region(s), CloudTrail trails or AWS Config delivery channels of this AWS Organizations account deliver logs to an S3 bucket in the same account. Anyone with administrative access to this account could alter or delete its own audit logs. Deliver logs to a bucket in a dedicated log archive account (for example with an organization trail and an organization-wide Config aggregator), and restrict access to that account.",
+		"shortDesc": "Deliver CloudTrail and Config logs to a separate log archive account",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Creating a trail for an organization]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/creating-trail-organization.html>",
+			"[Receiving CloudTrail log files from multiple accounts]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-receive-logs-from-multiple-accounts.html>",
+			"[Log archive account]<https://docs.aws.amazon.com/prescriptive-guidance/latest/security-reference-architecture/log-archive.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/creating-trail-organization.html"
+	},
+	"manualConsoleWritesDetected": {
+		"category": "S",
+		"^description": "In {$COUNT} Region(s), CloudTrail recorded write API calls made from AWS Management Console sessions in the last 30 days (heuristic, based on a sample of recent write events). Manual changes made outside your deployment pipelines bypass review and testing, cause configuration drift and are hard to audit. Make changes through infrastructure as code and pipelines, and reserve console write access for break-glass use.",
+		"shortDesc": "Avoid manual console changes outside pipelines",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[CloudTrail record contents]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/cloudtrail-event-reference-record-contents.html>",
+			"[Viewing events with CloudTrail Event history]<https://docs.aws.amazon.com/awscloudtrail/latest/userguide/view-cloudtrail-events.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/awscloudtrail/latest/userguide/view-cloudtrail-events.html"
 	}
 }

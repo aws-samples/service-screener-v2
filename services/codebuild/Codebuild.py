@@ -21,6 +21,13 @@ class Codebuild(Service):
       - batch_get_projects         (batched, 100 names per call)
       - list_report_groups         (paginated)
       - batch_get_report_groups    (batched, 100 ARNs per call)
+      - list_reports_for_report_group / batch_get_reports
+                                   (lazy, once per region, only when
+                                    cbProjectNoTestReports needs it)
+      - iam get_role / list_attached_role_policies / list_role_policies /
+        get_role_policy / get_policy / get_policy_version
+                                   (cbServiceRoleOverprivileged; cached per
+                                    role ARN so shared roles are read once)
 
     NOTE ON SECRETS: two checks in CodebuildProject look for credentials in
     project configuration. They report the LOCATION of the problem (variable name,
@@ -40,12 +47,23 @@ class Codebuild(Service):
         super().__init__(region)
         ssBoto = self.ssBoto
         self.cbClient = ssBoto.client('codebuild', config=self.bConfig)
+        self.iamClient = ssBoto.client('iam', config=self.bConfig)
+
+        ## Shared across every CodebuildProject in this region: many projects
+        ## reuse one service role, so its policies are evaluated once.
+        self._roleEvalCache = {}
+        self._reportIndex = None
+        self._projectNames = []
 
     # ------------------------------------------------------------------ #
     # Discovery
     # ------------------------------------------------------------------ #
     def getResources(self):
         names = self._listProjectNames()
+        ## Every project name in the region (before tag filtering), used to
+        ## attribute auto-named '<project>-<group>' report groups to the
+        ## project with the longest matching name.
+        self._projectNames = list(names)
         if not names:
             return []
 
@@ -158,6 +176,84 @@ class Codebuild(Service):
                     groups.append(group)
         return groups
 
+    ## How many of each report group's most recent reports are sampled to find
+    ## which projects write to it. Bounded so cost stays O(report groups).
+    REPORT_SAMPLE_PER_GROUP = 25
+
+    def _getReportIndex(self):
+        """
+        Lazily build (once per region) the evidence cbProjectNoTestReports needs:
+          groupNames      -- names of every report group in the region
+          projectNames    -- every project name in the region (for
+                             longest-prefix attribution of group names)
+          projects        -- project names seen as the executionId of a recent
+                             report in any report group
+          listError       -- error code if list_report_groups failed (index
+                             unusable)
+          linkageError    -- error code if reading reports failed (projects set
+                             is incomplete, so absence is not conclusive)
+        """
+        if self._reportIndex is not None:
+            return self._reportIndex
+
+        index = {'groupNames': [], 'projects': set(),
+                 'projectNames': list(self._projectNames),
+                 'listError': None, 'linkageError': None}
+        self._reportIndex = index
+
+        arns = []
+        try:
+            paginator = self.cbClient.get_paginator('list_report_groups')
+            for page in paginator.paginate():
+                arns += page.get('reportGroups', []) or []
+        except botocore.exceptions.ClientError as e:
+            index['listError'] = e.response.get('Error', {}).get('Code', 'Unknown')
+            return index
+        except botocore.exceptions.EndpointConnectionError:
+            index['listError'] = 'EndpointConnectionError'
+            return index
+
+        index['groupNames'] = [a.rsplit('/', 1)[-1] for a in arns]
+
+        reportArns = []
+        for arn in arns:
+            try:
+                resp = self.cbClient.list_reports_for_report_group(
+                    reportGroupArn=arn, sortOrder='DESCENDING',
+                    maxResults=self.REPORT_SAMPLE_PER_GROUP)
+                reportArns += resp.get('reports', []) or []
+            except botocore.exceptions.ClientError as e:
+                index['linkageError'] = e.response.get('Error', {}).get(
+                    'Code', 'Unknown')
+                ## Same error will repeat for every group; stop spending calls.
+                break
+
+        for i in range(0, len(reportArns), self.BATCH_SIZE):
+            batch = reportArns[i:i + self.BATCH_SIZE]
+            try:
+                resp = self.cbClient.batch_get_reports(reportArns=batch)
+            except botocore.exceptions.ClientError as e:
+                index['linkageError'] = e.response.get('Error', {}).get(
+                    'Code', 'Unknown')
+                break
+            for report in resp.get('reports', []) or []:
+                project = self._projectFromExecutionId(
+                    report.get('executionId') or '')
+                if project:
+                    index['projects'].add(project)
+
+        return index
+
+    @staticmethod
+    def _projectFromExecutionId(executionId):
+        """arn:aws:codebuild:<r>:<a>:build/<project>:<uuid> -> <project>
+        (also build-batch/<project>:<uuid>)."""
+        for marker in (':build/', ':build-batch/'):
+            if marker in executionId:
+                tail = executionId.split(marker, 1)[1]
+                return tail.rsplit(':', 1)[0] if ':' in tail else tail
+        return None
+
     def _normaliseTags(self, tags):
         """CodeBuild uses lowercase tag keys; convert to the Key/Value form."""
         normalised = []
@@ -180,7 +276,10 @@ class Codebuild(Service):
             name = project.get('name', 'unknown')
             try:
                 _pi('Codebuild', f"Analyzing project: {name}")
-                obj = CodebuildProject(project, self.cbClient)
+                obj = CodebuildProject(
+                    project, self.cbClient, iamClient=self.iamClient,
+                    roleCache=self._roleEvalCache,
+                    reportIndexFn=self._getReportIndex)
                 obj.run(self.__class__)
                 objs[f"CodeBuild Project::{name}"] = obj.getInfo()
                 del obj

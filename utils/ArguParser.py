@@ -23,7 +23,7 @@ class ArguParser:
         "services": {
             "required": False,
             "emptymsg": "Missing --services, using default value: $defaultValue",
-            "default": "rds,ec2,iam,s3,efs,lambda,guardduty,cloudfront,cloudtrail,elasticache,eks,dynamodb,opensearch,kms,cloudwatch,redshift,apigateway,sqs,glue,sagemaker,bedrock,stepfunctions,sns,wafv2,cognito,acm,kinesis,firehose,ecr,backup,ecs,route53,secretsmanager,eventbridge,config,ssm,codebuild,accessanalyzer,securityhub,inspector,athena,appsync,emr,cloudformation",
+            "default": "rds,ec2,iam,s3,efs,lambda,guardduty,cloudfront,cloudtrail,elasticache,eks,dynamodb,opensearch,kms,cloudwatch,redshift,apigateway,sqs,glue,sagemaker,bedrock,stepfunctions,sns,wafv2,cognito,acm,kinesis,firehose,ecr,backup,ecs,route53,secretsmanager,eventbridge,config,ssm,codebuild,accessanalyzer,securityhub,inspector,athena,appsync,emr,cloudformation,networkfirewall,codepipeline,codeartifact,codecommit,codedeploy,transfer,dms,vpclattice,fsx,resiliencehub,drs,arc,fis,verifiedpermissions",
             "help": "--services ec2,iam"
         },
         "debug": {

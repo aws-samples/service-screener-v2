@@ -3,7 +3,7 @@ from services.Evaluator import Evaluator
 
 class ConfigCommon(Evaluator):
     """
-    All 12 AWS Config checks.
+    All AWS Config checks (account/region scoped).
 
     AWS Config has no per-resource fan-out: at most one customer-managed
     configuration recorder and one delivery channel exist per account per region.
@@ -15,7 +15,7 @@ class ConfigCommon(Evaluator):
         '_region', '_accountId', '_recorders', '_recorderStatus',
         '_deliveryChannels', '_configRules', '_compliance',
         '_retentionConfigurations', '_aggregators', '_nonCompliantRules',
-        '_remediationConfigurations', '_keyResourceTypes'
+        '_remediationConfigurations', '_keyResourceTypes', '_errors'
       configClient -- boto3 config client (kept for future extension).
 
     Status contract (services/Evaluator.py): -1 = FAIL, 1 = PASS, 0 = INFO /
@@ -39,6 +39,60 @@ class ConfigCommon(Evaluator):
     ## How many names to name explicitly in a finding message before truncating.
     MAX_NAMES_IN_MESSAGE = 5
 
+    ## AWS managed rule identifiers (Source.SourceIdentifier) that evaluate a
+    ## core data-protection control: encryption at rest, encryption in transit,
+    ## key hygiene, or public exposure of stored data. Identifiers verified
+    ## against https://docs.aws.amazon.com/config/latest/developerguide/managed-rules-by-aws-config.html.
+    ## Rules deployed by conformance packs and Security Hub service-linked rules
+    ## are returned by describe_config_rules with the same SourceIdentifier, so
+    ## they are recognised too.
+    DATA_PROTECTION_RULE_IDENTIFIERS = frozenset([
+        ## Encryption at rest
+        'S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED',
+        'S3_DEFAULT_ENCRYPTION_KMS',
+        'ENCRYPTED_VOLUMES',
+        'EC2_EBS_ENCRYPTION_BY_DEFAULT',
+        'RDS_STORAGE_ENCRYPTED',
+        'RDS_SNAPSHOT_ENCRYPTED',
+        'DYNAMODB_TABLE_ENCRYPTED_KMS',
+        'EFS_ENCRYPTED_CHECK',
+        'EFS_FILESYSTEM_CT_ENCRYPTED',
+        'ELASTICSEARCH_ENCRYPTED_AT_REST',
+        'OPENSEARCH_ENCRYPTED_AT_REST',
+        'REDSHIFT_CLUSTER_KMS_ENABLED',
+        'SNS_ENCRYPTED_KMS',
+        'CLOUD_TRAIL_ENCRYPTION_ENABLED',
+        'CLOUDWATCH_LOG_GROUP_ENCRYPTED',
+        'KINESIS_STREAM_ENCRYPTED',
+        'SAGEMAKER_NOTEBOOK_INSTANCE_KMS_KEY_CONFIGURED',
+        'DAX_ENCRYPTION_ENABLED',
+        'BACKUP_RECOVERY_POINT_ENCRYPTED',
+        'EKS_SECRETS_ENCRYPTED',
+        'API_GW_CACHE_ENABLED_AND_ENCRYPTED',
+        'ELASTICACHE_REPL_GRP_ENCRYPTED_AT_REST',
+        'SECRETSMANAGER_USING_CMK',
+        ## Encryption in transit
+        'S3_BUCKET_SSL_REQUESTS_ONLY',
+        'ALB_HTTP_TO_HTTPS_REDIRECTION_CHECK',
+        'ELB_TLS_HTTPS_LISTENERS_ONLY',
+        'ELASTICSEARCH_NODE_TO_NODE_ENCRYPTION_CHECK',
+        'OPENSEARCH_HTTPS_REQUIRED',
+        'REDSHIFT_REQUIRE_TLS_SSL',
+        'API_GW_SSL_ENABLED',
+        'ELASTICACHE_REPL_GRP_ENCRYPTED_IN_TRANSIT',
+        ## Key management
+        'CMK_BACKING_KEY_ROTATION_ENABLED',
+        ## Public exposure of stored data
+        'S3_BUCKET_PUBLIC_READ_PROHIBITED',
+        'S3_BUCKET_PUBLIC_WRITE_PROHIBITED',
+        'S3_BUCKET_LEVEL_PUBLIC_ACCESS_PROHIBITED',
+        'S3_ACCOUNT_LEVEL_PUBLIC_ACCESS_BLOCKS',
+        'S3_ACCOUNT_LEVEL_PUBLIC_ACCESS_BLOCKS_PERIODIC',
+        'RDS_INSTANCE_PUBLIC_ACCESS_CHECK',
+        'RDS_SNAPSHOTS_PUBLIC_PROHIBITED',
+        'EBS_SNAPSHOT_PUBLIC_RESTORABLE_CHECK',
+    ])
+
     def __init__(self, detail, configClient):
         super().__init__()
         self.detail = detail
@@ -57,6 +111,8 @@ class ConfigCommon(Evaluator):
         self.nonCompliantRules = detail.get('_nonCompliantRules') or []
         self.remediationConfigurations = detail.get('_remediationConfigurations') or []
         self.keyResourceTypes = detail.get('_keyResourceTypes') or []
+        ## {api_name: error_code} for read calls that failed during hydration.
+        self.errors = detail.get('_errors') or {}
 
         ## The customer-managed recorder, if any. AWS permits only one per
         ## account per region, so index 0 is the whole story.
@@ -264,6 +320,8 @@ class ConfigCommon(Evaluator):
     # 7. No Config rules at all
     # ------------------------------------------------------------------ #
     def _checkConfigNoRules(self):
+        if self._rulesUnreadable('configNoRules'):
+            return
         if not self.configRules:
             self.results['configNoRules'] = [
                 -1,
@@ -290,6 +348,14 @@ class ConfigCommon(Evaluator):
     # 8. Rules reporting NON_COMPLIANT
     # ------------------------------------------------------------------ #
     def _checkConfigRulesNonCompliant(self):
+        if self._rulesUnreadable('configRulesNonCompliant'):
+            return
+        if 'describe_compliance_by_config_rule' in self.errors:
+            self.results['configRulesNonCompliant'] = [
+                0, "Unable to evaluate ({})".format(
+                    self.errors['describe_compliance_by_config_rule'])
+            ]
+            return
         if not self.configRules:
             self.results['configRulesNonCompliant'] = [
                 0, "No Config rules — see configNoRules"
@@ -363,6 +429,13 @@ class ConfigCommon(Evaluator):
             ## finding — the check is scoped to non-compliant rules.
             self.results['configNoRemediationActions'] = [
                 0, "No NON_COMPLIANT rule — remediation actions not applicable"
+            ]
+            return
+
+        if 'describe_remediation_configurations' in self.errors:
+            self.results['configNoRemediationActions'] = [
+                0, "Unable to evaluate ({})".format(
+                    self.errors['describe_remediation_configurations'])
             ]
             return
 
@@ -459,8 +532,156 @@ class ConfigCommon(Evaluator):
             ]
 
     # ------------------------------------------------------------------ #
+    # 13. No rule evaluates in PROACTIVE mode
+    # ------------------------------------------------------------------ #
+    def _checkConfigNoProactiveRules(self):
+        """
+        Proactive evaluation lets AWS Config assess a resource configuration
+        BEFORE it is provisioned (StartResourceEvaluation / CloudFormation
+        hooks). A rule only does so when its EvaluationModes include
+        Mode=PROACTIVE; describe_config_rules returns that list per rule. When
+        no rule exists at all, configNoRules already reports it, so this check
+        stays at 0 rather than double-reporting.
+        """
+        key = 'configNoProactiveRules'
+        if self._rulesUnreadable(key):
+            return
+        active = self._activeRules()
+        if not active:
+            self.results[key] = [0, "No active Config rules — see configNoRules"]
+            return
+
+        proactive = [
+            r.get('ConfigRuleName', 'unknown') for r in active
+            if any((m or {}).get('Mode') == 'PROACTIVE'
+                   for m in (r.get('EvaluationModes') or []))
+        ]
+        if proactive:
+            self.results[key] = [
+                1, f"{len(proactive)} of {len(active)} active rule(s) evaluate in "
+                   "PROACTIVE mode: " + self._joinNames(proactive)
+            ]
+        else:
+            self.results[key] = [
+                -1, f"None of the {len(active)} active Config rule(s) has "
+                    "EvaluationModes containing PROACTIVE — resources are only "
+                    "evaluated after they are deployed"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 14. No rule covers a core data-protection control
+    # ------------------------------------------------------------------ #
+    def _checkConfigDataProtectionRulesMissing(self):
+        """
+        Heuristic: look for at least one active AWS managed rule whose
+        SourceIdentifier is a recognised data-protection control (encryption at
+        rest / in transit, key rotation, public data exposure). Conformance-pack
+        and Security Hub service-linked rules are included because they are
+        returned by describe_config_rules. Custom rules (CUSTOM_LAMBDA /
+        CUSTOM_POLICY) cannot be classified from metadata, so when they exist and
+        no recognised managed rule does, the result is 0 (review) rather than a
+        possibly false FAIL.
+        """
+        key = 'configDataProtectionRulesMissing'
+        if self._rulesUnreadable(key):
+            return
+        active = self._activeRules()
+        if not active:
+            self.results[key] = [0, "No active Config rules — see configNoRules"]
+            return
+
+        matched = []
+        custom = []
+        for r in active:
+            src = r.get('Source') or {}
+            owner = src.get('Owner')
+            ident = (src.get('SourceIdentifier') or '').upper()
+            if owner == 'AWS' and ident in self.DATA_PROTECTION_RULE_IDENTIFIERS:
+                matched.append(r.get('ConfigRuleName', ident))
+            elif owner in ('CUSTOM_LAMBDA', 'CUSTOM_POLICY'):
+                custom.append(r.get('ConfigRuleName', 'unknown'))
+
+        if matched:
+            self.results[key] = [
+                1, f"{len(matched)} active rule(s) evaluate data-protection "
+                   "controls: " + self._joinNames(matched)
+            ]
+        elif custom:
+            self.results[key] = [
+                0, f"No recognised AWS managed data-protection rule; "
+                   f"{len(custom)} custom rule(s) may cover it — review: "
+                   + self._joinNames(custom)
+            ]
+        else:
+            self.results[key] = [
+                -1, f"None of the {len(active)} active Config rule(s) evaluates "
+                    "encryption at rest, encryption in transit, key rotation or "
+                    "public data exposure"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 15. Every remediation configuration is manual
+    # ------------------------------------------------------------------ #
+    def _checkConfigRemediationManualOnly(self):
+        """
+        Remediation configurations exist but none has Automatic=True, so every
+        correction still waits for a human to trigger it. When no remediation
+        configuration exists at all this check stays at 0 (the missing case is
+        configNoRemediationActions' finding).
+        """
+        key = 'configRemediationManualOnly'
+        if self._rulesUnreadable(key):
+            return
+        if 'describe_remediation_configurations' in self.errors:
+            self.results[key] = [
+                0, "Unable to evaluate ({})".format(
+                    self.errors['describe_remediation_configurations'])
+            ]
+            return
+        if not self.remediationConfigurations:
+            self.results[key] = [
+                0, "No remediation configurations — see configNoRemediationActions"
+            ]
+            return
+
+        automatic = [
+            r.get('ConfigRuleName', 'unknown')
+            for r in self.remediationConfigurations
+            if r.get('Automatic') is True
+        ]
+        if automatic:
+            self.results[key] = [
+                1, f"{len(automatic)} of {len(self.remediationConfigurations)} "
+                   "remediation configuration(s) run automatically: "
+                   + self._joinNames(automatic)
+            ]
+        else:
+            names = [r.get('ConfigRuleName', 'unknown')
+                     for r in self.remediationConfigurations]
+            self.results[key] = [
+                -1, f"All {len(names)} remediation configuration(s) are manual "
+                    "(Automatic=False): " + self._joinNames(names)
+            ]
+
+    # ------------------------------------------------------------------ #
     # Helpers
     # ------------------------------------------------------------------ #
+    def _rulesUnreadable(self, key):
+        """Record 'Unable to evaluate' when describe_config_rules failed, so an
+        unreadable rule list is never mistaken for an empty one."""
+        code = self.errors.get('describe_config_rules')
+        if code:
+            self.results[key] = [0, f"Unable to evaluate ({code})"]
+            return True
+        return False
+
+    def _activeRules(self):
+        ## EVALUATING is a transient state of a live rule; DELETING* are not.
+        return [
+            r for r in self.configRules
+            if r.get('ConfigRuleState', 'ACTIVE') in ('ACTIVE', 'EVALUATING')
+        ]
+
     def _recordingStrategy(self):
         return (self.recordingGroup.get('recordingStrategy') or {}).get('useOnly')
 

@@ -82,7 +82,9 @@ class StepfunctionsCommon(Evaluator):
         findings = _inspectRoleForBroadPolicies(
             self.iamClient, roleName, self.BROAD_ACTIONS
         )
-        if findings:
+        if findings is None:
+            self.results['sfnRoleOverprivileged'] = [0, "Unable to evaluate (IAM role policies not readable)"]
+        elif findings:
             self.results['sfnRoleOverprivileged'] = [
                 -1, "Overly permissive: " + "; ".join(findings)
             ]

@@ -1,0 +1,38 @@
+{
+    "drsNoRecentDrill": {
+        "category": "R",
+        "^description": "{$COUNT} region(s) have AWS Elastic Disaster Recovery source servers, protected for more than 90 days, with no successful recovery drill launched in the last 90 days. Replication alone does not prove that a server can be recovered: launch templates, networking, licensing, boot conversion and application start-up only get exercised when a drill instance is launched. Run non-disruptive drills regularly and after significant changes, then terminate the drill instances.",
+        "shortDesc": "Run DRS recovery drills at least every 90 days",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 1,
+        "ref": [
+            "[Preparing for recovery (recovery drills)]<https://docs.aws.amazon.com/drs/latest/userguide/preparing-failover.html>",
+            "[Recovery job history]<https://docs.aws.amazon.com/drs/latest/userguide/recovery-job.html>",
+            "[REL13-BP03 Test disaster recovery implementation to validate the implementation]<https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_planning_for_recovery_dr_tested.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/drs/latest/userguide/preparing-failover.html"
+    },
+    "drsReplicationUnhealthy": {
+        "category": "R",
+        "^description": "{$COUNT} AWS Elastic Disaster Recovery source server(s) are not replicating healthily: replication is stalled, paused, stopped or disconnected, reports a replication error, or lags by more than one hour. While replication is unhealthy the latest recovery point ages, so a recovery would lose more data than the intended RPO, or may not be possible at all. Resolve the replication error shown for the server.",
+        "shortDesc": "Keep DRS source server replication healthy",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Troubleshooting replication errors]<https://docs.aws.amazon.com/drs/latest/userguide/troubleshooting-replication.html>",
+            "[View server details with AWS DRS]<https://docs.aws.amazon.com/drs/latest/userguide/server-details.html>",
+            "[AWS DRS recovery dashboard]<https://docs.aws.amazon.com/drs/latest/userguide/recovery-dashboard.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/drs/latest/userguide/troubleshooting-replication.html"
+    }
+}

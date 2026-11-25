@@ -1,12 +1,18 @@
 import boto3, botocore
 import datetime
+import json
+import urllib.parse
 from dateutil.tz import tzlocal
+from dateutil.parser import parse
 
 from .IamCommon import IamCommon
+from . import IamPolicyHelpers
  
 class IamUser(IamCommon):
     ENUM_NO_INFO = ['not_supported', 'no_information']
-    
+    ACCESS_KEY_UNUSED_DAYS = 90
+    ACCESS_KEY_NEVER_USED_GRACE_DAYS = 7
+
     BEDROCK_API_KEY_USER_PREFIX = 'bedrockapikey'
 
     def __init__(self, user, iamClient, authDetails=None, policyDocumentMap=None, bedrockCredentialMap=None):
@@ -77,7 +83,9 @@ class IamUser(IamCommon):
                 self.results['userNotUsingGroup'] = [-1, '-']
         else:
             try:
-                resp = self.iamClient.list_groups_for_user(UserName=user)
+                # First page of the list_groups_for_user paginator (same request),
+                # shared with _userPolicyDocs().
+                resp = next(self._pages(self.iamClient, 'list_groups_for_user', UserName=user))
                 groups = resp.get('Groups')
                 if not groups:
                     self.results['userNotUsingGroup'] = [-1, '-']
@@ -98,11 +106,12 @@ class IamUser(IamCommon):
                 self.evaluateInlinePolicyFromDocs(inlinePolicies)
         else:
             try:
-                resp = self.iamClient.list_attached_user_policies(UserName=user)
+                # First pages of the paginators shared with _userPolicyDocs() (same requests).
+                resp = next(self._pages(self.iamClient, 'list_attached_user_policies', UserName=user))
                 policies = resp.get('AttachedPolicies')
                 self.evaluateManagePolicy(policies)
                 
-                resp = self.iamClient.list_user_policies(UserName=user)
+                resp = next(self._pages(self.iamClient, 'list_user_policies', UserName=user))
                 inlinePolicies = resp.get('PolicyNames')
                 self.evaluateInlinePolicy(inlinePolicies, user, 'user')
             except botocore.exceptions.ClientError as e:
@@ -162,6 +171,86 @@ class IamUser(IamCommon):
             if daysAccesskey >= 90 and daySinceLastLogin >= 90:
                 self.results['userNoActivity90days'] = [-1, '']
 
+    def _isCredentialReportRow(self):
+        # Placeholder rows built for Bedrock API key users missing from the
+        # credential report carry no real credential data - never evaluate them.
+        return 'user_creation_time' in self.user and self.user['user'] != '<root_account>'
+
+    @staticmethod
+    def _reportDate(value):
+        if not value or value in ('N/A', 'not_supported', 'no_information'):
+            return None
+        try:
+            dt = parse(value)
+        except (ValueError, OverflowError, TypeError):
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=datetime.timezone.utc)
+        return dt
+
+    def _checkIamActiveKeyUnused(self):
+        """Each active access key must have been used in the last
+        ACCESS_KEY_UNUSED_DAYS days; a key never used must not be older than
+        ACCESS_KEY_NEVER_USED_GRACE_DAYS. Evaluated per key, independently of
+        console activity (userNoActivity90days covers fully dormant users)."""
+        if not self._isCredentialReportRow():
+            return
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        activeKeys = 0
+        stale = []
+        unknown = []
+        for n in ('1', '2'):
+            if self.user.get('access_key_{}_active'.format(n)) != 'true':
+                continue
+            activeKeys += 1
+            lastUsedRaw = self.user.get('access_key_{}_last_used_date'.format(n), 'N/A')
+            lastUsed = self._reportDate(lastUsedRaw)
+            created = self._reportDate(self.user.get('access_key_{}_last_rotated'.format(n)))
+            if lastUsed is not None:
+                days = (now - lastUsed).days
+                if days > self.ACCESS_KEY_UNUSED_DAYS:
+                    stale.append('access key {}: last used {} days ago'.format(n, days))
+            elif lastUsedRaw == 'N/A' and created is not None:
+                days = (now - created).days
+                if days > self.ACCESS_KEY_NEVER_USED_GRACE_DAYS:
+                    stale.append('access key {}: never used, created {} days ago'.format(n, days))
+            else:
+                unknown.append('access key {}'.format(n))
+
+        if activeKeys == 0:
+            return
+        if stale:
+            self.results['iamActiveKeyUnused'] = [-1, '<br>'.join(stale)]
+        elif unknown:
+            self.results['iamActiveKeyUnused'] = [0, 'Unable to evaluate (no usable last-used/created date for {})'.format(', '.join(unknown))]
+        else:
+            self.results['iamActiveKeyUnused'] = [1, '{} active key(s), each used in the last {} days or created in the last {} days'.format(
+                activeKeys, self.ACCESS_KEY_UNUSED_DAYS, self.ACCESS_KEY_NEVER_USED_GRACE_DAYS)]
+
+    def _checkIamUserHumanAndMachineCreds(self):
+        """A user with both a console password and an active access key mixes
+        human and programmatic credentials on one identity."""
+        if not self._isCredentialReportRow():
+            return
+
+        activeKeys = [n for n in ('1', '2') if self.user.get('access_key_{}_active'.format(n)) == 'true']
+        if self.user.get('password_enabled') == 'true' and activeKeys:
+            self.results['iamUserHumanAndMachineCreds'] = [-1, 'Console password and active access key(s) {}'.format(', '.join(activeKeys))]
+        else:
+            self.results['iamUserHumanAndMachineCreds'] = [1, 'Single credential type']
+
+    def _checkIamUserTwoActiveKeys(self):
+        """CIS 1.13: an IAM user should have at most one active access key.
+        Two active keys are expected only briefly during a rotation."""
+        if not self._isCredentialReportRow():
+            return
+        active = [n for n in ('1', '2') if self.user.get('access_key_{}_active'.format(n)) == 'true']
+        if len(active) == 2:
+            self.results['iamUserTwoActiveKeys'] = [-1, 'Access keys 1 and 2 are both active']
+        elif active:
+            self.results['iamUserTwoActiveKeys'] = [1, 'One active access key']
+
     def _checkBedrockLongTermApiKey(self):
         user = self.user['user']
         if user == '<root_account>':
@@ -202,3 +291,207 @@ class IamUser(IamCommon):
         self.results['bedrockLongTermApiKey'] = [-1, '; '.join(details)]
         if noExpiry > 0:
             self.results['bedrockApiKeyNoExpiry'] = [-1, '{} active key(s) without expiry'.format(noExpiry)]
+
+    # ------------------------------------------------------------------ #
+    # WAFS2027 identity checks (chunk 3)
+    # ------------------------------------------------------------------ #
+    # Tag an IAM user with this key (any value except "false") to record an
+    # approved exception for iamUserLongTermAccessKey.
+    LONG_TERM_KEY_EXCEPTION_TAG = 'ServiceScreener:LongTermKeyException'
+
+    def _activeAccessKeys(self):
+        return [n for n in ('1', '2') if self.user.get('access_key_{}_active'.format(n)) == 'true']
+
+    def _userTags(self):
+        """(tags, error) for the user: prefetched authorization details first,
+        list_user_tags otherwise."""
+        if self._prefetchedUserDetail is not None:
+            return self._prefetchedUserDetail.get('Tags', []) or [], None
+        tags = []
+        try:
+            for page in self.iamClient.get_paginator('list_user_tags').paginate(UserName=self.user['user']):
+                tags.extend(page.get('Tags', []))
+        except botocore.exceptions.ClientError as e:
+            return [], e.response['Error']['Code']
+        return tags, None
+
+    def _checkIamUserLongTermAccessKey(self):
+        """Non-root IAM user with an active long-term access key. Workloads
+        should use IAM roles (instance profiles, task roles, IAM Roles
+        Anywhere) and people should use federation / IAM Identity Center."""
+        if not self._isCredentialReportRow():
+            return
+        active = self._activeAccessKeys()
+        if not active:
+            return
+        key = 'iamUserLongTermAccessKey'
+        kind = ('console + programmatic user' if self.user.get('password_enabled') == 'true'
+                else 'programmatic-only user (machine identity)')
+        tags, err = self._userTags()
+        for t in tags:
+            if t.get('Key') == self.LONG_TERM_KEY_EXCEPTION_TAG and str(t.get('Value', '')).strip().lower() != 'false':
+                self.results[key] = [0, 'Exception recorded by tag {}={} ({}, active key(s) {})'.format(
+                    t.get('Key'), t.get('Value', ''), kind, ', '.join(active))]
+                return
+        note = ' (tags not readable: {})'.format(err) if err else ''
+        self.results[key] = [-1, '{} with active access key(s) {}{}'.format(kind, ', '.join(active), note)]
+
+    def _userPolicyDocs(self):
+        """(docs, unreadable) - identity policies that apply to the user
+        (inline, attached, and those of its groups)."""
+        detail = self._prefetchedUserDetail
+        docs, unreadable = [], []
+        attached = []
+        if detail is not None:
+            docs.extend(p.get('PolicyDocument') for p in detail.get('UserPolicyList', []) or [])
+            attached.extend(detail.get('AttachedManagedPolicies', []) or [])
+            groupsByName = {g.get('GroupName'): g for g in (self._authDetails or {}).get('groups', [])}
+            for gname in detail.get('GroupList', []) or []:
+                g = groupsByName.get(gname)
+                if g is None:
+                    unreadable.append('group {}'.format(gname))
+                    continue
+                docs.extend(p.get('PolicyDocument') for p in g.get('GroupPolicyList', []) or [])
+                attached.extend(g.get('AttachedManagedPolicies', []) or [])
+        else:
+            user = self.user['user']
+            try:
+                for page in self._pages(self.iamClient, 'list_user_policies', UserName=user):
+                    for name in page.get('PolicyNames', []):
+                        docs.append(self._inlinePolicy('user', user, name)['PolicyDocument'])
+                for page in self._pages(self.iamClient, 'list_attached_user_policies', UserName=user):
+                    attached.extend(page.get('AttachedPolicies', []))
+                for page in self._pages(self.iamClient, 'list_groups_for_user', UserName=user):
+                    for g in page.get('Groups', []):
+                        gname = g['GroupName']
+                        for gp in self.iamClient.get_paginator('list_group_policies').paginate(GroupName=gname):
+                            for name in gp.get('PolicyNames', []):
+                                docs.append(self.iamClient.get_group_policy(GroupName=gname, PolicyName=name)['PolicyDocument'])
+                        for gp in self.iamClient.get_paginator('list_attached_group_policies').paginate(GroupName=gname):
+                            attached.extend(gp.get('AttachedPolicies', []))
+            except botocore.exceptions.ClientError as e:
+                return None, [e.response['Error']['Code']]
+
+        seen = set()
+        for p in attached:
+            arn = p.get('PolicyArn')
+            if not arn or arn in seen:
+                continue
+            seen.add(arn)
+            doc = self._policyDocumentMap.get(arn)
+            if doc is None:
+                try:
+                    ver = self._iamPolicy(arn)['Policy']['DefaultVersionId']
+                    doc = self._iamPolicyVersion(arn, ver)['PolicyVersion']['Document']
+                except (botocore.exceptions.ClientError, KeyError):
+                    unreadable.append(p.get('PolicyName') or arn)
+                    continue
+            docs.append(doc)
+        return docs, unreadable
+
+    def _permissionsBoundary(self):
+        if self._prefetchedUserDetail is not None:
+            return (self._prefetchedUserDetail.get('PermissionsBoundary') or {}).get('PermissionsBoundaryArn'), None
+        try:
+            user = self.iamClient.get_user(UserName=self.user['user'])['User']
+        except botocore.exceptions.ClientError as e:
+            return None, e.response['Error']['Code']
+        return (user.get('PermissionsBoundary') or {}).get('PermissionsBoundaryArn'), None
+
+    @staticmethod
+    def _parseDoc(doc):
+        """Policy document as a dict (JSON / URL-encoded JSON strings
+        accepted), or None when it cannot be parsed."""
+        if isinstance(doc, dict):
+            return doc
+        if isinstance(doc, (str, bytes)):
+            if isinstance(doc, bytes):
+                doc = doc.decode('utf-8', 'replace')
+            for text in (doc, urllib.parse.unquote(doc)):
+                try:
+                    parsed = json.loads(text)
+                except (ValueError, TypeError):
+                    continue
+                if isinstance(parsed, dict):
+                    return parsed
+        return None
+
+    def _boundaryDocument(self, arn):
+        """(document, errorCode) of the permissions boundary policy."""
+        doc = self._policyDocumentMap.get(arn)
+        if doc is None:
+            try:
+                ver = self._iamPolicy(arn)['Policy']['DefaultVersionId']
+                doc = self._iamPolicyVersion(arn, ver)['PolicyVersion']['Document']
+            except botocore.exceptions.ClientError as e:
+                return None, e.response['Error']['Code']
+            except KeyError:
+                return None, 'NoDefaultVersion'
+        parsed = self._parseDoc(doc)
+        if parsed is None:
+            return None, 'unparseable document'
+        return parsed, None
+
+    def _checkLongTermKeyNotContained(self):
+        """A user that keeps an active access key should limit where the key
+        can be used: a permissions boundary or identity policies that only
+        allow requests from known networks (aws:SourceIp / aws:SourceVpc /
+        aws:SourceVpce / aws:VpcSourceIp). Effective permissions are the
+        intersection of the boundary and the identity policies, so either one
+        being network-contained contains the key. A boundary is read and
+        evaluated like the identity policies - its mere presence (e.g.
+        AdministratorAccess as boundary) contains nothing. SCP/RCP network
+        perimeters are not visible from here."""
+        if not self._isCredentialReportRow():
+            return
+        active = self._activeAccessKeys()
+        if not active:
+            return
+        key = 'longTermKeyNotContained'
+        boundary, err = self._permissionsBoundary()
+        if err:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(err)]
+            return
+        boundaryName = boundary.split('/')[-1] if boundary else None
+        boundaryErr, boundaryReason = None, None
+        if boundary:
+            bdoc, boundaryErr = self._boundaryDocument(boundary)
+            if bdoc is not None:
+                bContained, bReason = IamPolicyHelpers.networkContainment([bdoc])
+                if bContained:
+                    self.results[key] = [1, 'Permissions boundary {}: {}'.format(boundaryName, bReason)]
+                    return
+                if bContained is None:
+                    self.results[key] = [1, 'Active key(s) {}, but permissions boundary {} grants no permissions'.format(
+                        ', '.join(active), boundaryName)]
+                    return
+                boundaryReason = 'permissions boundary {} has no network restriction ({})'.format(boundaryName, bReason)
+
+        docs, unreadable = self._userPolicyDocs()
+        if docs is None:
+            self.results[key] = [0, 'Unable to evaluate ({})'.format(', '.join(unreadable))]
+            return
+        parsedDocs = []
+        for d in docs:
+            pd = self._parseDoc(d)
+            if pd is None:
+                unreadable.append('unparseable policy document')
+            else:
+                parsedDocs.append(pd)
+        contained, reason = IamPolicyHelpers.networkContainment(parsedDocs)
+        # A Deny guard holds whatever an unreadable policy allows; "every
+        # Allow is network-restricted" cannot be proven with one unread.
+        denyGuard = any(IamPolicyHelpers.isNetworkDenyGuard(st) for d in parsedDocs
+                        for st in IamPolicyHelpers.PolicyPrincipal.iterStatements(d))
+        if contained and (denyGuard or not unreadable):
+            self.results[key] = [1, 'Identity policies: {}'.format(reason)]
+        elif boundaryErr:
+            self.results[key] = [0, 'Unable to evaluate (permissions boundary {} not readable: {})'.format(
+                boundaryName, boundaryErr)]
+        elif unreadable:
+            self.results[key] = [0, 'Unable to evaluate (policy not readable: {})'.format(', '.join(unreadable))]
+        elif contained is None:
+            self.results[key] = [1, 'Active key(s) {}, but identity policies {}'.format(', '.join(active), reason)]
+        else:
+            self.results[key] = [-1, 'Active key(s) {}: {}; identity policies: {}'.format(
+                ', '.join(active), boundaryReason or 'no permissions boundary', reason)]

@@ -1,4 +1,5 @@
 import botocore
+import botocore.config
 
 from utils.Tools import _pi
 from utils.Config import Config
@@ -198,7 +199,189 @@ class Eventbridge(Service):
             '_endpoints': self._listEndpoints(),
             '_discoverers': discoverers,
             '_discovererLookupFailed': self._discovererLookupFailed,
+            '_routing': self._getRoutingDetail(),
         }
+
+    # ------------------------------------------------------------------ #
+    # Event routing (securityFindingsNotRouted / healthEventsNotRouted)
+    # ------------------------------------------------------------------ #
+    def _getRoutingDetail(self):
+        """
+        Default-bus rules that route security findings or AWS Health events,
+        plus the enrichment needed to suppress member-account false positives.
+        All calls are read-only. Lookup failures are recorded as error codes so
+        the checks can report 'Unable to evaluate' instead of a false PASS/FAIL.
+        """
+        sources = list(EventbridgeRegional.SECURITY_SOURCES) + [EventbridgeRegional.HEALTH_SOURCE]
+        routing = {'_region': self.region}
+        routing['regionRules'], routing['regionError'] = self._listRoutingRules(self.ebClient, sources)
+
+        ## Global AWS Health events (IAM, CloudFront, Route 53, ...) are only
+        ## delivered to the default bus of the partition's global-event Region
+        ## (us-east-1, us-gov-west-1 for GovCloud, cn-north-1 for China).
+        globalRegion = self.healthGlobalRegion(self.region)
+        routing['_globalRegion'] = globalRegion
+        if globalRegion is None:
+            routing['globalRules'], routing['globalError'] = [], 'UnknownPartition'
+        elif self.region != globalRegion:
+            try:
+                globalClient = self.ssBoto.client(
+                    'events', region_name=globalRegion, config=self.bConfig.merge(botocore.config.Config(region_name=globalRegion)))
+                routing['globalRules'], routing['globalError'] = self._listRoutingRules(
+                    globalClient, [EventbridgeRegional.HEALTH_SOURCE])
+            except Exception as e:
+                routing['globalRules'], routing['globalError'] = [], type(e).__name__
+        else:
+            routing['globalRules'], routing['globalError'] = routing['regionRules'], routing['regionError']
+
+        errors = []
+        routing['guardDutyAdmin'] = self._guardDutyAdministrator(errors)
+        routing['securityHubAdmin'] = self._securityHubAdministrator(errors)
+        routing['securityHubAggregation'] = self._securityHubAggregationRegion(errors)
+        ## Membership / aggregation could not be read: a missing local route is then
+        ## not proof that findings reach no responder (INFO, not FAIL).
+        routing['enrichmentErrors'] = errors
+        return routing
+
+    ## Partition -> Region where AWS Health delivers global events.
+    HEALTH_GLOBAL_REGION = {'aws': 'us-east-1', 'aws-us-gov': 'us-gov-west-1', 'aws-cn': 'cn-north-1'}
+
+    @classmethod
+    def healthGlobalRegion(cls, region):
+        """Global-event Region of the partition `region` belongs to; None when unknown
+        (ISO partitions), so the caller reports 'Unable to evaluate' rather than guess."""
+        region = region or ''
+        if region.startswith('us-gov-'):
+            partition = 'aws-us-gov'
+        elif region.startswith('cn-'):
+            partition = 'aws-cn'
+        elif '-iso' in region:
+            partition = None
+        else:
+            partition = 'aws'
+        return cls.HEALTH_GLOBAL_REGION.get(partition)
+
+    def _listRoutingRules(self, client, sources):
+        """
+        Return ([{Name, State, sources, targetCount}], errorCode) for every
+        default-bus rule whose EventPattern matches at least one of `sources`.
+        Targets are only listed for matching rules, keeping the cost low.
+        """
+        out = []
+        try:
+            paginator = client.get_paginator('list_rules')
+            rules = []
+            for page in paginator.paginate(EventBusName='default'):
+                rules += page.get('Rules', []) or []
+        except botocore.exceptions.ClientError as e:
+            return [], e.response.get('Error', {}).get('Code', 'ClientError')
+        except botocore.exceptions.BotoCoreError as e:
+            return [], type(e).__name__
+
+        for rule in rules:
+            name = rule.get('Name')
+            pattern = rule.get('EventPattern')
+            if not name or not pattern:
+                continue
+            matched = [s for s in sources if EventbridgeRegional.patternMatchesSource(pattern, s)]
+            if not matched:
+                continue
+            targetCount = 0
+            try:
+                paginator = client.get_paginator('list_targets_by_rule')
+                for page in paginator.paginate(Rule=name, EventBusName='default'):
+                    targetCount += len(page.get('Targets', []) or [])
+            except botocore.exceptions.ClientError as e:
+                code = e.response.get('Error', {}).get('Code', 'ClientError')
+                if code != 'ResourceNotFoundException':
+                    return [], code
+                continue
+            out.append({'Name': name, 'State': rule.get('State'),
+                        'sources': matched, 'targetCount': targetCount})
+        return out, None
+
+    @staticmethod
+    def _enrichErr(e):
+        if isinstance(e, botocore.exceptions.ClientError):
+            return e.response.get('Error', {}).get('Code', 'ClientError')
+        return type(e).__name__
+
+    ## Security Hub answers InvalidAccessException when the account is not subscribed:
+    ## such an account can be neither a member nor part of an aggregation.
+    _SH_NOT_ENABLED = ('InvalidAccessException',)
+
+    def _securityHubNotEnabled(self, sh):
+        """True only when describe_hub proves Security Hub is not enabled here."""
+        try:
+            sh.describe_hub()
+            return False
+        except botocore.exceptions.ClientError as e:
+            return self._enrichErr(e) in self._SH_NOT_ENABLED
+        except Exception:
+            return False
+
+    def _guardDutyAdministrator(self, errors=None):
+        """Administrator account ID when this account is an active GuardDuty member, else None.
+        A read failure is appended to `errors` (enrichment unknown, not 'not a member')."""
+        try:
+            gd = self.ssBoto.client('guardduty', config=self.bConfig)
+            detectorIds = []
+            for page in gd.get_paginator('list_detectors').paginate():
+                detectorIds += page.get('DetectorIds', []) or []
+            for detectorId in detectorIds:
+                admin = gd.get_administrator_account(DetectorId=detectorId).get('Administrator') or {}
+                if admin.get('AccountId') and str(admin.get('RelationshipStatus', '')).lower() == 'enabled':
+                    return admin.get('AccountId')
+        except Exception as e:
+            if errors is not None:
+                errors.append('guardduty: ' + self._enrichErr(e))
+        return None
+
+    def _securityHubAdministrator(self, errors=None):
+        """Administrator account ID when this account is an active Security Hub member, else None."""
+        sh = None
+        try:
+            sh = self.ssBoto.client('securityhub', config=self.bConfig)
+            admin = sh.get_administrator_account().get('Administrator') or {}
+            if admin.get('AccountId') and str(admin.get('MemberStatus', '')).lower() in ('enabled', 'associated'):
+                return admin.get('AccountId')
+        except Exception as e:
+            code = self._enrichErr(e)
+            if code in self._SH_NOT_ENABLED or (sh is not None and self._securityHubNotEnabled(sh)):
+                return None
+            if errors is not None:
+                errors.append('securityhub administrator: ' + code)
+        return None
+
+    def _securityHubAggregationRegion(self, errors=None):
+        """
+        The Security Hub aggregation Region when this Region's findings are
+        aggregated into a different Region, else None.
+        """
+        try:
+            sh = self.ssBoto.client('securityhub', config=self.bConfig)
+            arns = []
+            for page in sh.get_paginator('list_finding_aggregators').paginate():
+                arns += [a.get('FindingAggregatorArn') for a in page.get('FindingAggregators', []) or []]
+            for arn in arns:
+                if not arn:
+                    continue
+                agg = sh.get_finding_aggregator(FindingAggregatorArn=arn)
+                aggRegion = agg.get('FindingAggregationRegion')
+                if not aggRegion or aggRegion == self.region:
+                    continue
+                mode = agg.get('RegionLinkingMode')
+                regions = agg.get('Regions') or []
+                linked = (mode == 'ALL_REGIONS'
+                          or (mode == 'ALL_REGIONS_EXCEPT_SPECIFIED' and self.region not in regions)
+                          or (mode == 'SPECIFIED_REGIONS' and self.region in regions))
+                if linked:
+                    return aggRegion
+        except Exception as e:
+            code = self._enrichErr(e)
+            if code not in self._SH_NOT_ENABLED and errors is not None:
+                errors.append('securityhub aggregation: ' + code)
+        return None
 
     def _listArchives(self):
         archives = []

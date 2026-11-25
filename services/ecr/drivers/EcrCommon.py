@@ -7,7 +7,7 @@ from services.Evaluator import Evaluator
 
 class EcrCommon(Evaluator):
     """
-    All 20 ECR checks.
+    All 21 ECR checks.
 
     Input:
       repo -- dict produced by Ecr.py._hydrateRepo. Keys of interest:
@@ -24,6 +24,10 @@ class EcrCommon(Evaluator):
         '_registryScanningConfig' -- registry scanning config (shared)
         '_replicationRules'       -- replication rules list (shared)
         '_pullThroughCacheRules'  -- pull-through cache rules (shared)
+        '_signingConfig'          -- {'rules': [...]}, {'_missing': True} or
+                                     {'_unreadable': code} (shared)
+        '_notationProfiles'       -- list of active Notation-OCI Signer
+                                     profiles or {'_unreadable': code} (shared)
         '_reportRegistryChecks'   -- True only for the first repo per region
         '_ownAccount'             -- caller account id (str)
       ecrClient -- boto3 ecr client (used for describe_image_scan_findings
@@ -624,6 +628,59 @@ class EcrCommon(Evaluator):
                 f"No image(s) with scan results older than "
                 f"{self.SCAN_FINDINGS_STALE_DAYS}d"
             ]
+
+    # ------------------------------------------------------------------ #
+    # 21. No image signing (ECR managed signing / AWS Signer Notation)
+    # ------------------------------------------------------------------ #
+    def _checkEcrImageSigningNotConfigured(self):
+        key = 'ecrImageSigningNotConfigured'
+        if not self.reportRegistry:
+            self.results[key] = [
+                0, "Registry-level finding — see the first repository in the region"
+            ]
+            return
+
+        signingCfg = self.repo.get('_signingConfig')
+        profiles = self.repo.get('_notationProfiles')
+        if not isinstance(signingCfg, dict):
+            signingCfg = {'_unreadable': 'NotLoaded'}
+        if not isinstance(profiles, (list, dict)):
+            profiles = {'_unreadable': 'NotLoaded'}
+
+        rules = signingCfg.get('rules') or []
+        if rules:
+            self.results[key] = [
+                1, f"ECR managed signing configured with {len(rules)} rule(s)"
+            ]
+            return
+
+        if isinstance(profiles, list) and profiles:
+            names = [p.get('profileName') or p.get('arn') or '?' for p in profiles]
+            self.results[key] = [
+                1,
+                "No ECR managed signing rules, but active AWS Signer Notation-OCI "
+                "profile(s) exist (images may be signed in CI): "
+                + self._truncateList(names)
+            ]
+            return
+
+        # Neither source shows signing. Only FAIL when both were readable.
+        unreadable = []
+        if '_unreadable' in signingCfg:
+            unreadable.append(f"ecr:{signingCfg['_unreadable']}")
+        if isinstance(profiles, dict) and '_unreadable' in profiles:
+            unreadable.append(f"signer:{profiles['_unreadable']}")
+        if unreadable:
+            self.results[key] = [
+                0, f"Unable to evaluate ({', '.join(unreadable)})"
+            ]
+            return
+
+        self.results[key] = [
+            -1,
+            "No ECR managed signing configuration and no active AWS Signer "
+            "Notation-OCI signing profile in this region"
+        ]
 
     # ================================================================== #
     # Helpers

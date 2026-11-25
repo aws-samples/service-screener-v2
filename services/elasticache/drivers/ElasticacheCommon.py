@@ -26,16 +26,23 @@ class ElasticacheCommon(Evaluator):
                                              f"using {self.cluster.get('EngineVersion')}"]
 
     def _checkEncryption(self):
+        # Flags when either in-transit or at-rest encryption is missing; the message names
+        # which one(s), so this single key covers both (WAFS2027 SEC08-BP02 / SEC09-BP02).
         stringBuild = []
         if self.cluster.get('TransitEncryptionEnabled') is not True:
             stringBuild.append('in transit')
         if self.cluster.get('AtRestEncryptionEnabled') is not True:
             stringBuild.append('at rest')
-        
-        ## TODO, need to flag as long as one hit
+
         if len(stringBuild) > 0:
-            self.results['EncInTransitAndRest'] = [-1,
-                                                   f"Not using encryption {' and '.join(stringBuild)}"]
+            msg = f"Not using encryption {' and '.join(stringBuild)}"
+            if self.cluster.get('Engine') == 'memcached' and 'at rest' in stringBuild:
+                msg += (" (node-based Memcached clusters do not support encryption at rest;"
+                        " migrate to ElastiCache Serverless for Memcached, or to Valkey/Redis OSS,"
+                        " to encrypt data at rest)")
+            self.results['EncInTransitAndRest'] = [-1, msg]
+        else:
+            self.results['EncInTransitAndRest'] = [1, 'Encryption in transit and at rest enabled']
 
     def _checkDefaultParamGroup(self):
         if self.cluster.get('CacheParameterGroup').get('CacheParameterGroupName').startswith("default."):

@@ -44,11 +44,11 @@ class Apigateway(Service):
         apis = []
 
         try:
-            apis = self.apiv2Client.get_apis()
-            self.apisv2 = apis.get('Items')
-            while apis.get('position') is not None:
-                apis = self.apiv2Client.get_apis(position=apis.get('position'))
-                self.apisv2 = self.apisv2 + apis.get('Items')
+            ## apigatewayv2 paginates with NextToken (not 'position' as in v1);
+            ## the old loop silently dropped every API after the first page.
+            self.apisv2 = []
+            for page in self.apiv2Client.get_paginator('get_apis').paginate():
+                self.apisv2 = self.apisv2 + page.get('Items', [])
 
         except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']

@@ -5,7 +5,8 @@ from utils.Config import Config
 from datetime import datetime, timezone
     
 class GuarddutyDriver(Evaluator):
-    def __init__(self, detector_id, guardduty_client, region, bedrock_client=None, cloudtrail_client=None):
+    def __init__(self, detector_id, guardduty_client, region, bedrock_client=None, cloudtrail_client=None, detective_client=None,
+                 s3_client=None):
         super().__init__()
         
         self.results = {}
@@ -17,6 +18,8 @@ class GuarddutyDriver(Evaluator):
         self.gd_client = guardduty_client
         self.bedrock_client = bedrock_client
         self.cloudtrail_client = cloudtrail_client
+        self.detective_client = detective_client
+        self.s3_client = s3_client
 
         self._resourceName = detector_id
 
@@ -192,14 +195,20 @@ class GuarddutyDriver(Evaluator):
             return self._detector
         if self._detectorFailed:
             return None
-        try:
-            self._detector = self.gd_client.get_detector(
-                DetectorId=self.detector_id
-            )
-            return self._detector
-        except ClientError:
+
+        def fetch():
+            try:
+                return self.gd_client.get_detector(DetectorId=self.detector_id)
+            except ClientError:
+                return None
+
+        ## Checks run concurrently: _memo makes sure only one thread calls the API.
+        detector = self._memo(('get_detector', self.detector_id), fetch)
+        if detector is None:
             self._detectorFailed = True
-            return None
+        else:
+            self._detector = detector
+        return detector
 
     def _featureStatus(self, name):
         """
@@ -495,6 +504,242 @@ class GuarddutyDriver(Evaluator):
                 "management is off, so coverage depends on manual agent "
                 "deployment"
             ]
+
+    # ------------------------------------------------------------------ #
+    # WAFS2027 checks: findings retention, forensics, org coverage,
+    # investigation and S3 malware scanning.
+    # All calls below are read-only (list/get/describe).
+    # ------------------------------------------------------------------ #
+
+    @staticmethod
+    def _errCode(e):
+        return e.response.get('Error', {}).get('Code', 'Unknown')
+
+    def _listAll(self, fn, listKey, **kwargs):
+        """Manual NextToken pagination for APIs without a boto3 paginator."""
+        items = []
+        params = dict(kwargs)
+        while True:
+            resp = fn(**params)
+            items.extend(resp.get(listKey, []) or [])
+            token = resp.get('NextToken')
+            if not token:
+                break
+            params['NextToken'] = token
+        return items
+
+    def _checkGuardDutyNoFindingsExport(self):
+        key = 'guardDutyNoFindingsExport'
+        ## Member accounts: the administrator aggregates (and typically exports)
+        ## findings, so a missing local destination is not evaluable here.
+        try:
+            admin = (self.gd_client.get_administrator_account(
+                DetectorId=self.detector_id) or {}).get('Administrator') or {}
+            if admin.get('AccountId') and admin.get('RelationshipStatus') == 'Enabled':
+                self.results[key] = [
+                    0, f"Member account of GuardDuty administrator {admin['AccountId']}; "
+                       "findings export is managed by the administrator account"
+                ]
+                return
+        except ClientError:
+            ## Not fatal: carry on and evaluate the local destinations.
+            pass
+
+        try:
+            destinations = self._listAll(self.gd_client.list_publishing_destinations,
+                                         'Destinations', DetectorId=self.detector_id)
+        except ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({self._errCode(e)})"]
+            return
+
+        if not destinations:
+            self.results[key] = [
+                -1, "No findings export (publishing destination) configured; findings are "
+                    "retained by GuardDuty for 90 days only"
+            ]
+            return
+
+        statuses = [d.get('Status') for d in destinations]
+        if 'PUBLISHING' in statuses:
+            self.results[key] = [1, "Findings are exported to an S3 publishing destination"]
+        elif 'PENDING_VERIFICATION' in statuses:
+            self.results[key] = [0, "Publishing destination is pending verification"]
+        else:
+            self.results[key] = [
+                -1, f"Publishing destination(s) exist but are not publishing ({', '.join(sorted(set(map(str, statuses))))})"
+            ]
+
+    def _checkGuardDutyNoSnapshotPreservation(self):
+        key = 'guardDutyNoSnapshotPreservation'
+        if self._getDetector() is None:
+            self.results[key] = [0, "Unable to evaluate (GetDetector failed)"]
+            return
+        status = self._featureStatus('EBS_MALWARE_PROTECTION')
+        if status != 'ENABLED':
+            self.results[key] = [
+                0, f"Malware Protection for EC2 is {status or 'not reported'}; snapshot retention not applicable"
+            ]
+            return
+        try:
+            settings = self.gd_client.get_malware_scan_settings(DetectorId=self.detector_id)
+        except ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({self._errCode(e)})"]
+            return
+        preservation = settings.get('EbsSnapshotPreservation')
+        if preservation == 'RETENTION_WITH_FINDING':
+            self.results[key] = [1, "EBS snapshots are retained when malware is found"]
+        elif preservation is None:
+            self.results[key] = [0, "Unable to evaluate (EbsSnapshotPreservation not reported)"]
+        else:
+            self.results[key] = [
+                -1, f"EbsSnapshotPreservation is {preservation}; snapshots of infected volumes are "
+                    "deleted after the scan and are not available for forensics"
+            ]
+
+    ## Member relationship statuses that are not a coverage gap the admin can fix
+    _MEMBER_STATUS_IGNORED = ('RegionDisabled', 'AccountSuspended')
+
+    def _checkGuardDutyOrgAutoEnableIncomplete(self):
+        key = 'guardDutyOrgAutoEnableIncomplete'
+        try:
+            features = []
+            org = None
+            params = {'DetectorId': self.detector_id}
+            while True:
+                page = self.gd_client.describe_organization_configuration(**params)
+                if org is None:
+                    org = page
+                features.extend(page.get('Features', []) or [])
+                if not page.get('NextToken'):
+                    break
+                params['NextToken'] = page['NextToken']
+        except ClientError as e:
+            code = self._errCode(e)
+            if code in ('BadRequestException',):
+                ## Raised when this account is not the GuardDuty delegated administrator
+                self.results[key] = [0, 'Not evaluable from member account']
+            else:
+                self.results[key] = [0, f"Unable to evaluate ({code})"]
+            return
+
+        issues = []
+        autoMembers = org.get('AutoEnableOrganizationMembers')
+        if autoMembers is None:
+            autoMembers = 'NEW' if org.get('AutoEnable') else 'NONE'
+        if autoMembers != 'ALL':
+            issues.append(f"AutoEnableOrganizationMembers={autoMembers}")
+
+        ## Only flag protections the administrator itself runs: a protection that is
+        ## off everywhere is a deliberate choice reported by the per-feature checks.
+        ## RUNTIME_MONITORING includes EKS runtime coverage and the two cannot both be
+        ## auto-enabled, so EKS_RUNTIME_MONITORING=NONE is fine when the unified one is on.
+        autoByName = {f.get('Name'): f.get('AutoEnable') for f in features}
+        noAuto = []
+        for f in features:
+            name = f.get('Name')
+            if name == 'EKS_RUNTIME_MONITORING' and autoByName.get('RUNTIME_MONITORING') in ('NEW', 'ALL'):
+                continue
+            if f.get('AutoEnable') == 'NONE' and self._featureStatus(name) == 'ENABLED':
+                noAuto.append(name)
+        if noAuto:
+            issues.append(f"protections enabled here but not auto-enabled for members: {', '.join(sorted(noAuto))}")
+
+        try:
+            members = []
+            for page in self.gd_client.get_paginator('list_members').paginate(
+                    DetectorId=self.detector_id, OnlyAssociated='false'):
+                members.extend(page.get('Members', []) or [])
+        except ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({self._errCode(e)})"]
+            return
+
+        notEnabled = [f"{m.get('AccountId')}({m.get('RelationshipStatus')})" for m in members
+                      if m.get('RelationshipStatus') != 'Enabled'
+                      and m.get('RelationshipStatus') not in self._MEMBER_STATUS_IGNORED]
+        if notEnabled:
+            shown = ', '.join(notEnabled[:10]) + (' ...' if len(notEnabled) > 10 else '')
+            issues.append(f"{len(notEnabled)} member(s) not Enabled: {shown}")
+
+        if issues:
+            self.results[key] = [-1, '; '.join(issues)]
+        else:
+            self.results[key] = [1, f"All {len(members)} member(s) enabled and auto-enable is ALL"]
+
+    def _checkDetectiveNotEnabled(self):
+        key = 'detectiveNotEnabled'
+        if self.detective_client is None:
+            return
+        try:
+            graphs = self._listAll(self.detective_client.list_graphs, 'GraphList')
+            if graphs:
+                self.results[key] = [1, f"Detective behavior graph enabled ({len(graphs)})"]
+                return
+            ## A member account has no graph of its own; it contributes to the admin's.
+            invitations = self._listAll(self.detective_client.list_invitations, 'Invitations')
+        except EndpointConnectionError:
+            self.results[key] = [0, "Amazon Detective is not available in this region"]
+            return
+        except ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({self._errCode(e)})"]
+            return
+
+        enabled = [i for i in invitations if i.get('Status') == 'ENABLED']
+        if enabled:
+            self.results[key] = [1, f"Member of Detective behavior graph {enabled[0].get('GraphArn')}"]
+        else:
+            self.results[key] = [
+                -1, "Amazon Detective is not enabled; no behavior graph to investigate GuardDuty findings"
+            ]
+
+    def _checkGuarddutyS3MalwareProtectionOff(self):
+        key = 'guarddutyS3MalwareProtectionOff'
+        try:
+            plans = self._listAll(self.gd_client.list_malware_protection_plans,
+                                  'MalwareProtectionPlans')
+        except ClientError as e:
+            self.results[key] = [0, f"Unable to evaluate ({self._errCode(e)})"]
+            return
+
+        if not plans:
+            ## Without a bucket in this Region there is nothing to protect, so a missing
+            ## plan is not a finding (one FAIL per empty Region would be noise).
+            if self.s3_client is not None:
+                try:
+                    resp = self.s3_client.list_buckets(BucketRegion=self.region, MaxBuckets=1)
+                except ClientError as e:
+                    self.results[key] = [0, f"Unable to evaluate ({self._errCode(e)})"]
+                    return
+                if not resp.get('Buckets'):
+                    self.results[key] = [
+                        0, "No S3 buckets in this region; Malware Protection for S3 not applicable"
+                    ]
+                    return
+            self.results[key] = [
+                -1, "No GuardDuty Malware Protection plan for S3 in this region; objects uploaded "
+                    "to buckets in this region are not scanned for malware"
+            ]
+            return
+
+        active, broken = [], []
+        for p in plans:
+            pid = p.get('MalwareProtectionPlanId')
+            try:
+                plan = self.gd_client.get_malware_protection_plan(MalwareProtectionPlanId=pid)
+            except ClientError as e:
+                self.results[key] = [0, f"Unable to evaluate ({self._errCode(e)})"]
+                return
+            bucket = ((plan.get('ProtectedResource') or {}).get('S3Bucket') or {}).get('BucketName', pid)
+            if plan.get('Status') == 'ACTIVE':
+                active.append(bucket)
+            else:
+                broken.append(f"{bucket}({plan.get('Status')})")
+
+        if broken:
+            self.results[key] = [
+                -1, f"Malware Protection plan(s) not ACTIVE, objects are not scanned: {', '.join(broken)}"
+            ]
+        else:
+            self.results[key] = [1, f"Malware Protection for S3 active on: {', '.join(active)}"]
 
     def _build_doc_links(self, topic):
         general_page = "https://docs.aws.amazon.com/guardduty/latest/ug/guardduty_finding-types-active.html"

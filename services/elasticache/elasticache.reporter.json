@@ -9,14 +9,14 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[New Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/GettingStarted.CreateCluster.html>",
-			"[New Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/GettingStarted.CreateCluster.html>",
-			"[Modify Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/Clusters.Modify.html>",
-			"[Modify Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Clusters.Modify.html>"
+			"[New Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Create.html>",
+			"[New Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Create.html>",
+			"[Modify Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Modify.html>",
+			"[Modify Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Modify.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Clusters.Modify.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Modify.html"
 	},
 	"EngineVersion": {
 		"category": "SP",
@@ -28,7 +28,7 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Redis Changelogs]<https://docs.redis.com/latest/rs/release-notes/>",
+			"[Redis Changelogs]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/engine-versions.html>",
 			"[Memcached ReleaseNotes]<https://github.com/memcached/memcached/wiki/ReleaseNotes>"
 		],
 		"remediation": null,
@@ -45,7 +45,7 @@
 		"additionalCost": 0,
 		"needFullTest": 1,
 		"ref": [
-			"[Redis Changelogs]<https://docs.redis.com/latest/rs/release-notes/>",
+			"[Redis Changelogs]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/engine-versions.html>",
 			"[Memcached ReleaseNotes]<https://github.com/memcached/memcached/wiki/ReleaseNotes>"
 		],
 		"remediation": null,
@@ -62,12 +62,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Latest redis supported nodes]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/CacheNodes.SupportedTypes.html>",
-			"[Latest memcached supported nodes]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/CacheNodes.SupportedTypes.html>"
+			"[Latest redis supported nodes]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/CacheNodes.SupportedTypes.html>",
+			"[Latest memcached supported nodes]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/CacheNodes.SupportedTypes.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/CacheNodes.SupportedTypes.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/CacheNodes.SupportedTypes.html"
 	},
 	"RInstanceType": {
 		"category": "PCS",
@@ -79,30 +79,32 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[ElastiCache Instance Type]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/CacheNodes.SupportedTypes.html>"
+			"[ElastiCache Instance Type]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/CacheNodes.SupportedTypes.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/CacheNodes.SupportedTypes.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/CacheNodes.SupportedTypes.html"
 	},
 	"EncInTransitAndRest": {
 		"category": "S",
-		"^description": "Encryption in Transit: {$COUNT} of ElastiCache are not enable encryption in transit",
-		"shortDesc": "Encryption in Transit",
+		"^description": "Encryption at rest and in transit: {$COUNT} ElastiCache cluster(s) do not have encryption at rest and/or in transit enabled. The finding message names which one is missing. Node-based Memcached clusters do not support encryption at rest; use ElastiCache Serverless or Valkey/Redis OSS for data that must be encrypted at rest.",
+		"shortDesc": "Encryption at rest and in transit",
 		"criticality": "L",
 		"downtime": 0,
 		"slowness": 0,
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[New Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/GettingStarted.CreateCluster.html>",
-			"[New Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/GettingStarted.CreateCluster.html>",
-			"[Modify Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/Clusters.Modify.html>",
-			"[Modify Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Clusters.Modify.html>"
+			"[New Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Create.html>",
+			"[New Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Create.html>",
+			"[Modify Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Modify.html>",
+			"[Modify Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Modify.html>",
+			"[At-rest encryption]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/at-rest-encryption.html>",
+			"[In-transit encryption]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/in-transit-encryption.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Clusters.Modify.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Modify.html"
 	},
 	"DefaultParamGroup": {
 		"category": "O",
@@ -114,14 +116,14 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[New Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/GettingStarted.CreateCluster.html>",
-			"[New Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/GettingStarted.CreateCluster.html>",
-			"[Modify Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/mem-ug/Clusters.Modify.html>",
-			"[Modify Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Clusters.Modify.html>"
+			"[New Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Create.html>",
+			"[New Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Create.html>",
+			"[Modify Memcached]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Modify.html>",
+			"[Modify Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Modify.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Clusters.Modify.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Clusters.Modify.html"
 	},
 	"EnableNotification": {
 		"category": "O",
@@ -133,11 +135,11 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Managing ElastiCache Notification]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/ECEvents.SNS.html>"
+			"[Managing ElastiCache Notification]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/ECEvents.SNS.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/ECEvents.SNS.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/ECEvents.SNS.html"
 	},
 	"EnableReadReplica": {
 		"category": "P",
@@ -149,11 +151,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Changing Number of Replicas]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/increase-decrease-replica-count.html>"
+			"[Changing Number of Replicas]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/increase-decrease-replica-count.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/increase-decrease-replica-count.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/increase-decrease-replica-count.html"
 	},
 	"EnableSlowLog": {
 		"category": "P",
@@ -165,11 +167,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[ElastiCache Redis Log Delivery]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Log_Delivery.html>"
+			"[ElastiCache Redis Log Delivery]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Log_Delivery.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Log_Delivery.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Log_Delivery.html"
 	},
 	"ClusterModeEnabled": {
 		"category": "R",
@@ -181,12 +183,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Scaling Redis Clusters]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Scaling.RedisReplGrps.html>",
-			"[Redis Cluster Mode]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Replication.Redis-RedisCluster.html>"
+			"[Scaling Redis Clusters]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Scaling.RedisReplGrps.html>",
+			"[Redis Cluster Mode]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Replication.Redis-RedisCluster.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Scaling.RedisReplGrps.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Scaling.RedisReplGrps.html"
 	},
 	"MultiAZEnabled": {
 		"category": "R",
@@ -198,12 +200,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Multi-AZ with Automatic Failover]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/AutoFailover.html>",
-			"[High Availability Using Replication Groups]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Replication.html>"
+			"[Multi-AZ with Automatic Failover]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/AutoFailover.html>",
+			"[High Availability Using Replication Groups]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Replication.html>"
 		],
 		"remediation": "aws elasticache modify-replication-group --replication-group-id {ResourceId} --automatic-failover-enabled --multi-az-enabled --apply-immediately",
 		"remediation_risk": "medium",
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/AutoFailover.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/AutoFailover.html"
 	},
 	"BackupEnabled": {
 		"category": "R",
@@ -215,12 +217,12 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[Backup and Restore for ElastiCache Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/backups.html>",
-			"[Scheduling Automatic Backups]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/backups-automatic.html>"
+			"[Backup and Restore for ElastiCache Redis]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/backups.html>",
+			"[Scheduling Automatic Backups]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/backups-automatic.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/backups-automatic.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/backups-automatic.html"
 	},
 	"IdleTimeout": {
 		"category": "O",
@@ -232,12 +234,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Redis timeout Parameter]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/ParameterGroups.Redis.html>",
-			"[Managing ElastiCache Parameter Groups]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/ParameterGroups.html>"
+			"[Redis timeout Parameter]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/BestPractices.Clients.Redis.ServerTimeout.html>",
+			"[Managing ElastiCache Parameter Groups]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/ParameterGroups.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/ParameterGroups.Redis.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/BestPractices.Clients.Redis.ServerTimeout.html"
 	},
 	"ServerlessReadReplica": {
 		"category": "P",
@@ -249,12 +251,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[ElastiCache Serverless]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/serverless.html>",
-			"[Serverless Cache Endpoints]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/serverless-endpoints.html>"
+			"[ElastiCache Serverless]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Scaling-serverless.html>",
+			"[Serverless Cache Endpoints]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/ReadReplicas.html#ReadReplicas.serverless>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/serverless-endpoints.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/ReadReplicas.html#ReadReplicas.serverless"
 	},
 	"GlobalDatastoreConfig": {
 		"category": "R",
@@ -266,11 +268,11 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[ElastiCache Global Datastore]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Redis-Global-Datastore.html>",
-			"[Creating a Global Datastore]<https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Redis-Global-Datastore-Creating.html>"
+			"[ElastiCache Global Datastore]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Redis-Global-Datastore.html>",
+			"[Creating a Global Datastore]<https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Redis-Global-Datastores-Console.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/red-ug/Redis-Global-Datastore.html"
+		"remediation_doc": "https://docs.aws.amazon.com/AmazonElastiCache/latest/dg/Redis-Global-Datastore.html"
 	}
 }

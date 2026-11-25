@@ -32,6 +32,7 @@ class EcsService(Evaluator):
     # 37  ecsServiceCapacityProviderFargateSpot (T2)
     # 38  ecsServiceServiceDiscoveryConfigured (T2)
     # 39  ecsServiceStaleTaskDefinition (T2)
+    # 43  ecsExecEnabledServices (WAFS2027 SEC06-BP03)
 
     # Fargate platform versions considered "current"
     CURRENT_PLATFORM_VERSIONS = {'LATEST', '1.4.0'}
@@ -456,3 +457,28 @@ class EcsService(Evaluator):
                 1,
                 f"Service on {fam}:{current_rev} (latest {fam}:{latest}, lag={lag})"
             ]
+
+    # ------------------------------------------------------------------ #
+    # #43 ecsExecEnabledServices (WAFS2027 SEC06-BP03)
+    # ------------------------------------------------------------------ #
+    PROD_TAG_VALUES = {'prod', 'production', 'prd'}
+
+    def _checkEcsExecEnabledServices(self):
+        key = 'ecsExecEnabledServices'
+        if 'enableExecuteCommand' not in self.service:
+            self.results[key] = [0, "Unable to evaluate (enableExecuteCommand not returned)"]
+            return
+        if not self.service.get('enableExecuteCommand'):
+            self.results[key] = [1, "ECS Exec (enableExecuteCommand) disabled"]
+            return
+        prod = False
+        for t in self.service.get('tags') or []:
+            k = str(t.get('key', '')).lower()
+            v = str(t.get('value', '')).lower()
+            if v in self.PROD_TAG_VALUES or (k in self.PROD_TAG_VALUES and v not in ('false', 'no', '0')):
+                prod = True
+                break
+        msg = "ECS Exec enabled: interactive shell access into running containers is allowed"
+        if prod:
+            msg = "[production-tagged] " + msg
+        self.results[key] = [-1, msg]

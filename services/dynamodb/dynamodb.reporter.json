@@ -153,7 +153,7 @@
 		"additionalCost": 1,
 		"needFullTest": 0,
 		"ref": [
-			"[DDB Backup/Restore]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/BackupRestore.html>"
+			"[DDB Backup/Restore]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Backup-and-Restore.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -410,12 +410,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[Global Tables Version Comparison]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/globaltables.V2.html>",
-			"[Upgrading Global Tables]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_upgrade.html>"
+			"[Global Tables Version Comparison]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_versions.html>",
+			"[Upgrading Global Tables]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_versions.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_upgrade.html"
+		"remediation_doc": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables_versions.html"
 	},
 	"tableClassOptimization": {
 		"category": "C",
@@ -433,5 +433,40 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.TableClasses.html"
+	},
+	"dynamodbResourcePolicyPublic": {
+		"category": "S",
+		"^description": "{$COUNT} DynamoDB table(s) have a resource-based policy on the table or its stream that allows any principal without a restricting condition, or allows principals in other AWS accounts without an aws:PrincipalOrgID condition. Anyone holding credentials in those accounts can read or modify the data, so scope cross-account access to your organization or to specific trusted principals.",
+		"shortDesc": "Restrict DynamoDB resource policy principals",
+		"criticality": "H",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 0,
+		"ref": [
+			"[Using resource-based policies for DynamoDB]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/access-control-resource-based.html>",
+			"[Blocking public access with resource-based policies in DynamoDB]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/rbac-bpa-rbp.html>",
+			"[Cross-account access with resource-based policies in DynamoDB]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/rbac-cross-account-access.html>"
+		],
+		"remediation": "aws dynamodb put-resource-policy --resource-arn <table-or-stream-arn> --policy file://scoped-policy.json",
+		"remediation_risk": "medium",
+		"remediation_doc": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/rbac-cross-account-access.html"
+	},
+	"dynamodbNoMultiRegionReplica": {
+		"category": "R",
+		"^description": "{$COUNT} DynamoDB table(s) tagged as business critical (for example criticality=high or tier=1) have no replica in another AWS Region. If the Region becomes unavailable the table cannot be served from elsewhere. Consider a global table replica, or confirm that your recovery objectives are met by cross-Region backups. Untagged tables are reported as informational only.",
+		"shortDesc": "Add a multi-Region replica for critical tables",
+		"criticality": "L",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"ref": [
+			"[Global tables - multi-Region replication for DynamoDB]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/GlobalTables.html>",
+			"[Resilience and disaster recovery in Amazon DynamoDB]<https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/disaster-recovery-resiliency.html>"
+		],
+		"remediation": "aws dynamodb update-table --table-name {ResourceName} --replica-updates '[{\"Create\":{\"RegionName\":\"<other-region>\"}}]'",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/V2globaltables.tutorial.html"
 	}
 }

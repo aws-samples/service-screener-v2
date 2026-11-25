@@ -23,6 +23,7 @@ class Dynamodb(Service):
         self.appScalingPolicyClient = ssBoto.client('application-autoscaling', config=self.bConfig)
         self.backupClient = ssBoto.client('backup', config=self.bConfig)
         self.cloudTrailClient = ssBoto.client('cloudtrail', config=self.bConfig)
+        self._tagsByArn = {}
     
     
     def list_tables(self):
@@ -49,6 +50,8 @@ class Dynamodb(Service):
             for i, detail in enumerate(tableArr):
                 tableArn = detail['Table']['TableArn']
                 tags = self.dynamoDbClient.list_tags_of_resource(ResourceArn=tableArn)
+                # Reused by DynamoDbCommon (same call), see advise().
+                self._tagsByArn[tableArn] = tags
                 if self.resourceHasTags(tags.get('Tags')):
                     finalArr.append(tableArr[i])
                 
@@ -78,7 +81,8 @@ class Dynamodb(Service):
             for eachTable in listOfTables:
                 objName = 'Dynamodb::' + eachTable['Table']['TableName']
                 _pi('Dynamodb::Table', objName)
-                obj = DynamoDbCommon(eachTable, self.dynamoDbClient, self.cloudWatchClient, self.serviceQuotaClient, self.appScalingPolicyClient, self.backupClient, self.cloudTrailClient)
+                obj = DynamoDbCommon(eachTable, self.dynamoDbClient, self.cloudWatchClient, self.serviceQuotaClient, self.appScalingPolicyClient, self.backupClient, self.cloudTrailClient,
+                                     tagsResp=self._tagsByArn.get(eachTable['Table']['TableArn']))
                 obj.run(self.__class__)
                 objs[objName] = obj.getInfo()
                 del obj

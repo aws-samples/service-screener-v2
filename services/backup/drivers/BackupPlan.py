@@ -14,6 +14,9 @@ class BackupPlan(Evaluator):
       - backupPlanInfrequentSchedule  (R/L)  Any rule fires < once per 24h
       - backupPlanNoCompletionWindow  (O/L)  Any rule missing CompletionWindowMinutes
       - backupPlanNoContinuousBackup  (R/L)  No rule sets EnableContinuousBackup=true
+      - backupMalwareScanDisabled     (S/L)  EC2/EBS/S3 plan without malware scanning
+      - backupPlanNotTargetingProtectedVault (S/M) No rule lands in a locked / air-gapped vault
+      - backupRetentionBelowDetectionWindow  (S/M) Longest retention < RETENTION_FLOOR_DAYS
 
     Input:
       plan -- dict produced by Backup.py._describePlan.
@@ -31,10 +34,26 @@ class BackupPlan(Evaluator):
         'RDS', 'Aurora', 'S3', 'DynamoDB',
     })
 
-    def __init__(self, plan, backupClient):
+    # Resource types GuardDuty Malware Protection for AWS Backup can scan.
+    MALWARE_SCANNABLE_ARN_RE = re.compile(
+        r'^arn:aws[a-z-]*:(ec2:[^:]*:[^:]*:(instance|volume)/|s3:::)'
+    )
+    LOGICALLY_AIR_GAPPED = 'LOGICALLY_AIR_GAPPED_BACKUP_VAULT'
+
+    # Minimum retention (days) that still covers a typical ransomware /
+    # compromise detection window. Policy-dependent; 35 days matches the
+    # maximum continuous-backup (PITR) window and common guidance.
+    RETENTION_FLOOR_DAYS = 35
+
+    def __init__(self, plan, backupClient, vaultLookup=None, accountId=None, region=None):
         super().__init__()
         self.plan = plan
         self.backupClient = backupClient
+        # vaultLookup(nameOrArn) -> (summary|None, reason|None); supplied by
+        # Backup.py so plan checks can see whether target vaults are locked.
+        self.vaultLookup = vaultLookup
+        self.accountId = accountId
+        self.region = region
 
         self._resourceName = plan.get('_name') or plan.get('_id', 'unknown')
         self.rules = plan.get('_rules') or []
@@ -129,7 +148,13 @@ class BackupPlan(Evaluator):
     # 4. Plan has no resource selections
     # ------------------------------------------------------------------ #
     def _checkBackupPlanNotAssigned(self):
-        if not self.selections:
+        err = self.plan.get('_selectionsError')
+        if err and not self.selections:
+            # list_backup_selections failed: the plan may have selections.
+            self.results['backupPlanNotAssigned'] = [
+                0, f"Unable to evaluate ({err}) - list_backup_selections failed"
+            ]
+        elif not self.selections:
             self.results['backupPlanNotAssigned'] = [
                 -1, "Plan has 0 resource selections — protects nothing"
             ]
@@ -148,13 +173,15 @@ class BackupPlan(Evaluator):
             ]
             return
 
-        infrequent = []
+        infrequent, unknown = [], []
         for rule in self.rules:
             expr = rule.get('ScheduleExpression') or ''
             freq = self._scheduleIsFrequent(expr)
             # freq: True (daily or more), False (less than daily), None (unknown)
             if freq is False:
                 infrequent.append(f"{rule.get('RuleName', '(unnamed)')}={expr}")
+            elif freq is None:
+                unknown.append(f"{rule.get('RuleName', '(unnamed)')}={expr or '(no schedule)'}")
 
         if infrequent:
             self.results['backupPlanInfrequentSchedule'] = [
@@ -162,9 +189,14 @@ class BackupPlan(Evaluator):
                 f"Rule(s) with < daily frequency: {', '.join(infrequent[:5])}"
                 + (f" (+{len(infrequent) - 5} more)" if len(infrequent) > 5 else "")
             ]
+        elif unknown:
+            self.results['backupPlanInfrequentSchedule'] = [
+                0, f"Unable to evaluate schedule frequency of rule(s): {', '.join(unknown[:5])}"
+                + (f" (+{len(unknown) - 5} more)" if len(unknown) > 5 else "")
+            ]
         else:
             self.results['backupPlanInfrequentSchedule'] = [
-                1, "All rules fire at least once per 24h (or schedule unparseable)"
+                1, "All rules fire at least once per 24h"
             ]
 
     # ------------------------------------------------------------------ #
@@ -232,8 +264,206 @@ class BackupPlan(Evaluator):
             ]
 
     # ------------------------------------------------------------------ #
+    # 8. EC2/EBS/S3 plan without GuardDuty malware scanning
+    # ------------------------------------------------------------------ #
+    def _checkBackupMalwareScanDisabled(self):
+        key = 'backupMalwareScanDisabled'
+        if not self.rules:
+            self.results[key] = [0, "No rules to evaluate"]
+            return
+        if not self.selections:
+            err = self.plan.get('_selectionsError')
+            self.results[key] = [0, (f"Unable to evaluate ({err}) - list_backup_selections failed" if err
+                                     else "Plan has no resource selections - see backupPlanNotAssigned")]
+            return
+
+        covers = self._selectionsCoverScannableTypes()
+        if covers is None:
+            self.results[key] = [
+                0, "Selections are tag/condition based only - cannot tell whether EC2/EBS/S3 are protected"
+            ]
+            return
+        if not covers:
+            self.results[key] = [0, "Plan does not protect EC2/EBS/S3 resources (malware scanning not applicable)"]
+            return
+
+        ruleScan = [r.get('RuleName', '(unnamed)') for r in self.rules if r.get('ScanActions')]
+        planScan = self.plan.get('_scanSettings') or []
+        if ruleScan and planScan:
+            self.results[key] = [
+                1, f"Malware scanning configured (ScanSettings present; rule(s) with ScanActions: {', '.join(ruleScan[:5])})"
+            ]
+        elif ruleScan or planScan:
+            self.results[key] = [
+                0,
+                "Malware scanning partially configured ("
+                + ("rule ScanActions present but no plan ScanSettings" if ruleScan
+                   else "plan ScanSettings present but no rule has ScanActions") + ")"
+            ]
+        else:
+            self.results[key] = [
+                -1, "Plan protects EC2/EBS/S3 resources but no rule has ScanActions and the plan has no ScanSettings"
+            ]
+
+    # ------------------------------------------------------------------ #
+    # 9. Rule data never lands in a locked / logically air-gapped vault
+    # ------------------------------------------------------------------ #
+    def _checkBackupPlanNotTargetingProtectedVault(self):
+        key = 'backupPlanNotTargetingProtectedVault'
+        if not self.rules:
+            self.results[key] = [0, "No rules to evaluate"]
+            return
+        if self.vaultLookup is None:
+            self.results[key] = [0, "Unable to evaluate (vault index unavailable)"]
+            return
+
+        unprotected, indeterminate = [], []
+        for rule in self.rules:
+            name = rule.get('RuleName', '(unnamed)')
+            state, notes = self._ruleProtection(rule)
+            if state == 'unprotected':
+                unprotected.append(name)
+            elif state != 'protected':
+                indeterminate.append(f"{name}({'; '.join(notes)})")
+
+        if unprotected:
+            self.results[key] = [
+                -1,
+                "Rule(s) whose target and copy vaults are neither Vault-Locked nor logically air-gapped: "
+                + ', '.join(unprotected[:5]) + (f" (+{len(unprotected) - 5} more)" if len(unprotected) > 5 else "")
+            ]
+        elif indeterminate:
+            self.results[key] = [
+                0,
+                "Protection relies on vaults that cannot be inspected from this account: "
+                + ', '.join(indeterminate[:3])
+            ]
+        else:
+            self.results[key] = [1, "Every rule stores or copies backups into a locked or air-gapped vault"]
+
+    # ------------------------------------------------------------------ #
+    # 10. Longest retention shorter than the detection window
+    # ------------------------------------------------------------------ #
+    def _checkBackupRetentionBelowDetectionWindow(self):
+        key = 'backupRetentionBelowDetectionWindow'
+        floor = self.RETENTION_FLOOR_DAYS
+        if not self.rules:
+            self.results[key] = [0, "No rules to evaluate"]
+            return
+
+        # The plan keeps a pre-compromise recovery point as long as its
+        # longest-lived recovery point (rule or any copy) outlives the floor,
+        # so a short daily rule next to a long monthly rule is fine.
+        best = 0          # None == some recovery point is kept indefinitely
+        details = []
+        copiesWithoutLifecycle = []
+        for rule in self.rules:
+            name = rule.get('RuleName', '(unnamed)')
+            rets = [self._retentionDays(rule.get('Lifecycle'), isRule=True)]
+            for a in (rule.get('CopyActions') or []):
+                if not (a.get('Lifecycle') or {}).get('DeleteAfterDays'):
+                    # Copy retention not stated explicitly - do not guess.
+                    copiesWithoutLifecycle.append(name)
+                    continue
+                rets.append(self._retentionDays(a.get('Lifecycle'), isRule=False))
+            if any(r is None for r in rets):
+                best = None
+                break
+            ruleMax = max(rets)
+            best = max(best, ruleMax)
+            details.append(f"{name}={ruleMax}d")
+
+        if best is None:
+            self.results[key] = [1, "At least one rule (or copy) retains recovery points indefinitely"]
+        elif best < floor and copiesWithoutLifecycle:
+            self.results[key] = [
+                0,
+                f"Rule retention is at most {best} days (< {floor}) but CopyActions in "
+                f"{', '.join(sorted(set(copiesWithoutLifecycle))[:5])} have no explicit DeleteAfterDays - "
+                "verify the retention of the copies"
+            ]
+        elif best >= floor:
+            self.results[key] = [1, f"Longest retention is {best} days (>= {floor})"]
+        else:
+            self.results[key] = [
+                -1,
+                f"Longest retention across all rules and copies is {best} days (< {floor}): "
+                + ', '.join(details[:5])
+            ]
+
+    # ------------------------------------------------------------------ #
     # Helpers
     # ------------------------------------------------------------------ #
+    @staticmethod
+    def _retentionDays(lifecycle, isRule):
+        """Return retention in days, or None for indefinite retention.
+
+        - No Lifecycle / no DeleteAfterDays / DeleteAfterDays <= 0 (-1 means
+          'keep forever') -> indefinite.
+        - DeleteAfterEvent=DELETE_AFTER_COPY on the rule without
+          DeleteAfterDays -> the source point is short-lived (0); only the
+          copies count."""
+        lifecycle = lifecycle or {}
+        days = lifecycle.get('DeleteAfterDays')
+        if days is None:
+            if isRule and lifecycle.get('DeleteAfterEvent'):
+                return 0
+            return None
+        try:
+            days = int(days)
+        except (TypeError, ValueError):
+            return None
+        if days <= 0:
+            return None
+        return days
+
+    def _selectionsCoverScannableTypes(self):
+        """True if any selection explicitly (or via '*') includes EC2/EBS/S3;
+        False if all selections list only other resource ARNs; None if the
+        resource types depend on tags/conditions only."""
+        opaque = False
+        for sel in self.selections:
+            resources = [r for r in (sel.get('Resources') or []) if isinstance(r, str)]
+            if not resources:
+                opaque = True
+                continue
+            for arn in resources:
+                if arn == '*' or self.MALWARE_SCANNABLE_ARN_RE.match(arn):
+                    return True
+        return None if opaque else False
+
+    def _ruleProtection(self, rule):
+        """Classify one rule: 'protected' if its target or any copy vault is
+        locked / logically air-gapped; 'unprotected' if every destination was
+        inspected and none is; otherwise 'indeterminate'."""
+        if rule.get('TargetLogicallyAirGappedBackupVaultArn'):
+            return 'protected', []
+        dests = []
+        if rule.get('TargetBackupVaultName'):
+            dests.append(rule['TargetBackupVaultName'])
+        for action in rule.get('CopyActions') or []:
+            if action.get('DestinationBackupVaultArn'):
+                dests.append(action['DestinationBackupVaultArn'])
+        if not dests:
+            return 'indeterminate', ['no destination vault']
+
+        notes = []
+        for dest in dests:
+            if dest.startswith('arn:'):
+                parts = dest.split(':')
+                acct = parts[4] if len(parts) > 4 else ''
+                if self.accountId and acct and acct != self.accountId:
+                    notes.append(f"copy to account {acct} assumed protected")
+                    continue
+            summary, reason = self.vaultLookup(dest)
+            if summary is None:
+                notes.append(f"{dest.split(':')[-1]}: {reason}")
+                continue
+            if bool(summary.get('Locked')) or \
+                    (summary.get('VaultType') or '').upper() == self.LOGICALLY_AIR_GAPPED:
+                return 'protected', []
+        return ('indeterminate', notes) if notes else ('unprotected', [])
+
     def _planHomeRegion(self):
         for rule in self.rules:
             arn = rule.get('TargetBackupVaultArn') or ''
@@ -281,47 +511,78 @@ class BackupPlan(Evaluator):
         if m:
             minute_f, hour_f, dom_f, month_f, dow_f = m.group(1), m.group(2), m.group(3), m.group(4), m.group(5)
 
-            # If day-of-week restricts to specific days (not '?' or '*'), the
-            # schedule fires only on those weekdays → less than daily.
-            if dow_f not in ('?', '*'):
-                # Some special cases: '1-7', '*/1' still daily; explicit list
-                # (e.g. '1,3,5' or '1' or 'MON') is not daily.
-                if not cls._cronFieldMatchesAll(dow_f):
+            # Day-of-week, day-of-month and month must each allow every value
+            # of their domain (e.g. '*', '?', '1-7', 'MON-SUN', '1-31',
+            # 'JAN-DEC'); any restriction means some days have no backup.
+            # The hour field only needs one firing per day.
+            for field, domain in ((dow_f, 'dow'), (dom_f, 'dom'), (month_f, 'month')):
+                allDays = cls._cronFieldMatchesAll(field, domain)
+                if allDays is None:
+                    return None
+                if not allDays:
                     return False
-
-            # If day-of-month restricts to specific days, the schedule fires
-            # only on those calendar days → less than daily.
-            if dom_f not in ('?', '*'):
-                if not cls._cronFieldMatchesAll(dom_f):
-                    return False
-
-            # If month restricts to specific months, still less than daily.
-            if month_f not in ('*',):
-                if not cls._cronFieldMatchesAll(month_f):
-                    return False
-
-            # By this point DOW/DOM/MONTH allow any day. Hour must allow at
-            # least one firing per day; even a single fixed hour still means
-            # once-per-day = daily.
             return True
 
         return None
 
-    @staticmethod
-    def _cronFieldMatchesAll(field):
-        """Return True if the cron field expression represents every value in
-        its range (e.g. '*', '*/1', '1-7' for DOW, '1-31' for DOM)."""
-        f = field.strip()
+    _CRON_DOMAINS = {'dow': (1, 7), 'dom': (1, 31), 'month': (1, 12)}
+    _CRON_NAMES = {
+        'dow': {n: i + 1 for i, n in enumerate(('SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'))},
+        'month': {n: i + 1 for i, n in enumerate(('JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN',
+                                                  'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'))},
+    }
+
+    @classmethod
+    def _cronFieldMatchesAll(cls, field, domain='dow'):
+        """True if the cron field covers every value of its domain ('*', '?',
+        '*/1', '1-7' / 'SUN-SAT' for day-of-week, '1-31' for day-of-month,
+        '1-12' / 'JAN-DEC' for month, or lists adding up to that), False if it
+        restricts the values (including 'L', 'W' and '#' forms), None if the
+        field cannot be parsed."""
+        f = field.strip().upper()
         if f in ('*', '?'):
             return True
-        if f in ('*/1', '1/1'):
-            return True
-        # Rough heuristic: hyphen ranges are considered "every value" only
-        # when explicitly full-range for that field. We do not attempt to
-        # compute the field's max here — anything more complex is safest
-        # treated as a restriction (i.e. return False so schedule is flagged
-        # as infrequent).
-        return False
+        lo, hi = cls._CRON_DOMAINS[domain]
+        names = cls._CRON_NAMES.get(domain, {})
+
+        def val(tok):
+            if tok in names:
+                return names[tok]
+            if tok.isdigit() and lo <= int(tok) <= hi:
+                return int(tok)
+            raise ValueError(tok)
+
+        values = set()
+        for item in f.split(','):
+            if not item:
+                return None
+            plain = all(t in names or t.isdigit() or t == '*' for t in re.split(r'[-/]', item))
+            if not plain and re.search(r'[LW#]', item):
+                if re.fullmatch(r'(\d{1,2}|[A-Z]{3})?(L|W|LW|#\d)', item) or item in ('L', 'LW'):
+                    return False  # last day / nearest weekday / nth weekday: a subset of days
+                return None
+            rng, _, step = item.partition('/')
+            try:
+                stepN = int(step) if step else 1
+                if stepN < 1:
+                    return None
+                if rng == '*':
+                    start, end = lo, hi
+                elif '-' in rng:
+                    a, b = rng.split('-', 1)
+                    start, end = val(a), val(b)
+                else:
+                    start = val(rng)
+                    end = hi if step else start
+            except ValueError:
+                return None
+            if start <= end:
+                values.update(range(start, end + 1, stepN))
+            else:
+                # Wrap-around range, e.g. FRI-MON.
+                seq = list(range(start, hi + 1)) + list(range(lo, end + 1))
+                values.update(seq[::stepN])
+        return values >= set(range(lo, hi + 1))
 
     def _planProtectsPitrResources(self):
         """Return True if any selection ARN clearly references a PITR-capable

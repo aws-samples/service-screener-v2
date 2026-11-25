@@ -1,7 +1,9 @@
-import json
 from datetime import datetime, timedelta, timezone
 
+import botocore
+
 from services.Evaluator import Evaluator
+from utils import PolicyPrincipal
 
 
 class BackupVault(Evaluator):
@@ -9,32 +11,47 @@ class BackupVault(Evaluator):
     Per-vault checks. Nine checks in total:
 
       - backupVaultNoLock              (S/H)   Vault Lock disabled
-      - backupVaultDefaultEncryption   (S/M)   AWS-owned KMS key
+      - backupVaultDefaultEncryption   (S/M)   AWS-owned / AWS-managed (aws/backup) KMS key
       - backupVaultNoAccessPolicy      (S/H)   No policy or open policy
+      - airGappedVaultNoMpa            (S/L)   LAG vault without MPA team
       - backupVaultEmpty               (R/L)   Zero recovery points > 7 days old
       - backupVaultLockNotFinalized    (S/M)   Governance mode / future LockDate
       - backupRecoveryPointNotEncrypted (S/M)  IsEncrypted=false on any point
       - backupRecoveryPointNeverRestored (R/M) LastRestoreTime null for all
       - backupRecoveryPointExpiredLifecycle (C/L) Status=EXPIRED on any point
-      - backupRecoveryPointNoCMK       (S/L)   AWS_OWNED_KMS_KEY on any point
+      - backupRecoveryPointNoCMK       (S/L)   Any point not on a customer-managed KMS key
+      - backupRetentionBelowDetectionWindow (S/M) Vault Lock MinRetentionDays < 35
 
     Input:
       vault -- dict produced by Backup.py._describeVault.
       backupClient -- boto3 backup client (retained for future extension).
+      kmsClient    -- optional boto3 kms client. kms:DescribeKey (read-only)
+                      resolves KeyManager, the only reliable way to tell a
+                      customer-managed key from the AWS-managed aws/backup
+                      key: describe_backup_vault returns both as a plain
+                      key/<uuid> ARN, and EncryptionKeyType only separates
+                      AWS-owned keys from keys in the customer's account.
 
     Recovery-point checks operate on a sample of up to
     Backup.RECOVERY_POINT_SAMPLE_LIMIT points.
     """
 
-    # AWS Backup's service-owned key aliases / ARN fragments.
+    # Alias ARN fragment of AWS-managed keys (alias/aws/backup, alias/aws/ebs,
+    # ...). Only matches when the API returns an alias ARN; key/<uuid> ARNs
+    # are resolved with kms:DescribeKey.
     AWS_OWNED_KMS_ALIASES = (
-        'aws/backup',    # standard service-managed alias
+        ':alias/aws/',
     )
     AWS_OWNED_KMS_TYPE = 'AWS_OWNED_KMS_KEY'
+
+    LOGICALLY_AIR_GAPPED = 'LOGICALLY_AIR_GAPPED_BACKUP_VAULT'
 
     # backupVaultEmpty grace period: newly-created vaults may legitimately be
     # empty for a few backup cycles.
     EMPTY_VAULT_GRACE_DAYS = 7
+
+    # Shared with BackupPlan.RETENTION_FLOOR_DAYS (backupRetentionBelowDetectionWindow).
+    RETENTION_FLOOR_DAYS = 35
 
     # Default AWS-managed vaults for service integrations that are permitted
     # to lack CMK / vault-lock (AWS Backup's own defaults).
@@ -43,10 +60,11 @@ class BackupVault(Evaluator):
         'aws/dynamodb/',                  # DynamoDB service-managed
     )
 
-    def __init__(self, vault, backupClient):
+    def __init__(self, vault, backupClient, kmsClient=None):
         super().__init__()
         self.vault = vault
         self.backupClient = backupClient
+        self.kmsClient = kmsClient
 
         self._resourceName = vault.get('_name', 'unknown')
         self.recovery_points = vault.get('_recoveryPoints') or []
@@ -84,8 +102,9 @@ class BackupVault(Evaluator):
     # 2. Default (AWS-owned) encryption key
     # ------------------------------------------------------------------ #
     def _checkBackupVaultDefaultEncryption(self):
+        key = 'backupVaultDefaultEncryption'
         if self._isServiceDefaultVault():
-            self.results['backupVaultDefaultEncryption'] = [
+            self.results[key] = [
                 0, "Service-managed default vault uses AWS-managed key by design"
             ]
             return
@@ -93,68 +112,92 @@ class BackupVault(Evaluator):
         keyType = self.vault.get('_encryptionKeyType')
         keyArn = self.vault.get('_encryptionKeyArn') or ''
 
-        if keyType == self.AWS_OWNED_KMS_TYPE or self._keyArnIsAwsOwned(keyArn):
-            self.results['backupVaultDefaultEncryption'] = [
+        if keyType == self.AWS_OWNED_KMS_TYPE:
+            self.results[key] = [
                 -1,
-                f"Encrypted with AWS-owned key ({keyArn or 'default'}); prefer a customer-managed KMS key"
+                f"Encrypted with an AWS-owned KMS key ({keyArn or 'default'}); prefer a customer-managed KMS key"
             ]
-        elif not keyArn:
+            return
+        if not keyArn:
             # AWS Backup always encrypts, but we cannot confirm the key type
             # in this response — flag as INFO rather than PASS.
-            self.results['backupVaultDefaultEncryption'] = [
+            self.results[key] = [
                 0, "EncryptionKeyArn not returned by API — cannot determine"
             ]
+            return
+
+        manager, err = self._keyManager(keyArn)
+        if manager == 'CUSTOMER':
+            self.results[key] = [1, f"Customer-managed KMS key: {keyArn}"]
+        elif manager == 'AWS':
+            self.results[key] = [
+                -1,
+                f"Encrypted with the AWS-managed KMS key aws/backup ({keyArn}); "
+                "prefer a customer-managed KMS key"
+            ]
         else:
-            self.results['backupVaultDefaultEncryption'] = [
-                1, f"Customer-managed KMS key: {keyArn}"
+            self.results[key] = [
+                0, f"Unable to evaluate ({err}) - KMS key manager of {keyArn} could not be read"
             ]
 
     # ------------------------------------------------------------------ #
     # 3. No / open access policy
     # ------------------------------------------------------------------ #
     def _checkBackupVaultNoAccessPolicy(self):
-        if self.vault.get('_accessPolicyMissing'):
-            self.results['backupVaultNoAccessPolicy'] = [
-                -1, "No vault access policy attached"
-            ]
+        key = 'backupVaultNoAccessPolicy'
+        err = self.vault.get('_accessPolicyError')
+        if err:
+            # get_backup_vault_access_policy failed with something other than
+            # ResourceNotFoundException (AccessDenied, throttling, ...): the
+            # policy may exist and may be public - never report "no policy".
+            self.results[key] = [0, f"Unable to evaluate ({err})"]
             return
 
         raw = self.vault.get('_accessPolicy')
-        if not raw:
-            self.results['backupVaultNoAccessPolicy'] = [
-                -1, "No vault access policy attached"
-            ]
+        if self.vault.get('_accessPolicyMissing') or not raw:
+            self.results[key] = [-1, "No vault access policy attached"]
             return
 
-        parsed = self._parsePolicy(raw)
-        if parsed is None:
-            self.results['backupVaultNoAccessPolicy'] = [
-                0, "Vault access policy present but not parseable"
-            ]
+        if PolicyPrincipal.parsePolicy(raw) is None:
+            self.results[key] = [0, "Vault access policy present but not parseable"]
             return
 
-        # Walk every statement; flag any Allow with Principal:* that has no
-        # scoping condition. That is the classic "world-writable" misconfig
-        # for Backup vaults.
+        # Flag any Allow statement that applies to any principal (Principal
+        # "*", {"AWS": "*"}, {"AWS": ["*"]}, or NotPrincipal) and is not bound
+        # to a known account / organisation by a positive-match Condition.
+        # IfExists / negated / ForAllValues operators and wildcard-only values
+        # do not count as scoping (utils.PolicyPrincipal).
         offending = []
-        for i, stmt in enumerate(self._policyStatements(parsed)):
-            if stmt.get('Effect') != 'Allow':
-                continue
-            if not self._principalIsWildcard(stmt.get('Principal')):
-                continue
-            if self._conditionScopes(stmt.get('Condition')):
-                continue
-            sid = stmt.get('Sid', f"stmt{i}")
-            offending.append(sid)
+        for i, stmt in enumerate(PolicyPrincipal.iterStatements(raw)):
+            if PolicyPrincipal.statementIsPublic(stmt):
+                offending.append(str(stmt.get('Sid') or f"stmt{i}"))
 
         if offending:
-            self.results['backupVaultNoAccessPolicy'] = [
+            self.results[key] = [
                 -1,
-                f"Access policy has wildcard-principal Allow without Condition: {', '.join(offending)}"
+                "Access policy grants access to any principal without a scoping Condition: "
+                + ', '.join(offending)
             ]
         else:
-            self.results['backupVaultNoAccessPolicy'] = [
-                1, "Vault access policy present and scoped"
+            self.results[key] = [1, "Vault access policy present and scoped"]
+
+    # ------------------------------------------------------------------ #
+    # 3b. Logically air-gapped vault without a multi-party approval team
+    # ------------------------------------------------------------------ #
+    def _checkAirGappedVaultNoMpa(self):
+        key = 'airGappedVaultNoMpa'
+        if (self.vault.get('_vaultType') or '').upper() != self.LOGICALLY_AIR_GAPPED:
+            # MPA only applies to logically air-gapped vaults: emit no row for
+            # standard vaults rather than a 0 "not applicable" per vault.
+            return
+        teamArn = self.vault.get('_mpaApprovalTeamArn')
+        if teamArn:
+            self.results[key] = [1, f"Multi-party approval team associated: {teamArn}"]
+        else:
+            self.results[key] = [
+                -1,
+                "Logically air-gapped vault has no multi-party approval (MPA) team associated; "
+                "vault access cannot be recovered through MPA if the owning account is compromised or lost"
             ]
 
     # ------------------------------------------------------------------ #
@@ -233,6 +276,37 @@ class BackupVault(Evaluator):
             ]
 
     # ------------------------------------------------------------------ #
+    # 5b. Vault Lock minimum retention shorter than the detection window
+    # ------------------------------------------------------------------ #
+    def _checkBackupRetentionBelowDetectionWindow(self):
+        key = 'backupRetentionBelowDetectionWindow'
+        floor = self.RETENTION_FLOOR_DAYS
+        isLag = (self.vault.get('_vaultType') or '').upper() == 'LOGICALLY_AIR_GAPPED_BACKUP_VAULT'
+        if not self.vault.get('_locked') and not isLag:
+            self.results[key] = [0, "Vault Lock not enabled - see backupVaultNoLock"]
+            return
+
+        minDays = self.vault.get('_minRetentionDays')
+        if minDays is None:
+            self.results[key] = [
+                -1, f"Vault Lock does not enforce MinRetentionDays (recommended >= {floor} days)"
+            ]
+            return
+        try:
+            minDays = int(minDays)
+        except (TypeError, ValueError):
+            self.results[key] = [0, f"MinRetentionDays unparseable: {minDays}"]
+            return
+        if minDays < floor:
+            self.results[key] = [
+                -1,
+                f"Vault Lock MinRetentionDays={minDays} (< {floor}); recovery points can be deleted "
+                "before a compromise is likely to be detected"
+            ]
+        else:
+            self.results[key] = [1, f"Vault Lock MinRetentionDays={minDays} (>= {floor})"]
+
+    # ------------------------------------------------------------------ #
     # 6. Recovery point encryption
     # ------------------------------------------------------------------ #
     def _checkBackupRecoveryPointNotEncrypted(self):
@@ -306,31 +380,57 @@ class BackupVault(Evaluator):
     # 9. Recovery points using AWS-owned key
     # ------------------------------------------------------------------ #
     def _checkBackupRecoveryPointNoCMK(self):
+        key = 'backupRecoveryPointNoCMK'
         if not self.recovery_points:
-            self.results['backupRecoveryPointNoCMK'] = [
+            self.results[key] = [
                 0, "No recovery points sampled in this vault"
             ]
             return
 
-        aws_owned = []
+        nonCmk, unencrypted, unknown = [], [], []
         for rp in self.recovery_points:
             keyType = rp.get('EncryptionKeyType')
             keyArn = rp.get('EncryptionKeyArn') or ''
-            if keyType == self.AWS_OWNED_KMS_TYPE or (
-                keyArn and self._keyArnIsAwsOwned(keyArn)
-            ):
-                aws_owned.append(rp)
+            if keyType == self.AWS_OWNED_KMS_TYPE:
+                nonCmk.append(rp)
+                continue
+            if not keyArn:
+                # No key reported: unencrypted points are certainly not on a
+                # CMK; otherwise the key cannot be determined.
+                (unencrypted if rp.get('IsEncrypted') is False else unknown).append(
+                    (rp, 'EncryptionKeyArn not returned'))
+                continue
+            manager, err = self._keyManager(keyArn)
+            if manager == 'CUSTOMER':
+                continue
+            if manager == 'AWS':
+                nonCmk.append(rp)
+            else:
+                unknown.append((rp, err))
 
-        if aws_owned:
-            names = [self._rpShortId(rp) for rp in aws_owned[:5]]
-            more = f" (+{len(aws_owned) - 5} more)" if len(aws_owned) > 5 else ""
-            self.results['backupRecoveryPointNoCMK'] = [
-                -1,
-                f"Recovery point(s) encrypted with AWS-owned key: {', '.join(names)}{more}"
+        if nonCmk or unencrypted:
+            parts = []
+            if nonCmk:
+                names = [self._rpShortId(rp) for rp in nonCmk[:5]]
+                more = f" (+{len(nonCmk) - 5} more)" if len(nonCmk) > 5 else ""
+                parts.append(f"encrypted with an AWS-owned or AWS-managed key: {', '.join(names)}{more}")
+            if unencrypted:
+                names = [self._rpShortId(rp) for rp, _ in unencrypted[:5]]
+                more = f" (+{len(unencrypted) - 5} more)" if len(unencrypted) > 5 else ""
+                parts.append(f"not encrypted: {', '.join(names)}{more}")
+            self.results[key] = [
+                -1, f"Recovery point(s) not on a customer-managed KMS key - {'; '.join(parts)}"
+                + (f"; {len(unknown)} point(s) could not be evaluated" if unknown else "")
+            ]
+        elif unknown:
+            reasons = sorted({str(r) for _, r in unknown})
+            self.results[key] = [
+                0, f"Unable to evaluate ({', '.join(reasons[:3])}) for {len(unknown)} of "
+                   f"{len(self.recovery_points)} sampled recovery point(s)"
             ]
         else:
-            self.results['backupRecoveryPointNoCMK'] = [
-                1, "All sampled recovery points use a customer-managed KMS key"
+            self.results[key] = [
+                1, f"All {len(self.recovery_points)} sampled recovery points use a customer-managed KMS key"
             ]
 
     # ------------------------------------------------------------------ #
@@ -347,62 +447,34 @@ class BackupVault(Evaluator):
 
     @classmethod
     def _keyArnIsAwsOwned(cls, keyArn):
+        """True for an alias ARN of an AWS-managed key (alias/aws/...)."""
         if not keyArn:
             return False
         lower = keyArn.lower()
         return any(alias in lower for alias in cls.AWS_OWNED_KMS_ALIASES)
 
-    @staticmethod
-    def _parsePolicy(raw):
-        if not raw:
-            return None
-        if isinstance(raw, dict):
-            return raw
+    def _keyManager(self, keyArn):
+        """Return (KeyManager, None) - 'CUSTOMER' or 'AWS' - or (None, reason)
+        when it cannot be determined. AWS-managed alias ARNs are recognised
+        without an API call; everything else is resolved with kms:DescribeKey
+        (read-only), cached for the whole scan because many vaults and
+        recovery points share one key."""
+        if self._keyArnIsAwsOwned(keyArn):
+            return 'AWS', None
+        if self.kmsClient is None:
+            return None, 'kms client unavailable'
+
+        def fetch():
+            return (self.kmsClient.describe_key(KeyId=keyArn).get('KeyMetadata') or {}).get('KeyManager')
         try:
-            return json.loads(raw)
-        except (ValueError, TypeError):
-            return None
-
-    @staticmethod
-    def _policyStatements(policy):
-        if not isinstance(policy, dict):
-            return []
-        stmts = policy.get('Statement', [])
-        if isinstance(stmts, dict):
-            return [stmts]
-        return stmts if isinstance(stmts, list) else []
-
-    @staticmethod
-    def _principalIsWildcard(principal):
-        if principal is None:
-            return False
-        if principal == '*':
-            return True
-        if isinstance(principal, dict):
-            for v in principal.values():
-                if v == '*':
-                    return True
-                if isinstance(v, list) and '*' in v:
-                    return True
-        return False
-
-    # Conditions that legitimately scope a Principal:* Allow statement.
-    SCOPING_CONDITION_KEYS = frozenset({
-        'aws:SourceAccount', 'aws:SourceArn', 'aws:SourceOwner',
-        'aws:PrincipalOrgID', 'aws:PrincipalOrgPaths',
-        'aws:PrincipalAccount', 'aws:PrincipalArn',
-    })
-
-    def _conditionScopes(self, condition):
-        if not condition or not isinstance(condition, dict):
-            return False
-        for op_block in condition.values():
-            if not isinstance(op_block, dict):
-                continue
-            for key in op_block.keys():
-                if key in self.SCOPING_CONDITION_KEYS:
-                    return True
-        return False
+            manager = self._sharedMemo(('kms.describe_key', keyArn), fetch)
+        except botocore.exceptions.ClientError as e:
+            return None, e.response.get('Error', {}).get('Code') or 'ClientError'
+        except botocore.exceptions.BotoCoreError as e:
+            return None, type(e).__name__
+        if manager in ('CUSTOMER', 'AWS'):
+            return manager, None
+        return None, f"KeyManager={manager}"
 
     @staticmethod
     def _asDatetime(value):

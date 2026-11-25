@@ -367,5 +367,23 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/cloudwatch-alarms.html"
+	},
+	"AccessPolicyPublic": {
+		"category": "S",
+		"^description": "{$COUNT} OpenSearch domain(s) use a public endpoint and have an access policy that allows any principal (\"*\") to call the OpenSearch HTTP APIs without an aws:SourceIp, aws:SourceVpce or aws:PrincipalOrgID restriction. Without fine-grained access control (FGAC), anyone who can reach the endpoint can read, write or delete data; with FGAC anonymous authentication enabled, unauthenticated requests are accepted with the permissions of the FGAC anonymous role. Public domains that use this open policy with FGAC enabled and anonymous authentication disabled (the AWS-documented FGAC setup) are reported as informational instead: every request must still authenticate through FGAC, but the endpoint remains reachable from the internet.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"criticality": "H",
+		"needFullTest": 1,
+		"shortDesc": "Restrict the domain access policy to specific IAM principals or source IPs, or move the domain into a VPC.",
+		"ref": [
+			"[Identity and Access Management in Amazon OpenSearch Service]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ac.html>",
+			"[Security best practices for Amazon OpenSearch Service]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ac.html#ac-types-resource>",
+			"[Launching your Amazon OpenSearch Service domains within a VPC]<https://docs.aws.amazon.com/opensearch-service/latest/developerguide/vpc.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/opensearch-service/latest/developerguide/ac.html"
 	}
 }

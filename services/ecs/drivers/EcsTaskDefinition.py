@@ -1,3 +1,4 @@
+import json
 import re
 import botocore
 
@@ -36,6 +37,7 @@ class EcsTaskDefinition(Evaluator):
     # 40 ecsTaskDefinitionSensitiveHostPaths (T2)
     # 41 ecsTaskDefinitionUlimitsConfigured (T2)
     # 42 ecsTaskDefinitionEphemeralStorageEncryption (T2)
+    # 43 ecsTaskRoleOverprivileged (WAFS2027 SEC03-BP01)
 
     ROOT_USER_VALUES = {'', 'root', '0', '0:0'}
 
@@ -83,12 +85,17 @@ class EcsTaskDefinition(Evaluator):
     ULIMIT_NOFILE_MAX = 65536
     ULIMIT_NPROC_MAX = 4096
 
-    def __init__(self, task_def, secrets_client, ssm_client, cluster_has_fargate_cmk):
+    def __init__(self, task_def, secrets_client, ssm_client, cluster_has_fargate_cmk,
+                 iam_client=None, role_cache=None):
         super().__init__()
         self.td = task_def or {}
         self.secretsClient = secrets_client
         self.ssmClient = ssm_client
         self.cluster_has_fargate_cmk = bool(cluster_has_fargate_cmk)
+        self.iamClient = iam_client
+        # roleName -> (findings, errorCode); shared across task definitions so
+        # a task role used by many families is only inspected once per region.
+        self.roleCache = role_cache if role_cache is not None else {}
 
         family = self.td.get('family', 'unknown')
         rev = self.td.get('revision', '?')
@@ -454,6 +461,14 @@ class EcsTaskDefinition(Evaluator):
                 1, f"All {checked} probed secret reference(s) resolve"
             ]
 
+    def _sharedRead(self, client, op, **params):
+        """One read per (region, op, params) for the whole scan: the same secret or
+        parameter is often referenced by several containers and task definitions.
+        Only success / the raised ClientError matters, so the response (which may
+        hold a parameter value) is not kept."""
+        key = (client.meta.region_name, op, tuple(sorted(params.items())))
+        self._sharedMemo(key, lambda: getattr(client, op)(**params) and None)
+
     def _probeSecret(self, value_from):
         """
         Return 'ok' | 'broken' | 'unknown'.
@@ -473,7 +488,7 @@ class EcsTaskDefinition(Evaluator):
                 base = value_from.split(':secret:', 1)[0] + ':secret:' + \
                        value_from.split(':secret:', 1)[1].split(':', 1)[0]
                 try:
-                    self.secretsClient.describe_secret(SecretId=base)
+                    self._sharedRead(self.secretsClient, 'describe_secret', SecretId=base)
                     return 'ok'
                 except botocore.exceptions.ClientError as e:
                     code = e.response.get('Error', {}).get('Code', '')
@@ -486,7 +501,7 @@ class EcsTaskDefinition(Evaluator):
                 if not param_name.startswith('/'):
                     param_name = '/' + param_name
                 try:
-                    self.ssmClient.get_parameter(Name=param_name, WithDecryption=False)
+                    self._sharedRead(self.ssmClient, 'get_parameter', Name=param_name, WithDecryption=False)
                     return 'ok'
                 except botocore.exceptions.ClientError as e:
                     code = e.response.get('Error', {}).get('Code', '')
@@ -496,7 +511,7 @@ class EcsTaskDefinition(Evaluator):
             elif value_from.startswith('/') or not value_from.startswith('arn:'):
                 # Plain SSM parameter name
                 try:
-                    self.ssmClient.get_parameter(Name=value_from, WithDecryption=False)
+                    self._sharedRead(self.ssmClient, 'get_parameter', Name=value_from, WithDecryption=False)
                     return 'ok'
                 except botocore.exceptions.ClientError as e:
                     code = e.response.get('Error', {}).get('Code', '')
@@ -585,3 +600,189 @@ class EcsTaskDefinition(Evaluator):
                 f"Ephemeral storage {eph} GiB (> 20 default) but no cluster in region sets "
                 "fargateEphemeralStorageKmsKeyId"
             ]
+
+    # ------------------------------------------------------------------ #
+    # #43 ecsTaskRoleOverprivileged (WAFS2027 SEC03-BP01)
+    # ------------------------------------------------------------------ #
+    def _checkEcsTaskRoleOverprivileged(self):
+        key = 'ecsTaskRoleOverprivileged'
+        roleArn = self.td.get('taskRoleArn')
+        if not roleArn:
+            self.results[key] = [0, "No task role (taskRoleArn) configured"]
+            return
+        if self.iamClient is None:
+            self.results[key] = [0, "Unable to evaluate (IAM client unavailable)"]
+            return
+        roleName = _roleNameFromArn(roleArn)
+        if roleName not in self.roleCache:
+            self.roleCache[roleName] = _inspectTaskRole(self.iamClient, roleName)
+        findings, scopedFindings, errCode = self.roleCache[roleName]
+
+        if findings:
+            msg = f"Task role {roleName} is overprivileged: " + "; ".join(findings[:5])
+            if errCode:
+                msg += f" (some policies unreadable: {errCode})"
+            self.results[key] = [-1, msg]
+        elif errCode:
+            self.results[key] = [0, f"Unable to evaluate ({errCode})"]
+        elif scopedFindings:
+            ## '<svc>:*' limited to named resources is not admin-level; report it for
+            ## review rather than as a high-criticality finding.
+            self.results[key] = [
+                0, f"Task role {roleName} has no admin-level grants, but grants service-wide "
+                   f"wildcard actions on specific resources (review): " + "; ".join(scopedFindings[:5])]
+        else:
+            self.results[key] = [1, f"Task role {roleName} has no admin, service-wide wildcard or *FullAccess policies"]
+
+
+# ---------------------------------------------------------------------- #
+# Task-role inspection helpers (read-only IAM calls)
+# ---------------------------------------------------------------------- #
+_AWS_MANAGED_PREFIX = ':iam::aws:policy/'
+
+
+def _roleNameFromArn(arn):
+    """taskRoleArn may be a full ARN (optionally with a path) or a bare role name."""
+    if ':role/' in arn:
+        return arn.split(':role/', 1)[1].rsplit('/', 1)[-1]
+    return arn.rsplit('/', 1)[-1]
+
+
+## Service-wide wildcards on these services allow privilege escalation (granting the
+## role itself more permissions, or assuming other roles) even when Resource is scoped.
+_ESCALATION_SERVICES = ('iam', 'sts', 'organizations')
+## Resource part of an ARN that names no specific resource: '*', '*/*', or a
+## resource-type-wide wildcard such as 'table/*' or 'log-group:*'.
+_UNSCOPED_RESOURCE_RE = re.compile(r'^(?:[A-Za-z0-9-]+[/:])?[*/]+$')
+
+
+def _isUnscopedResource(res):
+    if not isinstance(res, str):
+        return True
+    res = res.strip()
+    if res == '*':
+        return True
+    parts = res.split(':', 5)
+    if len(parts) < 6 or parts[0] != 'arn':
+        return True
+    if parts[2] in ('', '*'):
+        return True
+    resPart = parts[5]
+    if parts[2] == 's3':
+        ## S3 ARNs have no resource type: 'arn:aws:s3:::*' / ':::*/*' are every bucket.
+        return bool(re.fullmatch(r'[*/]+', resPart))
+    return bool(_UNSCOPED_RESOURCE_RE.match(resPart))
+
+
+def _resourcesUnscoped(st):
+    """True when the statement applies to all resources of the service (or all of AWS)."""
+    if 'NotResource' in st or 'Resource' not in st:
+        return True
+    res = st.get('Resource')
+    if isinstance(res, str):
+        res = [res]
+    if not res:
+        return True
+    return any(_isUnscopedResource(r) for r in res)
+
+
+def _broadStatements(doc):
+    """Return (broad, scoped) sorted lists of grants in a policy document.
+
+    broad: '*' / '*:*' (full admin), Allow+NotAction, '<svc>:*' on all resources, or
+    '<svc>:*' for privilege-escalation services (iam/sts/organizations) on any resource.
+    scoped: '<svc>:*' whose Resource names specific resources, e.g.
+    's3:* on arn:aws:s3:::app-bucket/*' - still wider than needed, but not admin-level."""
+    if isinstance(doc, str):
+        try:
+            doc = json.loads(doc)
+        except (ValueError, TypeError):
+            return [], []
+    if not isinstance(doc, dict):
+        return [], []
+    stmts = doc.get('Statement', [])
+    if isinstance(stmts, dict):
+        stmts = [stmts]
+    found, scoped = set(), set()
+    for st in stmts or []:
+        if not isinstance(st, dict) or st.get('Effect') != 'Allow':
+            continue
+        if 'NotAction' in st:
+            found.add('Allow+NotAction')
+            continue
+        actions = st.get('Action', [])
+        if isinstance(actions, str):
+            actions = [actions]
+        unscoped = _resourcesUnscoped(st)
+        for a in actions or []:
+            if not isinstance(a, str):
+                continue
+            a = a.strip()
+            if a in ('*', '*:*'):
+                found.add('*')
+            elif a.endswith(':*'):
+                a = a.lower()
+                if unscoped or a.split(':', 1)[0] in _ESCALATION_SERVICES:
+                    found.add(a)
+                else:
+                    res = st.get('Resource')
+                    res = [res] if isinstance(res, str) else list(res or [])
+                    shown = ', '.join(str(r) for r in res[:3]) + (' ...' if len(res) > 3 else '')
+                    scoped.add(f"{a} on {shown}")
+    return sorted(found), sorted(scoped)
+
+
+def _inspectTaskRole(iamClient, roleName):
+    """Return (findings, scopedFindings, errorCode). findings are admin-level grants;
+    scopedFindings are service-wide wildcards limited to named resources. errorCode is
+    set when any part of the role could not be read, so the caller never reports PASS
+    on partial data."""
+    findings, scopedFindings = [], []
+    errCode = None
+    try:
+        attached = []
+        for page in iamClient.get_paginator('list_attached_role_policies').paginate(RoleName=roleName):
+            attached.extend(page.get('AttachedPolicies', []) or [])
+        inline = []
+        for page in iamClient.get_paginator('list_role_policies').paginate(RoleName=roleName):
+            inline.extend(page.get('PolicyNames', []) or [])
+    except botocore.exceptions.ClientError as e:
+        return [], [], e.response.get('Error', {}).get('Code', 'Unknown')
+
+    for p in attached:
+        arn = p.get('PolicyArn', '') or ''
+        name = p.get('PolicyName') or arn.rsplit('/', 1)[-1]
+        awsManaged = _AWS_MANAGED_PREFIX in arn
+        if awsManaged and name == 'AdministratorAccess':
+            findings.append("managed:AdministratorAccess")
+            continue
+        if awsManaged and name.endswith('FullAccess'):
+            findings.append(f"managed:{name}")
+            continue
+        try:
+            pol = iamClient.get_policy(PolicyArn=arn).get('Policy', {}) or {}
+            ver = pol.get('DefaultVersionId')
+            if not ver:
+                errCode = errCode or 'NoDefaultVersion'
+                continue
+            doc = iamClient.get_policy_version(PolicyArn=arn, VersionId=ver).get('PolicyVersion', {}).get('Document')
+            broad, scoped = _broadStatements(doc)
+            if broad:
+                findings.append(f"managed:{name} ({', '.join(broad)})")
+            if scoped:
+                scopedFindings.append(f"managed:{name} ({'; '.join(scoped)})")
+        except botocore.exceptions.ClientError as e:
+            errCode = errCode or e.response.get('Error', {}).get('Code', 'Unknown')
+
+    for pname in inline:
+        try:
+            doc = iamClient.get_role_policy(RoleName=roleName, PolicyName=pname).get('PolicyDocument')
+            broad, scoped = _broadStatements(doc)
+            if broad:
+                findings.append(f"inline:{pname} ({', '.join(broad)})")
+            if scoped:
+                scopedFindings.append(f"inline:{pname} ({'; '.join(scoped)})")
+        except botocore.exceptions.ClientError as e:
+            errCode = errCode or e.response.get('Error', {}).get('Code', 'Unknown')
+
+    return findings, scopedFindings, errCode

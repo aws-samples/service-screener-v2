@@ -27,7 +27,7 @@
         "needFullTest": 0,
         "ref": [
             "[Security standards]<https://docs.aws.amazon.com/securityhub/latest/userguide/standards-reference.html>",
-            "[Enabling standards]<https://docs.aws.amazon.com/securityhub/latest/userguide/set-standards.html>"
+            "[Enabling standards]<https://docs.aws.amazon.com/securityhub/latest/userguide/enable-standards.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -44,7 +44,7 @@
         "needFullTest": 0,
         "ref": [
             "[CIS AWS Foundations Benchmark]<https://docs.aws.amazon.com/securityhub/latest/userguide/cis-aws-foundations-benchmark.html>",
-            "[Enabling standards]<https://docs.aws.amazon.com/securityhub/latest/userguide/set-standards.html>"
+            "[Enabling standards]<https://docs.aws.amazon.com/securityhub/latest/userguide/enable-standards.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -61,7 +61,7 @@
         "needFullTest": 0,
         "ref": [
             "[Auto-enabling controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/controls-auto-enable.html>",
-            "[Managing controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/controls-manage.html>"
+            "[Managing controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/controls-auto-enable.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -128,11 +128,80 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Finding workflow status]<https://docs.aws.amazon.com/securityhub/latest/userguide/finding-workflow-status.html>",
+            "[Finding workflow status]<https://docs.aws.amazon.com/securityhub/latest/userguide/findings-workflow-status.html>",
             "[Managing findings]<https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-findings-viewing.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/securityhub/latest/userguide/finding-workflow-status.html"
+        "remediation_doc": "https://docs.aws.amazon.com/securityhub/latest/userguide/findings-workflow-status.html"
+    },
+    "shubFsbpStandardDisabled": {
+        "category": "S",
+        "^description": "{$COUNT} region(s) run Security Hub CSPM without the AWS Foundational Security Best Practices (FSBP) standard. FSBP is the AWS-curated set of controls that detects deviations from security best practice across the services in use (encryption, public access, logging, IAM). Without it, most service-level misconfigurations are not evaluated even though the hub is on.",
+        "shortDesc": "Enable the AWS Foundational Security Best Practices standard",
+        "criticality": "M",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[AWS Foundational Security Best Practices standard]<https://docs.aws.amazon.com/securityhub/latest/userguide/fsbp-standard.html>",
+            "[Enabling standards]<https://docs.aws.amazon.com/securityhub/latest/userguide/enable-standards.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/securityhub/latest/userguide/fsbp-standard.html"
+    },
+    "securityHubV2NotEnabled": {
+        "category": "S",
+        "^description": "{$COUNT} region(s) do not have the new AWS Security Hub enabled. Security Hub correlates findings from Amazon GuardDuty, Amazon Inspector, Amazon Macie and Security Hub CSPM into exposures and prioritised risks, giving a single place to see which issues actually combine into an attack path. Without it, related signals must be correlated by hand.",
+        "shortDesc": "Enable the new AWS Security Hub",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 1,
+        "needFullTest": 0,
+        "ref": [
+            "[What is AWS Security Hub]<https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub-v2.html>",
+            "[Enabling Security Hub]<https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-v2-enable.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/securityhub/latest/userguide/what-is-securityhub-v2.html"
+    },
+    "shubControlsDisabledNoReason": {
+        "category": "S",
+        "^description": "{$COUNT} region(s) have Security Hub controls disabled with no recorded reason. A disabled control is a deliberate exception to the security baseline; without a reason nobody can later tell whether it was a reviewed decision, a temporary workaround that was never reverted, or an accident, so the exception cannot be audited or revisited.",
+        "shortDesc": "Record a reason for every disabled Security Hub control",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Disabling controls]<https://docs.aws.amazon.com/securityhub/latest/userguide/disable-controls-overview.html>",
+            "[DescribeStandardsControls]<https://docs.aws.amazon.com/securityhub/1.0/APIReference/API_DescribeStandardsControls.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/securityhub/latest/userguide/disable-controls-overview.html"
+    },
+    "securityHubNoAutomationRules": {
+        "category": "S",
+        "^description": "{$COUNT} region(s) have Security Hub enabled but no sign of automated finding handling: no ENABLED Security Hub automation rule and no ENABLED EventBridge rule with a target on the default bus that matches Security Hub finding events (source aws.securityhub with detail-type 'Security Hub Findings - Imported', 'Findings Imported V2', or a custom action / insight event). A custom action without an EventBridge rule, or an SSM Automation document nothing invokes, does not respond to findings and is not counted. Findings are then triaged, suppressed and remediated entirely by hand, which does not scale and slows response. Member accounts of a Security Hub administrator and Regions linked into another aggregation Region are reported as informational, because automation rules for their findings are owned by the administrator account or the aggregation Region. This is a heuristic: automation that runs in an external SOAR polling the API is not visible here.",
+        "shortDesc": "Automate Security Hub finding response",
+        "criticality": "L",
+        "downtime": 0,
+        "slowness": 0,
+        "additionalCost": 0,
+        "needFullTest": 0,
+        "ref": [
+            "[Automation rules]<https://docs.aws.amazon.com/securityhub/latest/userguide/automation-rules.html>",
+            "[Custom actions and EventBridge]<https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cwe-custom-actions.html>",
+            "[Automated response and remediation]<https://docs.aws.amazon.com/securityhub/latest/userguide/securityhub-cloudwatch-events.html>"
+        ],
+        "remediation": null,
+        "remediation_risk": null,
+        "remediation_doc": "https://docs.aws.amazon.com/securityhub/latest/userguide/automation-rules.html"
     }
 }

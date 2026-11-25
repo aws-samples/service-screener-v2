@@ -13,6 +13,8 @@ from utils.Tools import _pi
 from utils.Tools import _warn
 
 from utils.Config import Config
+from services.Evaluator import _isTransient
+from services.ec2.acctCache import acctKey
 from services.Service import Service
 from services.ec2.drivers.Ec2Instance import Ec2Instance
 from services.ec2.drivers.Ec2CompOpt import Ec2CompOpt
@@ -24,11 +26,21 @@ from services.ec2.drivers.Ec2ElbCommon import Ec2ElbCommon
 from services.ec2.drivers.Ec2ElbClassic import Ec2ElbClassic
 from services.ec2.drivers.Ec2AutoScaling import Ec2AutoScaling
 from services.ec2.drivers.Ec2EbsSnapshot import Ec2EbsSnapshot
-from services.ec2.drivers.Ec2Vpc import Ec2Vpc
+from services.ec2.drivers.Ec2Vpc import Ec2Vpc, getPeerRouteContext
 from services.ec2.drivers.Ec2NACL import Ec2NACL
 from services.ec2.drivers.Ec2Regional import Ec2Regional
 from services.ec2.drivers.Ec2KeyPair import Ec2KeyPair
 from services.ec2.drivers.Ec2SSM import Ec2SSM
+from services.ec2.drivers.Ec2Ami import Ec2Ami
+from services.ec2.drivers.Ec2EbsSnapshotSharing import Ec2EbsSnapshotSharing
+from services.ec2.drivers.Ec2LaunchTemplate import Ec2LaunchTemplate
+from services.ec2.drivers.Ec2VpcEndpoint import Ec2VpcEndpoint
+from services.ec2.drivers.Ec2VpnConnection import Ec2VpnConnection
+from services.ec2.drivers.Ec2DataTierSecGroup import Ec2DataTierSecGroup, classifyDataTierEni
+from services.ec2.drivers.Ec2ImageBuilder import Ec2ImageBuilder
+from services.ec2.drivers.Ec2NetworkInterface import Ec2NetworkInterface, classifyEni, getSubnetRouting
+
+import concurrent.futures as cf
 
 class Ec2(Service):
     CHARTSTYPE = {
@@ -49,6 +61,9 @@ class Ec2(Service):
         self.asgClient = ssBoto.client('autoscaling', config=self.bConfig)
         self.wafv2Client = ssBoto.client('wafv2', config=self.bConfig)
         self.cwClient = ssBoto.client('cloudwatch', config=self.bConfig)
+        self.rbinClient = ssBoto.client('rbin', config=self.bConfig)
+        self.orgClient = ssBoto.client('organizations', config=self.bConfig)
+        self.ibClient = ssBoto.client('imagebuilder', config=self.bConfig)
         
         self.getOutdateSQLVersion()
         self.getWindowsVersion()
@@ -148,7 +163,7 @@ class Ec2(Service):
         of each doing its own describe_security_groups(GroupIds=...) call.
         Real fleets share a small number of SGs across many instances/ELBs -
         this call should scale with unique-SG count, not instance/ELB count."""
-        cacheKey = 'ec2::allsgs::' + self.region
+        cacheKey = acctKey('ec2::allsgs::' + self.region)
         cached = Config.get(cacheKey, None)
         if cached is not None:
             return cached
@@ -241,10 +256,11 @@ class Ec2(Service):
         
         arr = results.get('LoadBalancerDescriptions')
         while results.get('NextMarker') is not None:
-            results = self.elbClient.describe_load_balancers(
+            # Classic LB pagination must use the classic (elb) client
+            results = self.elbClassicClient.describe_load_balancers(
                 Marker = results.get('NextMarker')
             )
-            
+
             arr = arr + results.get('LoadBalancerDescriptions')
             
         return arr
@@ -357,15 +373,49 @@ class Ec2(Service):
         return flowLogList
         
     def getNetworkACLs(self):
-        result = self.ec2Client.describe_network_acls()
-        
-        networkACLs = result.get('NetworkAcls')
-        while result.get('NextToken') is not None:
-            result = self.ec2Client.describe_network_acls(
-                NextToken = result.get('NextToken')
-            )
-        networkACLs = networkACLs + result.get('NetworkAcls')
+        networkACLs = []
+        paginator = self.ec2Client.get_paginator('describe_network_acls')
+        for page in paginator.paginate():
+            networkACLs.extend(page.get('NetworkAcls', []))
         return networkACLs
+
+    def getInstanceAllSecurityGroups(self, instance):
+        """Every security group on the instance's network interfaces (no tag filter:
+        the groups decide what the instance accepts). Returns (groups, errorCode):
+        (None, '<code>') when unreadable, (groups, None) otherwise - the error is
+        returned with the result, not stored on self, so it cannot leak across
+        instances."""
+        ids = {g.get('GroupId') for g in instance.get('SecurityGroups', []) or []}
+        for eni in instance.get('NetworkInterfaces', []) or []:
+            ids.update(g.get('GroupId') for g in eni.get('Groups', []) or [])
+        try:
+            allSGs = self._getAllSecurityGroupsCached()
+        except botocore.exceptions.ClientError as e:
+            return None, e.response.get('Error', {}).get('Code', 'ClientError')
+        return [allSGs[i] for i in sorted(i for i in ids if i) if i in allSGs], None
+
+    def getDataTierSecurityGroups(self, enis):
+        """{groupId: (group, {kind: [eniId, ...]})} for security groups attached to
+        managed data-store network interfaces (tag filter applied to the groups)."""
+        usage = {}
+        for eni in enis:
+            kind = classifyDataTierEni(eni)
+            if kind is None:
+                continue
+            for g in eni.get('Groups', []) or []:
+                usage.setdefault(g.get('GroupId'), {}).setdefault(kind, []).append(eni.get('NetworkInterfaceId'))
+        if not usage:
+            return {}
+        allSGs = self._getAllSecurityGroupsCached()
+        out = {}
+        for gid, kinds in usage.items():
+            group = allSGs.get(gid)
+            if group is None:
+                continue
+            if self.tags and not ('Tags' in group and self.resourceHasTags(group['Tags'])):
+                continue
+            out[gid] = (group, kinds)
+        return out
 
     def getKeyPairs(self):
         filters = []
@@ -397,12 +447,19 @@ class Ec2(Service):
         instance as unmanaged (false positives).
         """
         managedSet = set()
+        pingStatus = {}
+        platform = {}
+        self.ssmError = None
+        self.ssmPingStatus = pingStatus
+        self.ssmPlatform = platform
         try:
             # MaxResults=50 is the API maximum — request full pages to
             # minimize round-trips for large fleets.
             results = self.ssmClient.describe_instance_information(MaxResults=50)
             for info in results.get('InstanceInformationList', []):
                 managedSet.add(info['InstanceId'])
+                pingStatus[info['InstanceId']] = info.get('PingStatus')
+                platform[info['InstanceId']] = info.get('PlatformType')
             
             while results.get('NextToken'):
                 results = self.ssmClient.describe_instance_information(
@@ -411,13 +468,214 @@ class Ec2(Service):
                 )
                 for info in results.get('InstanceInformationList', []):
                     managedSet.add(info['InstanceId'])
+                    pingStatus[info['InstanceId']] = info.get('PingStatus')
+                    platform[info['InstanceId']] = info.get('PlatformType')
         except botocore.exceptions.ClientError as e:
+            self.ssmError = e.response['Error']['Code']
             _warn("Unable to retrieve SSM managed instances ({}); skipping SSM check to avoid false positives.".format(e.response['Error']['Code']))
             return None
         except Exception as e:
+            self.ssmError = type(e).__name__
             _warn("Unable to retrieve SSM managed instances ({}); skipping SSM check to avoid false positives.".format(e))
             return None
         return managedSet
+
+    def _ruleSelected(self, ruleName):
+        """True when no --rules filter is set or ruleName is in it. Used to skip
+        expensive pre-fetches whose only consumer is a single check."""
+        rules = Config.get(self.RULESPREFIX, []) or []
+        return not rules or ruleName.lower() in rules
+
+    def getSelfImages(self):
+        """AMIs owned by this account (paginated; tag filters applied)."""
+        kwargs = {'Owners': ['self']}
+        if self.tags:
+            kwargs['Filters'] = self.tags
+        images = []
+        paginator = self.ec2Client.get_paginator('describe_images')
+        for page in paginator.paginate(**kwargs):
+            images.extend(page.get('Images', []))
+        return images
+
+    def getOrgContext(self):
+        """Organization membership for outside-org sharing checks, cached per scan.
+        inOrg: True / False / None (unknown). accounts: set of member account IDs, or
+        None when not listable (only the management or a delegated admin account can
+        call organizations:ListAccounts)."""
+        cacheKey = acctKey('ec2::orgContext')
+        cached = Config.get(cacheKey, None)
+        if cached is not None:
+            return cached
+
+        ctx = {'inOrg': None, 'accounts': None, 'error': None, 'orgId': None}
+        transient = False
+        try:
+            org = self.orgClient.describe_organization()
+            ctx['inOrg'] = True
+            ctx['orgId'] = (org.get('Organization') or {}).get('Id')
+        except botocore.exceptions.ClientError as e:
+            code = e.response['Error']['Code']
+            if code == 'AWSOrganizationsNotInUseException':
+                ctx['inOrg'] = False
+            else:
+                ctx['error'] = code
+                transient = _isTransient(e)
+        except Exception as e:
+            ctx['error'] = type(e).__name__
+            transient = _isTransient(e)
+
+        if ctx['inOrg'] is True:
+            try:
+                accounts = set()
+                paginator = self.orgClient.get_paginator('list_accounts')
+                for page in paginator.paginate():
+                    for acct in page.get('Accounts', []):
+                        accounts.add(acct['Id'])
+                ctx['accounts'] = accounts
+            except botocore.exceptions.ClientError as e:
+                ctx['accountsError'] = e.response['Error']['Code']
+                transient = _isTransient(e)
+            except Exception as e:
+                ctx['accountsError'] = type(e).__name__
+                transient = _isTransient(e)
+
+        if not transient:   # throttling / 5xx: not cached, the next caller retries
+            Config.set(cacheKey, ctx)
+        return ctx
+
+    def getSelfSnapshots(self):
+        """Self-owned EBS snapshots (paginated; tag filters applied)."""
+        kwargs = {'OwnerIds': ['self']}
+        if self.tags:
+            kwargs['Filters'] = self.tags
+        snapshots = []
+        paginator = self.ec2Client.get_paginator('describe_snapshots')
+        for page in paginator.paginate(**kwargs):
+            snapshots.extend(page.get('Snapshots', []))
+        return snapshots
+
+    def getSnapshotSharing(self, snapshots=None):
+        """[(snapshot, {'perms': [...]} | {'error': code})] for every self-owned
+        snapshot. describe_snapshot_attribute is one call per snapshot, so the
+        calls are made concurrently (botocore clients are thread-safe)."""
+        if snapshots is None:
+            snapshots = Ec2.getSelfSnapshots(self)
+
+        def fetch(snap):
+            try:
+                resp = self.ec2Client.describe_snapshot_attribute(
+                    SnapshotId = snap['SnapshotId'],
+                    Attribute = 'createVolumePermission'
+                )
+                return {'perms': resp.get('CreateVolumePermissions', [])}
+            except botocore.exceptions.ClientError as e:
+                return {'error': e.response['Error']['Code']}
+            except Exception as e:
+                return {'error': type(e).__name__}
+
+        if not snapshots:
+            return []
+        with cf.ThreadPoolExecutor(max_workers=8) as executor:
+            perms = list(executor.map(fetch, snapshots))
+        return list(zip(snapshots, perms))
+
+    def getImageLaunchPermissions(self, images):
+        """{imageId: {'perms': [...]} | {'error': code}} - describe_image_attribute
+        (launchPermission) is one call per AMI, so calls are made concurrently."""
+        def fetch(image):
+            try:
+                resp = self.ec2Client.describe_image_attribute(
+                    ImageId = image['ImageId'],
+                    Attribute = 'launchPermission'
+                )
+                return {'perms': resp.get('LaunchPermissions', [])}
+            except botocore.exceptions.ClientError as e:
+                return {'error': e.response['Error']['Code']}
+            except Exception as e:
+                return {'error': type(e).__name__}
+
+        if not images:
+            return {}
+        with cf.ThreadPoolExecutor(max_workers=8) as executor:
+            perms = list(executor.map(fetch, images))
+        return {img['ImageId']: p for img, p in zip(images, perms)}
+
+    def getLaunchTemplates(self):
+        kwargs = {}
+        if self.tags:
+            kwargs['Filters'] = self.tags
+        templates = []
+        paginator = self.ec2Client.get_paginator('describe_launch_templates')
+        for page in paginator.paginate(**kwargs):
+            templates.extend(page.get('LaunchTemplates', []))
+        return templates
+
+    def getVpcEndpoints(self):
+        kwargs = {}
+        if self.tags:
+            kwargs['Filters'] = self.tags
+        endpoints = []
+        paginator = self.ec2Client.get_paginator('describe_vpc_endpoints')
+        for page in paginator.paginate(**kwargs):
+            endpoints.extend(page.get('VpcEndpoints', []))
+        return endpoints
+
+    def getAllVpcEndpoints(self):
+        """Every VPC endpoint of the region (no tag filter: an untagged endpoint
+        still serves a tagged VPC). Returns (endpoints, None) or (None, errorCode)."""
+        try:
+            endpoints = []
+            paginator = self.ec2Client.get_paginator('describe_vpc_endpoints')
+            for page in paginator.paginate():
+                endpoints.extend(page.get('VpcEndpoints', []))
+            return endpoints, None
+        except botocore.exceptions.ClientError as e:
+            return None, e.response['Error']['Code']
+
+    def getVpnConnections(self):
+        """DescribeVpnConnections is not paginated and returns every connection."""
+        kwargs = {}
+        if self.tags:
+            kwargs['Filters'] = self.tags
+        return self.ec2Client.describe_vpn_connections(**kwargs).get('VpnConnections', [])
+
+    def getEndpointPolicySupport(self, serviceNames):
+        """({serviceName: VpcEndpointPolicySupported}, errorCode|None). Unknown /
+        unavailable service names are looked up one by one so one bad name does
+        not hide the rest."""
+        names = sorted({n for n in serviceNames if n})
+        support, error = {}, None
+
+        def lookup(batch):
+            out = {}
+            paginator = self.ec2Client.get_paginator('describe_vpc_endpoint_services')
+            for page in paginator.paginate(ServiceNames=batch):
+                for d in page.get('ServiceDetails', []):
+                    out[d.get('ServiceName')] = d.get('VpcEndpointPolicySupported')
+            return out
+
+        for i in range(0, len(names), 100):
+            batch = names[i:i+100]
+            try:
+                support.update(lookup(batch))
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                if code != 'InvalidServiceName':
+                    error = code
+                    continue
+                for name in batch:
+                    try:
+                        support.update(lookup([name]))
+                    except botocore.exceptions.ClientError as e2:
+                        error = e2.response['Error']['Code']
+        return support, error
+
+    def getNetworkInterfaces(self):
+        enis = []
+        paginator = self.ec2Client.get_paginator('describe_network_interfaces')
+        for page in paginator.paginate():
+            enis.extend(page.get('NetworkInterfaces', []))
+        return enis
 
     def getChartGenCost(self):
         '''
@@ -547,12 +805,12 @@ class Ec2(Service):
         
         # Regional-level checks (EBS encryption by default, service quotas)
         _pi('EC2::Regional Checks')
-        obj = Ec2Regional(self.ec2Client, self.compOptClient)
+        obj = Ec2Regional(self.ec2Client, self.compOptClient, self.rbinClient)
         obj.run(self.__class__)
         objs['EC2::Regional'] = obj.getInfo()
         
         # compute optimizer checks
-        hasRunComputeOpt = Config.get('EC2_HasRunComputeOpt', False)
+        hasRunComputeOpt = Config.get(acctKey('EC2_HasRunComputeOpt'), False)
         if hasRunComputeOpt == False:
             try:
                 compOptPath = "/aws/service/global-infrastructure/regions/" + self.region + "/services/compute-optimizer";
@@ -565,7 +823,7 @@ class Ec2(Service):
                     obj = Ec2CompOpt(self.compOptClient)
                     obj.run(self.__class__)
                     objs['ComputeOptimizer'] = obj.getInfo()
-                    Config.set('EC2_HasRunComputeOpt', True)
+                    Config.set(acctKey('EC2_HasRunComputeOpt'), True)
                     
             except botocore.exceptions.ClientError as e:
                 ecode = e.response['Error']['Code']
@@ -577,14 +835,14 @@ class Ec2(Service):
             
         
         #EC2 Cost Explorer checks
-        hasRunRISP = Config.get('EC2_HasRunRISP', False)
+        hasRunRISP = Config.get(acctKey('EC2_HasRunRISP'), False)
         if hasRunRISP == False:
             _pi('Cost Explorer Recommendations')
             obj = Ec2CostExplorerRecs(self.ceClient)
             obj.run(self.__class__)
     
             objs['CostExplorer'] = obj.getInfo()
-            Config.set('EC2_HasRunRISP', True)
+            Config.set(acctKey('EC2_HasRunRISP'), True)
         
         # EC2 instance checks
         instances = self.getResources()
@@ -621,6 +879,131 @@ class Ec2(Service):
 
         obj.run(self.__class__)
         objs["EBS::Snapshots"] = obj.getInfo()
+
+        selfAccount = (Config.get('stsInfo', {}) or {}).get('Account')
+
+        # Self-owned AMIs (also used to label AMI backing snapshots)
+        amiKeys = [k for k in ('ec2AmiPublic', 'ec2AmiSharedExternally') if self._ruleSelected(k)]
+        images = None
+        if amiKeys:
+            try:
+                images = self.getSelfImages()
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                _warn("Unable to list self-owned AMIs ({})".format(code))
+                objs["AMI::unavailable"] = {'results': {k: [0, f"Unable to evaluate ({code})"] for k in amiKeys}, 'info': {}}
+            if images:
+                amiPerms = {}
+                amiOrgCtx = None
+                if self._ruleSelected('ec2AmiSharedExternally'):
+                    amiPerms = self.getImageLaunchPermissions(images)
+                    amiOrgCtx = self.getOrgContext()
+                for image in images:
+                    _pi('EC2::AMI', image['ImageId'])
+                    obj = Ec2Ami(image, amiPerms.get(image['ImageId']), selfAccount, amiOrgCtx)
+                    obj.run(self.__class__)
+                    objs[f"AMI::{image['ImageId']}"] = obj.getInfo()
+
+        # Per-snapshot checks (sharing: one describe_snapshot_attribute per
+        # snapshot - only fetched when that check is selected)
+        snapKeys = [k for k in ('ebsSnapshotSharedExternally', 'ebsSnapshotUnencrypted') if self._ruleSelected(k)]
+        if snapKeys:
+            try:
+                snapshots = self.getSelfSnapshots()
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                _warn("Unable to list EBS snapshots ({})".format(code))
+                objs["EBSSnapshot::unavailable"] = {'results': {k: [0, f"Unable to evaluate ({code})"] for k in snapKeys}, 'info': {}}
+                snapshots = []
+            if snapshots:
+                permsById = {}
+                orgCtx = None
+                if self._ruleSelected('ebsSnapshotSharedExternally'):
+                    permsById = {snap['SnapshotId']: perms for snap, perms in self.getSnapshotSharing(snapshots)}
+                    orgCtx = self.getOrgContext()
+                backing = {}
+                for image in images or []:
+                    for bdm in image.get('BlockDeviceMappings', []) or []:
+                        sid = (bdm.get('Ebs') or {}).get('SnapshotId')
+                        if sid:
+                            backing.setdefault(sid, []).append(image['ImageId'])
+                for snap in snapshots:
+                    _pi('EBS::Snapshot', snap['SnapshotId'])
+                    obj = Ec2EbsSnapshotSharing(snap, permsById.get(snap['SnapshotId']), selfAccount, orgCtx,
+                                                backing.get(snap['SnapshotId']))
+                    obj.run(self.__class__)
+                    objs[f"EBSSnapshot::{snap['SnapshotId']}"] = obj.getInfo()
+
+        # Launch template user data
+        if self._ruleSelected('ec2UserDataSecrets'):
+            try:
+                templates = self.getLaunchTemplates()
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                _warn("Unable to list launch templates ({})".format(code))
+                objs["LaunchTemplate::unavailable"] = {'results': {'ec2UserDataSecrets': [0, f"Unable to evaluate ({code})"]}, 'info': {}}
+                templates = []
+            for lt in templates:
+                _pi('EC2::Launch Template', lt['LaunchTemplateId'])
+                obj = Ec2LaunchTemplate(lt, self.ec2Client)
+                obj.run(self.__class__)
+                objs[f"LaunchTemplate::{lt['LaunchTemplateId']}"] = obj.getInfo()
+
+        # VPC endpoint policies
+        if self._ruleSelected('vpcEndpointPolicyFullAccess'):
+            try:
+                endpoints = self.getVpcEndpoints()
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                _warn("Unable to list VPC endpoints ({})".format(code))
+                objs["VPCEndpoint::unavailable"] = {'results': {'vpcEndpointPolicyFullAccess': [0, f"Unable to evaluate ({code})"]}, 'info': {}}
+                endpoints = []
+            if endpoints:
+                support, supportErr = self.getEndpointPolicySupport([ep.get('ServiceName') for ep in endpoints])
+                for ep in endpoints:
+                    _pi('VPC::Endpoint', ep['VpcEndpointId'])
+                    obj = Ec2VpcEndpoint(ep, support.get(ep.get('ServiceName')), supportErr)
+                    obj.run(self.__class__)
+                    objs[f"VPCEndpoint::{ep['VpcEndpointId']}"] = obj.getInfo()
+
+        # Internal-tier managed-service interfaces (RDS / ElastiCache / ECS) in public subnets;
+        # EC2 instances are evaluated by Ec2Instance
+        eniKeys = [k for k in ('ec2InstanceInPublicSubnet', 'sgUnrestrictedEgress') if self._ruleSelected(k)]
+        enis = []
+        if eniKeys:
+            try:
+                enis = self.getNetworkInterfaces()
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                _warn("Unable to list network interfaces ({})".format(code))
+                objs["ENI::unavailable"] = {'results': {k: [0, f"Unable to evaluate ({code})"] for k in eniKeys}, 'info': {}}
+        if self._ruleSelected('ec2InstanceInPublicSubnet'):
+            routing = None
+            for eni in enis:
+                kind = classifyEni(eni)
+                if kind is None:
+                    continue
+                if routing is None:
+                    routing = getSubnetRouting(self.ec2Client)
+                _pi('EC2::Network Interface', eni['NetworkInterfaceId'])
+                obj = Ec2NetworkInterface(eni, kind, routing)
+                obj.run(self.__class__)
+                objs[f"ENI::{eni['NetworkInterfaceId']}"] = obj.getInfo()
+
+        # Security groups of managed data stores (RDS / ElastiCache / Redshift / OpenSearch)
+        if enis and self._ruleSelected('sgUnrestrictedEgress'):
+            for gid, (group, usage) in self.getDataTierSecurityGroups(enis).items():
+                _pi('EC2::Data-tier Security Group', gid)
+                obj = Ec2DataTierSecGroup(group, usage)
+                obj.run(self.__class__)
+                objs[f"DataTierSG::{gid}"] = obj.getInfo()
+
+        # Image pipelines (region level)
+        if self._ruleSelected('imagebuilderNoPipeline'):
+            _pi('EC2::Image Builder')
+            obj = Ec2ImageBuilder(self.ibClient, self.ec2Client, list(instancesById.values()))
+            obj.run(self.__class__)
+            objs['EC2::ImageBuilder'] = obj.getInfo()
         
         
         # ELB checks
@@ -683,12 +1066,46 @@ class Ec2(Service):
         # VPC Checks
         vpcs = self.getVpcs()
         flowLogs = self.getFlowLogs()
+        vpcRouting, allEndpoints, allEndpointsErr = None, None, None
+        if vpcs and (self._ruleSelected('vpcNoGatewayEndpoints') or self._ruleSelected('ssmVpcEndpointsMissing')):
+            vpcRouting = getSubnetRouting(self.ec2Client)
+            allEndpoints, allEndpointsErr = self.getAllVpcEndpoints()
+        vpcInstances = list(instancesById.values()) if self._ruleSelected('ssmVpcEndpointsMissing') else None
+        # SSM managed instances: read once here, used by ssmVpcEndpointsMissing (agents
+        # Online through centralized endpoints) and by the per-instance SSM checks below.
+        ssmManagedSet = self.getSSMManagedInstances()
+        vpcPing = getattr(self, 'ssmPingStatus', None) if ssmManagedSet is not None else None
+        peerRouting = None
+        if vpcs and self._ruleSelected('vpcPeeringFullRoute'):
+            # reuse the route tables getSubnetRouting already read in this scan (for the VPC
+            # or the instance checks), when it ran and succeeded; otherwise read them here
+            routingCtx = vpcRouting or Config.get(acctKey('ec2::subnetRouting::' + str(self.ec2Client.meta.region_name)), None)
+            routeTables = (routingCtx or {}).get('_routeTables')
+            peerRouting = getPeerRouteContext(self.ec2Client, vpcs, routeTables)
         for vpc in vpcs:
             _pi('VPC::Virtual Private Cloud', vpc['VpcId'])
-            obj = Ec2Vpc(vpc, flowLogs, self.ec2Client)
+            obj = Ec2Vpc(vpc, flowLogs, self.ec2Client, vpcRouting, allEndpoints, allEndpointsErr, selfAccount,
+                         vpcInstances, peerRouting, vpcPing)
             obj.run(self.__class__)
             objs[f"VPC::{vpc['VpcId']}"] = obj.getInfo()
             
+        # Site-to-Site VPN tunnel options
+        if self._ruleSelected('vpnWeakTunnelCrypto'):
+            try:
+                vpns = self.getVpnConnections()
+            except botocore.exceptions.ClientError as e:
+                code = e.response['Error']['Code']
+                _warn("Unable to list VPN connections ({})".format(code))
+                objs["VPN::unavailable"] = {'results': {'vpnWeakTunnelCrypto': [0, f"Unable to evaluate ({code})"]}, 'info': {}}
+                vpns = []
+            for vpn in vpns:
+                if vpn.get('State') in ('deleting', 'deleted'):
+                    continue
+                _pi('VPC::VPN Connection', vpn['VpnConnectionId'])
+                obj = Ec2VpnConnection(vpn)
+                obj.run(self.__class__)
+                objs[f"VPN::{vpn['VpnConnectionId']}"] = obj.getInfo()
+
         # NACL Checks
         nacls = self.getNetworkACLs()
         for nacl in nacls:
@@ -707,21 +1124,28 @@ class Ec2(Service):
             obj.run(self.__class__)
             objs[f"KeyPair::{kp['KeyName']}"] = obj.getInfo()
         
-        # SSM Managed Instance Checks
-        ssmManagedSet = self.getSSMManagedInstances()
-        # Skip the SSM check entirely if the managed-instance lookup failed
-        # (getSSMManagedInstances returns None) to avoid false positives.
-        if ssmManagedSet is not None:
+        # SSM Managed Instance Checks (ssmManagedSet read before the VPC checks)
+        # If the managed-instance lookup failed (getSSMManagedInstances returns
+        # None) EC2SSMNotManaged is skipped to avoid false positives;
+        # ec2InstanceWithKeyPair then reports "Unable to evaluate".
+        if (ssmManagedSet is not None or self._ruleSelected('ec2InstanceWithKeyPair')
+                or self._ruleSelected('ec2SshdRunning') or self._ruleSelected('selfManagedDataStoreOnEc2')):
             for instanceArr in instances:
                 for instanceData in instanceArr['Instances']:
                     if instanceData['State']['Name'] not in ('running', 'stopped'):
                         continue
                     _pi('EC2::SSM Check', instanceData['InstanceId'])
-                    obj = Ec2SSM(instanceData['InstanceId'], ssmManagedSet)
+                    instSgs, instSgError = (self.getInstanceAllSecurityGroups(instanceData)
+                                            if self._ruleSelected('selfManagedDataStoreOnEc2') else (None, None))
+                    obj = Ec2SSM(instanceData['InstanceId'], ssmManagedSet, instanceData,
+                                 getattr(self, 'ssmError', None), getattr(self, 'ssmPingStatus', None),
+                                 self.ssmClient, getattr(self, 'ssmPlatform', None),
+                                 instSgs, instSgError)
                     obj.run(self.__class__)
                     objs[f"SSM::{instanceData['InstanceId']}"] = obj.getInfo()
         
-        if self.getChartGenCost():
-            self.setChartData({"EC2 Instance Family Pricing": self.getChartGenCost()})
+        chartGenCost = self.getChartGenCost()
+        if chartGenCost:
+            self.setChartData({"EC2 Instance Family Pricing": chartGenCost})
 
         return objs

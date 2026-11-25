@@ -10,7 +10,7 @@
         "needFullTest": 1,
         "ref": [
             "[Encrypting query results]<https://docs.aws.amazon.com/athena/latest/ug/encryption.html>",
-            "[Workgroup settings]<https://docs.aws.amazon.com/athena/latest/ug/workgroups-settings.html>"
+            "[Workgroup settings]<https://docs.aws.amazon.com/athena/latest/ug/creating-workgroups.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -27,7 +27,7 @@
         "needFullTest": 1,
         "ref": [
             "[Workgroup settings override]<https://docs.aws.amazon.com/athena/latest/ug/workgroups-settings-override.html>",
-            "[Workgroup settings]<https://docs.aws.amazon.com/athena/latest/ug/workgroups-settings.html>"
+            "[Workgroup settings]<https://docs.aws.amazon.com/athena/latest/ug/creating-workgroups.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -44,7 +44,7 @@
         "needFullTest": 1,
         "ref": [
             "[Minimum encryption]<https://docs.aws.amazon.com/athena/latest/ug/encryption.html>",
-            "[Workgroup settings]<https://docs.aws.amazon.com/athena/latest/ug/workgroups-settings.html>"
+            "[Workgroup settings]<https://docs.aws.amazon.com/athena/latest/ug/creating-workgroups.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -78,7 +78,7 @@
         "needFullTest": 0,
         "ref": [
             "[Query results location]<https://docs.aws.amazon.com/athena/latest/ug/querying.html>",
-            "[Workgroup settings]<https://docs.aws.amazon.com/athena/latest/ug/workgroups-settings.html>"
+            "[Workgroup settings]<https://docs.aws.amazon.com/athena/latest/ug/creating-workgroups.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -112,7 +112,7 @@
         "needFullTest": 1,
         "ref": [
             "[Athena engine versioning]<https://docs.aws.amazon.com/athena/latest/ug/engine-versions.html>",
-            "[Engine version reference]<https://docs.aws.amazon.com/athena/latest/ug/engine-versions-reference.html>"
+            "[Engine version reference]<https://docs.aws.amazon.com/athena/latest/ug/engine-versions.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -129,7 +129,7 @@
         "needFullTest": 0,
         "ref": [
             "[Monitoring with CloudWatch]<https://docs.aws.amazon.com/athena/latest/ug/query-metrics-viewing.html>",
-            "[Workgroup settings]<https://docs.aws.amazon.com/athena/latest/ug/workgroups-settings.html>"
+            "[Workgroup settings]<https://docs.aws.amazon.com/athena/latest/ug/creating-workgroups.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
@@ -145,12 +145,12 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Managing workgroups]<https://docs.aws.amazon.com/athena/latest/ug/workgroups-procedure.html>",
-            "[Workgroup settings]<https://docs.aws.amazon.com/athena/latest/ug/workgroups-settings.html>"
+            "[Managing workgroups]<https://docs.aws.amazon.com/athena/latest/ug/workgroups-enabled-disabled.html>",
+            "[Workgroup settings]<https://docs.aws.amazon.com/athena/latest/ug/creating-workgroups.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/athena/latest/ug/workgroups-procedure.html"
+        "remediation_doc": "https://docs.aws.amazon.com/athena/latest/ug/workgroups-enabled-disabled.html"
     },
     "athenaNoTags": {
         "category": "O",
@@ -162,11 +162,11 @@
         "additionalCost": 0,
         "needFullTest": 0,
         "ref": [
-            "[Tagging workgroups]<https://docs.aws.amazon.com/athena/latest/ug/tags-best-practices.html>",
+            "[Tagging workgroups]<https://docs.aws.amazon.com/athena/latest/ug/tags.html>",
             "[Tagging AWS resources]<https://docs.aws.amazon.com/tag-editor/latest/userguide/tagging.html>"
         ],
         "remediation": null,
         "remediation_risk": null,
-        "remediation_doc": "https://docs.aws.amazon.com/athena/latest/ug/tags-best-practices.html"
+        "remediation_doc": "https://docs.aws.amazon.com/athena/latest/ug/tags.html"
     }
 }

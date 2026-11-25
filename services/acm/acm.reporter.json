@@ -26,7 +26,7 @@
 		"criticality": "H",
 		"shortDesc": "Certificate has expired",
 		"ref": [
-			"[ACM Certificate Lifecycle]<https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate.html>",
+			"[ACM Certificate Lifecycle]<https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate-characteristics.html>",
 			"[Troubleshoot certificate renewal]<https://docs.aws.amazon.com/acm/latest/userguide/troubleshooting-renewal.html>"
 		],
 		"remediation": null,
@@ -44,11 +44,11 @@
 		"shortDesc": "RSA key too short (< 2048 bits)",
 		"ref": [
 			"[ACM.2 Security Hub Control]<https://docs.aws.amazon.com/securityhub/latest/userguide/acm-controls.html>",
-			"[ACM Supported Key Algorithms]<https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate.html>"
+			"[ACM Supported Key Algorithms]<https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate-characteristics.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate.html"
+		"remediation_doc": "https://docs.aws.amazon.com/acm/latest/userguide/acm-certificate-characteristics.html"
 	},
 	"acmCertRenewalFailed": {
 		"category": "R",
@@ -77,11 +77,11 @@
 		"criticality": "H",
 		"shortDesc": "Certificate has been revoked",
 		"ref": [
-			"[ACM Certificate Revocation]<https://docs.aws.amazon.com/acm/latest/userguide/revocation-reasons.html>"
+			"[ACM Certificate Revocation]<https://docs.aws.amazon.com/acm/latest/userguide/revoke-certificate.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/acm/latest/userguide/revocation-reasons.html"
+		"remediation_doc": "https://docs.aws.amazon.com/acm/latest/userguide/revoke-certificate.html"
 	},
 	"acmCertExpiry90Days": {
 		"category": "O",
@@ -125,11 +125,11 @@
 		"criticality": "M",
 		"shortDesc": "Certificate validation stuck or failed",
 		"ref": [
-			"[Troubleshoot validation]<https://docs.aws.amazon.com/acm/latest/userguide/troubleshooting-validation.html>"
+			"[Troubleshoot validation]<https://docs.aws.amazon.com/acm/latest/userguide/certificate-validation.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/acm/latest/userguide/troubleshooting-validation.html"
+		"remediation_doc": "https://docs.aws.amazon.com/acm/latest/userguide/certificate-validation.html"
 	},
 	"acmCertRenewalIneligible": {
 		"category": "O",
@@ -214,5 +214,58 @@
 		"remediation": null,
 		"remediation_risk": null,
 		"remediation_doc": "https://docs.aws.amazon.com/acm/latest/userguide/import-reimport.html"
+	},
+	"pcaCaCertExpiringOrFailed": {
+		"category": "S",
+		"^description": "You have {$COUNT} AWS Private CA certificate authorities that have FAILED or EXPIRED, or whose CA certificate expires soon (within 365 days for a root CA, 90 days for a subordinate CA). When a CA certificate expires, every certificate it issued stops validating and the CA can no longer issue certificates. Rotating a root CA takes a long time because the new root must reach every trust store. Plan the renewal or replacement before the CA certificate expires.",
+		"downtime": 1,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"criticality": "H",
+		"shortDesc": "Private CA failed, expired or expiring soon",
+		"ref": [
+			"[Managing the private CA lifecycle]<https://docs.aws.amazon.com/privateca/latest/userguide/ca-lifecycle.html>",
+			"[Private CA best practices]<https://docs.aws.amazon.com/privateca/latest/userguide/ca-best-practices.html>",
+			"[DescribeCertificateAuthority]<https://docs.aws.amazon.com/privateca/latest/APIReference/API_DescribeCertificateAuthority.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/privateca/latest/userguide/ca-lifecycle.html"
+	},
+	"pcaRevocationNotConfigured": {
+		"category": "S",
+		"^description": "You have {$COUNT} active AWS Private CA certificate authorities with neither CRL nor OCSP enabled. Without a way to check revocation, relying parties keep trusting a compromised or retired certificate until it expires. Enable CRL distribution or OCSP. If certificates are short-lived, use short-lived certificate mode instead.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 1,
+		"needFullTest": 0,
+		"criticality": "M",
+		"shortDesc": "Private CA has no CRL or OCSP revocation",
+		"ref": [
+			"[Planning a certificate revocation method]<https://docs.aws.amazon.com/privateca/latest/userguide/revocation-setup.html>",
+			"[Private CA best practices]<https://docs.aws.amazon.com/privateca/latest/userguide/ca-best-practices.html>"
+		],
+		"remediation": "aws acm-pca update-certificate-authority --certificate-authority-arn {ResourceArn} --revocation-configuration OcspConfiguration={Enabled=true}",
+		"remediation_risk": "low",
+		"remediation_doc": "https://docs.aws.amazon.com/privateca/latest/userguide/revocation-setup.html"
+	},
+	"pcaRootCaInWorkloadAccount": {
+		"category": "S",
+		"^description": "[Heuristic] An active AWS Private CA root CA is in an account and Region that also has ACM certificates in use by AWS resources, which suggests the root sits in a workload account. Keep root CAs in a dedicated, tightly restricted PKI account, and let only subordinate CAs (shared through AWS RAM if needed) issue workload certificates. This limits who can reach the trust anchor. If this account is already a dedicated PKI account, you can ignore this finding.",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"criticality": "L",
+		"shortDesc": "Root CA appears to live in a workload account",
+		"ref": [
+			"[Private CA best practices - CA hierarchy]<https://docs.aws.amazon.com/privateca/latest/userguide/ca-best-practices.html>",
+			"[Designing a CA hierarchy]<https://docs.aws.amazon.com/privateca/latest/userguide/ca-hierarchy.html>",
+			"[Using AWS RAM to share a private CA cross-account]<https://docs.aws.amazon.com/privateca/latest/userguide/pca-ram.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/privateca/latest/userguide/ca-hierarchy.html"
 	}
 }

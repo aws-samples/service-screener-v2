@@ -38,7 +38,7 @@ Enhanced EKS service with 14 new checks across Security, Reliability, and Cost O
    - Reduces operational overhead
 
 8. **eksNoIRSAConfigured** (Security - High)
-   - Validates OIDC provider configuration for IRSA
+   - Passes when IRSA (issuer registered as IAM OIDC provider) or EKS Pod Identity (associations, agent add-on or Auto Mode) is configured
    - Ensures pod-level IAM permissions
 
 9. **eksNoAutoscaling** (Cost Optimization - Medium)
@@ -56,7 +56,7 @@ Enhanced EKS service with 14 new checks across Security, Reliability, and Cost O
     - Reduces operational overhead
 
 12. **eksNoIRSAConfigured** (Security - High)
-    - Validates OIDC provider configuration for IRSA
+    - Passes when IRSA (issuer registered as IAM OIDC provider) or EKS Pod Identity (associations, agent add-on or Auto Mode) is configured
     - Ensures pod-level IAM permissions
 
 13. **eksNoAutoscaling** (Cost Optimization - Medium)
@@ -66,6 +66,12 @@ Enhanced EKS service with 14 new checks across Security, Reliability, and Cost O
 14. **eksNoManagedStorageDrivers** (Reliability - Medium)
     - Validates EBS or EFS CSI driver installation
     - Ensures persistent storage capabilities
+
+**WAFS2027 additions**:
+
+15. **eksNodeGroupAmiOutdated** (Security - Medium)
+    - Compares each managed node group releaseVersion with the latest EKS-optimized AMI release in the public SSM parameters for its Kubernetes version and amiType (AL2, AL2023, Bottlerocket)
+    - CUSTOM and Windows node groups are not evaluated; unreadable parameters give "Unable to evaluate"
 
 ### Coverage Improvement
 

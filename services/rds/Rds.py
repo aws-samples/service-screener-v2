@@ -14,6 +14,7 @@ from services.rds.drivers.RdsMssql import RdsMssql
 from services.rds.drivers.RdsSecretsManager import RdsSecretsManager
 from services.rds.drivers.RdsSecretsVsDB import RdsSecretsVsDB
 from services.rds.drivers.RdsSecurityGroup import RdsSecurityGroup
+from services.rds.drivers.RdsSnapshot import RdsSnapshot
 
 from datetime import datetime, timedelta, time, timezone
 
@@ -34,6 +35,7 @@ class Rds(Service):
         self.smClient = ssBoto.client('secretsmanager', config=self.bConfig)
         self.cwClient = ssBoto.client('cloudwatch', config=self.bConfig)
         self.ceClient = ssBoto.client('ce', config=self.bConfig)
+        self.orgClient = ssBoto.client('organizations', config=self.bConfig)
         self.setChartsType(self.CHARTSTYPE)
         
         self.secrets = []
@@ -93,6 +95,53 @@ class Rds(Service):
             
         return finalArr
             
+    # rds describe_db_cluster_snapshots also returns DocumentDB and Neptune
+    # cluster snapshots; those engines are not RDS and are skipped here.
+    NON_RDS_SNAPSHOT_ENGINES = ('docdb', 'neptune')
+
+    def getManualSnapshots(self):
+        # DB snapshots and DB cluster snapshots owned by this account: manual
+        # ones plus AWS Backup-managed DB snapshots (SnapshotType='awsbackup',
+        # which does not apply to Aurora / DB cluster snapshots). Automated
+        # snapshots mirror the source DB (already covered by StorageEncrypted)
+        # and cannot be shared.
+        snaps = []
+        for op, key, isCluster, snapType in (('describe_db_snapshots', 'DBSnapshots', False, 'manual'),
+                                             ('describe_db_snapshots', 'DBSnapshots', False, 'awsbackup'),
+                                             ('describe_db_cluster_snapshots', 'DBClusterSnapshots', True, 'manual')):
+            try:
+                for page in self.rdsClient.get_paginator(op).paginate(SnapshotType=snapType):
+                    snaps += [(s, isCluster) for s in page.get(key, [])]
+            except botocore.exceptions.ClientError as e:
+                _warn("Unable to list RDS {} snapshots ({}): {}".format(snapType, op, e.response.get('Error', {}).get('Code')))
+
+        snaps = [(s, c) for (s, c) in snaps
+                 if (s.get('Engine') or '').lower() not in self.NON_RDS_SNAPSHOT_ENGINES]
+
+        if not self.tags:
+            return snaps
+        return [(s, c) for (s, c) in snaps if self.resourceHasTags(s.get('TagList', []))]
+
+    def getOrgAccounts(self, accountId=None):
+        # Only readable from the Organizations management / delegated admin
+        # account; None means org membership cannot be verified. The result
+        # is account-wide, so it is fetched once per scan (not per region).
+        cacheKey = 'rds::orgAccounts::{}'.format(accountId)
+        cached = Config.get(cacheKey, None)
+        if cached is not None:
+            return cached.get('accounts')
+        try:
+            accounts = set()
+            for page in self.orgClient.get_paginator('list_accounts').paginate():
+                accounts |= {a['Id'] for a in page.get('Accounts', [])}
+        except botocore.exceptions.ClientError as e:
+            # Not in an organization: every other account is external (empty
+            # set). Any other error: membership unknown (None).
+            code = e.response.get('Error', {}).get('Code')
+            accounts = set() if code == 'AWSOrganizationsNotInUseException' else None
+        Config.set(cacheKey, {'accounts': accounts})
+        return accounts
+
     def getSecrets(self):
         p = {"IncludePlannedDeletion": False, "MaxResults": 10}
         
@@ -204,6 +253,15 @@ class Rds(Service):
         clusters = self.getClusters()
 
         groupedResources = instances + clusters
+
+        # Sources whose public snapshots RdsCommon._checkPublicSnapshot
+        # (SnapshotRDSIsPublic) evaluates in this scan; RdsSnapshot does not
+        # report those public snapshots a second time.
+        # Only when that check is part of this run (--rules can exclude it).
+        publicCoveredInstances = set()
+        publicCoveredClusters = set()
+        rules = Config.get(self.RULESPREFIX, []) or []
+        publicCheckRuns = not rules or 'publicsnapshot' in rules
         
         for instance in groupedResources:
             dbKey = 'DBClusterIdentifier'
@@ -238,6 +296,18 @@ class Rds(Service):
                 obj = globals()[driver](instance, self.rdsClient, self.ctClient, self.cwClient)
                 obj.setEngine(engine)
                 obj.run(self.__class__)
+
+                ## Only a source on which SnapshotRDSIsPublic actually FAILED is
+                ## covered: when that check errored (throttling, access
+                ## denied) or did not see the snapshot, RdsSnapshot reports
+                ## the public snapshot itself instead of hiding it.
+                publicResult = (obj.results.get('SnapshotRDSIsPublic') or [None])[0]
+                if publicCheckRuns and publicResult == -1:
+                    if engine.startswith('aurora'):
+                        if instance.get('DBClusterIdentifier'):
+                            publicCoveredClusters.add(instance['DBClusterIdentifier'])
+                    elif instance.get('DBInstanceIdentifier'):
+                        publicCoveredInstances.add(instance['DBInstanceIdentifier'])
                 
                 objs[instance['Engine'] + '::' + dbInfo + '=' + instance[dbKey]] = obj.getInfo()
                 del obj
@@ -260,6 +330,18 @@ class Rds(Service):
             obj.run(self.__class__)
             objs['RDS_SG::' + sg] = obj.getInfo()
             del obj
+
+        snapshots = self.getManualSnapshots()
+        if snapshots:
+            accountId = (Config.get('stsInfo', {}) or {}).get('Account')
+            orgAccounts = self.getOrgAccounts(accountId)
+            for snap, isClusterSnap in snapshots:
+                obj = RdsSnapshot(snap, isClusterSnap, self.rdsClient, accountId, orgAccounts,
+                                  publicCoveredInstances, publicCoveredClusters)
+                _pi('RDS-Snapshot', obj._resourceName)
+                obj.run(self.__class__)
+                objs[('ClusterSnapshot::' if isClusterSnap else 'Snapshot::') + obj._resourceName] = obj.getInfo()
+                del obj
 
         self.getSecrets()
         for secret in self.secrets:

@@ -203,12 +203,12 @@
 		"additionalCost": 0,
 		"needFullTest": 0,
 		"ref": [
-			"[SageMaker Model Data]<https://docs.aws.amazon.com/sagemaker/latest/dg/API_ContainerDefinition.html>",
-			"[Security Best Practices]<https://docs.aws.amazon.com/sagemaker/latest/dg/security-best-practices.html>"
+			"[SageMaker Model Data]<https://docs.aws.amazon.com/sagemaker/latest/APIReference/API_ContainerDefinition.html>",
+			"[Security Best Practices]<https://docs.aws.amazon.com/sagemaker/latest/dg/docker-containers-prebuilt.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
-		"remediation_doc": "https://docs.aws.amazon.com/sagemaker/latest/dg/API_ContainerDefinition.html"
+		"remediation_doc": "https://docs.aws.amazon.com/sagemaker/latest/APIReference/API_ContainerDefinition.html"
 	},
 	"TrainingSpotInstancesEnabled": {
 		"category": "C",
@@ -272,7 +272,7 @@
 		"needFullTest": 0,
 		"ref": [
 			"[Customize Notebook Instances Using Lifecycle Configurations]<https://docs.aws.amazon.com/sagemaker/latest/dg/notebook-lifecycle-config.html>",
-			"[Lifecycle Configuration Best Practices]<https://docs.aws.amazon.com/sagemaker/latest/dg/nbi-lifecycle-config-install.html>"
+			"[Lifecycle Configuration Best Practices]<https://docs.aws.amazon.com/sagemaker/latest/dg/notebook-lifecycle-config.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,
@@ -340,7 +340,7 @@
 		"needFullTest": 0,
 		"ref": [
 			"[AWS Deep Learning Containers]<https://docs.aws.amazon.com/deep-learning-containers/latest/devguide/what-is-dlc.html>",
-			"[Security Best Practices]<https://docs.aws.amazon.com/sagemaker/latest/dg/security-best-practices.html>"
+			"[Security Best Practices]<https://docs.aws.amazon.com/sagemaker/latest/dg/docker-containers-prebuilt.html>"
 		],
 		"remediation": null,
 		"remediation_risk": null,

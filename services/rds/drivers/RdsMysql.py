@@ -6,12 +6,14 @@ class RdsMysql(RdsCommon):
         self.loadParameterInfo()
         
     def _checkEnableLogs(self):
-        logsExports = self.db.get('EnabledCloudwatchLogsExports', [])
-        
-        if 'error' not in logsExports:
-            self.results['MYSQL__LogsGeneral'] = [-1, 'ALL']
-        elif 'error' not in logsExports:
-            self.results['MYSQL__LogsErrorEnable'] = [-1, 'Disabled']
+        # MYSQL__LogsGeneral: general query log turned on (logs every statement).
+        # Missing CloudWatch error/audit log exports used to be reported here
+        # (under the wrong key; the MYSQL__LogsErrorEnable branch was
+        # unreachable). That finding is now rdsLogExportsDisabled in RdsCommon,
+        # covering every engine, so it is not duplicated here.
+        generalLog = self.dbParams.get('general_log', None)
+        if str(generalLog).strip().lower() in ('1', 'on', 'true'):
+            self.results['MYSQL__LogsGeneral'] = [-1, 'general_log=' + str(generalLog)]
     
     # Todo: 
     # https://aws.amazon.com/blogs/database/best-practices-for-configuring-parameters-for-amazon-rds-for-mysql-part-2-parameters-related-to-replication/

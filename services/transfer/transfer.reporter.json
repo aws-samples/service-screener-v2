@@ -1,0 +1,20 @@
+{
+	"transferFamilyInsecure": {
+		"category": "S",
+		"^description": "{$COUNT} Transfer Family server(s) allow plaintext FTP or use an outdated or deprecated security policy (TransferSecurityPolicy-2018-11, TransferSecurityPolicy-Restricted-2018-11, TransferSecurityPolicy-2020-06, TransferSecurityPolicy-Restricted-2020-06, TransferSecurityPolicy-FIPS-2020-06 or the deprecated TransferSecurityPolicy-PQ-SSH-Experimental-2023-04 / TransferSecurityPolicy-PQ-SSH-FIPS-Experimental-2023-04). FTP sends user credentials and file contents unencrypted, and the older security policies still offer SHA-1 based and other legacy cryptographic algorithms. Use SFTP or FTPS and attach a current security policy such as TransferSecurityPolicy-2024-01 (or a FIPS equivalent).",
+		"shortDesc": "Disable FTP and use a current security policy",
+		"criticality": "M",
+		"downtime": 0,
+		"slowness": 0,
+		"additionalCost": 0,
+		"needFullTest": 1,
+		"ref": [
+			"[Security policies for AWS Transfer Family servers]<https://docs.aws.amazon.com/transfer/latest/userguide/security-policies.html>",
+			"[Edit the file transfer protocols]<https://docs.aws.amazon.com/transfer/latest/userguide/edit-server-config.html>",
+			"[Data protection in AWS Transfer Family]<https://docs.aws.amazon.com/transfer/latest/userguide/security-policies.html>"
+		],
+		"remediation": null,
+		"remediation_risk": null,
+		"remediation_doc": "https://docs.aws.amazon.com/transfer/latest/userguide/security-policies.html"
+	}
+}

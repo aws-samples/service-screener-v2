@@ -11,6 +11,8 @@ from services.iam.drivers.IamRole import IamRole
 from services.iam.drivers.IamGroup import IamGroup
 from services.iam.drivers.IamUser import IamUser
 from services.iam.drivers.IamAccount import IamAccount
+from services.iam.drivers.IamOrgData import OrgData
+from services.iam.drivers.IamTrust import buildTrustContext
 
 from utils.Tools import _pi
 
@@ -37,6 +39,8 @@ class Iam(Service):
         self._authDetails = None
         self._policyDocumentMap = None
         self._bedrockCredentialMap = None
+        # get_credential_report() response read by getUsers(), reused by IamAccount
+        self._credentialReport = None
 
     def _prefetchBedrockApiKeys(self):
         """List long-term Amazon Bedrock API keys (service-specific credentials) for all users in one call"""
@@ -180,6 +184,7 @@ class Iam(Service):
             print('IAM Users scan will be skip, unable to acquire IamCredentialReports')
             return []
         
+        self._credentialReport = results
         rows = results.get('Content')
         rows = rows.decode('UTF-8')
         
@@ -188,6 +193,10 @@ class Iam(Service):
         fields = row[0].split(',')
         del row[0]
         for temp in row:
+            # Skip blank lines (the report may end with a newline); a blank
+            # row would otherwise become a user record with no fields.
+            if not temp.strip():
+                continue
             arr.append(dict(zip(fields, temp.split(','))))
         
         if not self.tags:
@@ -271,6 +280,13 @@ class Iam(Service):
         roleLastUsedCache = IamRoleLastUsedCache.load(accountId)
         cacheSizeBefore = len(roleLastUsedCache)
 
+        ## Org membership for third-party trust classification (read-only,
+        ## describe_organization + list_accounts, each called once).
+        ## The same OrgData (cached) is handed to IamAccount, so these reads are
+        ## not repeated there.
+        orgData = OrgData(self.awsClients['orgClient'], accountId if accountId != 'default' else None)
+        trustContext = buildTrustContext(orgData, accountId if accountId != 'default' else None)
+
         for role in roles:
             _pi('IAM::Role', role['RoleName'])
 
@@ -285,7 +301,7 @@ class Iam(Service):
                 role = dict(role)
                 role['RoleLastUsed'] = {}
 
-            obj = IamRole(role, self.iamClient, self._authDetails, self._policyDocumentMap, roleLastUsedCache)
+            obj = IamRole(role, self.iamClient, self._authDetails, self._policyDocumentMap, roleLastUsedCache, trustContext)
             obj.run(self.__class__)
 
             objs['Role::' + role['RoleName']] = obj.getInfo()
@@ -304,7 +320,8 @@ class Iam(Service):
             del obj
         
         _pi('IAM:Account')
-        obj = IamAccount(None, self.awsClients, users, roles, self.ssBoto, self._authDetails, self._policyDocumentMap)
+        obj = IamAccount(None, self.awsClients, users, roles, self.ssBoto, self._authDetails, self._policyDocumentMap,
+                         orgData=orgData, credentialReport=self._credentialReport)
         obj.run(self.__class__)
         objs['Account::Config'] = obj.getInfo()
         

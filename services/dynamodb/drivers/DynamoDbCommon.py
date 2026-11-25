@@ -1,6 +1,7 @@
 import boto3
 import botocore
 import datetime
+import re
 import urllib.parse
 from statistics import mean
 
@@ -8,11 +9,216 @@ from services.Service import Service
 from utils.Config import Config
 from utils.Policy import Policy
 from services.Evaluator import Evaluator
+from utils import PolicyPrincipal
+
+
+# Condition keys accepted as organisation scoping for cross-account grants.
+_ORG_CONDITION_KEYS = frozenset(('aws:principalorgid', 'aws:principalorgpaths'))
+# Positive-match operators (negated / IfExists / ForAllValues forms do not restrict callers).
+_POSITIVE_OPERATORS = frozenset(('stringequals', 'stringequalsignorecase', 'stringlike', 'arnequals', 'arnlike'))
+_ALL_ORG_KEYS = _ORG_CONDITION_KEYS | frozenset(('aws:sourceorgid', 'aws:sourceorgpaths'))
+_ACCOUNT_KEYS = frozenset(('aws:principalaccount', 'aws:sourceaccount', 'aws:sourceowner'))
+_ARN_KEYS = frozenset(('aws:principalarn', 'aws:sourcearn'))
+_NETWORK_PATH_KEYS = frozenset(('aws:sourcevpc', 'aws:sourcevpce'))
+_ORG_ID = re.compile(r'^o-[a-z0-9]{10,32}$')
+_ACCOUNT_ID = re.compile(r'^\d{12}$')
+# Principal values that carry an account ID: "123456789012", arn:aws:iam::123456789012:..., arn:aws:sts::123456789012:...
+_ACCOUNT_IN_PRINCIPAL = re.compile(r'^(?:arn:aws[a-z-]*:(?:iam|sts)::)?(\d{12})(?::|$)')
+_OPEN_CIDRS = frozenset(('0.0.0.0/0', '::/0'))
+# Replica statuses that can serve traffic. CREATING, CREATION_FAILED, DELETING, REGION_DISABLED,
+# INACCESSIBLE_ENCRYPTION_CREDENTIALS, ARCHIVING, ARCHIVED and REPLICATION_NOT_AUTHORIZED do not.
+_HEALTHY_REPLICA_STATUSES = frozenset(('ACTIVE', 'UPDATING'))
+
+# Tag keys/values (case-insensitive, '-', '_' and spaces ignored) that mark a table as business critical.
+_CRITICALITY_TAG_KEYS = frozenset((
+    'criticality', 'critical', 'businesscriticality', 'datacriticality', 'servicecriticality',
+    'tier', 'servicetier', 'apptier', 'applicationtier', 'businesstier', 'drtier',
+))
+_CRITICALITY_TAG_VALUES = frozenset((
+    'critical', 'missioncritical', 'businesscritical', 'high', 'tier0', 'tier1', '0', '1',
+    'p0', 'p1', 'true', 'yes',
+))
+
+
+def _norm(value):
+    return re.sub(r'[\s_-]', '', str(value)).lower()
+
+
+def _asList(value):
+    if value is None:
+        return []
+    return value if isinstance(value, list) else [value]
+
+
+def _hasWildcard(value):
+    return '*' in value or '?' in value
+
+
+def _orgValueIsConcrete(key, value):
+    """aws:PrincipalOrgID / SourceOrgID must be a full o-... ID (no wildcards: 'o-*' matches every
+    organisation). aws:PrincipalOrgPaths / SourceOrgPaths must start with a concrete o-... segment."""
+    if not isinstance(value, str):
+        return False
+    if key.endswith('orgid'):
+        return bool(_ORG_ID.match(value))
+    first = value.split('/', 1)[0]
+    return bool(_ORG_ID.match(first)) and '/' in value
+
+
+def _positiveBlocks(condition):
+    """Yield (key_lower, values) for positive-match operators that actually restrict callers.
+    Negated, IfExists and ForAllValues forms are skipped (they can match callers without the key)."""
+    if not isinstance(condition, dict):
+        return
+    for operator, block in condition.items():
+        if not isinstance(operator, str) or not isinstance(block, dict):
+            continue
+        op = operator.lower()
+        if op.startswith('forallvalues:'):
+            continue
+        if op.startswith('foranyvalue:'):
+            op = op[len('foranyvalue:'):]
+        if op not in _POSITIVE_OPERATORS:
+            continue
+        for key, value in block.items():
+            values = _asList(value)
+            if values:
+                yield str(key).lower(), values
+
+
+def _conditionScopesToOrg(condition, keys=_ORG_CONDITION_KEYS):
+    """True if the Condition pins an organisation key to a concrete organisation."""
+    for key, values in _positiveBlocks(condition):
+        if key in keys and all(_orgValueIsConcrete(key, v) for v in values):
+            return True
+    return False
+
+
+def _wildcardScope(condition, ownAccount):
+    """
+    Classify how a Condition restricts an Allow statement whose principal is "*" / NotPrincipal.
+    Returns (scoped, externalAccounts):
+      scoped=True  -> limited to a concrete organisation, to this account, to a specific source
+                      resource / VPC / VPC endpoint, or to fixed non-open source CIDRs;
+      externalAccounts -> other 12-digit accounts the caller is pinned to (cross-account grant,
+                      still needs organisation scoping);
+      scoped=False and no accounts -> effectively public.
+    Wildcards in an account position (e.g. aws:PrincipalArn arn:aws:iam::*:role/x) do not scope.
+    """
+    if _conditionScopesToOrg(condition, _ALL_ORG_KEYS) or _conditionScopesToNetwork(condition):
+        return True, set()
+    scoped = False
+    external = set()
+    for key, values in _positiveBlocks(condition):
+        if not all(isinstance(v, str) and v for v in values):
+            continue
+        if key in _ACCOUNT_KEYS:
+            if all(_ACCOUNT_ID.match(v) for v in values):
+                others = {v for v in values if v != ownAccount}
+                if others:
+                    external |= others
+                else:
+                    scoped = True
+        elif key in _ARN_KEYS:
+            accounts = set()
+            ok = True
+            for v in values:
+                parts = v.split(':')
+                if len(parts) < 6 or not parts[0] == 'arn':
+                    ok = False
+                    break
+                acct = parts[4]
+                if acct == '':
+                    # Resources without an account segment (e.g. S3 buckets) scope only when fully concrete.
+                    if key == 'aws:principalarn' or _hasWildcard(v):
+                        ok = False
+                        break
+                elif _ACCOUNT_ID.match(acct):
+                    accounts.add(acct)
+                else:
+                    ok = False
+                    break
+            if not ok:
+                continue
+            others = accounts - {ownAccount}
+            if others:
+                external |= others
+            else:
+                scoped = True
+        elif key in _NETWORK_PATH_KEYS:
+            if not any(_hasWildcard(v) for v in values):
+                scoped = True
+    if scoped:
+        # Any concrete own-account / resource / VPC restriction is ANDed with the others.
+        return True, set()
+    return False, external
+
+
+def _conditionScopesToNetwork(condition):
+    """True if the Condition pins aws:SourceIp to concrete, non-open CIDRs (IpAddress operator)."""
+    if not isinstance(condition, dict):
+        return False
+    for operator, block in condition.items():
+        if not isinstance(operator, str) or not isinstance(block, dict):
+            continue
+        op = operator.lower()
+        if op.startswith('foranyvalue:'):
+            op = op[len('foranyvalue:'):]
+        if op != 'ipaddress':
+            continue
+        for key, value in block.items():
+            if str(key).lower() != 'aws:sourceip':
+                continue
+            values = _asList(value)
+            if values and all(isinstance(v, str) and v.strip() not in _OPEN_CIDRS for v in values):
+                return True
+    return False
+
+
+def resourcePolicyIssues(policyDoc, ownAccount):
+    """
+    Return a list of human-readable issues for a DynamoDB table/stream resource policy:
+    - an Allow statement for any principal ("*", {"AWS": ["*"]}, NotPrincipal) that is not
+      restricted by a scoping Condition (org / account / source / VPC / fixed source IP), or
+    - an Allow statement for a principal in another AWS account without an
+      aws:PrincipalOrgID / aws:PrincipalOrgPaths condition.
+    Returns None if the policy cannot be parsed. Deny statements are not subtracted.
+    """
+    if PolicyPrincipal.parsePolicy(policyDoc) is None:
+        return None
+    issues = []
+    for stmt in PolicyPrincipal.iterStatements(policyDoc):
+        if str(stmt.get('Effect', '')).lower() != 'allow':
+            continue
+        sid = stmt.get('Sid')
+        label = 'statement ' + (str(sid) if sid else '(no Sid)')
+        condition = stmt.get('Condition')
+        if PolicyPrincipal.principalIsWildcard(stmt.get('Principal')) or 'NotPrincipal' in stmt:
+            scoped, externalAccts = _wildcardScope(condition, ownAccount)
+            if scoped:
+                continue
+            if externalAccts:
+                issues.append(label + ' allows any principal in account(s) ' + ', '.join(sorted(externalAccts))
+                              + ' without aws:PrincipalOrgID')
+            else:
+                issues.append(label + ' allows any principal without a restricting condition')
+            continue
+        principal = stmt.get('Principal')
+        awsValues = _asList(principal.get('AWS')) if isinstance(principal, dict) else []
+        external = set()
+        for value in awsValues:
+            m = _ACCOUNT_IN_PRINCIPAL.match(str(value).strip())
+            if m and m.group(1) != ownAccount:
+                external.add(m.group(1))
+        if external and not _conditionScopesToOrg(condition):
+            issues.append(label + ' allows cross-account principal(s) ' + ', '.join(sorted(external))
+                          + ' without aws:PrincipalOrgID')
+    return issues
 
 
 class DynamoDbCommon(Evaluator):
 
-    def __init__(self, tables, dynamoDbClient, cloudWatchClient, serviceQuotaClient, appScalingPolicyClient, backupClient, cloudTrailClient):
+    def __init__(self, tables, dynamoDbClient, cloudWatchClient, serviceQuotaClient, appScalingPolicyClient, backupClient, cloudTrailClient, tagsResp=None):
         super().__init__()
         self.tables = tables
         self.tablename = self.tables['Table']['TableName']
@@ -22,8 +228,40 @@ class DynamoDbCommon(Evaluator):
         self.appScalingPolicyClient = appScalingPolicyClient
         self.backupClient = backupClient
         self.cloudTrailClient = cloudTrailClient
+        # list_tags_of_resource(ResourceArn=...) response already fetched by
+        # Dynamodb.list_tables() when tag filtering is on; None otherwise.
+        self._tagsResp = tagsResp
 
         self._resourceName = self.tablename
+
+    # ---- read-once API helpers shared by several checks ---- #
+    def _tagsFirstPage(self, arn):
+        """list_tags_of_resource(ResourceArn=arn) - first page, fetched once."""
+        if self._tagsResp is not None and arn == self.tables['Table'].get('TableArn'):
+            return self._memo(('list_tags_of_resource', arn), lambda: self._tagsResp)
+        return self._memo(('list_tags_of_resource', arn),
+                          lambda: self.dynamoDbClient.list_tags_of_resource(ResourceArn=arn))
+
+    def _scalingPolicies(self):
+        resourceId = 'table/' + self.tables['Table']['TableName']
+        return self._memo(('describe_scaling_policies', resourceId),
+                          lambda: self.appScalingPolicyClient.describe_scaling_policies(
+                              ServiceNamespace='dynamodb', ResourceId=resourceId))
+
+    def _consumedWcu7Days(self):
+        """ConsumedWriteCapacityUnits, hourly Average over the past 7 days."""
+        def fetch():
+            return self.cloudWatchClient.get_metric_statistics(
+                Namespace='AWS/DynamoDB',
+                MetricName='ConsumedWriteCapacityUnits',
+                Dimensions=[{'Name': 'TableName', 'Value': self.tables['Table']['TableName']}],
+                StartTime=datetime.datetime.now() - datetime.timedelta(7),
+                EndTime=datetime.datetime.now(),
+                Period=3600,
+                Statistics=['Average'],
+                Unit='Count'
+            )
+        return self._memo(('get_metric_statistics', 'ConsumedWriteCapacityUnits', 3600, 'Average', 7), fetch)
 
     # logic to check delete protection    
     def _check_delete_protection(self):
@@ -42,7 +280,7 @@ class DynamoDbCommon(Evaluator):
         #print('Checking ' + self.tables['Table']['TableName'] + ' for resource tag started')
         try:
             #retrieve tags for specific table by tableARN
-            result = self.dynamoDbClient.list_tags_of_resource(ResourceArn = self.tables['Table']['TableArn'])
+            result = self._tagsFirstPage(self.tables['Table']['TableArn'])
             #check tags
             if not result['Tags']:
                 self.results['resourcesWithoutTags'] = [-1, '']
@@ -183,23 +421,7 @@ class DynamoDbCommon(Evaluator):
     def _check_capacity_mode(self):
         try:
             #Count the number active reads on the table on the GSIs
-            result = self.cloudWatchClient.get_metric_statistics(
-                Namespace = 'AWS/DynamoDB',
-                MetricName = 'ConsumedWriteCapacityUnits',
-                Dimensions = [
-                       {
-                            'Name':'TableName',
-                            'Value':self.tables['Table']['TableName']
-                        },
-                    ],
-                StartTime = datetime.datetime.now() - datetime.timedelta(7),
-                EndTime = datetime.datetime.now(),
-                Period = 3600,
-                Statistics = [
-                    'Average'
-                ], 
-                Unit = 'Count'
-            )
+            result = self._consumedWcu7Days()
         
             #Calculate % of write capacity in the given hour
             _percentageWrite = 0  
@@ -230,17 +452,14 @@ class DynamoDbCommon(Evaluator):
         try:
 
             #Check for autoscaling policy in each table
-            results = self.appScalingPolicyClient.describe_scaling_policies(
-                ServiceNamespace = 'dynamodb',
-                ResourceId = 'table/' + self.tables['Table']['TableName']
-                )
+            results = self._scalingPolicies()
             
             #If results comes back with record, autoscaling is enabled
             if len(results['ScalingPolicies']) == 0:
                 if 'BillingModeSummary' in self.tables['Table'] and 'BillingMode' in self.tables['Table']['BillingModeSummary'] and self.tables['Table']['BillingModeSummary']['BillingMode'] == 'PROVISIONED':
                     self.results['autoScalingStatus'] = [-1 , '']
                 
-        except botocore.exceptions as e:
+        except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']
             print(ecode)
     
@@ -251,9 +470,10 @@ class DynamoDbCommon(Evaluator):
 
             if len(results['RecoveryPoints']) < 1:
                 self.results['disabledBackup'] = [-1, '']
-        except botocore.exception as e:
+        except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']
-            print(ecode)
+            # Recovery points could not be read: do not report the table as backed up.
+            self.results['disabledBackup'] = [0, f'Unable to evaluate ({ecode})']
             
     # logic to check service limits max GSI per table
     def _check_service_limits_max_gsi_table(self):
@@ -344,23 +564,7 @@ class DynamoDbCommon(Evaluator):
             )
             
             #Count the number active reads on the table WCU
-            wcuResult = self.cloudWatchClient.get_metric_statistics(
-                Namespace = 'AWS/DynamoDB',
-                MetricName = 'ConsumedWriteCapacityUnits',
-                Dimensions = [
-                        {
-                            'Name':'TableName',
-                            'Value':self.tables['Table']['TableName']
-                        },
-                    ],
-                StartTime = _startTime,
-                EndTime = _endTime,
-                Period = 3600,
-                Statistics = [
-                    'Average',
-                ],
-                Unit = 'Count'
-            )
+            wcuResult = self._consumedWcu7Days()
             
             _rcuLimitCount = 0
             _wcuLimitCount = 0
@@ -387,10 +591,7 @@ class DynamoDbCommon(Evaluator):
     # logic to check autoscaling aggresiveness
     def _check_autoscaling_aggresiveness(self):
         try:
-            results = self.appScalingPolicyClient.describe_scaling_policies(
-                ServiceNamespace = 'dynamodb',
-                ResourceId = 'table/' + self.tables['Table']['TableName']
-            )
+            results = self._scalingPolicies()
             
             
             if len(results['ScalingPolicies']) > 0:
@@ -416,7 +617,7 @@ class DynamoDbCommon(Evaluator):
                 if _wcuTarget <= 50.0:
                     self.results['autoScalingLowUtil'] = [-1, 'WCU = ' + str(_wcuTarget)]
                    
-        except botocore.exceptions as e:
+        except botocore.exceptions.ClientError as e:
             ecode = e.response['Error']['Code']
             print(ecode)
     
@@ -555,3 +756,120 @@ class DynamoDbCommon(Evaluator):
             ecode = e.response['Error']['Code']
             emsg = e.response['Error']['Message']
             print(ecode, emsg)
+
+    # Resource-based policy on the table (and its stream) must not grant access to any principal
+    # or to unscoped cross-account principals.
+    def _checkDynamodbResourcePolicyPublic(self):
+        table = self.tables['Table']
+        tableArn = table.get('TableArn')
+        if not tableArn:
+            self.results['dynamodbResourcePolicyPublic'] = [0, 'Unable to evaluate (TableArn missing)']
+            return
+        ownAccount = tableArn.split(':')[4] if len(tableArn.split(':')) > 4 else ''
+
+        targets = [('table', tableArn)]
+        if table.get('LatestStreamArn'):
+            targets.append(('stream', table['LatestStreamArn']))
+
+        issues = []
+        errors = []
+        for kind, arn in targets:
+            try:
+                resp = self.dynamoDbClient.get_resource_policy(ResourceArn=arn)
+            except botocore.exceptions.ClientError as e:
+                code = e.response.get('Error', {}).get('Code', 'Unknown')
+                if code == 'PolicyNotFoundException':
+                    continue
+                # A stream ARN that is no longer readable (stream disabled) has no policy to evaluate.
+                if kind == 'stream' and code == 'ResourceNotFoundException':
+                    continue
+                errors.append(code)
+                continue
+            found = resourcePolicyIssues(resp.get('Policy'), ownAccount)
+            if found is None:
+                errors.append('PolicyNotParseable')
+                continue
+            issues.extend(kind + ' policy ' + i for i in found)
+
+        if issues:
+            self.results['dynamodbResourcePolicyPublic'] = [-1, '; '.join(issues)]
+        elif errors:
+            self.results['dynamodbResourcePolicyPublic'] = [0, 'Unable to evaluate (' + ', '.join(sorted(set(errors))) + ')']
+        else:
+            self.results['dynamodbResourcePolicyPublic'] = [1, '']
+
+    # Heuristic (tier 3): a table tagged as business critical should have a replica in another
+    # Region (global table) for disaster recovery. Untagged tables are reported as INFO only.
+    def _checkDynamodbNoMultiRegionReplica(self):
+        key = 'dynamodbNoMultiRegionReplica'
+        table = self.tables['Table']
+        tableArn = table.get('TableArn', '')
+        arnParts = tableArn.split(':')
+        ownRegion = arnParts[3] if len(arnParts) > 3 else None
+
+        replicaRegions = set()
+        unhealthy = []
+
+        def consider(r):
+            region = r.get('RegionName')
+            if not region or region == ownRegion:
+                return
+            status = r.get('ReplicaStatus')
+            # Allowlist: only replicas that can serve traffic count for DR. A missing (optional)
+            # status field is not evidence of an unhealthy replica.
+            if status is None or status in _HEALTHY_REPLICA_STATUSES:
+                replicaRegions.add(region)
+            else:
+                unhealthy.append(region + ' (' + str(status) + ')')
+
+        for r in table.get('Replicas') or []:
+            if isinstance(r, dict):
+                consider(r)
+
+        # Legacy (2017.11.29) global tables report their replicas only via DescribeGlobalTable.
+        if not replicaRegions and table.get('GlobalTableVersion') == '2017.11.29':
+            try:
+                gt = self.dynamoDbClient.describe_global_table(GlobalTableName=self.tablename)
+                for r in gt.get('GlobalTableDescription', {}).get('ReplicationGroup', []) or []:
+                    if isinstance(r, dict):
+                        consider(r)
+            except botocore.exceptions.ClientError as e:
+                code = e.response.get('Error', {}).get('Code', 'Unknown')
+                self.results[key] = [0, 'Unable to evaluate (' + code + ')']
+                return
+
+        if replicaRegions:
+            self.results[key] = [1, 'Replicas: ' + ', '.join(sorted(replicaRegions))]
+            return
+
+        try:
+            tags = []
+            kwargs = {'ResourceArn': tableArn}
+            while True:
+                # First page is shared with _check_resources_for_tags; later pages are fetched here.
+                if 'NextToken' in kwargs:
+                    resp = self.dynamoDbClient.list_tags_of_resource(**kwargs)
+                else:
+                    resp = self._tagsFirstPage(tableArn)
+                tags.extend(resp.get('Tags', []) or [])
+                if not resp.get('NextToken'):
+                    break
+                kwargs['NextToken'] = resp['NextToken']
+        except botocore.exceptions.ClientError as e:
+            code = e.response.get('Error', {}).get('Code', 'Unknown')
+            self.results[key] = [0, 'Unable to evaluate (' + code + ')']
+            return
+
+        criticalTag = None
+        for t in tags:
+            if _norm(t.get('Key', '')) in _CRITICALITY_TAG_KEYS and _norm(t.get('Value', '')) in _CRITICALITY_TAG_VALUES:
+                criticalTag = str(t.get('Key')) + '=' + str(t.get('Value'))
+                break
+
+        note = ''
+        if unhealthy:
+            note = ' (replicas not serving traffic: ' + ', '.join(sorted(unhealthy)) + ')'
+        if criticalTag:
+            self.results[key] = [-1, 'Table tagged ' + criticalTag + ' has no active replica in another Region' + note]
+        else:
+            self.results[key] = [0, 'No active replica in another Region; table is not tagged as critical - review its DR requirements' + note]

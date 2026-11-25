@@ -7,6 +7,7 @@ from utils.Config import Config
 from utils.Tools import _pr, _pi, aws_get_latest_instance_generations
 from services.Service import Service
 from services.elasticache.drivers.ElasticacheRedis import ElasticacheRedis
+from services.elasticache.drivers.ElasticacheMemcached import ElasticacheMemcached
 from services.elasticache.drivers.ElasticacheReplicationGroup import ElasticacheReplicationGroup
 
 class Elasticache(Service):

@@ -1,4 +1,6 @@
+import fnmatch
 import json
+
 import botocore
 
 from services.Evaluator import Evaluator
@@ -68,7 +70,7 @@ class BedrockAgent(Evaluator):
         findings = _inspectRoleForBroadPolicies(self.iamClient, roleName, self.BROAD_ACTIONS)
         if findings is None:
             # Throttled — cannot determine, report INFO instead of false PASS
-            self.results['bedrockAgentIamRoleOverprivileged'] = [0, "IAM inspection throttled — cannot verify role scope"]
+            self.results['bedrockAgentIamRoleOverprivileged'] = [0, "Unable to evaluate (IAM role policies not readable)"]
         elif findings:
             self.results['bedrockAgentIamRoleOverprivileged'] = [
                 -1,
@@ -234,20 +236,27 @@ def _inspectRoleForBroadPolicies(iamClient, roleName, broadActions):
     """
     Returns a list of findings (strings) for any policy on the role that grants
     wildcard actions or wildcard resources with broad actions.
-    Returns [] when the role looks scoped, or when the inspection cannot complete
-    (e.g., AccessDenied) — caller treats [] as "pass".
+    Returns [] only when every policy on the role was read and none is broad.
+    Returns None when the inspection could not complete (AccessDenied,
+    NoSuchEntity, throttling, or any policy document that could not be read)
+    and nothing broad was found — callers must report this as "unable to
+    evaluate", never as a pass.
     """
     findings = []
+    incomplete = False
     try:
         # Inline policies
         inline = iamClient.list_role_policies(RoleName=roleName)
         for policyName in inline.get('PolicyNames', []):
             try:
                 doc = iamClient.get_role_policy(RoleName=roleName, PolicyName=policyName)
-                policyDoc = doc.get('PolicyDocument', {})
-                if _statementsAreBroad(policyDoc, broadActions):
+                broad = _statementsAreBroad(doc.get('PolicyDocument', {}), broadActions)
+                if broad is None:
+                    incomplete = True
+                elif broad:
                     findings.append(f"inline:{policyName}")
             except botocore.exceptions.ClientError:
+                incomplete = True
                 continue
 
         # Attached managed policies
@@ -262,57 +271,79 @@ def _inspectRoleForBroadPolicies(iamClient, roleName, broadActions):
                 pol = iamClient.get_policy(PolicyArn=policyArn)
                 versionId = pol.get('Policy', {}).get('DefaultVersionId')
                 if not versionId:
+                    incomplete = True  # default version unknown: policy not evaluated
                     continue
                 ver = iamClient.get_policy_version(PolicyArn=policyArn, VersionId=versionId)
-                policyDoc = ver.get('PolicyVersion', {}).get('Document', {})
-                if _statementsAreBroad(policyDoc, broadActions):
+                broad = _statementsAreBroad(ver.get('PolicyVersion', {}).get('Document', {}), broadActions)
+                if broad is None:
+                    incomplete = True
+                elif broad:
                     findings.append(f"managed:{policyName}")
             except botocore.exceptions.ClientError:
+                incomplete = True
                 continue
     except botocore.exceptions.ClientError as e:
         code = e.response.get('Error', {}).get('Code', '')
-        if code in ('Throttling', 'ThrottlingException', 'TooManyRequestsException', 'RequestLimitExceeded'):
-            return None  # Signal throttle — caller should report INFO, not PASS
-        if code not in ('AccessDenied', 'AccessDeniedException', 'NoSuchEntity', 'NoSuchEntityException'):
+        if code not in ('AccessDenied', 'AccessDeniedException', 'NoSuchEntity', 'NoSuchEntityException',
+                        'Throttling', 'ThrottlingException', 'TooManyRequestsException', 'RequestLimitExceeded'):
             print(f"IAM inspection error on role {roleName}: {code}")
-        # Treat unavailable inspection as no finding
-        return []
+        return findings or None
+    if incomplete and not findings:
+        return None
     return findings
 
 
 def _statementsAreBroad(policyDoc, broadActions):
+    """
+    True when an Allow statement grants Action "*" (on any resource), or a
+    service-wide wildcard from broadActions (e.g. "s3:*") on Resource "*", or
+    NotAction on Resource "*" (allows everything except the listed actions).
+    NotResource is treated as a wildcard resource. Action matching is
+    case-insensitive and honours IAM wildcards in the statement ("S3:*",
+    "*:*", "s3:*" all cover "s3:*"); narrower patterns such as "s3:Get*" are
+    not service-wide and are not flagged.
+    Returns None when the document cannot be parsed (caller: unable to evaluate).
+    """
     if isinstance(policyDoc, str):
         try:
             policyDoc = json.loads(policyDoc)
         except (ValueError, TypeError):
-            return False
+            return None
+    if not isinstance(policyDoc, dict):
+        return None
 
     statements = policyDoc.get('Statement', [])
     if isinstance(statements, dict):
         statements = [statements]
 
+    broad = {str(b).lower() for b in broadActions} | {'*'}
     for stmt in statements:
         if not isinstance(stmt, dict):
             continue
         if stmt.get('Effect') != 'Allow':
             continue
 
-        actions = stmt.get('Action', [])
-        if isinstance(actions, str):
-            actions = [actions]
         resources = stmt.get('Resource', [])
         if isinstance(resources, str):
             resources = [resources]
+        hasWildcardResource = '*' in resources or 'NotResource' in stmt
 
-        hasWildcardResource = '*' in resources
-        actionSet = {a for a in actions if isinstance(a, str)}
+        if 'NotAction' in stmt:
+            if hasWildcardResource:
+                return True
+            continue
 
-        # Pure Action: "*"
-        if '*' in actionSet:
+        actions = stmt.get('Action', [])
+        if isinstance(actions, str):
+            actions = [actions]
+        patterns = {a.lower() for a in actions if isinstance(a, str)}
+
+        # Action "*" (or "*:*"), whatever the resource
+        if patterns & {'*', '*:*'}:
             return True
 
-        # Broad service-level wildcards with wildcard resource
-        if hasWildcardResource and (actionSet & broadActions):
+        # Service-wide wildcards with wildcard resource
+        if hasWildcardResource and any(fnmatch.fnmatchcase(b, p) for b in broad for p in patterns):
             return True
 
     return False
